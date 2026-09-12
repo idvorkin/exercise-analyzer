@@ -19,8 +19,12 @@ public struct SwingThresholds {
   public init() {}
   public var topSpineMax = 25.0  // spine must be more upright than this at the top
   public var topHipMin = 150.0  // hip must be extended past this at the top
-  public var topArmMin = 55.0  // arm must be above this (near horizontal) at the top
-  public var bottomArmMax = 40.0  // CONNECT→BOTTOM uses |arm| < bottomArmMax + 15
+  /// Arm must be above this at the top. Low swings and a low, close camera (arms in front foreshortened) read
+  /// 40–55°; the top is confirmed by the wrist-height peak, so this only has to exclude hanging arms (#16).
+  public var topArmMin = 40.0
+  /// CONNECT→BOTTOM uses |arm| < bottomArmMax + 15: anything short of horizontal. The spine and hip conditions
+  /// already separate the bottom from the top; from a low camera the arms behind the body read up to 85° (#16).
+  public var bottomArmMax = 75.0
   public var bottomSpineMin = 35.0  // spine must be hinged past this at the bottom
   public var bottomHipMax = 140.0  // hip must be flexed below this at the bottom
   public var connectArmMax = 25.0  // arms near vertical while spine still upright

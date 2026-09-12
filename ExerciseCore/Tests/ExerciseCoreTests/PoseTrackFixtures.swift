@@ -26,6 +26,9 @@ struct Fixture {
     Fixture(name: "swing-pickup-10reps", expectedExercise: .kettlebellSwing, expectedReps: 9, humanVerified: true),
     // IMG_4337 (issue #15): the walk-in and pick-up (0.5–6.6 s) counted as rep 1; Igor: 9 real swings.
     Fixture(name: "swing-walkin-9reps", expectedExercise: .kettlebellSwing, expectedReps: 9, humanVerified: true),
+    // IMG_4340 (issue #16): low, close camera; arms behind the body read ~80°, arms in front ~45°. Counted 0 before
+    // the arm thresholds were relaxed; 10 is the analyzer's count, not yet confirmed by Igor.
+    Fixture(name: "swing-lowcam-10reps", expectedExercise: .kettlebellSwing, expectedReps: 10, humanVerified: false),
     Fixture(name: "pistol-6reps", expectedExercise: .pistolSquat, expectedReps: 6, humanVerified: false),
     // Head height drops 8 times at a steady ~4.2 s rhythm; the earlier front-knee analyzer counted 10.
     Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
@@ -41,6 +44,11 @@ struct Fixture {
     let url = try XCTUnwrap(
       Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures"),
       "missing fixture \(name)")
+    return try Self.frames(at: url)
+  }
+
+  /// Decodes a compact pose track (fixture or archived track) into frames.
+  static func frames(at url: URL) throws -> [FrameRecord] {
     let data = try Data(contentsOf: url)
     let decoded = try JSONDecoder().decode(StoredTrack.self, from: data)
     return decoded.frames.map { f in
