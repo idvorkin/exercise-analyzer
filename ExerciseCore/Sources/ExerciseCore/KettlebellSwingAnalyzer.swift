@@ -31,6 +31,9 @@ public struct SwingThresholds {
   /// the arms reach the top 0.15–0.3 s after crossing vertical. Standing up after parking the bell (or after
   /// picking it up) looks like a release too, but the arms then rise seconds later, if at all.
   public var releaseMaxDuration = 1.0
+  /// A swing rep (top to top) takes about 1.2 s, a slow first hike about 2 s. Longer "reps" are the walk-in or
+  /// the bell pick-up flowing into the first swing and are discarded (issue #15).
+  public var maxRepDuration = 4.0
 }
 
 public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
@@ -62,9 +65,12 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
   private let wristHeightWindowSize = 5
   private var currentPhasePeak: RepPosition?
   private var releaseStartTime = 0.0
+  private var repStartTime = 0.0
 
   private struct Angles {
     var arm = 0.0, spine = 0.0, hip = 0.0, knee = 0.0, wristHeight = 0.0
+    /// BodySkeleton reports exactly 0 for an angle it could not measure; such frames must not drive transitions.
+    var measured: Bool { arm != 0 && spine != 0 && hip != 0 }
     var metrics: [String: Double] {
       ["arm": arm, "spine": spine, "hip": hip, "knee": knee, "wristHeight": wristHeight]
     }
@@ -88,6 +94,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
     wristHeightHistory = []
     currentPhasePeak = nil
     releaseStartTime = 0
+    repStartTime = 0
     metrics = RepMetrics()
   }
 
@@ -112,6 +119,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
     case Self.top:
       if shouldTransitionToConnect(a) {
         finalizePhasePeak()
+        repStartTime = machine.currentRepPeaks[Self.top]?.time ?? time
         machine.transition(to: Self.connect)
       }
     case Self.connect:
@@ -127,10 +135,14 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
       }
     default:  // release
       if shouldTransitionToTop(a) {
-        finalizePhasePeak()
-        completedRep = machine.completeRep(quality: calculateRepQuality())
-        machine.transition(to: Self.top)
-        metrics = RepMetrics()
+        if time - repStartTime > thresholds.maxRepDuration {
+          abandonRep()  // walk-in or pick-up that ended in a first lockout: not a swing
+        } else {
+          finalizePhasePeak()
+          completedRep = machine.completeRep(quality: calculateRepQuality())
+          machine.transition(to: Self.top)
+          metrics = RepMetrics()
+        }
       } else if time - releaseStartTime > thresholds.releaseMaxDuration {
         abandonRep()
       }
@@ -180,24 +192,24 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
 
   /// TOP → CONNECT: arms near vertical while the spine is still upright.
   private func shouldTransitionToConnect(_ a: Angles) -> Bool {
-    machine.canTransition && abs(a.arm) < thresholds.connectArmMax && a.spine < thresholds.connectSpineMax
+    machine.canTransition && a.measured && abs(a.arm) < thresholds.connectArmMax && a.spine < thresholds.connectSpineMax
   }
 
   /// CONNECT → BOTTOM: arms behind the body, spine hinged, hips flexed.
   private func shouldTransitionToBottom(_ a: Angles) -> Bool {
-    machine.canTransition && abs(a.arm) < abs(thresholds.bottomArmMax) + 15
+    machine.canTransition && a.measured && abs(a.arm) < abs(thresholds.bottomArmMax) + 15
       && a.spine > thresholds.bottomSpineMin && a.hip < thresholds.bottomHipMax
   }
 
   /// BOTTOM → RELEASE: arms crossing vertical on the way up, spine returning upright.
   private func shouldTransitionToRelease(_ a: Angles) -> Bool {
-    machine.canTransition && abs(a.arm) < thresholds.releaseArmMax && a.spine < thresholds.releaseSpineMax
+    machine.canTransition && a.measured && abs(a.arm) < thresholds.releaseArmMax && a.spine < thresholds.releaseSpineMax
   }
 
   /// RELEASE → TOP (rep complete): standing upright with the arm near horizontal, confirmed either by
   /// the wrist height peaking or by the arm staying horizontal for a few frames.
   private func shouldTransitionToTop(_ a: Angles) -> Bool {
-    guard machine.canTransition else { return false }
+    guard machine.canTransition, a.measured else { return false }
     guard a.spine <= thresholds.topSpineMax, a.hip >= thresholds.topHipMin else { return false }
     guard abs(a.arm) > thresholds.topArmMin else { return false }
 

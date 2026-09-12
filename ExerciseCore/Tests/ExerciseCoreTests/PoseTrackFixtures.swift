@@ -22,7 +22,10 @@ struct Fixture {
     Fixture(name: "swing-1h-9reps", expectedExercise: .kettlebellSwing, expectedReps: 9, humanVerified: true),
     Fixture(name: "swing-phone-13reps", expectedExercise: .kettlebellSwing, expectedReps: 13, humanVerified: true),
     // Issue #4: the lifter bends over to pick the bell up in the first second, then swings 10 reps from 25 s.
-    Fixture(name: "swing-pickup-10reps", expectedExercise: .kettlebellSwing, expectedReps: 10, humanVerified: true),
+    // 11 counted originally: the setup (8–25 s) and the bell park at the end were both "reps". Igor: neither is.
+    Fixture(name: "swing-pickup-10reps", expectedExercise: .kettlebellSwing, expectedReps: 9, humanVerified: true),
+    // IMG_4337 (issue #15): the walk-in and pick-up (0.5–6.6 s) counted as rep 1; Igor: 9 real swings.
+    Fixture(name: "swing-walkin-9reps", expectedExercise: .kettlebellSwing, expectedReps: 9, humanVerified: true),
     Fixture(name: "pistol-6reps", expectedExercise: .pistolSquat, expectedReps: 6, humanVerified: false),
     // Head height drops 8 times at a steady ~4.2 s rhythm; the earlier front-knee analyzer counted 10.
     Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
