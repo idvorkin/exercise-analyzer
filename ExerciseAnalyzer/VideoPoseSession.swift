@@ -237,7 +237,22 @@ final class VideoPoseSession: NSObject, ObservableObject {
       detection = nil
       installPlayerItem(url: url, pipeline: pipeline)
       statusMessage = recordedLine(reps: pipeline.reps.count)
-      log.event("recents_open", ["id": entry.id, "reps": pipeline.reps.count])
+      log.event("recents_open", ["id": entry.id, "reps": pipeline.reps.count, "exercise": pipeline.exercise.rawValue])
+      // A stored analysis can predate an exercise the detector now knows (issue #17): in Auto, re-detect over the
+      // stored poses and re-analyze when the answer changed. No inference, so this is quick.
+      if case .auto = exerciseMode {
+        let fresh = ExerciseDetector.detect(frames: extractedFrames)
+        if fresh.exercise != pipeline.exercise, fresh.confidence >= 70 {
+          log.event(
+            "recents_redetect",
+            ["id": entry.id, "was": pipeline.exercise.rawValue, "now": fresh.exercise.rawValue, "confidence": fresh.confidence])
+          activity = .working("Re-analyzing as \(fresh.exercise.definition.name)", progress: nil)
+          await analyzeExtracted(url: url, reason: "recents_redetect")
+          statusMessage = "Re-analyzed as \(exercise.definition.name): \(self.pipeline.reps.count) reps"
+          rememberCurrent(clipURL: url)
+          activity = .idle
+        }
+      }
       play()
     }
   }
