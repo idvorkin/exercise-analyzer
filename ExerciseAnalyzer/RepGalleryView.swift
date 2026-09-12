@@ -4,6 +4,7 @@
 //  Tap a thumbnail to seek, tap a phase header to zoom that column, select reps in the sheet to compare.
 
 import SwiftUI
+import ExerciseCore
 
 /// Inline gallery shown under the video.
 struct RepGalleryWidget: View {

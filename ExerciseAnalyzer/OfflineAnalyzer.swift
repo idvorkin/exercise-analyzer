@@ -6,6 +6,7 @@
 //  re-analysis never re-run the model.
 
 import AVFoundation
+import ExerciseCore
 import UIKit
 import UltralyticsYOLO
 
@@ -61,14 +62,7 @@ enum OfflineAnalyzer {
         catcher.result = nil
         predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: catcher)
         guard let result = catcher.result else { continue }
-        let personIndex = result.boxes.indices.max { result.boxes[$0].conf < result.boxes[$1].conf }
-        frames.append(
-          FrameRecord(
-            time: time, imageSize: result.orig_shape,
-            pose: personIndex.flatMap {
-              $0 < result.keypointsList.count ? Pose(keypoints: result.keypointsList[$0]) : nil
-            },
-            box: personIndex.map { result.boxes[$0].xywhn }, analysis: nil))
+        frames.append(FrameRecord(result: result, time: time))
         inferenceTotal += result.inferenceMs
         if duration > 0, time - lastProgress > 0.5 {
           lastProgress = time

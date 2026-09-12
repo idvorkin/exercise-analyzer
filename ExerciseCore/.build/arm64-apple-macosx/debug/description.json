@@ -1,0 +1,809 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.xctest/Contents/MacOS/ExerciseCorePackageTests",
+      "packagePath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore",
+      "productName" : "ExerciseCorePackageTests"
+    }
+  ],
+  "copyCommands" : {
+    "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore_ExerciseCoreTests.bundle/Fixtures" : {
+      "inputs" : [
+        {
+          "kind" : "directory",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/Fixtures"
+        }
+      ],
+      "outputs" : [
+        {
+          "kind" : "directory",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore_ExerciseCoreTests.bundle/Fixtures"
+        }
+      ]
+    }
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.ExerciseCore-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/sources",
+      "importPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/AnalysisPipeline.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/BodySkeleton.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/BulgarianSplitSquatAnalyzer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/Exercise.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/ExerciseDetector.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/KettlebellSwingAnalyzer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/PistolSquatAnalyzer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/Pose.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/PoseTrack.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "ExerciseCore",
+      "moduleOutputPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules/ExerciseCore.swiftmodule",
+      "objects" : [
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/AnalysisPipeline.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/BodySkeleton.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/BulgarianSplitSquatAnalyzer.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/Exercise.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/ExerciseDetector.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/KettlebellSwingAnalyzer.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/PistolSquatAnalyzer.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/Pose.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/PoseTrack.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/include/ExerciseCore-Swift.h",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "exercisecore"
+      ],
+      "outputFileMapPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/AnalysisPipeline.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/BodySkeleton.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/BulgarianSplitSquatAnalyzer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/Exercise.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/ExerciseDetector.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/KettlebellSwingAnalyzer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/PistolSquatAnalyzer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/Pose.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/PoseTrack.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules/ExerciseCore.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/AnalysisPipeline.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/BodySkeleton.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/BulgarianSplitSquatAnalyzer.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/Exercise.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/ExerciseDetector.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/KettlebellSwingAnalyzer.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/PistolSquatAnalyzer.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/Pose.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/PoseTrack.swift"
+      ],
+      "tempsPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.ExerciseCorePackageTests-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/sources",
+      "importPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules/ExerciseCoreTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "ExerciseCorePackageTests",
+      "moduleOutputPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules/ExerciseCorePackageTests.swiftmodule",
+      "objects" : [
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx13.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/include/ExerciseCorePackageTests-Swift.h",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "exercisecore"
+      ],
+      "outputFileMapPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules/ExerciseCorePackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.ExerciseCoreTests-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/sources",
+      "importPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/ExerciseCoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/PoseTrackFixtures.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/DerivedSources/resource_bundle_accessor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "virtual",
+          "name" : "<ExerciseCoreTests-arm64-apple-macosx-debug.module-resources>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules/ExerciseCore.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "ExerciseCoreTests",
+      "moduleOutputPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules/ExerciseCoreTests.swiftmodule",
+      "objects" : [
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/ExerciseCoreTests.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/PoseTrackFixtures.swift.o",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/resource_bundle_accessor.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE",
+        "-module-cache-path",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "5",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "exercisecore"
+      ],
+      "outputFileMapPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/ExerciseCoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/PoseTrackFixtures.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/resource_bundle_accessor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules/ExerciseCoreTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/ExerciseCoreTests.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/PoseTrackFixtures.swift",
+        "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/DerivedSources/resource_bundle_accessor.swift"
+      ],
+      "tempsPath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "ExerciseCore" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "ExerciseCore",
+      "-package-name",
+      "exercisecore",
+      "-c",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/AnalysisPipeline.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/BodySkeleton.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/BulgarianSplitSquatAnalyzer.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/Exercise.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/ExerciseDetector.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/KettlebellSwingAnalyzer.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/PistolSquatAnalyzer.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/Pose.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/PoseTrack.swift",
+      "-I",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/include/ExerciseCore-Swift.h",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "exercisecore",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "ExerciseCorePackageTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "ExerciseCorePackageTests",
+      "-package-name",
+      "exercisecore",
+      "-c",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.derived/runner.swift",
+      "-I",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx13.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/include/ExerciseCorePackageTests-Swift.h",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "exercisecore",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "ExerciseCoreTests" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "ExerciseCoreTests",
+      "-package-name",
+      "exercisecore",
+      "-c",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/ExerciseCoreTests.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/PoseTrackFixtures.swift",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/DerivedSources/resource_bundle_accessor.swift",
+      "-I",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE",
+      "-module-cache-path",
+      "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "5",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.4.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "exercisecore",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "ExerciseCore" : [
+
+    ],
+    "ExerciseCorePackageTests" : [
+      "ExerciseCoreTests",
+      "ExerciseCore"
+    ],
+    "ExerciseCoreTests" : [
+      "ExerciseCore"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+    "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.derived/runner.swift" : {
+      "inputs" : [
+
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.derived/runner.swift"
+        }
+      ]
+    }
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/AnalysisPipeline.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/BodySkeleton.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/BulgarianSplitSquatAnalyzer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/Exercise.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/ExerciseDetector.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/KettlebellSwingAnalyzer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/PistolSquatAnalyzer.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/Pose.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Sources/ExerciseCore/PoseTrack.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/sources"
+    },
+    "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/sources"
+    },
+    "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/AnalysisPipeline.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/BodySkeleton.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/BulgarianSplitSquatAnalyzer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/Exercise.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/ExerciseDetector.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/KettlebellSwingAnalyzer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/PistolSquatAnalyzer.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/Pose.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCore.build/PoseTrack.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/ExerciseCoreTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/PoseTrackFixtures.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/resource_bundle_accessor.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCorePackageTests.product/Objects.LinkFileList"
+    },
+    "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/ExerciseCoreTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/PoseTrackFixtures.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/DerivedSources/resource_bundle_accessor.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/sources"
+    },
+    "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

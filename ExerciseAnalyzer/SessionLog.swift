@@ -4,6 +4,7 @@
 //  `just pull-logs`). One event per line with a monotonic `t` in ms since the session started.
 
 import Foundation
+import ExerciseCore
 import UIKit
 
 final class SessionLog: @unchecked Sendable {

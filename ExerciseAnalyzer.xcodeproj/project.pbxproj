@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		5A1A00000000000000000012 /* UltralyticsYOLO in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1A00000000000000000011 /* UltralyticsYOLO */; };
+		5A1A00000000000000000022 /* ExerciseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1A00000000000000000021 /* ExerciseCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5A1A00000000000000000012 /* UltralyticsYOLO in Frameworks */,
+				5A1A00000000000000000022 /* ExerciseCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = ExerciseAnalyzer;
 			packageProductDependencies = (
 				5A1A00000000000000000011 /* UltralyticsYOLO */,
+				5A1A00000000000000000021 /* ExerciseCore */,
 			);
 			productName = ExerciseAnalyzer;
 			productReference = 5A1A0000000000000000000C /* ExerciseAnalyzer.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				5A1A00000000000000000010 /* XCRemoteSwiftPackageReference "yolo-ios-app" */,
+				5A1A00000000000000000020 /* XCLocalSwiftPackageReference "ExerciseCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5A1A00000000000000000006 /* Products */;
@@ -342,6 +346,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		5A1A00000000000000000020 /* XCLocalSwiftPackageReference "ExerciseCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ExerciseCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		5A1A00000000000000000010 /* XCRemoteSwiftPackageReference "yolo-ios-app" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -358,6 +369,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5A1A00000000000000000010 /* XCRemoteSwiftPackageReference "yolo-ios-app" */;
 			productName = UltralyticsYOLO;
+		};
+		5A1A00000000000000000021 /* ExerciseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ExerciseCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

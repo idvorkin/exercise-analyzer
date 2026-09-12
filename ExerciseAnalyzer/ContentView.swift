@@ -5,6 +5,7 @@
 //  Launch with the SWING_VIDEO environment variable set to a file path to auto-load a video (simulator testing).
 
 import AVFoundation
+import ExerciseCore
 import Photos
 import PhotosUI
 import SwiftUI

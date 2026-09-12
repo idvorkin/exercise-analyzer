@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/primary.swiftdeps"
+  },
+  "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/ExerciseCoreTests.swift": {
+    "dependencies": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/ExerciseCoreTests.d",
+    "object": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/ExerciseCoreTests.swift.o",
+    "swiftmodule": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/ExerciseCoreTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/ExerciseCoreTests.swiftdeps",
+    "diagnostics": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/ExerciseCoreTests.dia"
+  },
+  "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/Tests/ExerciseCoreTests/PoseTrackFixtures.swift": {
+    "dependencies": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/PoseTrackFixtures.d",
+    "object": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/PoseTrackFixtures.swift.o",
+    "swiftmodule": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/PoseTrackFixtures~partial.swiftmodule",
+    "swift-dependencies": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/PoseTrackFixtures.swiftdeps",
+    "diagnostics": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/PoseTrackFixtures.dia"
+  },
+  "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/DerivedSources/resource_bundle_accessor.swift": {
+    "dependencies": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/resource_bundle_accessor.d",
+    "object": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/resource_bundle_accessor.swift.o",
+    "swiftmodule": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/resource_bundle_accessor~partial.swiftmodule",
+    "swift-dependencies": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/resource_bundle_accessor.swiftdeps",
+    "diagnostics": "/Users/idvorkin/gits/exercise-analyzer/ExerciseCore/.build/arm64-apple-macosx/debug/ExerciseCoreTests.build/resource_bundle_accessor.dia"
+  }
+}

@@ -9,6 +9,16 @@ device_app := "Build/Build/Products/Debug-iphoneos/ExerciseAnalyzer.app"
 default:
     @just --list
 
+# Test ladder, cheapest first. Rung 1: analyzers and detector replayed over stored pose tracks on the Mac.
+test:
+    cd ExerciseCore && swift test 2>&1 | grep -E "Test Suite|passed|failed|error" | tail -20
+
+# Rung 2: simulator smoke run of every sample clip; checks detection and rep counts from the session log.
+test-sim: build-sim
+    bash scripts/sim-smoke.sh "{{sim}}" {{bundle}} {{sim_app}}
+
+# Rung 3 is the phone: just run-device, then use the app and just pull-logs.
+
 # Download the bundled pose model (yolo26n-pose) from the Ultralytics release into the app folder.
 model:
     bash scripts/download-model.sh

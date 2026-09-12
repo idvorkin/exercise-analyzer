@@ -4,6 +4,7 @@
 //  right arm that drive the analysis highlighted.
 
 import AVFoundation
+import ExerciseCore
 import SwiftUI
 import UltralyticsYOLO
 
@@ -84,10 +85,11 @@ struct PoseThumbnail: View {
       ZStack {
         Color(.tertiarySystemFill)
         if let position, let image = position.image {
-          Image(uiImage: image).resizable().scaledToFit()
+          Image(decorative: image, scale: 1).resizable().scaledToFit()
           Canvas { context, size in
             let rect = AVMakeRect(
-              aspectRatio: image.size, insideRect: CGRect(origin: .zero, size: size))
+              aspectRatio: CGSize(width: image.width, height: image.height),
+              insideRect: CGRect(origin: .zero, size: size))
             PoseDrawing.draw(context, pose: position.pose, in: rect, lineWidth: 1)
           }
         } else {

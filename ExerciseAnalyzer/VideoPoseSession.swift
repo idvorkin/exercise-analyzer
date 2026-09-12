@@ -9,6 +9,7 @@
 //  Playback then replays the stored pose track from the player clock; no frames are pulled from the player.
 
 import AVFoundation
+import ExerciseCore
 import Combine
 import CoreMedia
 import Photos
@@ -256,8 +257,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     let firstRep = pipeline.reps.first
     let thumbnail =
-      pipeline.exercise.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
-      ?? firstRep?.checkpoints.first?.image
+      (pipeline.exercise.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
+        ?? firstRep?.checkpoints.first?.image).map { UIImage(cgImage: $0) }
     do {
       try recents.save(
         id: id, source: source, recordedAt: currentRecordedAt ?? Date(), duration: duration,

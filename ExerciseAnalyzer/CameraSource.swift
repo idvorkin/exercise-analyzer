@@ -28,6 +28,8 @@ final class CameraSource: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     else { throw CameraError.noCamera }
     let input = try AVCaptureDeviceInput(device: device)
 
+    // Video only, and leave the app's audio session alone so music keeps playing while recording.
+    session.automaticallyConfiguresApplicationAudioSession = false
     session.beginConfiguration()
     session.sessionPreset = .hd1280x720
     session.addInput(input)

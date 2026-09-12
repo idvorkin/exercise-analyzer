@@ -5,6 +5,7 @@
 //  are kept as files under Documents/recents/<id>/ until saved or removed.
 
 import AVFoundation
+import ExerciseCore
 import Foundation
 import Photos
 import UIKit
@@ -88,7 +89,7 @@ final class RecentsStore: ObservableObject {
     try JSONEncoder().encode(snapshot).write(to: dir.appendingPathComponent("analysis.json"))
     for rep in pipeline.reps {
       for (phase, position) in rep.positions {
-        guard let image = position.image, let data = image.jpegData(compressionQuality: 0.8) else { continue }
+        guard let image = position.image, let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.8) else { continue }
         try data.write(to: dir.appendingPathComponent(Self.imageName(rep: rep.number, phase: phase)))
       }
     }
@@ -142,7 +143,7 @@ final class RecentsStore: ObservableObject {
         positions: rep.positions.mapValues { position in
           var restored = position
           restored.image = UIImage(
-            contentsOfFile: dir.appendingPathComponent(Self.imageName(rep: rep.number, phase: position.phase)).path)
+            contentsOfFile: dir.appendingPathComponent(Self.imageName(rep: rep.number, phase: position.phase)).path)?.cgImage
           return restored
         },
         quality: rep.quality)
