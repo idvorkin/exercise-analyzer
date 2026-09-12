@@ -311,17 +311,18 @@ struct ContentView: View {
 
   private var playbackControls: some View {
     Group {
-      HStack(spacing: 18) {
-        navButton("backward.end.fill", "Previous rep") { session.seekToRep(offset: -1) }
-        navButton("chevron.left.2", "Previous checkpoint") { session.seekToCheckpoint(offset: -1) }
-        navButton("chevron.left", "Previous frame") { session.stepFrame(-1) }
+      // Frame and phase steps get big, captioned targets; reps are navigated from the gallery (issue #11).
+      HStack(spacing: 6) {
+        navButton("chevron.left.2", "phase", "Previous checkpoint") { session.seekToCheckpoint(offset: -1) }
+        navButton("chevron.left", "frame", "Previous frame") { session.stepFrame(-1) }
         Button(action: session.togglePlayback) {
-          Image(systemName: session.isPlaying ? "pause.fill" : "play.fill").font(.title2)
+          Image(systemName: session.isPlaying ? "pause.fill" : "play.fill")
+            .font(.title)
+            .frame(maxWidth: .infinity, minHeight: 52)
         }
         .disabled(session.duration == 0)
-        navButton("chevron.right", "Next frame") { session.stepFrame(1) }
-        navButton("chevron.right.2", "Next checkpoint") { session.seekToCheckpoint(offset: 1) }
-        navButton("forward.end.fill", "Next rep") { session.seekToRep(offset: 1) }
+        navButton("chevron.right", "frame", "Next frame") { session.stepFrame(1) }
+        navButton("chevron.right.2", "phase", "Next checkpoint") { session.seekToCheckpoint(offset: 1) }
       }
       .frame(maxWidth: .infinity)
 
@@ -418,12 +419,19 @@ struct ContentView: View {
     }
   }
 
-  private func navButton(_ symbol: String, _ label: String, action: @escaping () -> Void)
-    -> some View
-  {
+  /// A large captioned step button: the icon over a one-word caption, filling its share of the row.
+  private func navButton(
+    _ symbol: String, _ caption: String, _ label: String, action: @escaping () -> Void
+  ) -> some View {
     Button(action: action) {
-      Label(label, systemImage: symbol).labelStyle(.iconOnly).font(.title3)
+      VStack(spacing: 2) {
+        Image(systemName: symbol).font(.title2)
+        Text(caption).font(.caption2)
+      }
+      .frame(maxWidth: .infinity, minHeight: 52)
+      .contentShape(Rectangle())
     }
+    .accessibilityLabel(label)
     .disabled(session.duration == 0)
   }
 
