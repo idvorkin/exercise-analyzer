@@ -24,7 +24,8 @@ struct ContentView: View {
   @State private var focusedRep: Int?
   @State private var scrubTime = 0.0
   @State private var isScrubbing = false
-  @AppStorage("showSkeleton") private var showSkeleton = true
+  @AppStorage("overlayMode") private var overlayModeRaw = OverlayMode.both.rawValue
+  private var overlayMode: OverlayMode { OverlayMode(rawValue: overlayModeRaw) ?? .both }
   @AppStorage("meView") private var meView = true
   @AppStorage("galleryHeight") private var galleryHeight = 170.0
   @State private var galleryDragStart: Double?
@@ -39,12 +40,14 @@ struct ContentView: View {
           crop: meView ? session.personCrop : nil, imageSize: session.latestFrame?.imageSize
         ) { zoom in
           ZStack {
-            if session.source == .camera {
+            if overlayMode == .skeleton {
+              Color.black  // skeleton only (#7): the player keeps running, just not on screen
+            } else if session.source == .camera {
               CameraPreviewView(previewLayer: session.cameraPreviewLayer, zoom: zoom)
             } else {
               PlayerView(player: session.player, zoom: zoom, onReady: session.logPlayerLayer)
             }
-            if showSkeleton {
+            if overlayMode != .video {
               PoseOverlayView(frame: session.latestFrame)
                 .scaleEffect(zoom.scale)
                 .offset(zoom.offset)
@@ -172,11 +175,11 @@ struct ContentView: View {
         }
         .accessibilityLabel(meView ? "Show whole frame" : "Zoom to me")
         Button {
-          showSkeleton.toggle()
+          overlayModeRaw = overlayMode.next.rawValue
         } label: {
-          Image(systemName: showSkeleton ? "eye" : "eye.slash").font(.title3)
+          Image(systemName: overlayMode.symbol).font(.title3)
         }
-        .accessibilityLabel(showSkeleton ? "Hide skeleton" : "Show skeleton")
+        .accessibilityLabel(overlayMode.next.label)
       }
       HStack(spacing: 5) {
         ForEach(definition.phases, id: \.id) { phase in
@@ -623,4 +626,34 @@ struct PickedMovie: Transferable {
 
 #Preview {
   ContentView()
+}
+
+/// What the picture shows: video with the skeleton, video alone, or the skeleton on black (#7).
+enum OverlayMode: String, CaseIterable {
+  case both, video, skeleton
+
+  var next: OverlayMode {
+    switch self {
+    case .both: return .video
+    case .video: return .skeleton
+    case .skeleton: return .both
+    }
+  }
+
+  var symbol: String {
+    switch self {
+    case .both: return "eye"
+    case .video: return "eye.slash"
+    case .skeleton: return "figure.stand"
+    }
+  }
+
+  /// Names what the button will switch to.
+  var label: String {
+    switch self {
+    case .both: return "Show video and skeleton"
+    case .video: return "Show video only"
+    case .skeleton: return "Show skeleton only"
+    }
+  }
 }
