@@ -55,6 +55,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var duration = 0.0
   @Published private(set) var cameraPreviewLayer: AVCaptureVideoPreviewLayer?
   @Published private(set) var cameraPosition: AVCaptureDevice.Position = .back
+  /// Whether the athlete is inside the picture (live camera only); mirrored to the watch.
+  @Published private(set) var frameStatus = FrameStatus(box: nil, pose: nil)
+  let watch = WatchBridge()
   @Published private(set) var canSave = false
   /// Normalized image rect to zoom to for the "me view": stable over a replayed track, slowly adapting while live.
   @Published private(set) var personCrop: CGRect?
@@ -112,6 +115,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     super.init()
     if case .fixed(let kind) = exerciseMode { exercise = kind }
     pipeline = AnalysisPipeline(exercise: exercise)
+    watch.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
+    watch.onCommand = { [weak self] command in self?.handleWatch(command) }
     player.actionAtItemEnd = .pause
     timeObserver = player.addPeriodicTimeObserver(
       forInterval: CMTime(value: 1, timescale: 30), queue: .main
@@ -630,6 +635,30 @@ final class VideoPoseSession: NSObject, ObservableObject {
       lastQuality = rep.quality
       log.rep(rep, source: source == .camera ? "live" : "file")
     }
+    if source == .camera {
+      frameStatus = FrameStatus(box: frame.box, pose: frame.pose)
+      pushWatchStatus()
+    }
+  }
+
+  // MARK: - Watch companion
+
+  private func pushWatchStatus(force: Bool = false) {
+    let status = WatchStatus(
+      recording: source == .camera, frame: frameStatus, reps: pipeline.reps.count,
+      phase: latestFrame?.analysis?.phase ?? "", elapsed: source == .camera ? duration : 0,
+      camera: cameraPosition == .front ? "front" : "back", exercise: exercise.definition.name)
+    watch.send(status, force: force)
+  }
+
+  private func handleWatch(_ command: WatchCommand) {
+    log.event("ui", ["action": command.rawValue, "from": "watch", "source": "\(source)"])
+    switch command {
+    case .start: if source != .camera { startCamera(position: cameraPosition) }
+    case .switchCamera: flipCamera()
+    case .finish: if source == .camera { finishCamera() }
+    case .cancel: if source == .camera { cancelCamera() }
+    }
   }
 
   /// While inferring live, zoom to the union of the last few seconds of boxes, eased so it doesn't jump.
@@ -687,28 +716,41 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self.statusMessage = "Camera access denied"
           return
         }
-        do {
-          let camera = try CameraSource(position: position, orientation: self.currentVideoOrientation())
-          let recorder = FrameRecorder()
-          camera.onFrame = { [weak self] sampleBuffer in
-            recorder.append(sampleBuffer)
-            let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
-            guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-            Task { @MainActor in self?.cameraFrame(pixelBuffer: pixelBuffer, pts: pts) }
-          }
-          self.camera = camera
-          self.recorder = recorder
-          self.cameraPreviewLayer = camera.previewLayer
-          self.source = .camera
+        let recorder = FrameRecorder()
+        recorder.onError = { [weak self] message in
+          Task { @MainActor in self?.log.event("error", ["where": "recorder", "message": message]) }
+        }
+        self.recorder = recorder
+        self.attachCamera(position: position)
+        if self.source == .camera {
           self.activity = .working("Recording", progress: nil)
           UIApplication.shared.isIdleTimerDisabled = true  // a set is longer than the auto-lock timeout
-          self.log.event("camera_start", ["position": position == .front ? "front" : "back"])
-          camera.start()
-        } catch {
-          self.statusMessage = "Camera failed: \(error.localizedDescription)"
-          self.log.event("error", ["where": "camera", "message": "\(error)"])
+          self.frameStatus = FrameStatus(box: nil, pose: nil)
+          self.pushWatchStatus(force: true)
         }
       }
+    }
+  }
+
+  /// Builds the capture source for `position`, feeding frames to the current recorder and the analyzer.
+  private func attachCamera(position: AVCaptureDevice.Position) {
+    do {
+      let camera = try CameraSource(position: position, orientation: currentVideoOrientation())
+      camera.onFrame = { [weak self] sampleBuffer in
+        self?.recorder?.append(sampleBuffer)
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        Task { @MainActor in self?.cameraFrame(pixelBuffer: pixelBuffer, pts: pts) }
+      }
+      self.camera = camera
+      cameraPosition = position
+      cameraPreviewLayer = camera.previewLayer
+      source = .camera
+      log.event("camera_start", ["position": position == .front ? "front" : "back"])
+      camera.start()
+    } catch {
+      statusMessage = "Camera failed: \(error.localizedDescription)"
+      log.event("error", ["where": "camera", "message": "\(error)"])
     }
   }
 
@@ -722,8 +764,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
     ingest(pixelBuffer: pixelBuffer, time: time)
   }
 
+  /// Switches between the front and back camera. While recording, the recorder and the analysis carry on
+  /// (both cameras deliver 720p, so the writer keeps accepting frames); otherwise it just starts the other one.
   func flipCamera() {
-    startCamera(position: cameraPosition == .back ? .front : .back)
+    let other: AVCaptureDevice.Position = cameraPosition == .back ? .front : .back
+    guard source == .camera, let old = camera else {
+      startCamera(position: other)
+      return
+    }
+    old.stop()
+    log.event("camera_switch", ["to": other == .front ? "front" : "back", "at_s": duration])
+    attachCamera(position: other)
+    pushWatchStatus(force: true)
   }
 
   /// Stops the camera without keeping the recording.
@@ -740,6 +792,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     cameraPreviewLayer = nil
     UIApplication.shared.isIdleTimerDisabled = false
     if source == .camera { source = .none }
+    pushWatchStatus(force: true)
   }
 
   /// Done: stop, trim the recording to the rep span, run the offline pass on the clip, and show it.

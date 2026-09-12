@@ -24,7 +24,7 @@ model:
     bash scripts/download-model.sh
 
 build-sim:
-    xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer -sdk iphonesimulator \
+    xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer \
       -derivedDataPath Build/ -destination "platform=iOS Simulator,name={{sim}}" \
       CODE_SIGNING_ALLOWED=NO build | grep -E "error:|BUILD"
 
@@ -37,7 +37,7 @@ run-sim video="": build-sim
     SIMCTL_CHILD_SWING_VIDEO="{{video}}" xcrun simctl launch "{{sim}}" {{bundle}}
 
 build-device:
-    xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer -sdk iphoneos \
+    xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer \
       -derivedDataPath Build/ -destination "platform=iOS,id={{device}}" \
       -allowProvisioningUpdates -allowProvisioningDeviceRegistration build | grep -E "error:|BUILD"
 

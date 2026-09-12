@@ -194,6 +194,11 @@ struct ContentView: View {
 
       Spacer()
 
+      if session.source == .camera, !session.frameStatus.inFrame {
+        Text(session.frameStatus.hint.uppercased())
+          .font(.caption.bold()).padding(.horizontal, 8).padding(.vertical, 3)
+          .background(Color.red.opacity(0.75), in: Capsule())
+      }
       HStack(spacing: 14) {
         ForEach(definition.hudMetrics, id: \.key) { m in
           metric(m.label, analysis?.metrics[m.key], unit: m.unit)
