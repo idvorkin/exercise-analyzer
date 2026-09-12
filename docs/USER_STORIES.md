@@ -158,12 +158,10 @@ tells you when you've stepped out of frame.
 
 **Question:** should the watch also start the set for you, or only control one the phone started?
 
-### 19. Just the skeleton — built
+### 19. Just the skeleton — dropped
 
-The eye button now cycles: video with skeleton, video only, skeleton on black. The last one shows the movement
-alone. Blurring the background (keeping you and the bell sharp) is possible but costs a lot per frame; parked.
-
-**Question:** is the skeleton-on-black view enough, or is the blur worth the battery?
+Tried as a third state of the eye button (skeleton on black); Igor: "who cares". The eye button is back to
+skeleton on or off. Background blur stays parked.
 
 ### 20. Trim in a blink — built
 
@@ -202,6 +200,5 @@ COCO-17).
 | 16 More than swings | every exercise counted on the simulator; host fixtures per exercise | Bulgarian and get-up sets from the gym verified |
 | 17 Workouts | grouping, totals, cards verified; From Photos needs the phone | not yet |
 | 18 Watch | n/a | waiting for Developer Mode on the watch |
-| 19 Just the skeleton | screenshot verified | not yet |
 | 20 Trim in a blink | passthrough cut verified, first frame at zero | HDR clip not yet |
 | 21 Shake to report | hook verified | in daily use |

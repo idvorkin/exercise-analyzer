@@ -8,9 +8,9 @@ User stories with per-feature verification status: [docs/USER_STORIES.md](docs/U
 
 ## Screenshots
 
-| Swing analysis | Skeleton only | Workouts |
-|---|---|---|
-| ![Swing analysis: HUD with rep count, phase pills and joint angles over the video, rep gallery below](docs/screenshots/swing-analysis.png) | ![Skeleton-only view](docs/screenshots/skeleton-only.png) | ![Workout gallery grouped by day and exercise](docs/screenshots/workouts.png) |
+| Swing analysis | Workouts |
+|---|---|
+| ![Swing analysis: HUD with rep count, phase pills and joint angles over the video, rep gallery below](docs/screenshots/swing-analysis.png) | ![Workout gallery grouped by day and exercise](docs/screenshots/workouts.png) |
 
 | Bulgarian split squat | Pistol squat |
 |---|---|

@@ -33,7 +33,6 @@ shoot() {  # name clip overlayMode meView extra-wait
   echo "shot $1"
 }
 shoot swing-analysis swing-sample-4reps both true 6
-shoot skeleton-only swing-sample-4reps skeleton true 6
 shoot bulgarian-split-squat bulgarian both true 6
 shoot pistol-squat pistols both false 6
 xcrun simctl spawn "$SIM" defaults write "$BUNDLE" overlayMode -string both

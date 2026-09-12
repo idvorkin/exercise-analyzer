@@ -40,9 +40,7 @@ struct ContentView: View {
           crop: meView ? session.personCrop : nil, imageSize: session.latestFrame?.imageSize
         ) { zoom in
           ZStack {
-            if overlayMode == .skeleton {
-              Color.black  // skeleton only (#7): the player keeps running, just not on screen
-            } else if session.source == .camera {
+            if session.source == .camera {
               CameraPreviewView(previewLayer: session.cameraPreviewLayer, zoom: zoom)
             } else {
               PlayerView(player: session.player, zoom: zoom, onReady: session.logPlayerLayer)
@@ -632,32 +630,14 @@ struct PickedMovie: Transferable {
   ContentView()
 }
 
-/// What the picture shows: video with the skeleton, video alone, or the skeleton on black (#7).
+/// What the picture shows: video with the skeleton, or video alone.
 enum OverlayMode: String, CaseIterable {
-  case both, video, skeleton
+  case both, video
 
-  var next: OverlayMode {
-    switch self {
-    case .both: return .video
-    case .video: return .skeleton
-    case .skeleton: return .both
-    }
-  }
+  var next: OverlayMode { self == .both ? .video : .both }
 
-  var symbol: String {
-    switch self {
-    case .both: return "eye"
-    case .video: return "eye.slash"
-    case .skeleton: return "figure.stand"
-    }
-  }
+  var symbol: String { self == .both ? "eye" : "eye.slash" }
 
   /// Names what the button will switch to.
-  var label: String {
-    switch self {
-    case .both: return "Show video and skeleton"
-    case .video: return "Show video only"
-    case .skeleton: return "Show skeleton only"
-    }
-  }
+  var label: String { self == .both ? "Show video and skeleton" : "Show video only" }
 }
