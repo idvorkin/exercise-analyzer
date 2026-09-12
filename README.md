@@ -38,19 +38,10 @@ just log-summary <file.jsonl>  # everything except per-frame events, plus frame 
 
 ## Test ladder
 
-Cheapest rung first; go up only when the lower one cannot answer the question.
-
-1. **Host** (`just test`, sub-second): `ExerciseCore` is a SwiftPM package that builds on macOS. Its tests replay
-   real pose tracks (`ExerciseCore/Tests/ExerciseCoreTests/Fixtures/*.json`, exported from the phone's
-   `Documents/recents/<id>/analysis.json`) through the detector and every analyzer and pin the rep counts.
-   `swift test --filter TuningReports` prints how an analyzer behaves under different thresholds and the phase
-   transitions it took (the analyzer's `trace` hook), which is how analyzers get tuned against a bad set.
-2. **Simulator** (`just test-sim`): builds the app, runs the pose model on the CPU, and drives it with the
-   `SWING_*` hooks below. Answers "does the app still load, analyze, trim and save".
-3. **Phone** (`just run-device`): the only rung with the Neural Engine, the camera, HDR playback and Photos.
-
-Any analyzer bug starts by exporting the set as a fixture and reproducing it on the host, never by tuning on the
-phone.
+Cheapest rung first: `just test` (host, ~1 s, everything in `ExerciseCore` against real pose tracks),
+`just test-sim` (simulator, minutes, the app end to end judged from its log), `just run-device` (phone: camera,
+HDR, Photos, watch). Which kind of change is verified where, how fixtures are made, the launch hooks, and the
+screenshot script are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Bug reports
 
