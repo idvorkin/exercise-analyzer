@@ -6,6 +6,18 @@ squats and Bulgarian split squats next. A native port of the analysis core and U
 
 User stories with per-feature verification status: [docs/USER_STORIES.md](docs/USER_STORIES.md).
 
+## Screenshots
+
+| Swing analysis | Skeleton only | Workouts |
+|---|---|---|
+| ![Swing analysis: HUD with rep count, phase pills and joint angles over the video, rep gallery below](docs/screenshots/swing-analysis.png) | ![Skeleton-only view](docs/screenshots/skeleton-only.png) | ![Workout gallery grouped by day and exercise](docs/screenshots/workouts.png) |
+
+| Bulgarian split squat | Pistol squat |
+|---|---|
+| ![Bulgarian split squat analysis](docs/screenshots/bulgarian-split-squat.png) | ![Pistol squat analysis](docs/screenshots/pistol-squat.png) |
+
+Captured from the simulator by `scripts/screenshots.sh` (sample clips, CPU inference, so the fps readout is low).
+
 ## What it does
 
 - **Live camera.** Records 720p while running `yolo26n-pose` and the swing state machine live for the HUD
