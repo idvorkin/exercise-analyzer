@@ -30,8 +30,17 @@ struct RecentEntry: Codable, Identifiable {
   var source: Source
   var thumbnail: String?
   var exercise: ExerciseKind?
+  /// Name of the clip as it was opened (Photos file name or the imported file), used to spot re-analyses.
+  var originalName: String?
 
   var exerciseKind: ExerciseKind { exercise ?? .kettlebellSwing }
+
+  /// Same Photos asset, or the same imported file name with the same length (within a frame or two).
+  func isSameClip(source other: Source, originalName name: String?, duration length: Double) -> Bool {
+    if case .photos(let a) = source, case .photos(let b) = other { return a == b }
+    guard let name, let mine = originalName, name == mine else { return false }
+    return abs(duration - length) < 0.1
+  }
 
   var isInPhotos: Bool {
     if case .photos = source { return true }
@@ -72,8 +81,12 @@ final class RecentsStore: ObservableObject {
   /// Adds or replaces an entry, writing its analysis, rep images, and (for file sources) the clip itself.
   func save(
     id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,
-    clipURL: URL?, thumbnail: UIImage?
+    clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil
   ) throws {
+    // Re-analyzing a clip replaces its earlier entry instead of adding a second set to the workout.
+    for old in entries where old.id != id && old.isSameClip(source: source, originalName: originalName, duration: duration) {
+      remove(id: old.id)
+    }
     let dir = folder(for: id)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
@@ -102,7 +115,7 @@ final class RecentsStore: ObservableObject {
     let entry = RecentEntry(
       id: id, analyzedAt: Date(), recordedAt: recordedAt, duration: duration,
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
-      source: source, thumbnail: thumbnailName, exercise: pipeline.exercise)
+      source: source, thumbnail: thumbnailName, exercise: pipeline.exercise, originalName: originalName)
     entries.removeAll { $0.id == id }
     entries.insert(entry, at: 0)
     try persistIndex()

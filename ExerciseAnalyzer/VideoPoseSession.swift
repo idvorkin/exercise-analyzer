@@ -280,7 +280,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     do {
       try recents.save(
         id: id, source: source, recordedAt: currentRecordedAt ?? Date(), duration: duration,
-        pipeline: pipeline, clipURL: clipURL, thumbnail: thumbnail)
+        pipeline: pipeline, clipURL: clipURL, thumbnail: thumbnail,
+        originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil)
       currentEntryID = id
       log.event("recents_saved", ["id": id, "reps": pipeline.reps.count, "in_photos": source.isPhotos])
     } catch {
