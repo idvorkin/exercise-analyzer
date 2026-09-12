@@ -854,25 +854,28 @@ final class VideoPoseSession: NSObject, ObservableObject {
       ["start_s": span.start, "end_s": span.end, "reps": analyzed.reps.count, "source_duration_s": clipDuration])
     let started = Date()
     do {
-      let clip = try await VideoFile.trim(url, start: span.start, end: span.end) { [weak self] progress in
+      let trimmed = try await VideoFile.trim(url, start: span.start, end: span.end) { [weak self] progress in
         Task { @MainActor in self?.activity = .working("Trimming", progress: progress) }
       }
-      log.event("trim_done", ["elapsed_s": Date().timeIntervalSince(started)])
+      let clip = trimmed.url
+      log.event(
+        "trim_done",
+        ["elapsed_s": Date().timeIntervalSince(started), "passthrough": trimmed.passthrough, "aligned_start_s": trimmed.start])
       trimmedURL = clip
       canSave = true
       log.event(
         "trim",
         [
-          "start_s": span.start, "end_s": span.end, "reps": analyzed.reps.count,
+          "start_s": trimmed.start, "requested_start_s": span.start, "end_s": span.end, "reps": analyzed.reps.count,
           "source_duration_s": clipDuration, "clip": clip.lastPathComponent,
         ])
       if thenAnalyze {
         await analyzeAndPlay(url: clip)
       } else {
         installPlayerItem(
-          url: clip, pipeline: analyzed.shifted(toStartAt: span.start, end: span.end))
+          url: clip, pipeline: analyzed.shifted(toStartAt: trimmed.start, end: span.end))
         extractedFrames = pipeline.track.frames
-        statusMessage = String(format: "Trimmed to %.1fs", span.end - span.start)
+        statusMessage = String(format: "Trimmed to %.1fs", span.end - trimmed.start)
         currentFileURL = clip
         rememberCurrent(clipURL: clip)
         activity = .idle

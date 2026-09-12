@@ -102,29 +102,53 @@ enum VideoFile {
     case photosDenied
   }
 
-  /// Re-encodes `start...end` of the clip into a new temp file. Passthrough export is deliberately avoided: cutting
-  /// mid-GOP leaves leading frames with negative timestamps and AVPlayer then starts the item several seconds in,
-  /// while AVAssetReader reads it from zero, so the replayed pose track no longer lines up with playback.
-  /// `progress` is called on an arbitrary thread roughly twice a second with the export's 0...1 progress.
+  /// Longest lead-in a passthrough cut may add ahead of the requested start.
+  static let maxKeyframeLead = 2.0
+
+  struct Trimmed {
+    let url: URL
+    /// Where the clip actually starts in the source: the requested start moved back to the previous keyframe.
+    let start: Double
+    let passthrough: Bool
+  }
+
+  /// Cuts `start...end` out of the clip without re-encoding (issue #13). The start is moved back to the sync
+  /// sample at or before it: a passthrough cut mid-GOP keeps the pre-roll samples and AVPlayer then begins at the
+  /// next keyframe, up to a second late, while AVAssetReader starts at the cut, so the pose track and playback
+  /// disagree. From a keyframe both start at zero. Falls back to an HEVC re-encode if the passthrough export is
+  /// refused. `progress` is called on an arbitrary thread roughly twice a second with the export's 0...1 progress.
   static func trim(
     _ url: URL, start: Double, end: Double, progress: (@Sendable (Double) -> Void)? = nil
-  ) async throws -> URL {
+  ) async throws -> Trimmed {
     let asset = AVURLAsset(url: url)
-    guard
-      let export = AVAssetExportSession(
-        asset: asset, presetName: AVAssetExportPresetHEVCHighestQuality)  // HEVC keeps HDR clips HDR
+    let keyframe = try? await syncSampleAtOrBefore(asset: asset, seconds: start)
+    // Camera clips have a keyframe about every second, so the lossless cut starts at most a second early. Clips
+    // with sparse keyframes (some transcodes have one every 8 s) are re-encoded from the exact start instead.
+    // The range starts at the keyframe's *decode* time: with B-frames it decodes before it is presented, and the
+    // exporter keeps a sample only if its decode time is inside the range. Cutting from the presentation time
+    // drops the keyframe and the clip then plays from the next one, seconds late on sparse-keyframe clips.
+    let usePassthrough = keyframe.map { start - $0.decode <= maxKeyframeLead } ?? false
+    let alignedStart = usePassthrough ? max(0, keyframe!.decode) : start
+    let range = CMTimeRange(
+      start: CMTime(seconds: alignedStart, preferredTimescale: 600),
+      end: CMTime(seconds: end, preferredTimescale: 600))
+    if usePassthrough, let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) {
+      let output = tempURL()
+      export.outputURL = output
+      export.outputFileType = .mov
+      export.timeRange = range
+      await export.export()
+      if export.status == .completed { return Trimmed(url: output, start: alignedStart, passthrough: true) }
+    }
+    // Re-encode: the HEVC preset keeps HDR clips HDR; the video composition forces every frame through the
+    // compositor so an H.264 track is not passed through untouched.
+    guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHEVCHighestQuality)
     else { throw VideoFileError.exportFailed("no export session") }
-    // The quality presets still pass an H.264 track through untouched; a video composition forces every frame
-    // through the compositor and therefore a clean re-encode.
-    export.videoComposition = try await AVMutableVideoComposition.videoComposition(
-      withPropertiesOf: asset)
-    let output = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "swing-trimmed-\(Int(Date().timeIntervalSince1970)).mov")
+    export.videoComposition = try await AVMutableVideoComposition.videoComposition(withPropertiesOf: asset)
+    let output = tempURL()
     export.outputURL = output
     export.outputFileType = .mov
-    export.timeRange = CMTimeRange(
-      start: CMTime(seconds: start, preferredTimescale: 600),
-      end: CMTime(seconds: end, preferredTimescale: 600))
+    export.timeRange = range
     let poller = Task {
       while !Task.isCancelled {
         try? await Task.sleep(for: .milliseconds(500))
@@ -137,7 +161,43 @@ enum VideoFile {
     guard export.status == .completed else {
       throw VideoFileError.exportFailed(export.error?.localizedDescription ?? "unknown")
     }
-    return output
+    return Trimmed(url: output, start: alignedStart, passthrough: false)
+  }
+
+  private static func tempURL() -> URL {
+    FileManager.default.temporaryDirectory.appendingPathComponent(
+      "swing-trimmed-\(Int(Date().timeIntervalSince1970 * 1000)).mov")
+  }
+
+  /// The last video keyframe at or before `seconds`: its presentation time and its decode time (earlier when the
+  /// stream has B-frames). Reads compressed samples only (no decode), a fraction of a second even for a long clip.
+  static func syncSampleAtOrBefore(asset: AVAsset, seconds: Double) async throws -> (presentation: Double, decode: Double) {
+    guard let track = try await asset.loadTracks(withMediaType: .video).first else { return (seconds, seconds) }
+    return try await Task.detached(priority: .userInitiated) {
+      let reader = try AVAssetReader(asset: asset)
+      let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+      output.alwaysCopiesSampleData = false
+      reader.add(output)
+      reader.timeRange = CMTimeRange(start: .zero, end: CMTime(seconds: seconds + 0.001, preferredTimescale: 600))
+      guard reader.startReading() else { throw VideoFileError.exportFailed("sample scan: \(String(describing: reader.error))") }
+      var last = (presentation: 0.0, decode: 0.0)
+      while let sample = output.copyNextSampleBuffer() {
+        let pts = CMSampleBufferGetPresentationTimeStamp(sample).seconds
+        let dtsTime = CMSampleBufferGetDecodeTimeStamp(sample)
+        let dts = dtsTime.isValid ? dtsTime.seconds : pts
+        // A time-ranged read ends with empty placeholder samples (invalid PTS, then one at the range end)
+        // that carry the sync flag; only real samples count.
+        guard pts.isFinite, CMSampleBufferGetTotalSampleSize(sample) > 0 else { continue }
+        var sync = true
+        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[CFString: Any]],
+          let first = attachments.first, let notSync = first[kCMSampleAttachmentKey_NotSync] as? Bool, notSync
+        {
+          sync = false
+        }
+        if sync, pts <= seconds, pts > last.presentation { last = (pts, min(dts, pts)) }
+      }
+      return last
+    }.value
   }
 
   /// Saves the clip to Photos and returns the new asset's local identifier.
