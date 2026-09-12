@@ -301,6 +301,14 @@ struct ContentView: View {
         Label("Flip camera", systemImage: "arrow.triangle.2.circlepath.camera")
       }
       .labelStyle(.iconOnly).font(.title3)
+      Button {
+        session.cycleZoom()
+      } label: {
+        Text(Self.zoomLabel(session.cameraZoom)).font(.headline.monospacedDigit())
+          .padding(.horizontal, 10).padding(.vertical, 4)
+          .background(Color(.secondarySystemFill), in: Capsule())
+      }
+      .accessibilityLabel("Zoom \(Self.zoomLabel(session.cameraZoom)), tap for the next level")
       Spacer()
       Button {
         session.finishCamera()
@@ -640,4 +648,10 @@ enum OverlayMode: String, CaseIterable {
 
   /// Names what the button will switch to.
   var label: String { self == .both ? "Show video and skeleton" : "Show video only" }
+}
+
+extension ContentView {
+  static func zoomLabel(_ zoom: Double) -> String {
+    zoom == zoom.rounded() ? "\(Int(zoom))×" : String(format: "%.1f×", zoom)
+  }
 }

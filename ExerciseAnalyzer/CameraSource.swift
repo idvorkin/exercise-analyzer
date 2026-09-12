@@ -12,6 +12,10 @@ final class CameraSource: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
   let position: AVCaptureDevice.Position
   let previewLayer: AVCaptureVideoPreviewLayer
+  private let device: AVCaptureDevice
+  /// User-facing zoom presets available on this camera (0.5× needs the ultra-wide; the front camera has 1× only).
+  let zoomPresets: [Double]
+  private(set) var zoom: Double = 1
   /// Called on the capture queue for every frame.
   var onFrame: ((CMSampleBuffer) -> Void)?
 
@@ -20,12 +24,19 @@ final class CameraSource: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
   private let queue = DispatchQueue(label: "swing.camera")
 
   init(position: AVCaptureDevice.Position, orientation: AVCaptureVideoOrientation) throws {
+    // The back camera prefers a virtual device that spans the ultra-wide and wide lenses so 0.5× is available;
+    // zoom factors below the first switch-over factor select the ultra-wide.
+    let backTypes: [AVCaptureDevice.DeviceType] = [.builtInDualWideCamera, .builtInTripleCamera, .builtInWideAngleCamera]
+    let candidates = position == .back ? backTypes : [.builtInWideAngleCamera]
+    guard let device = candidates.lazy.compactMap({ AVCaptureDevice.default($0, for: .video, position: position) }).first
+    else { throw CameraError.noCamera }
     self.position = position
+    self.device = device
+    let wideFactor = device.virtualDeviceSwitchOverVideoZoomFactors.first.map { Double(truncating: $0) } ?? 1
+    zoomPresets = wideFactor > 1 ? [0.5, 1, 2] : [1, 2]
     previewLayer = AVCaptureVideoPreviewLayer(session: session)
     super.init()
 
-    guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
-    else { throw CameraError.noCamera }
     let input = try AVCaptureDeviceInput(device: device)
 
     // Video only, and leave the app's audio session alone so music keeps playing while recording.
@@ -56,6 +67,22 @@ final class CameraSource: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
   func start() {
     queue.async { [session] in
       if !session.isRunning { session.startRunning() }
+    }
+    setZoom(1)
+  }
+
+  /// Sets a user-facing zoom (0.5, 1, 2): on a virtual device 1× is the first switch-over factor (the wide lens),
+  /// so the device factor is the display value times that; clamped to what the device allows.
+  func setZoom(_ display: Double) {
+    let wideFactor = device.virtualDeviceSwitchOverVideoZoomFactors.first.map { Double(truncating: $0) } ?? 1
+    let factor = min(max(display * wideFactor, Double(device.minAvailableVideoZoomFactor)), Double(device.maxAvailableVideoZoomFactor))
+    do {
+      try device.lockForConfiguration()
+      device.videoZoomFactor = CGFloat(factor)
+      device.unlockForConfiguration()
+      zoom = display
+    } catch {
+      // leave the zoom as it was; the session logs the request
     }
   }
 

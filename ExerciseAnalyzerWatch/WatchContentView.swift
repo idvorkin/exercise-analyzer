@@ -51,8 +51,16 @@ struct WatchContentView: View {
           if !status.exercise.isEmpty {
             Text(status.exercise).font(.caption2).foregroundStyle(.secondary)
           }
-          Button { phone.send(.switchCamera) } label: {
-            Label("Switch camera", systemImage: "arrow.triangle.2.circlepath.camera").frame(maxWidth: .infinity)
+          HStack(spacing: 6) {
+            Button { phone.send(.switchCamera) } label: {
+              Label("Switch", systemImage: "arrow.triangle.2.circlepath.camera").frame(maxWidth: .infinity)
+            }
+            if status.zoomPresets.count > 1 {
+              Button { phone.send(.zoom) } label: {
+                Text(status.zoom == status.zoom.rounded() ? "\(Int(status.zoom))×" : String(format: "%.1f×", status.zoom))
+                  .font(.headline.monospacedDigit()).frame(maxWidth: .infinity)
+              }
+            }
           }
           Button { phone.send(.finish) } label: {
             Label("Done", systemImage: "checkmark.circle.fill").frame(maxWidth: .infinity)

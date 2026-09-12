@@ -55,6 +55,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var duration = 0.0
   @Published private(set) var cameraPreviewLayer: AVCaptureVideoPreviewLayer?
   @Published private(set) var cameraPosition: AVCaptureDevice.Position = .back
+  @Published private(set) var cameraZoom: Double = 1
   /// Whether the athlete is inside the picture (live camera only); mirrored to the watch.
   @Published private(set) var frameStatus = FrameStatus(box: nil, pose: nil)
   let watch = WatchBridge()
@@ -738,21 +739,48 @@ final class VideoPoseSession: NSObject, ObservableObject {
     if source == .camera {
       frameStatus = FrameStatus(box: frame.box, pose: frame.pose)
       pushWatchStatus()
+      if watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
+        lastPreviewSent = Date()
+        if let small = FrameImage.thumbnail(from: pending.pixelBuffer, longSide: 176),
+          let jpeg = UIImage(cgImage: small).jpegData(compressionQuality: 0.45)
+        {
+          watch.sendPreview(jpeg)
+        }
+      }
     }
   }
+
+  private var lastPreviewSent = Date.distantPast
 
   // MARK: - Watch companion
 
   private var lastWatchHeartbeat = Date.distantPast
+  private var cancellables = Set<AnyCancellable>()
+  private var keepAwake = false
+
+  /// The phone must stay in front for the watch to start a set (iOS keeps the camera and the foreground away from
+  /// a backgrounded app), so while the app is open and a watch is connected the phone does not auto-lock.
+  private func updateKeepAwake() {
+    let active = UIApplication.shared.applicationState == .active
+    let wanted = active && (source == .camera || watch.reachable)
+    guard wanted != keepAwake else { return }
+    keepAwake = wanted
+    UIApplication.shared.isIdleTimerDisabled = wanted
+    log.event("keep_awake", ["on": wanted, "recording": source == .camera, "watch_reachable": watch.reachable])
+  }
 
   private func pushWatchStatus(force: Bool = false) {
     // Heartbeat: the watch marks a status stale after 8 s, so resend at least every 3 s while recording.
     let heartbeat = source == .camera && Date().timeIntervalSince(lastWatchHeartbeat) > 3
     if force || heartbeat { lastWatchHeartbeat = Date() }
-    let status = WatchStatus(
+    var status = WatchStatus(
       recording: source == .camera, frame: frameStatus, reps: pipeline.reps.count,
       phase: latestFrame?.analysis?.phase ?? "", elapsed: source == .camera ? duration : 0,
-      camera: cameraPosition == .front ? "front" : "back", exercise: exercise.definition.name)
+      camera: cameraPosition == .front ? "front" : "back", exercise: exercise.definition.name,
+      phoneActive: UIApplication.shared.applicationState == .active)
+    status.mode = exerciseMode.storageValue
+    status.zoom = camera?.zoom ?? 1
+    status.zoomPresets = camera?.zoomPresets ?? [1]
     watch.send(status, force: force || heartbeat)
   }
 
@@ -774,6 +802,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     case .finish: if source == .camera { finishCamera() }
     case .cancel: if source == .camera { cancelCamera() }
     case .status: pushWatchStatus(force: true)
+    case .zoom: cycleZoom()
+    case .exercise: break  // carries a payload; handled by onExercise
     }
   }
 
@@ -861,6 +891,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       self.camera = camera
       cameraPosition = position
+      cameraZoom = 1
       cameraPreviewLayer = camera.previewLayer
       source = .camera
       log.event("camera_start", ["position": position == .front ? "front" : "back"])
@@ -879,6 +910,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
     duration = time
     currentTime = time
     ingest(pixelBuffer: pixelBuffer, time: time)
+  }
+
+  /// Steps the live camera to its next zoom preset (0.5× → 1× → 2× on the back camera).
+  func cycleZoom() {
+    guard let camera, source == .camera else { return }
+    let presets = camera.zoomPresets
+    guard let index = presets.firstIndex(of: camera.zoom) ?? presets.firstIndex(of: 1) else { return }
+    let next = presets[(index + 1) % presets.count]
+    camera.setZoom(next)
+    cameraZoom = camera.zoom
+    log.event("camera_zoom", ["zoom": camera.zoom, "presets": presets])
+    pushWatchStatus(force: true)
   }
 
   /// Switches between the front and back camera. While recording, the recorder and the analysis carry on

@@ -66,8 +66,19 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   public var elapsed: Double
   public var camera: String
   public var exercise: String
+  /// Exercise mode the phone is in: "auto" or an ExerciseKind raw value (for the watch's picker).
+  public var mode: String = "auto"
+  /// Current camera zoom (0.5, 1, 2) and the presets the camera offers.
+  public var zoom: Double = 1
+  public var zoomPresets: [Double] = [1]
+  /// False when the phone app is in the background: iOS then allows neither the camera nor coming to the front,
+  /// so the watch shows what to do instead of a dead Record button.
+  public var phoneActive: Bool
 
-  public init(recording: Bool, frame: FrameStatus, reps: Int, phase: String, elapsed: Double, camera: String, exercise: String) {
+  public init(
+    recording: Bool, frame: FrameStatus, reps: Int, phase: String, elapsed: Double, camera: String, exercise: String,
+    phoneActive: Bool = true
+  ) {
     self.recording = recording
     self.frame = frame
     self.reps = reps
@@ -75,6 +86,26 @@ public struct WatchStatus: Codable, Equatable, Sendable {
     self.elapsed = elapsed
     self.camera = camera
     self.exercise = exercise
+    self.phoneActive = phoneActive
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case recording, frame, reps, phase, elapsed, camera, exercise, phoneActive, mode, zoom, zoomPresets
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    recording = try c.decode(Bool.self, forKey: .recording)
+    frame = try c.decode(FrameStatus.self, forKey: .frame)
+    reps = try c.decode(Int.self, forKey: .reps)
+    phase = try c.decode(String.self, forKey: .phase)
+    elapsed = try c.decode(Double.self, forKey: .elapsed)
+    camera = try c.decode(String.self, forKey: .camera)
+    exercise = try c.decode(String.self, forKey: .exercise)
+    phoneActive = try c.decodeIfPresent(Bool.self, forKey: .phoneActive) ?? true
+    mode = try c.decodeIfPresent(String.self, forKey: .mode) ?? "auto"
+    zoom = try c.decodeIfPresent(Double.self, forKey: .zoom) ?? 1
+    zoomPresets = try c.decodeIfPresent([Double].self, forKey: .zoomPresets) ?? [1]
   }
 
   public static let idle = WatchStatus(
@@ -86,4 +117,8 @@ public enum WatchCommand: String, Codable, CaseIterable, Sendable {
   case start, switchCamera, finish, cancel
   /// The watch asks for a fresh status (it treats anything older than a few seconds as stale).
   case status
+  /// Pick the exercise (message carries "exercise": ExerciseKind raw value or "auto").
+  case exercise
+  /// Step to the next zoom preset on the current camera.
+  case zoom
 }
