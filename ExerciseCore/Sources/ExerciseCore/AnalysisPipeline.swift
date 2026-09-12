@@ -19,6 +19,12 @@ public final class AnalysisPipeline: @unchecked Sendable {
     analyzer = exercise.makeAnalyzer()
   }
 
+  /// For tuning and tests: run a specific analyzer instance (e.g. custom thresholds).
+  public init(exercise: ExerciseKind, analyzer: ExerciseAnalyzer) {
+    self.exercise = exercise
+    self.analyzer = analyzer
+  }
+
   public func reset() {
     analyzer.reset()
     track.removeAll()

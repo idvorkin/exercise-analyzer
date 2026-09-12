@@ -4,3 +4,5 @@ Build/
 xcuserdata/
 *.xcuserstate
 .DS_Store
+# SwiftPM build products
+.build/

@@ -1,22 +1,28 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 //  Bulgarian split squat: rear foot elevated on a bench, front leg does the work.
-//  Phases: STANDING → DESCENDING → BOTTOM → ASCENDING → STANDING (rep complete), driven by the front knee angle
-//  with the bottom taken from the lowest head position, like the pistol squat. The front leg is the one whose
-//  foot sits lower on screen (the rear foot is up on the bench).
+//  Phases: STANDING → DESCENDING → BOTTOM → ASCENDING → STANDING (rep complete), driven by head height relative to
+//  the standing height (scaled by leg length): the front knee often bends only modestly in a split squat, so it
+//  scores quality but does not gate the phases. The front leg is the one whose foot sits lower on screen (the
+//  rear foot is up on the bench).
 
 import CoreGraphics
 import Foundation
 
 public struct BulgarianSplitSquatThresholds {
   public init() {}
-  public var standingKneeMin = 150.0  // front knee nearly straight at the top
-  public var standingSpineMax = 35.0  // a forward lean is normal in a hip-dominant split squat
-  public var descendingKneeThreshold = 140.0
-  public var ascendingKneeThreshold = 95.0
+  /// Head must drop this fraction of the standing body height (front ankle to ear) to count as descending.
+  public var descendFraction = 0.08
+  /// Head must rise this fraction of body height off the lowest point for the bottom to be confirmed.
+  public var riseFraction = 0.02
+  /// Head must come back within this fraction of body height of the standing height to complete the rep.
+  public var returnFraction = 0.05
   public var maxValidSpineAngle = 60.0
-  /// Rear ankle must sit this much higher than the front ankle (as a fraction of the front leg length) to vote.
-  public var elevationVoteFraction = 0.2
+  /// Rear ankle must sit this much higher than the front ankle (as a fraction of body height) to count as elevated.
+  public var elevationVoteFraction = 0.12
+  /// A rep may only start when at least this fraction of the last second showed the rear foot elevated; keeps
+  /// setup crouches with both feet on the floor from counting.
+  public var elevatedRecentlyFraction = 0.3
 }
 
 public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
@@ -45,13 +51,19 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
   private let thresholds: BulgarianSplitSquatThresholds
   private let machine = PhaseStateMachine(initialPhase: BulgarianSplitSquatAnalyzer.standing)
   private let legs = SingleLegTracker(asymmetryVoteThreshold: 20)
-  private var kneeHistory: [Double] = []
-  private var smoothedKnee: Double?
   private var standingEarY: Double?
   private var bottomCandidate: SingleLegFrame?
   private var bottomImage: CGImage?
   private var framesAscendingAfterBottom = 0
   private var frameHistory: [SingleLegFrame] = []
+  /// Standing body height on screen (front ankle to ear), learned while standing with the rear foot up and
+  /// frozen during a rep; all head-travel thresholds scale by it.
+  private var bodyHeight: Double?
+  private var elevatedFlags: [Bool] = []
+  private var repStartTime = 0.0
+  private var frameCounter = 0
+  /// Phase transitions and the values that triggered them, for tuning reports and the session log.
+  public var trace: ((String) -> Void)?
 
   private struct RepMetrics {
     var minFrontKnee = 180.0
@@ -67,25 +79,38 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
   public func reset() {
     machine.resetState(to: Self.standing)
     legs.reset()
-    kneeHistory = []
-    smoothedKnee = nil
     standingEarY = nil
     bottomCandidate = nil
     bottomImage = nil
     framesAscendingAfterBottom = 0
     frameHistory = []
+    bodyHeight = nil
+    elevatedFlags = []
+    repStartTime = 0
     metrics = RepMetrics()
   }
 
+  private var elevatedRecently: Bool {
+    guard !elevatedFlags.isEmpty else { return false }
+    return Double(elevatedFlags.filter { $0 }.count) / Double(elevatedFlags.count) >= thresholds.elevatedRecentlyFraction
+  }
+
+  private func observeFeet(_ skeleton: BodySkeleton, front: BodySide, scale: Double) {
+    guard let frontY = skeleton.ankleY(front), let rearY = skeleton.ankleY(front.other) else { return }
+    elevatedFlags.append(frontY - rearY > scale * thresholds.elevationVoteFraction)
+    if elevatedFlags.count > 30 { elevatedFlags.removeFirst() }
+  }
+
   /// The front leg is the one whose ankle is lower on screen by a clear margin (rear foot is on the bench).
+  /// The margin scales by body height on screen so a slight stagger with both feet on the floor never votes.
   private func voteFrontLeg(_ skeleton: BodySkeleton) {
     guard legs.workingLeg == nil, let leftY = skeleton.ankleY(.left), let rightY = skeleton.ankleY(.right),
-      let leftHip = skeleton.point(.leftHip), let leftAnkle = skeleton.point(.leftAnkle)
+      let earY = skeleton.earY
     else { return }
-    let legLength = Double(abs(leftAnkle.y - leftHip.y))
-    guard legLength > 0 else { return }
+    let height = max(leftY, rightY) - earY
+    guard height > 0 else { return }
     let diff = leftY - rightY  // positive: left ankle lower on screen → left is the front foot
-    if abs(diff) > legLength * thresholds.elevationVoteFraction {
+    if abs(diff) > height * thresholds.elevationVoteFraction {
       legs.vote(for: diff > 0 ? .left : .right)
     }
   }
@@ -101,18 +126,26 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
       "frontKnee": frontKnee, "rearKnee": rearKnee, "hip": skeleton.hipAngle(front), "spine": spine,
       "depth": SingleLegTracker.depthPercent(knee: frontKnee),
     ]
-    let earY = skeleton.earY ?? 0
 
-    guard spine <= thresholds.maxValidSpineAngle else {
+    // Phases run on head height (ear Y, larger = lower on screen) scaled by the front leg's length, which is
+    // robust for split squats where the front knee may bend only modestly.
+    guard spine <= thresholds.maxValidSpineAngle, let earY = skeleton.earY, let ankleY = skeleton.ankleY(front)
+    else {
       return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil)
     }
-
-    let clamped = max(30, frontKnee)
-    let smoothed = smoothedKnee.map { 0.3 * clamped + 0.7 * $0 } ?? clamped
-    smoothedKnee = smoothed
-    kneeHistory.append(smoothed)
-    if kneeHistory.count > 10 { kneeHistory.removeFirst(kneeHistory.count - 10) }
-
+    let currentHeight = max(ankleY - earY, 1)
+    observeFeet(skeleton, front: front, scale: bodyHeight ?? currentHeight)
+    if machine.phase == Self.standing, elevatedRecently {
+      bodyHeight = bodyHeight.map { $0 * 0.9 + currentHeight * 0.1 } ?? currentHeight
+    }
+    let legLength = bodyHeight ?? currentHeight
+    frameCounter += 1
+    if frameCounter % 15 == 0 {
+      trace?(String(format: "%.2fs %@ ear %.0f top %@ height %.0f elevated %.2f front %@", time, machine.phase, earY,
+        standingEarY.map { String(format: "%.0f", $0) } ?? "-", legLength,
+        elevatedFlags.isEmpty ? 0 : Double(elevatedFlags.filter { $0 }.count) / Double(elevatedFlags.count),
+        legs.workingLeg.map { "\($0)" } ?? "-"))
+    }
     let frame = SingleLegFrame(pose: pose, time: time, earY: earY, metrics: m)
     frameHistory.append(frame)
     if frameHistory.count > 120 { frameHistory.removeFirst() }
@@ -125,17 +158,22 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     var completedRep: RepRecord?
     switch machine.phase {
     case Self.standing:
-      if machine.canTransition && frontKnee < thresholds.descendingKneeThreshold {
+      // The standing height is the highest the head has been while standing.
+      standingEarY = min(standingEarY ?? earY, earY)
+      if !elevatedRecently {
+        standingEarY = nil  // both feet on the floor: not set up yet, forget the standing height
+      } else if machine.canTransition, let top = standingEarY, earY > top + legLength * thresholds.descendFraction {
+        trace?(String(format: "%.2fs descending: ear %.0f > top %.0f + %.0f", time, earY, top, legLength * thresholds.descendFraction))
+        repStartTime = time
         machine.storePeak(
-          RepPosition(phase: Self.standing, time: time, pose: pose, metrics: m, score: frontKnee, image: image()))
-        standingEarY = earY
+          RepPosition(phase: Self.standing, time: time, pose: pose, metrics: m, score: -earY, image: image()))
         machine.transition(to: Self.descending)
         bottomCandidate = nil
         bottomImage = nil
         framesAscendingAfterBottom = 0
       }
     case Self.descending:
-      if let candidate = bottomCandidate, earY < candidate.earY - 5 {
+      if let candidate = bottomCandidate, earY < candidate.earY - legLength * thresholds.riseFraction {
         framesAscendingAfterBottom += 1
       } else if bottomCandidate == nil || earY >= bottomCandidate!.earY {
         framesAscendingAfterBottom = 0
@@ -146,13 +184,14 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
         framesAscendingAfterBottom = 0
       }
       if machine.canTransition, let bottom = bottomCandidate, framesAscendingAfterBottom >= 3 {
+        trace?(String(format: "%.2fs ascending: bottom ear %.0f at %.2fs", time, bottom.earY, bottom.time))
         machine.storePeak(
           RepPosition(
             phase: Self.bottom, time: bottom.time, pose: bottom.pose, metrics: bottom.metrics,
             score: bottom.earY, image: bottomImage))
         if let standingEarY {
           let target = standingEarY + (bottom.earY - standingEarY) * 0.5
-          if let closest = frameHistory.filter({ $0.time < bottom.time })
+          if let closest = frameHistory.filter({ $0.time >= repStartTime && $0.time < bottom.time })
             .min(by: { abs($0.earY - target) < abs($1.earY - target) })
           {
             machine.storePeak(
@@ -161,29 +200,25 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
                 score: closest.earY, image: nil))
           }
         }
-        machine.transition(to: Self.bottom)
-      }
-    case Self.bottom:
-      if machine.canTransition, kneeHistory.count >= 2, kneeHistory[kneeHistory.count - 1] > kneeHistory[kneeHistory.count - 2],
-        frontKnee > thresholds.ascendingKneeThreshold
-      {
         machine.transition(to: Self.ascending)
       }
-    default:  // ascending
-      if machine.canTransition && frontKnee > thresholds.standingKneeMin && spine < thresholds.standingSpineMax {
-        if let standingEarY, let bottom = bottomCandidate {
-          let target = bottom.earY - (bottom.earY - standingEarY) * 0.5
+    default:  // ascending: back near the standing height completes the rep
+      if machine.canTransition, let top = standingEarY, earY < top + legLength * thresholds.returnFraction {
+        trace?(String(format: "%.2fs rep %d done: ear %.0f < top %.0f + %.0f", time, machine.repCount + 1, earY, top, legLength * thresholds.returnFraction))
+        if let bottom = bottomCandidate {
+          let target = bottom.earY - (bottom.earY - top) * 0.5
           if let closest = frameHistory.filter({ $0.time > bottom.time })
             .min(by: { abs($0.earY - target) < abs($1.earY - target) })
           {
             machine.storePeak(
               RepPosition(
                 phase: Self.ascending, time: closest.time, pose: closest.pose, metrics: closest.metrics,
-                score: 180 - (closest.metrics["frontKnee"] ?? 0), image: nil))
+                score: -closest.earY, image: nil))
           }
         }
         completedRep = machine.completeRep(quality: calculateRepQuality())
         machine.transition(to: Self.standing)
+        standingEarY = earY
         metrics = RepMetrics()
       }
     }

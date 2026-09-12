@@ -22,7 +22,10 @@ struct Fixture {
     Fixture(name: "swing-1h-9reps", expectedExercise: .kettlebellSwing, expectedReps: 9, humanVerified: true),
     Fixture(name: "swing-phone-13reps", expectedExercise: .kettlebellSwing, expectedReps: 13, humanVerified: true),
     Fixture(name: "pistol-6reps", expectedExercise: .pistolSquat, expectedReps: 6, humanVerified: false),
-    Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 10, humanVerified: false),
+    // Head height drops 8 times at a steady ~4.2 s rhythm; the earlier front-knee analyzer counted 10.
+    Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
+    // Igor's gym set (prod bug report 2026-09-12): 8 head drops at a ~4 s rhythm, setup crouches at both ends.
+    Fixture(name: "bulgarian-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
   ]
 
   func frames() throws -> [FrameRecord] {
