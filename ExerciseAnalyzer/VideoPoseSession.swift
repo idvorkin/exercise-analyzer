@@ -87,6 +87,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   private var camera: CameraSource?
   private var recorder: FrameRecorder?
+  /// Orientation the capture is rotated to; a rotation mid-recording restarts the capture into a new segment.
+  private var cameraOrientation: AVCaptureVideoOrientation = .portrait
+  private var recordedSegments: [URL] = []
   private var cameraFirstTime: Double?
   private var cameraFramesDelivered = 0
   private var cameraFramesAnalyzed = 0
@@ -149,6 +152,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     loadModel()
     RecordPrompt.prepare(log: log)
+    UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+    NotificationCenter.default.addObserver(forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main) {
+      [weak self] _ in
+      Task { @MainActor in self?.deviceRotated() }
+    }
     for name in [UIApplication.didBecomeActiveNotification, UIApplication.willResignActiveNotification] {
       NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
         Task { @MainActor in
@@ -866,6 +874,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     cameraFirstTime = nil
     cameraFramesDelivered = 0
     cameraFramesAnalyzed = 0
+    recordedSegments = []
 
     AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
       Task { @MainActor in
@@ -892,9 +901,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Builds the capture source for `position`, feeding frames to the current recorder and the analyzer.
-  private func attachCamera(position: AVCaptureDevice.Position) {
+  private func attachCamera(position: AVCaptureDevice.Position, orientation: AVCaptureVideoOrientation? = nil) {
     do {
-      let camera = try CameraSource(position: position, orientation: currentVideoOrientation())
+      let orientation = orientation ?? currentVideoOrientation()
+      cameraOrientation = orientation
+      let camera = try CameraSource(position: position, orientation: orientation)
       camera.onFrame = { [weak self] sampleBuffer in
         self?.recorder?.append(sampleBuffer)
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
@@ -922,6 +933,42 @@ final class VideoPoseSession: NSObject, ObservableObject {
     duration = time
     currentTime = time
     ingest(pixelBuffer: pixelBuffer, time: time)
+  }
+
+  /// The phone turned while the camera runs: the frame follows the phone. The recorder cannot change frame size
+  /// mid-file, so the capture restarts into a new segment with the same analysis running on; Done stitches the
+  /// segments into one clip (issue #22).
+  private func deviceRotated() {
+    guard source == .camera, let camera else { return }
+    let wanted: AVCaptureVideoOrientation
+    switch UIDevice.current.orientation {
+    case .portrait: wanted = .portrait
+    case .portraitUpsideDown: wanted = .portraitUpsideDown
+    case .landscapeLeft: wanted = .landscapeRight  // device turned left: the home edge is on the right
+    case .landscapeRight: wanted = .landscapeLeft
+    default: return  // face up, face down, unknown: keep what we have
+    }
+    guard wanted != cameraOrientation else { return }
+    let position = cameraPosition
+    let zoom = camera.zoom
+    camera.stop()
+    let finished = recorder
+    let next = FrameRecorder()
+    next.onError = finished?.onError
+    recorder = next
+    log.event(
+      "camera_rotate",
+      ["from": cameraOrientation.rawValue, "to": wanted.rawValue, "segment": recordedSegments.count + 1, "at_s": duration])
+    attachCamera(position: position, orientation: wanted)
+    if zoom != 1, let back = self.camera, back.zoomPresets.contains(zoom) {
+      back.setZoom(zoom)
+      cameraZoom = back.zoom
+    }
+    Task {
+      if let finished, let url = await finished.finish() ?? finished.partialURL {
+        recordedSegments.append(url)
+      }
+    }
   }
 
   /// One control for the three views that matter at the gym: front → back 0.5× → back 1× → front.
@@ -1016,12 +1063,29 @@ final class VideoPoseSession: NSObject, ObservableObject {
         statusMessage = "Recording was cut short, keeping what was captured"
         log.event("recording_partial", ["url": url.lastPathComponent, "duration_s": recordedDuration])
       }
-      currentFileURL = url
+      var clipURL = url
+      if !recordedSegments.isEmpty {
+        // Rotated mid-set: join the segments into one clip before trimming and analysis.
+        let segments = recordedSegments + [url]
+        recordedSegments = []
+        activity = .working("Joining \(segments.count) segments", progress: 0)
+        let started = Date()
+        do {
+          clipURL = try await VideoFile.stitch(segments) { [weak self] progress in
+            Task { @MainActor in self?.activity = .working("Joining segments", progress: progress) }
+          }
+          log.event("stitch", ["segments": segments.count, "elapsed_s": Date().timeIntervalSince(started), "clip": clipURL.lastPathComponent])
+        } catch {
+          log.event("error", ["where": "stitch", "message": "\(error)"])
+          statusMessage = "Couldn't join the rotated segments; keeping the last one"
+        }
+      }
+      currentFileURL = clipURL
       currentOrigin = .recording
       currentEntryID = nil
       currentRecordedAt = Date()
       canSave = true
-      await trim(url: url, using: livePipeline, thenAnalyze: true)
+      await trim(url: clipURL, using: livePipeline, thenAnalyze: true)
     }
   }
 

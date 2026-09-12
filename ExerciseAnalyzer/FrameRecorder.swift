@@ -164,6 +164,69 @@ enum VideoFile {
     return Trimmed(url: output, start: alignedStart, passthrough: false)
   }
 
+  /// Joins recordings made in different orientations into one clip: each segment is scaled to fit the first
+  /// segment's display size (letterboxed when the shapes differ) and the result is re-encoded (issue #22).
+  static func stitch(_ urls: [URL], progress: (@Sendable (Double) -> Void)? = nil) async throws -> URL {
+    let composition = AVMutableComposition()
+    guard let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+    else { throw VideoFileError.exportFailed("no composition track") }
+    var instructions: [AVMutableVideoCompositionInstruction] = []
+    var renderSize = CGSize.zero
+    var cursor = CMTime.zero
+    for url in urls {
+      let asset = AVURLAsset(url: url)
+      guard let source = try await asset.loadTracks(withMediaType: .video).first else { continue }
+      let duration = try await asset.load(.duration)
+      let natural = try await source.load(.naturalSize)
+      let transform = try await source.load(.preferredTransform)
+      let display = natural.applying(transform)
+      let displaySize = CGSize(width: abs(display.width), height: abs(display.height))
+      if renderSize == .zero { renderSize = displaySize }
+      try track.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: source, at: cursor)
+      // Fit this segment's displayed picture into the render size, centred.
+      let scale = min(renderSize.width / displaySize.width, renderSize.height / displaySize.height)
+      let fitted = CGSize(width: displaySize.width * scale, height: displaySize.height * scale)
+      let offset = CGPoint(x: (renderSize.width - fitted.width) / 2, y: (renderSize.height - fitted.height) / 2)
+      // preferredTransform maps natural → display coordinates (possibly with a negative origin); normalise it so the
+      // displayed picture starts at (0, 0), then scale and centre.
+      let displayRect = CGRect(origin: .zero, size: natural).applying(transform)
+      let normalised = transform.concatenating(CGAffineTransform(translationX: -displayRect.minX, y: -displayRect.minY))
+      let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
+      layer.setTransform(
+        normalised.concatenating(CGAffineTransform(scaleX: scale, y: scale))
+          .concatenating(CGAffineTransform(translationX: offset.x, y: offset.y)), at: cursor)
+      let instruction = AVMutableVideoCompositionInstruction()
+      instruction.timeRange = CMTimeRange(start: cursor, duration: duration)
+      instruction.layerInstructions = [layer]
+      instructions.append(instruction)
+      cursor = cursor + duration
+    }
+    guard renderSize != .zero else { throw VideoFileError.exportFailed("no video in segments") }
+    let videoComposition = AVMutableVideoComposition()
+    videoComposition.renderSize = renderSize
+    videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+    videoComposition.instructions = instructions
+    guard let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHEVCHighestQuality)
+    else { throw VideoFileError.exportFailed("no export session") }
+    let output = tempURL()
+    export.outputURL = output
+    export.outputFileType = .mov
+    export.videoComposition = videoComposition
+    let poller = Task {
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .milliseconds(500))
+        if Task.isCancelled { break }
+        progress?(Double(export.progress))
+      }
+    }
+    await export.export()
+    poller.cancel()
+    guard export.status == .completed else {
+      throw VideoFileError.exportFailed(export.error?.localizedDescription ?? "unknown")
+    }
+    return output
+  }
+
   private static func tempURL() -> URL {
     FileManager.default.temporaryDirectory.appendingPathComponent(
       "swing-trimmed-\(Int(Date().timeIntervalSince1970 * 1000)).mov")
