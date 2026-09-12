@@ -32,6 +32,9 @@ public final class ExerciseDetector {
   private var armSwingFrames = 0
   private var armCycles = 0
   private var armIsHigh = false
+  private var uprightFrames = 0
+  private var lyingFrames = 0
+  private var standingFrames = 0
 
   public func reset() {
     frameCount = 0
@@ -42,11 +45,19 @@ public final class ExerciseDetector {
     armSwingFrames = 0
     armCycles = 0
     armIsHigh = false
+    uprightFrames = 0
+    lyingFrames = 0
+    standingFrames = 0
   }
 
   public func observe(pose: Pose) {
     let skeleton = BodySkeleton(pose: pose)
     frameCount += 1
+    // A get-up is the only exercise here that spends time on the floor.
+    if let upright = skeleton.uprightness {
+      uprightFrames += 1
+      if upright < 0.15 { lyingFrames += 1 } else if upright > 0.85 { standingFrames += 1 }
+    }
     // A swing's arms cycle between hanging (<30°) and near horizontal (>50°) every rep. A pistol squat holds the
     // arms out for balance, so "arms horizontal" alone isn't enough; count the cycles.
     let arm = skeleton.armToVerticalAngle
@@ -90,7 +101,10 @@ public final class ExerciseDetector {
       ? 0 : Double(asymmetries.filter { $0 > asymmetryThreshold }.count) / Double(asymmetries.count)
     let elevatedRatio = measuredFrames > 0 ? Double(elevatedFrames) / Double(measuredFrames) : 0
     let armSwingRatio = frameCount > 0 ? Double(armSwingFrames) / Double(frameCount) : 0
+    let lyingRatio = uprightFrames > 0 ? Double(lyingFrames) / Double(uprightFrames) : 0
+    let standingRatio = uprightFrames > 0 ? Double(standingFrames) / Double(uprightFrames) : 0
     let stats: [String: Double] = [
+      "lying_ratio": lyingRatio, "standing_ratio": standingRatio,
       "frames": Double(frameCount), "max_asymmetry": maxAsymmetry, "p95_asymmetry": p95, "avg_asymmetry": avg,
       "high_asymmetry_ratio": highRatio, "elevated_ratio": elevatedRatio, "elevation_frames": Double(measuredFrames),
       "arm_swing_ratio": armSwingRatio, "arm_cycles": Double(armCycles),
@@ -99,6 +113,12 @@ public final class ExerciseDetector {
     if frameCount < 30 {
       return ExerciseDetection(
         exercise: .kettlebellSwing, confidence: 0, reason: "Not enough frames (\(frameCount))", stats: stats)
+    }
+    if lyingRatio > 0.1 && standingRatio > 0.03 {
+      return ExerciseDetection(
+        exercise: .turkishGetUp, confidence: min(100, 70 + Int(lyingRatio * 100)),
+        reason: String(format: "on the floor in %.0f%% of frames and standing in %.0f%%", lyingRatio * 100, standingRatio * 100),
+        stats: stats)
     }
     if armCycles >= 3 && p95 < asymmetryThreshold {
       return ExerciseDetection(

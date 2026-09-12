@@ -90,7 +90,7 @@ extension TuningReports {
     print(lines.joined(separator: "\n"))
     // Naive rep count: smoothed min-knee dips below 110 separated by rises above 140.
     var smoothed: [Double] = []
-    for (i, v) in minKnee.enumerated() {
+    for i in minKnee.indices {
       let window = minKnee[max(0, i - 3)...i]
       smoothed.append(window.reduce(0, +) / Double(window.count))
     }
@@ -100,5 +100,21 @@ extension TuningReports {
       if below && v > 140 { below = false }
     }
     print("naive rep count from knee dips: \(dips)")
+  }
+}
+
+extension TuningReports {
+  /// Get-up phase transitions and per-rep quality on the TGU fixture.
+  func testTurkishGetUpTrace() throws {
+    let frames = try Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false).frames()
+    let analyzer = TurkishGetUpAnalyzer()
+    var transitions: [String] = []
+    analyzer.trace = { transitions.append($0) }
+    let pipeline = AnalysisPipeline(exercise: .turkishGetUp, analyzer: analyzer)
+    for frame in frames { pipeline.process(extracted: frame) { nil } }
+    print(transitions.map { "    " + $0 }.joined(separator: "\n"))
+    report("tgu-phone-2min", pipeline)
+    for rep in pipeline.reps { print("    rep \(rep.number) quality \(rep.quality.metrics) \(rep.quality.feedback)") }
+    print("    detection:", ExerciseDetector.detect(frames: frames).reason)
   }
 }

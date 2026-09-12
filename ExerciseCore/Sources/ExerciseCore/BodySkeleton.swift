@@ -174,3 +174,42 @@ public struct BodySkeleton {
     return acos(cosine) * 180 / .pi
   }
 }
+
+// MARK: - Get-up signals
+
+extension BodySkeleton {
+  /// How upright the body is, independent of camera orientation: the ankle-to-shoulder rise on screen divided by
+  /// the body length measured along the limbs. About 1 standing, about 0 lying, negative when the head lies
+  /// lower on screen than the feet. Uses the side whose limbs are all measured and longest on screen.
+  public var uprightness: Double? {
+    var best: (value: Double, length: Double)?
+    for side in [BodySide.left, .right] {
+      guard let shoulder = point(side.shoulder), let hip = point(side.hip), let knee = point(side.knee),
+        let ankle = point(side.ankle)
+      else { continue }
+      let length = Self.distance(shoulder, hip) + Self.distance(hip, knee) + Self.distance(knee, ankle)
+      guard length > 0 else { continue }
+      let value = Double(ankle.y - shoulder.y) / length
+      if best == nil || length > best!.length { best = (value, length) }
+    }
+    return best?.value
+  }
+
+  /// Angle from vertical of the arm holding a weight overhead: the wrist highest above its own shoulder.
+  /// Nil when no wrist is above a shoulder.
+  public var overheadArmAngle: Double? {
+    var best: (rise: Double, angle: Double)?
+    for side in [BodySide.left, .right] {
+      guard let wrist = point(side.wrist, minConf: Self.reliableThreshold), let shoulder = point(side.shoulder) else { continue }
+      let rise = Double(shoulder.y - wrist.y)
+      guard rise > 0 else { continue }
+      let angle = atan2(Double(abs(wrist.x - shoulder.x)), rise) * 180 / .pi
+      if best == nil || rise > best!.rise { best = (rise, angle) }
+    }
+    return best?.angle
+  }
+
+  private static func distance(_ a: CGPoint, _ b: CGPoint) -> Double {
+    Double(hypot(a.x - b.x, a.y - b.y))
+  }
+}

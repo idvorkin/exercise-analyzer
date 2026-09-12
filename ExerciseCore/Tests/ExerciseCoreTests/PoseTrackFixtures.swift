@@ -28,6 +28,8 @@ struct Fixture {
     Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
     // Igor's gym set (prod bug report 2026-09-12): 8 head drops at a ~4 s rhythm, setup crouches at both ends.
     Fixture(name: "bulgarian-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
+    // Igor's TGU clip (2026-09-12, IMG_4342): two get-ups, one per side, with a rest lying between them.
+    Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false),
   ]
 
   func frames() throws -> [FrameRecord] {

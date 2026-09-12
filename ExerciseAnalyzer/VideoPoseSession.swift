@@ -404,6 +404,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
       fields["bit_depth"] = ext[kCMFormatDescriptionExtension_BitsPerComponent as String] ?? "n/a"
     }
     fields["hdr"] = track.hasMediaCharacteristic(.containsHDRVideo)
+    if let t = try? await track.load(.preferredTransform) {
+      // A negative determinant means the clip carries a mirror (a flipped edit), not just a rotation (#5).
+      fields["transform"] = [t.a, t.b, t.c, t.d, t.tx, t.ty].map { Double($0) }
+      fields["transform_det"] = Double(t.a * t.d - t.b * t.c)
+    }
     fields["edr_headroom"] = UIScreen.main.currentEDRHeadroom
     fields["edr_potential"] = UIScreen.main.potentialEDRHeadroom
     fields["low_power"] = ProcessInfo.processInfo.isLowPowerModeEnabled
