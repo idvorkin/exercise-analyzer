@@ -83,6 +83,8 @@ The simulator cannot be tapped from a script, so the app has **launch hooks** re
 | `SWING_AUTO_TRIM=1` | trim to the rep span right after the first analysis |
 | `SWING_OPEN_RECENT=1` | reopen the newest Recents entry |
 | `SWING_BUG=text` | file a bug report on launch |
+| `SWING_SHOW_WORKOUTS=1` | open the workout gallery on launch (screenshots) |
+| `SWING_PHOTOS_ACCESS=1` | ask for Photos access when the gallery opens (the simulator cannot be granted Photos access from the command line on iOS 26, so this dialog needs a hand) |
 
 Results are read from the **session log** (`Documents/logs/*.jsonl` in the app container), not the screen. The
 simulator runs the pose model on the CPU at roughly 20 fps, a tenth of the phone, so the script waits for the

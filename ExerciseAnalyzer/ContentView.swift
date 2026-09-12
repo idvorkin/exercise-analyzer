@@ -102,7 +102,10 @@ struct ContentView: View {
       isPresented: $showPhotosPicker, selection: $pickerItem, matching: .videos,
       photoLibrary: .shared())
     .sheet(isPresented: $showRecents) {
-      WorkoutGalleryView(store: session.recents) { session.open(recent: $0) }
+      WorkoutGalleryView(
+        store: session.recents, onOpen: { session.open(recent: $0) },
+        onImport: { identifier, date in Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) } },
+        onEvent: { session.log.event($0, $1) })
     }
     .fileImporter(
       isPresented: $showFileImporter, allowedContentTypes: [.movie, .video, .mpeg4Movie]

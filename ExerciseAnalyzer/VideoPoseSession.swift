@@ -176,6 +176,19 @@ final class VideoPoseSession: NSObject, ObservableObject {
     Task { await analyzeAndPlay(url: url) }
   }
 
+  /// A Photos video chosen from the gallery's "From Photos" strip: opened in place by identifier.
+  func importPhotosAsset(identifier: String, recordedAt: Date?) async {
+    activity = .working("Opening", progress: nil)
+    guard let url = await RecentsStore.photosClipURL(identifier: identifier) else {
+      activity = .idle
+      statusMessage = "Couldn't open that video from Photos"
+      log.event("error", ["where": "photos_suggestion", "message": "no url for \(identifier)"])
+      return
+    }
+    log.event("import", ["url": url.lastPathComponent, "path": "photos_suggestion"])
+    load(url: url, origin: .photos(identifier: identifier), recordedAt: recordedAt)
+  }
+
   /// A clip picked from Photos. With library read access the asset is opened in place (no copy, so no dead
   /// time); otherwise the picker's copy is used and Recents keeps that file.
   func importPicked(item: PhotosPickerItem) async {

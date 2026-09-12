@@ -71,3 +71,7 @@ log-summary file:
 # File each new shake-to-report bug from the pulled bugs.jsonl as a GitHub issue (skips ones already filed).
 file-bugs:
     scripts/file-bugs.sh
+
+# Capture README screenshots from the simulator build (docs/screenshots/), see docs/TESTING.md.
+screenshots: build-sim
+    bash scripts/screenshots.sh "{{sim}}" {{bundle}} {{sim_app}}

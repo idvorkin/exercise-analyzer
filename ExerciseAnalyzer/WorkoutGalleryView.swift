@@ -10,18 +10,44 @@ import SwiftUI
 struct WorkoutGalleryView: View {
   @ObservedObject var store: RecentsStore
   let onOpen: (RecentEntry) -> Void
+  /// Opens a Photos video that has not been analyzed yet (identifier and creation date).
+  var onImport: ((String, Date?) -> Void)? = nil
+  var onEvent: ((String, [String: Any]) -> Void)? = nil
   @Environment(\.dismiss) private var dismiss
+  @StateObject private var suggestions = PhotosSuggestions()
+
+  private var knownPhotosIDs: Set<String> {
+    Set(store.entries.compactMap { entry -> String? in
+      if case .photos(let identifier) = entry.source { return identifier }
+      return nil
+    })
+  }
 
   var body: some View {
     NavigationStack {
       Group {
-        if store.entries.isEmpty {
+        if store.entries.isEmpty && suggestions.clips.isEmpty {
           ContentUnavailableView(
             "No workouts yet", systemImage: "figure.strengthtraining.traditional",
             description: Text("Record a set or open a video and it shows up here, grouped by day."))
         } else {
           ScrollView {
             LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
+              if !suggestions.clips.isEmpty, let onImport {
+                PhotosSuggestionsRow(suggestions: suggestions) { clip in
+                  dismiss()
+                  onImport(clip.id, clip.asset.creationDate)
+                }
+              } else if suggestions.status == .notDetermined, onImport != nil {
+                Button {
+                  suggestions.requestAccess()
+                } label: {
+                  Label("Show recent videos from Photos", systemImage: "photo.on.rectangle")
+                    .font(.subheadline)
+                }
+                .buttonStyle(.bordered)
+                .padding(.top, 8)
+              }
               ForEach(WorkoutDay.group(store.entries)) { day in
                 Section {
                   ForEach(day.exercises) { exercise in
@@ -45,7 +71,45 @@ struct WorkoutGalleryView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
       }
+      .onAppear {
+        suggestions.onEvent = onEvent
+        suggestions.refresh(excluding: knownPhotosIDs)
+        // Test hook: ask for Photos access on open so a simulator run can answer the system dialog.
+        if ProcessInfo.processInfo.environment["SWING_PHOTOS_ACCESS"] == "1", suggestions.status == .notDetermined {
+          suggestions.requestAccess()
+        }
+      }
     }
+  }
+}
+
+/// Recent set-sized videos in Photos that have not been analyzed: one tap opens them in place.
+struct PhotosSuggestionsRow: View {
+  @ObservedObject var suggestions: PhotosSuggestions
+  let onImport: (PhotosSuggestions.Clip) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 8) {
+        Image(systemName: "photo.on.rectangle")
+          .font(.subheadline.bold())
+          .frame(width: 28, height: 28)
+          .background(Color.blue.opacity(0.15), in: Circle())
+          .foregroundStyle(.blue)
+        Text("From Photos").font(.headline)
+        Spacer(minLength: 8)
+        Text("\(suggestions.clips.count) not analyzed").font(.caption).foregroundStyle(.secondary)
+      }
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          ForEach(suggestions.clips) { clip in
+            PhotosClipCard(clip: clip, suggestions: suggestions)
+              .onTapGesture { onImport(clip) }
+          }
+        }
+      }
+    }
+    .padding(.top, 8)
   }
 }
 
