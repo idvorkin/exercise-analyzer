@@ -18,6 +18,10 @@ struct WatchContentView: View {
           Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
           Text(phone.reachable ? "Waiting for the phone app…" : "Phone not reachable. Open Exercise Analyzer on the phone.")
             .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
+          if let since = phone.receivedAt {
+            // Reconnects by itself (retries every 2 s); this just says how long it has been.
+            Text("Last heard \(Int(max(0, now.timeIntervalSince(since)))) s ago").font(.caption2).foregroundStyle(.tertiary)
+          }
           Button { phone.ping() } label: { Label("Retry", systemImage: "arrow.clockwise").frame(maxWidth: .infinity) }
         } else if !status.phoneActive {
           Image(systemName: "iphone.gen3").font(.largeTitle).foregroundStyle(.secondary)
