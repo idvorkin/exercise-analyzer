@@ -234,6 +234,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// Imports a video: shows it paused, runs the offline pass, then plays with the stored track.
   func load(url: URL, origin: Origin = .file, recordedAt: Date? = nil) {
     stopCamera()
+    untrimmed = nil
+    canUndoTrim = false
     guard predictor != nil else {
       pendingLoadURL = url  // model still loading; retried from loadModel's completion
       statusMessage = "Waiting for model…"
@@ -1090,16 +1092,48 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Trim the current file to the detected rep span (file mode button).
+  /// Seconds kept before the first rep and after the last: enough to see the setup and the finish.
+  static let trimPadding = 5.0
+
+  /// What a trim replaced, so it can be undone: the untrimmed clip and its analysis (file mode only).
+  private struct Untrimmed {
+    let url: URL
+    let pipeline: AnalysisPipeline
+    let frames: [FrameRecord]
+    let origin: Origin
+  }
+  private var untrimmed: Untrimmed?
+  @Published private(set) var canUndoTrim = false
+
   func trimToReps() {
     guard let url = trimmedURL ?? currentFileURL, source == .file else { return }
     let current = pipeline
+    untrimmed = Untrimmed(url: url, pipeline: current, frames: extractedFrames, origin: currentOrigin)
     Task { await trim(url: url, using: current, thenAnalyze: false) }
+  }
+
+  /// Puts the untrimmed clip and its analysis back (the trimmed file is dropped).
+  func undoTrim() {
+    guard let before = untrimmed, source == .file else { return }
+    untrimmed = nil
+    canUndoTrim = false
+    let dropped = trimmedURL
+    trimmedURL = nil
+    currentFileURL = before.url
+    currentOrigin = before.origin
+    installPlayerItem(url: before.url, pipeline: before.pipeline)
+    extractedFrames = before.frames
+    statusMessage = "Trim undone"
+    log.event("trim_undo", ["dropped": dropped?.lastPathComponent ?? ""])
+    rememberCurrent(clipURL: before.url)
+    if let dropped { try? FileManager.default.removeItem(at: dropped) }
+    play()
   }
 
   private func trim(url: URL, using analyzed: AnalysisPipeline, thenAnalyze: Bool) async {
     let asset = AVURLAsset(url: url)
     let clipDuration = (try? await asset.load(.duration).seconds) ?? duration
-    guard let span = analyzed.repSpan(padding: 1.0, duration: clipDuration) else {
+    guard let span = analyzed.repSpan(padding: Self.trimPadding, duration: clipDuration) else {
       statusMessage = "No reps detected, keeping the whole clip"
       log.event("trim_skipped", ["reason": "no reps", "duration_s": clipDuration])
       if thenAnalyze { await analyzeAndPlay(url: url) } else { activity = .idle }
@@ -1134,9 +1168,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
         extractedFrames = pipeline.track.frames
         statusMessage = String(format: "Trimmed to %.1fs", span.end - trimmed.start)
         currentFileURL = clip
+        canUndoTrim = untrimmed != nil
         rememberCurrent(clipURL: clip)
         activity = .idle
         play()
+        // Test hook: SWING_UNDO_TRIM=1 undoes the trim a moment later (simulator runs can't tap the UI).
+        if ProcessInfo.processInfo.environment["SWING_UNDO_TRIM"] == "1" {
+          Task {
+            try? await Task.sleep(for: .seconds(3))
+            undoTrim()
+          }
+        }
       }
     } catch {
       statusMessage = "Trim failed: \(error.localizedDescription)"

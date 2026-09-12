@@ -162,7 +162,7 @@ Status of each story is in the table at the end (built; verified on host, simula
 - **Scenario:** Trimming a recording to its set
 - **Given:** a recording with 25 s of setup before the first rep
 - **When:** I tap Trim
-- **Then:** the clip starts within 1.5 s before the first rep, plays from its first frame, keeps HDR, and the cut takes under a second
+- **Then:** the clip starts about 5 s before the first rep and ends about 5 s after the last, plays from its first frame, keeps HDR, and the cut takes under a second; an Undo button restores the untrimmed clip
 
 ---
 

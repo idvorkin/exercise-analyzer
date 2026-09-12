@@ -93,6 +93,7 @@ The simulator cannot be tapped from a script, so the app has **launch hooks** re
 |---|---|
 | `SWING_VIDEO=/path.mp4` | load the clip on launch (waits for the model) |
 | `SWING_AUTO_TRIM=1` | trim to the rep span right after the first analysis |
+| `SWING_UNDO_TRIM=1` | undo that trim 3 s later (with `SWING_AUTO_TRIM`) |
 | `SWING_OPEN_RECENT=1` | reopen the newest Recents entry |
 | `SWING_BUG=text` | file a bug report on launch |
 | `SWING_SHOW_WORKOUTS=1` | open the workout gallery on launch (screenshots) |

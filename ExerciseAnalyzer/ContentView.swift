@@ -374,7 +374,13 @@ struct ContentView: View {
             Label("Full screen", systemImage: "arrow.up.left.and.arrow.down.right")
           }
         }
-        if !session.reps.isEmpty {
+        if session.canUndoTrim {
+          Button {
+            session.undoTrim()
+          } label: {
+            Label("Undo trim", systemImage: "arrow.uturn.backward")
+          }
+        } else if !session.reps.isEmpty {
           Button {
             session.trimToReps()
           } label: {
