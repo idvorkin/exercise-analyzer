@@ -67,3 +67,7 @@ pull-logs-sim:
 log-summary file:
     @jq -c 'select(.type != "frame")' {{file}}
     @echo "frames: $(grep -c '"type":"frame"' {{file}})"
+
+# File each new shake-to-report bug from the pulled bugs.jsonl as a GitHub issue (skips ones already filed).
+file-bugs:
+    scripts/file-bugs.sh
