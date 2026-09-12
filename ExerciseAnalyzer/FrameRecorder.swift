@@ -12,6 +12,9 @@ final class FrameRecorder: @unchecked Sendable {
   private var writer: AVAssetWriter?
   private var input: AVAssetWriterInput?
   private var sessionStarted = false
+  /// Called off the main thread when the writer cannot start, fails, or finishes without completing.
+  var onError: ((String) -> Void)?
+  private var failureReported = false
 
   init() {
     url = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -26,6 +29,8 @@ final class FrameRecorder: @unchecked Sendable {
       if writer == nil {
         do {
           let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+          // Fragmented movie: a recording cut short (phone locked, app backgrounded) stays playable.
+          writer.movieFragmentInterval = CMTime(seconds: 2, preferredTimescale: 600)
           let input = AVAssetWriterInput(
             mediaType: .video,
             outputSettings: [
@@ -36,17 +41,24 @@ final class FrameRecorder: @unchecked Sendable {
           input.expectsMediaDataInRealTime = true
           writer.add(input)
           guard writer.startWriting() else {
-            print("[ExerciseAnalyzer] recorder failed to start: \(String(describing: writer.error))")
+            onError?("start failed: \(String(describing: writer.error))")
             return
           }
           self.writer = writer
           self.input = input
         } catch {
-          print("[ExerciseAnalyzer] recorder init failed: \(error)")
+          onError?("init failed: \(error)")
           return
         }
       }
-      guard let writer, let input, writer.status == .writing else { return }
+      guard let writer, let input else { return }
+      guard writer.status == .writing else {
+        if !failureReported {
+          failureReported = true
+          onError?("writer status \(writer.status.rawValue): \(String(describing: writer.error))")
+        }
+        return
+      }
       let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
       if !sessionStarted {
         writer.startSession(atSourceTime: time)
@@ -58,16 +70,25 @@ final class FrameRecorder: @unchecked Sendable {
     }
   }
 
+  /// The file on disk if frames were ever written. Because the movie is fragmented, this is playable up to the
+  /// last fragment even when the writer failed part way (phone locked, app backgrounded).
+  var partialURL: URL? {
+    queue.sync { sessionStarted && FileManager.default.fileExists(atPath: url.path) ? url : nil }
+  }
+
   /// Finishes the file and returns its URL, or nil if nothing was written.
   func finish() async -> URL? {
     await withCheckedContinuation { continuation in
       queue.async { [self] in
         guard let writer, sessionStarted, writer.status == .writing else {
+          onError?(
+            "finish with nothing to write: started \(sessionStarted), status \(writer?.status.rawValue ?? -1), \(String(describing: writer?.error))")
           continuation.resume(returning: nil)
           return
         }
         input?.markAsFinished()
         writer.finishWriting {
+          if writer.status != .completed { self.onError?("finish failed: \(String(describing: writer.error))") }
           continuation.resume(returning: writer.status == .completed ? self.url : nil)
         }
       }

@@ -759,11 +759,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
         "live_reps": livePipeline.reps.count,
       ])
     Task {
-      guard let url = await recorder.finish() else {
+      let finished = await recorder.finish()
+      guard let url = finished ?? recorder.partialURL else {
         statusMessage = "Nothing recorded"
         log.event("error", ["where": "recorder", "message": "finish returned no file"])
         activity = .idle
         return
+      }
+      if finished == nil {
+        statusMessage = "Recording was cut short, keeping what was captured"
+        log.event("recording_partial", ["url": url.lastPathComponent, "duration_s": recordedDuration])
       }
       currentFileURL = url
       currentOrigin = .recording
