@@ -117,6 +117,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
     pipeline = AnalysisPipeline(exercise: exercise)
     watch.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
+    NotificationCenter.default.addObserver(forName: RecordPrompt.tapped, object: nil, queue: .main) { [weak self] _ in
+      Task { @MainActor in
+        guard let self, self.source != .camera else { return }
+        self.log.event("ui", ["action": "start", "from": "watch_notification"])
+        self.startCamera(position: self.cameraPosition)
+      }
+    }
     player.actionAtItemEnd = .pause
     timeObserver = player.addPeriodicTimeObserver(
       forInterval: CMTime(value: 1, timescale: 30), queue: .main
@@ -714,21 +721,35 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   // MARK: - Watch companion
 
+  private var lastWatchHeartbeat = Date.distantPast
+
   private func pushWatchStatus(force: Bool = false) {
+    // Heartbeat: the watch marks a status stale after 8 s, so resend at least every 3 s while recording.
+    let heartbeat = source == .camera && Date().timeIntervalSince(lastWatchHeartbeat) > 3
+    if force || heartbeat { lastWatchHeartbeat = Date() }
     let status = WatchStatus(
       recording: source == .camera, frame: frameStatus, reps: pipeline.reps.count,
       phase: latestFrame?.analysis?.phase ?? "", elapsed: source == .camera ? duration : 0,
       camera: cameraPosition == .front ? "front" : "back", exercise: exercise.definition.name)
-    watch.send(status, force: force)
+    watch.send(status, force: force || heartbeat)
   }
 
   private func handleWatch(_ command: WatchCommand) {
     log.event("ui", ["action": command.rawValue, "from": "watch", "source": "\(source)"])
     switch command {
-    case .start: if source != .camera { startCamera(position: cameraPosition) }
+    case .start:
+      if source == .camera { break }
+      if UIApplication.shared.applicationState == .active {
+        startCamera(position: cameraPosition)
+      } else {
+        // The watch woke the app in the background; iOS will not let it come forward or use the camera from
+        // there, so ask the lifter to tap the notification, which opens the app straight into recording.
+        RecordPrompt.post(log: log)
+      }
     case .switchCamera: flipCamera()
     case .finish: if source == .camera { finishCamera() }
     case .cancel: if source == .camera { cancelCamera() }
+    case .status: pushWatchStatus(force: true)
     }
   }
 

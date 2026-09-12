@@ -5,13 +5,21 @@ import SwiftUI
 
 struct WatchContentView: View {
   @ObservedObject var phone: PhoneLink
+  /// Ticks so a status that stops arriving turns stale on screen.
+  @State private var now = Date()
+  private let clock = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
   private var status: WatchStatus { phone.status }
 
   var body: some View {
     ScrollView {
       VStack(spacing: 8) {
-        if status.recording {
+        if !phone.isLive {
+          Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
+          Text(phone.reachable ? "Waiting for the phone app…" : "Phone not reachable. Open Exercise Analyzer on the phone.")
+            .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
+          Button { phone.ping() } label: { Label("Retry", systemImage: "arrow.clockwise").frame(maxWidth: .infinity) }
+        } else if status.recording {
           Text(status.frame.hint.uppercased())
             .font(.headline).multilineTextAlignment(.center)
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -57,6 +65,8 @@ struct WatchContentView: View {
       }
       .padding(.horizontal, 4)
     }
+    .onReceive(clock) { now = $0; if !phone.isLive { phone.ping() } }
+    .onAppear { phone.ping() }
   }
 
   private var elapsed: String {

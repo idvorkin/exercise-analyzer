@@ -84,4 +84,6 @@ public struct WatchStatus: Codable, Equatable, Sendable {
 
 public enum WatchCommand: String, Codable, CaseIterable, Sendable {
   case start, switchCamera, finish, cancel
+  /// The watch asks for a fresh status (it treats anything older than a few seconds as stale).
+  case status
 }
