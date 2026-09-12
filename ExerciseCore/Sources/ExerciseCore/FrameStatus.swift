@@ -37,9 +37,11 @@ public struct FrameStatus: Codable, Equatable, Sendable {
     self.coverage = coverage
   }
 
-  /// `box` is the person's box normalized to the frame (origin top-left, 0...1). Ankles below confidence while the
-  /// box reaches the bottom edge count as feet cut off even when the box itself stops a little short.
-  public init(box: CGRect?, pose: Pose?, edgeMargin: Double = 0.02) {
+  /// `box` is the person's box normalized to the frame (origin top-left, 0...1). An edge counts as clipped when the
+  /// box runs into it (within `edgeMargin`); feet also count as cut off when both ankles are unmeasured while the
+  /// box nearly touches the bottom, but not when they are merely low-confidence (hands and bell pass in front of
+  /// the shins at the bottom of a swing).
+  public init(box: CGRect?, pose: Pose?, edgeMargin: Double = 0.01) {
     guard let box else {
       self.init(personSeen: false, clippedEdges: [], coverage: 0)
       return
@@ -49,9 +51,9 @@ public struct FrameStatus: Codable, Equatable, Sendable {
     if Double(box.maxY) >= 1 - edgeMargin { edges.append(.bottom) }
     if Double(box.minX) <= edgeMargin { edges.append(.left) }
     if Double(box.maxX) >= 1 - edgeMargin { edges.append(.right) }
-    if let pose, !edges.contains(.bottom), Double(box.maxY) >= 1 - edgeMargin * 4 {
+    if let pose, !edges.contains(.bottom), Double(box.maxY) >= 0.97 {
       let ankles = [CocoKeypoint.leftAnkle, .rightAnkle].map { pose.conf[$0.rawValue] }
-      if ankles.allSatisfy({ $0 < 0.3 }) { edges.append(.bottom) }
+      if ankles.allSatisfy({ $0 < 0.1 }) { edges.append(.bottom) }
     }
     self.init(personSeen: true, clippedEdges: edges, coverage: min(1, max(0, Double(box.height))))
   }

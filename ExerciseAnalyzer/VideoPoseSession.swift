@@ -737,7 +737,19 @@ final class VideoPoseSession: NSObject, ObservableObject {
       log.rep(rep, source: source == .camera ? "live" : "file")
     }
     if source == .camera {
-      frameStatus = FrameStatus(box: frame.box, pose: frame.pose)
+      let status = FrameStatus(box: frame.box, pose: frame.pose)
+      if status.hint != frameStatus.hint {
+        // Why the hint changed: the box edges and ankle confidences behind it (#21).
+        let ankles = frame.pose.map { [$0.conf[CocoKeypoint.leftAnkle.rawValue], $0.conf[CocoKeypoint.rightAnkle.rawValue]] } ?? []
+        log.event(
+          "frame_status",
+          [
+            "hint": status.hint, "edges": status.clippedEdges.map(\.rawValue), "coverage": status.coverage,
+            "box": frame.box.map { [$0.minX, $0.minY, $0.maxX, $0.maxY].map { Double($0) } } ?? [],
+            "ankle_conf": ankles.map { Double($0) },
+          ])
+      }
+      frameStatus = status
       pushWatchStatus()
       if watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
         lastPreviewSent = Date()

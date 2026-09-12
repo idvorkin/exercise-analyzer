@@ -22,15 +22,21 @@ final class FrameStatusTests: XCTestCase {
   func testBoxAtTheBottomEdgeIsFeetCutOff() {
     let status = FrameStatus(box: CGRect(x: 0.3, y: 0.2, width: 0.3, height: 0.8), pose: nil)
     XCTAssertEqual(status.clippedEdges, [.bottom])
+    // Feet a little above the edge are fine, even at the bottom of a swing with low-confidence ankles.
+    var conf = Array(repeating: Float(0.9), count: 17)
+    conf[CocoKeypoint.leftAnkle.rawValue] = 0.25
+    conf[CocoKeypoint.rightAnkle.rawValue] = 0.2
+    let lowAnkles = Pose(xyn: Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17), conf: conf, imageSize: CGSize(width: 100, height: 100))
+    XCTAssertEqual(FrameStatus(box: CGRect(x: 0.3, y: 0.1, width: 0.3, height: 0.86), pose: lowAnkles).hint, "In frame")
     XCTAssertEqual(status.hint, "Feet cut off")
   }
 
   func testUnseenAnklesNearTheBottomCountAsFeetCutOff() {
     var conf = Array(repeating: Float(0.9), count: 17)
-    conf[CocoKeypoint.leftAnkle.rawValue] = 0.1
-    conf[CocoKeypoint.rightAnkle.rawValue] = 0.1
+    conf[CocoKeypoint.leftAnkle.rawValue] = 0.05
+    conf[CocoKeypoint.rightAnkle.rawValue] = 0.05
     let pose = Pose(xyn: Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17), conf: conf, imageSize: CGSize(width: 100, height: 100))
-    let status = FrameStatus(box: CGRect(x: 0.3, y: 0.1, width: 0.3, height: 0.84), pose: pose)
+    let status = FrameStatus(box: CGRect(x: 0.3, y: 0.1, width: 0.3, height: 0.88), pose: pose)
     XCTAssertEqual(status.hint, "Feet cut off")
   }
 
