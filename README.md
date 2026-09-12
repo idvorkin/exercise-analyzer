@@ -51,8 +51,8 @@ just log-summary <file.jsonl>  # everything except per-frame events, plus frame 
 ## Test ladder
 
 Cheapest rung first: `just test` (host, ~1 s, everything in `ExerciseCore` against real pose tracks),
-`just test-sim` (simulator, minutes, the app end to end judged from its log), `just run-device` (phone: camera,
-HDR, Photos, watch). Which kind of change is verified where, how fixtures are made, the launch hooks, and the
+`just analyze clip.mov` (the model plus the analyzers on the Mac, any clip, 130 fps), `just test-sim` (simulator,
+minutes, the app end to end judged from its log), `just run-device` (phone: camera, HDR, Photos, watch). Which kind of change is verified where, how fixtures are made, the launch hooks, and the
 screenshot script are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Bug reports

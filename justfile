@@ -75,3 +75,9 @@ file-bugs:
 # Capture README screenshots from the simulator build (docs/screenshots/), see docs/TESTING.md.
 screenshots: build-sim
     bash scripts/screenshots.sh "{{sim}}" {{bundle}} {{sim_app}}
+
+# Rung 1.5: run the pose model on a clip on the Mac and analyze it like the phone (no simulator).
+# Usage: just analyze path/to/clip.mov [--exercise kettlebell-swing] [--fixture ExerciseCore/Tests/ExerciseCoreTests/Fixtures/name.json]
+analyze clip *args:
+    cd ExerciseCore && swift build -c release --product posetrack 2>&1 | grep -E "error:" || true
+    ExerciseCore/.build/release/posetrack "{{clip}}" --model ExerciseAnalyzer/yolo26n-pose.mlpackage {{args}}

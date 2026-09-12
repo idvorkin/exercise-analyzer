@@ -8,6 +8,7 @@ camera, a display, or a wrist goes higher.
 | Rung | What runs | Command | Time | Answers |
 |---|---|---|---|---|
 | 1 Host | `ExerciseCore` XCTest against stored pose tracks | `just test` | ~1 s | detection, rep counts, phases, checkpoints, quality, crops, frame status, message types |
+| 1.5 Mac model | `posetrack`: the pose model plus the analyzers on a clip | `just analyze clip.mov` | ~clip length ÷ 4 | what the phone would count for any clip on the Mac (AirDropped or sample); makes fixtures without the phone |
 | 2 Simulator | the app, driven by env hooks, judged from its log | `just test-sim` | 5–8 min | loading, offline pose pass, analysis in the app, trim (`AVAssetExportSession`), player start, Recents |
 | 3 Phone | the app on the iPhone, a human at the gym | `just run-device` then `just pull-logs` | minutes + a person | Neural Engine speed, camera and recorder, HDR playback, Photos, the watch, everything visual |
 
@@ -69,6 +70,17 @@ assertions. `swift test --filter TuningReports` prints, per fixture, every phase
 `trace` hook), each rep's checkpoint times and quality, raw per-second signals, and the count under alternative
 thresholds. This is how an analyzer gets tuned against a bad set, and how a "why did it count that" question gets
 answered with numbers instead of theories.
+
+## Rung 1.5: the model on the Mac
+
+[`ExerciseCore/Sources/posetrack/main.swift`](../ExerciseCore/Sources/posetrack/main.swift) is a macOS executable
+in the package: `just analyze <clip> [--exercise kind] [--fixture out.json]`. It reads the clip through the same
+rotation-applying video composition as the app, letterboxes with Vision's `scaleFit` like the SDK, maps the
+end2end output back with the SDK's letterbox math, and runs the detector and analyzers from `ExerciseCore`. On an
+M4 it runs at 130 fps or more (the simulator does 20). Poses match the phone's to a few pixels (3 px mean on the 4-rep sample), so `--fixture`
+writes a host-test fixture from any clip: this is how a clip that only exists on the Mac (AirDrop, a sample) gets
+into rung 1. The model comes from `just model` (`ExerciseAnalyzer/yolo26n-pose.mlpackage`, gitignored) and is
+compiled once into `~/tmp/agent/skill/posetrack/`.
 
 ## Rung 2: simulator smoke
 
