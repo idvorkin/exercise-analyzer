@@ -11,10 +11,24 @@ enum RecordPrompt {
   static let tapped = Notification.Name("ExerciseAnalyzer.recordPromptTapped")
   static let category = "record"
 
+  /// Ask once while the app is in front: a request made from a background-launched app is deferred by iOS until
+  /// the app is foregrounded, and its completion never runs, so the watch's Record would post nothing.
+  static func prepare(log: SessionLog) {
+    let center = UNUserNotificationCenter.current()
+    center.getNotificationSettings { settings in
+      log.event("notification_auth", ["status": settings.authorizationStatus.rawValue])
+      guard settings.authorizationStatus == .notDetermined else { return }
+      center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+        log.event("notification_auth", ["requested": true, "granted": granted, "error": error.map { "\($0)" } ?? ""])
+      }
+    }
+  }
+
   static func post(log: SessionLog) {
     let center = UNUserNotificationCenter.current()
-    center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-      log.event("record_prompt", ["granted": granted, "error": error.map { "\($0)" } ?? ""])
+    center.getNotificationSettings { settings in
+      let granted = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+      log.event("record_prompt", ["status": settings.authorizationStatus.rawValue, "granted": granted])
       guard granted else { return }
       let content = UNMutableNotificationContent()
       content.title = "Ready to record"

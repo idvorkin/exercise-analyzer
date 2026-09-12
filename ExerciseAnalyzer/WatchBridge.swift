@@ -75,6 +75,14 @@ extension WatchBridge: WCSessionDelegate {
 
   nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) { handle(message) }
 
+  /// Watch-side log lines arrive as user info (queued, delivered even when the watch was not reachable at the time).
+  nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+    guard let type = userInfo["watch_log"] as? String else { return }
+    var fields = userInfo
+    fields.removeValue(forKey: "watch_log")
+    Task { @MainActor in self.onEvent?("watch_" + type, fields) }
+  }
+
   nonisolated func session(
     _ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void
   ) {

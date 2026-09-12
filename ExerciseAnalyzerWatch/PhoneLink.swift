@@ -26,7 +26,7 @@ final class PhoneLink: NSObject, ObservableObject {
   /// Asks the phone for a fresh status (a reachable phone app answers with one).
   func ping() {
     guard WCSession.default.activationState == .activated, WCSession.default.isReachable else { return }
-    WCSession.default.sendMessage(["command": "status"], replyHandler: nil) { _ in }
+    send(.status)
   }
 
   override init() {
@@ -36,11 +36,27 @@ final class PhoneLink: NSObject, ObservableObject {
     WCSession.default.activate()
   }
 
-  func send(_ command: WatchCommand) {
+  /// Watch-side log: forwarded to the phone's session log as `watch_<type>` (queued user info, so it arrives even
+  /// if the phone is unreachable right now).
+  func logEvent(_ type: String, _ fields: [String: Any] = [:]) {
+    var info: [String: Any] = ["watch_log": type, "watch_t": Date().timeIntervalSince1970]
+    for (k, v) in fields { info[k] = v }
     guard WCSession.default.activationState == .activated else { return }
-    WKInterfaceDevice.current().play(.click)
-    WCSession.default.sendMessage(["command": command.rawValue], replyHandler: nil) { [weak self] error in
-      Task { @MainActor in self?.lastError = error.localizedDescription }
+    WCSession.default.transferUserInfo(info)
+  }
+
+  func send(_ command: WatchCommand) {
+    let session = WCSession.default
+    logEvent("command", ["command": command.rawValue, "reachable": session.isReachable, "activation": session.activationState.rawValue, "live": isLive])
+    guard session.activationState == .activated else { return }
+    if command != .status { WKInterfaceDevice.current().play(.click) }
+    session.sendMessage(["command": command.rawValue], replyHandler: { [weak self] reply in
+      Task { @MainActor in self?.logEvent("command_reply", ["command": command.rawValue, "reply": "\(reply)"]) }
+    }) { [weak self] error in
+      Task { @MainActor in
+        self?.lastError = error.localizedDescription
+        self?.logEvent("command_failed", ["command": command.rawValue, "message": error.localizedDescription])
+      }
     }
   }
 
@@ -51,6 +67,9 @@ final class PhoneLink: NSObject, ObservableObject {
     status = next
     receivedAt = Date()
     lastError = nil
+    if previous.recording != next.recording || previous.reps != next.reps {
+      logEvent("status", ["recording": next.recording, "reps": next.reps, "in_frame": next.frame.inFrame])
+    }
     if next.recording {
       if previous.frame.inFrame && !next.frame.inFrame { WKInterfaceDevice.current().play(.notification) }
       if next.reps > previous.reps { WKInterfaceDevice.current().play(.success) }
@@ -63,15 +82,20 @@ extension PhoneLink: WCSessionDelegate {
     _ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?
   ) {
     let context = session.receivedApplicationContext
+    let fields: [String: Any] = ["state": state.rawValue, "reachable": session.isReachable, "error": error.map { "\($0)" } ?? ""]
     Task { @MainActor in
       self.reachable = session.isReachable
       self.apply(context)
+      self.logEvent("session", fields)
     }
   }
 
   nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
     let reachable = session.isReachable
-    Task { @MainActor in self.reachable = reachable }
+    Task { @MainActor in
+      self.reachable = reachable
+      self.logEvent("reachable", ["reachable": reachable])
+    }
   }
 
   nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {

@@ -136,6 +136,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       Task { @MainActor in self?.isPlaying = false }
     }
     loadModel()
+    RecordPrompt.prepare(log: log)
     Task { await refreshStaleEntries() }
   }
 
@@ -735,7 +736,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   private func handleWatch(_ command: WatchCommand) {
-    log.event("ui", ["action": command.rawValue, "from": "watch", "source": "\(source)"])
+    log.event(
+      "ui",
+      ["action": command.rawValue, "from": "watch", "source": "\(source)", "app_state": UIApplication.shared.applicationState.rawValue])
     switch command {
     case .start:
       if source == .camera { break }
@@ -806,6 +809,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         guard let self else { return }
         guard granted else {
           self.statusMessage = "Camera access denied"
+          self.log.event("error", ["where": "camera", "message": "access denied"])
           return
         }
         let recorder = FrameRecorder()
