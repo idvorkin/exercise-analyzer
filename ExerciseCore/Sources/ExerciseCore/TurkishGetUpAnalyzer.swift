@@ -20,6 +20,9 @@ public struct TurkishGetUpThresholds {
   public var loweringMax = 0.7
   /// Frames a condition must hold before the phase changes (about a quarter second at 30 fps).
   public var holdFrames = 8
+  /// A get-up takes several seconds each way; anything faster is a pose glitch, not a rep (issue #14).
+  public var minRiseSeconds = 3.0
+  public var minLowerSeconds = 2.0
   /// Overhead arm drift from vertical (90th percentile over the rep) that costs points.
   public var armDriftWarn = 15.0
   public var armDriftBad = 25.0
@@ -66,6 +69,7 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   private var standingPeak: Frame?
   private var standingImage: CGImage?
   private var armAngles: [Double] = []
+  private var overheadSideVotes: [BodySide: Int] = [:]
   /// Phase transitions with the values that triggered them, for tuning reports and the session log.
   public var trace: ((String) -> Void)?
 
@@ -84,6 +88,7 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
     standingPeak = nil
     standingImage = nil
     armAngles = []
+    overheadSideVotes = [:]
   }
 
   /// True once `condition` has held for `holdFrames` consecutive frames.
@@ -118,6 +123,7 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
     if machine.phase != Self.lying {
       repFrames.append(frame)
       if let arm { armAngles.append(arm) }
+      if let side = skeleton.overheadArmSide { overheadSideVotes[side, default: 0] += 1 }
     }
 
     var completedRep: RepRecord?
@@ -138,9 +144,15 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
       }
     case Self.rising:
       if held("standing", upright >= thresholds.standingMin) {
-        trace?(String(format: "%.2fs standing: upright %.2f", time, upright))
-        storeMidpoint(phase: Self.rising, frames: repFrames)
-        machine.transition(to: Self.standing)
+        let rise = time - (repFrames.first?.time ?? time)
+        if rise < thresholds.minRiseSeconds {
+          trace?(String(format: "%.2fs stood up in %.1fs: glitch, not a get-up", time, rise))
+          abandon()
+        } else {
+          trace?(String(format: "%.2fs standing: upright %.2f", time, upright))
+          storeMidpoint(phase: Self.rising, frames: repFrames)
+          machine.transition(to: Self.standing)
+        }
       } else if held("abandon", upright <= thresholds.lyingMax) {
         trace?(String(format: "%.2fs back to lying without standing: upright %.2f", time, upright))
         abandon()
@@ -161,6 +173,13 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
         trace?(String(format: "%.2fs standing again: upright %.2f", time, upright))
         machine.transition(to: Self.standing)
       } else if held("lying", upright <= thresholds.lyingMax) {
+        let lower = time - (standingPeak?.time ?? time)
+        if lower < thresholds.minLowerSeconds {
+          trace?(String(format: "%.2fs lay down in %.1fs: glitch, not a get-up", time, lower))
+          abandon()
+          lastLying = frame
+          return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil)
+        }
         trace?(String(format: "%.2fs rep %d done: upright %.2f", time, machine.repCount + 1, upright))
         let down = repFrames.filter { $0.time > (standingPeak?.time ?? 0) }
         storeMidpoint(phase: Self.lowering, frames: down)
@@ -169,6 +188,7 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
         lastLying = frame
         repFrames = []
         armAngles = []
+        overheadSideVotes = [:]
       }
     }
     return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: completedRep)
@@ -181,10 +201,13 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
     machine.storePeak(RepPosition(phase: phase, time: mid.time, pose: mid.pose, metrics: mid.metrics, score: mid.upright, image: nil))
   }
 
+  /// Drops the partial rep without touching the rep count.
   private func abandon() {
-    machine.resetState(to: Self.lying)
+    machine.currentRepPeaks = [:]
+    machine.transition(to: Self.lying)
     repFrames = []
     armAngles = []
+    overheadSideVotes = [:]
     standingPeak = nil
   }
 
@@ -210,7 +233,12 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
       score -= 10
     }
     if feedback.isEmpty { feedback.append("Smooth get-up!") }
+    // Which arm held the bell: 1 = left, 2 = right, 0 = unknown. Lets a set be read as one rep per side.
+    let side = overheadSideVotes.max { $0.value < $1.value }?.key
+    let sideValue: Double = side == .left ? 1 : side == .right ? 2 : 0
+    if let side { feedback.insert(side == .left ? "Left arm" : "Right arm", at: 0) }
     return RepQuality(
-      score: max(0, score), metrics: ["armDrift": armDrift, "upSeconds": up, "downSeconds": down], feedback: feedback)
+      score: max(0, score),
+      metrics: ["armDrift": armDrift, "upSeconds": up, "downSeconds": down, "side": sideValue], feedback: feedback)
   }
 }

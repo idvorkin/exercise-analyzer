@@ -106,14 +106,18 @@ extension TuningReports {
 extension TuningReports {
   /// Get-up phase transitions and per-rep quality on the TGU fixture.
   func testTurkishGetUpTrace() throws {
-    let frames = try Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false).frames()
+    for fixture in Fixture.all where fixture.expectedExercise == .turkishGetUp { try traceGetUp(fixture) }
+  }
+
+  private func traceGetUp(_ fixture: Fixture) throws {
+    let frames = try fixture.frames()
     let analyzer = TurkishGetUpAnalyzer()
     var transitions: [String] = []
     analyzer.trace = { transitions.append($0) }
     let pipeline = AnalysisPipeline(exercise: .turkishGetUp, analyzer: analyzer)
     for frame in frames { pipeline.process(extracted: frame) { nil } }
     print(transitions.map { "    " + $0 }.joined(separator: "\n"))
-    report("tgu-phone-2min", pipeline)
+    report(fixture.name, pipeline)
     for rep in pipeline.reps { print("    rep \(rep.number) quality \(rep.quality.metrics) \(rep.quality.feedback)") }
     print("    detection:", ExerciseDetector.detect(frames: frames).reason)
   }

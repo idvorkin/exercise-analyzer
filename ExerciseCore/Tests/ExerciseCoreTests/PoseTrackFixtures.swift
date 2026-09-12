@@ -30,6 +30,8 @@ struct Fixture {
     Fixture(name: "bulgarian-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
     // Igor's TGU clip (2026-09-12, IMG_4342): two get-ups, one per side, with a rest lying between them.
     Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false),
+    // Igor's second TGU clip (IMG_4343, issue #14): one get-up per side; a pose glitch at 14 s once counted as a rep.
+    Fixture(name: "tgu-phone-2sides", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: true),
   ]
 
   func frames() throws -> [FrameRecord] {

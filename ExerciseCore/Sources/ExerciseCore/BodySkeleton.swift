@@ -195,6 +195,17 @@ extension BodySkeleton {
     return best?.value
   }
 
+  /// The side whose wrist is highest above its own shoulder, or nil when neither is.
+  public var overheadArmSide: BodySide? {
+    var best: (rise: Double, side: BodySide)?
+    for side in [BodySide.left, .right] {
+      guard let wrist = point(side.wrist, minConf: Self.reliableThreshold), let shoulder = point(side.shoulder) else { continue }
+      let rise = Double(shoulder.y - wrist.y)
+      if rise > 0, best == nil || rise > best!.rise { best = (rise, side) }
+    }
+    return best?.side
+  }
+
   /// Angle from vertical of the arm holding a weight overhead: the wrist highest above its own shoulder.
   /// Nil when no wrist is above a shoulder.
   public var overheadArmAngle: Double? {
