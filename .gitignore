@@ -6,3 +6,6 @@ xcuserdata/
 .DS_Store
 # SwiftPM build products
 .build/
+
+# Agent worktrees
+.claude/worktrees/
