@@ -16,6 +16,7 @@ struct ContentView: View {
   @State private var showFileImporter = false
   @State private var showPhotosPicker = false
   @State private var showRecents = false
+  @State private var showBugReport = false
   @State private var showGallery = false
   @State private var showKeyframeViewer = false
   @State private var focusedPhase: String?
@@ -80,13 +81,13 @@ struct ContentView: View {
       controls
     }
     .background(Color(.systemBackground))
+    .background(ShakeDetector { showBugReport = true })
+    .sheet(isPresented: $showBugReport) { BugReportSheet(session: session) }
     .onAppear(perform: loadFromEnvironment)
     .onChange(of: pickerItem) { _, item in
       guard let item else { return }
       Task {
-        if let movie = try? await item.loadTransferable(type: PickedMovie.self) {
-          session.importPicked(url: movie.url, photosIdentifier: item.itemIdentifier)
-        }
+        await session.importPicked(item: item)
         pickerItem = nil
       }
     }
@@ -401,6 +402,12 @@ struct ContentView: View {
           } label: {
             Label("Files", systemImage: "folder")
           }
+          Divider()
+          Button {
+            showBugReport = true
+          } label: {
+            Label("Report a problem (or shake)", systemImage: "ladybug")
+          }
         } label: {
           Label("Open", systemImage: "folder.badge.plus")
         }
@@ -427,6 +434,9 @@ struct ContentView: View {
 
   private func loadFromEnvironment() {
     let env = ProcessInfo.processInfo.environment
+    if let note = env["SWING_BUG"], !note.isEmpty {
+      session.reportBug(note: note)  // test hook: file a report on launch
+    }
     if env["SWING_OPEN_RECENT"] == "1", let newest = session.recents.entries.first {
       session.open(recent: newest)  // test hook: reopen the newest Recents entry
       return

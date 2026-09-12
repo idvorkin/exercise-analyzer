@@ -20,6 +20,9 @@ final class ExerciseDetector {
   private var maxAsymmetry = 0.0
   private var elevatedFrames = 0
   private var measuredFrames = 0
+  private var armSwingFrames = 0
+  private var armCycles = 0
+  private var armIsHigh = false
 
   func reset() {
     frameCount = 0
@@ -27,11 +30,27 @@ final class ExerciseDetector {
     maxAsymmetry = 0
     elevatedFrames = 0
     measuredFrames = 0
+    armSwingFrames = 0
+    armCycles = 0
+    armIsHigh = false
   }
 
   func observe(pose: Pose) {
     let skeleton = BodySkeleton(pose: pose)
     frameCount += 1
+    // A swing's arms cycle between hanging (<30°) and near horizontal (>50°) every rep. A pistol squat holds the
+    // arms out for balance, so "arms horizontal" alone isn't enough; count the cycles.
+    let arm = skeleton.armToVerticalAngle
+    if arm > 50 {
+      armSwingFrames += 1
+      if !armIsHigh {
+        armIsHigh = true
+        armCycles += 1
+      }
+    } else if arm < 30 {
+      armIsHigh = false
+    }
+
     let left = skeleton.kneeAngle(.left)
     let right = skeleton.kneeAngle(.right)
     guard left > 0, right > 0 else { return }
@@ -40,12 +59,14 @@ final class ExerciseDetector {
     if asymmetries.count > 400 { asymmetries.removeFirst() }
     maxAsymmetry = max(maxAsymmetry, asymmetry)
 
-    if let ly = skeleton.ankleY(.left), let ry = skeleton.ankleY(.right),
-      let hip = skeleton.point(.leftHip), let ankle = skeleton.point(.leftAnkle)
+    // Foot elevation only counts when both ankles are confidently seen: feet cut off at the frame edge
+    // still get guessed positions, and those guesses read as one foot "raised" in every frame.
+    if let leftAnkle = skeleton.point(.leftAnkle, minConf: 0.5), let rightAnkle = skeleton.point(.rightAnkle, minConf: 0.5),
+      let hip = skeleton.point(.leftHip)
     {
-      let legLength = Double(abs(ankle.y - hip.y))
+      let legLength = Double(abs(leftAnkle.y - hip.y))
       measuredFrames += 1
-      if legLength > 0, abs(ly - ry) > legLength * 0.2 { elevatedFrames += 1 }
+      if legLength > 0, abs(Double(leftAnkle.y - rightAnkle.y)) > legLength * 0.2 { elevatedFrames += 1 }
     }
   }
 
@@ -59,14 +80,22 @@ final class ExerciseDetector {
     let highRatio = asymmetries.isEmpty
       ? 0 : Double(asymmetries.filter { $0 > asymmetryThreshold }.count) / Double(asymmetries.count)
     let elevatedRatio = measuredFrames > 0 ? Double(elevatedFrames) / Double(measuredFrames) : 0
+    let armSwingRatio = frameCount > 0 ? Double(armSwingFrames) / Double(frameCount) : 0
     let stats: [String: Double] = [
       "frames": Double(frameCount), "max_asymmetry": maxAsymmetry, "p95_asymmetry": p95, "avg_asymmetry": avg,
-      "high_asymmetry_ratio": highRatio, "elevated_ratio": elevatedRatio,
+      "high_asymmetry_ratio": highRatio, "elevated_ratio": elevatedRatio, "elevation_frames": Double(measuredFrames),
+      "arm_swing_ratio": armSwingRatio, "arm_cycles": Double(armCycles),
     ]
 
     if frameCount < 30 {
       return ExerciseDetection(
         exercise: .kettlebellSwing, confidence: 0, reason: "Not enough frames (\(frameCount))", stats: stats)
+    }
+    if armCycles >= 3 && p95 < asymmetryThreshold {
+      return ExerciseDetection(
+        exercise: .kettlebellSwing, confidence: min(100, 80 + armCycles),
+        reason: "arms swing up and down \(armCycles) times with symmetric legs (asymmetry \(Int(p95))°)",
+        stats: stats)
     }
     if p95 > 80 && elevatedRatio < 0.5 {
       return ExerciseDetection(

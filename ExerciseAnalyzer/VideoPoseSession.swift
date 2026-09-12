@@ -12,7 +12,10 @@ import AVFoundation
 import Combine
 import CoreMedia
 import Photos
+import PhotosUI
+import PhotosUI
 import QuartzCore
+import SwiftUI
 import UIKit
 import UltralyticsYOLO
 
@@ -167,16 +170,28 @@ final class VideoPoseSession: NSObject, ObservableObject {
     Task { await analyzeAndPlay(url: url) }
   }
 
-  /// A clip picked from Photos: keep a pointer to the asset when the library lets us read it, else copy the file.
-  func importPicked(url: URL, photosIdentifier: String?) {
+  /// A clip picked from Photos. With library read access the asset is opened in place (no copy, so no dead
+  /// time); otherwise the picker's copy is used and Recents keeps that file.
+  func importPicked(item: PhotosPickerItem) async {
+    let started = CACurrentMediaTime()
+    activity = .working("Importing", progress: nil)
     let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    if let photosIdentifier, status == .authorized || status == .limited,
-      let date = RecentsStore.photosAssetDate(identifier: photosIdentifier)
+    if let identifier = item.itemIdentifier, status == .authorized || status == .limited,
+      let url = await RecentsStore.photosClipURL(identifier: identifier)
     {
-      load(url: url, origin: .photos(identifier: photosIdentifier), recordedAt: date)
-    } else {
-      load(url: url, origin: .file, recordedAt: Self.fileDate(url))
+      log.event(
+        "import", ["path": "photos_in_place", "seconds": CACurrentMediaTime() - started, "url": url.lastPathComponent])
+      load(url: url, origin: .photos(identifier: identifier), recordedAt: RecentsStore.photosAssetDate(identifier: identifier))
+      return
     }
+    guard let movie = try? await item.loadTransferable(type: PickedMovie.self) else {
+      activity = .idle
+      statusMessage = "Couldn't read that video"
+      log.event("error", ["where": "import", "message": "loadTransferable failed"])
+      return
+    }
+    log.event("import", ["path": "picker_copy", "seconds": CACurrentMediaTime() - started])
+    load(url: movie.url, origin: .file, recordedAt: Self.fileDate(movie.url))
   }
 
   /// Reopens a Recents entry with its stored analysis: no inference, instant.
@@ -797,6 +812,48 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       activity = .idle
     }
+  }
+
+  // MARK: - Bug reports
+
+  /// What a report carries besides the note: enough to find the moment in the log and the clip in Recents.
+  func bugContext() -> [String: String] {
+    var context: [String: String] = [
+      "log": log.url.lastPathComponent,
+      "exercise": exercise.definition.name,
+      "mode": exerciseMode.storageValue,
+      "source": "\(source)",
+      "playhead": String(format: "%.2f s", currentTime),
+      "reps": "\(reps.count)",
+      "phase": latestFrame?.analysis?.phase ?? "–",
+    ]
+    if let id = currentEntryID { context["recents_id"] = id }
+    if let url = trimmedURL ?? currentFileURL { context["clip"] = url.lastPathComponent }
+    if let detection { context["detected"] = "\(detection.exercise.rawValue) \(detection.confidence)%" }
+    return context
+  }
+
+  /// Writes the report into the session log and to Documents/bugs.jsonl (one line per report, newest last).
+  func reportBug(note: String) {
+    let context = bugContext()
+    log.event("bug_report", context.merging(["note": note]) { a, _ in a })
+    var record: [String: Any] = context
+    record["note"] = note
+    record["reported_at"] = ISO8601DateFormatter().string(from: Date())
+    record["session_t_ms"] = Int(Date().timeIntervalSince(log.startedAt) * 1000)
+    let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("bugs.jsonl")
+    if let data = try? JSONSerialization.data(withJSONObject: record) {
+      if let handle = try? FileHandle(forWritingTo: url) {
+        handle.seekToEndOfFile()
+        handle.write(data)
+        handle.write(Data([0x0A]))
+        try? handle.close()
+      } else {
+        try? (data + Data([0x0A])).write(to: url)
+      }
+    }
+    statusMessage = "Problem logged. Thanks."
   }
 
   private func currentVideoOrientation() -> AVCaptureVideoOrientation {

@@ -11,6 +11,7 @@ final class SessionLog: @unchecked Sendable {
   private let queue = DispatchQueue(label: "swing.log")
   private var handle: FileHandle?
   private let start = Date()
+  var startedAt: Date { start }
 
   init() {
     let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]

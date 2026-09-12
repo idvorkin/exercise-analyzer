@@ -41,7 +41,11 @@ pull-logs:
     mkdir -p ~/tmp/agent/swing-logs
     xcrun devicectl device copy from --device {{device}} --domain-type appDataContainer \
       --domain-identifier {{bundle}} --source Documents/logs --destination ~/tmp/agent/swing-logs
+    xcrun devicectl device copy from --device {{device}} --domain-type appDataContainer \
+      --domain-identifier {{bundle}} --source Documents/bugs.jsonl --destination ~/tmp/agent/swing-logs/bugs.jsonl || true
     ls -t ~/tmp/agent/swing-logs/logs | head -5
+    @echo "--- bug reports (newest last); each names its log file:"
+    @tail -5 ~/tmp/agent/swing-logs/bugs.jsonl 2>/dev/null | jq -c '{reported_at, note, log, clip, exercise, playhead}' || true
 
 # Copy session logs from the simulator instead.
 pull-logs-sim:
