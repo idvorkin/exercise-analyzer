@@ -798,11 +798,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
         // there, so ask the lifter to tap the notification, which opens the app straight into recording.
         RecordPrompt.post(log: log)
       }
-    case .switchCamera: flipCamera()
+    case .switchCamera: cycleCameraLevel()
     case .finish: if source == .camera { finishCamera() }
     case .cancel: if source == .camera { cancelCamera() }
     case .status: pushWatchStatus(force: true)
-    case .zoom: cycleZoom()
+    case .zoom: cycleCameraLevel()
     case .exercise: break  // carries a payload; handled by onExercise
     }
   }
@@ -912,16 +912,37 @@ final class VideoPoseSession: NSObject, ObservableObject {
     ingest(pixelBuffer: pixelBuffer, time: time)
   }
 
-  /// Steps the live camera to its next zoom preset (0.5× → 1× → 2× on the back camera).
-  func cycleZoom() {
-    guard let camera, source == .camera else { return }
-    let presets = camera.zoomPresets
-    guard let index = presets.firstIndex(of: camera.zoom) ?? presets.firstIndex(of: 1) else { return }
-    let next = presets[(index + 1) % presets.count]
-    camera.setZoom(next)
-    cameraZoom = camera.zoom
-    log.event("camera_zoom", ["zoom": camera.zoom, "presets": presets])
+  /// One control for the three views that matter at the gym: front → back 0.5× → back 1× → front.
+  func cycleCameraLevel() {
+    guard source == .camera, let camera else {
+      flipCamera()
+      return
+    }
+    if cameraPosition == .front {
+      flipCamera()  // to the back camera, which starts at 1×
+      if let back = self.camera, back.zoomPresets.contains(0.5) {
+        back.setZoom(0.5)
+        cameraZoom = back.zoom
+      }
+    } else if camera.zoom < 1, camera.zoomPresets.contains(1) {
+      camera.setZoom(1)
+      cameraZoom = camera.zoom
+    } else {
+      flipCamera()  // back 1× → front
+    }
+    log.event("camera_level", ["position": cameraPosition == .front ? "front" : "back", "zoom": cameraZoom])
     pushWatchStatus(force: true)
+  }
+
+  /// What the camera control will switch to next, for its label.
+  var nextCameraLevelLabel: String {
+    if cameraPosition == .front { return "0.5×" }
+    return cameraZoom < 1 ? "1×" : "Front"
+  }
+
+  /// The current view for the HUD: "Front", "0.5×" or "1×".
+  var cameraLevelLabel: String {
+    cameraPosition == .front ? "Front" : (cameraZoom < 1 ? "0.5×" : "1×")
   }
 
   /// Switches between the front and back camera. While recording, the recorder and the analysis carry on

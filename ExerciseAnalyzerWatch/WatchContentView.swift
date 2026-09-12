@@ -44,23 +44,15 @@ struct WatchContentView: View {
             .frame(maxWidth: .infinity)
             VStack {
               Text(elapsed).font(.system(size: 26, weight: .semibold, design: .rounded)).monospacedDigit()
-              Text(status.camera == "front" ? "front cam" : "back cam").font(.caption2).foregroundStyle(.secondary)
+              Text(cameraLevel).font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
           }
           if !status.exercise.isEmpty {
             Text(status.exercise).font(.caption2).foregroundStyle(.secondary)
           }
-          HStack(spacing: 6) {
-            Button { phone.send(.switchCamera) } label: {
-              Label("Switch", systemImage: "arrow.triangle.2.circlepath.camera").frame(maxWidth: .infinity)
-            }
-            if status.zoomPresets.count > 1 {
-              Button { phone.send(.zoom) } label: {
-                Text(status.zoom == status.zoom.rounded() ? "\(Int(status.zoom))×" : String(format: "%.1f×", status.zoom))
-                  .font(.headline.monospacedDigit()).frame(maxWidth: .infinity)
-              }
-            }
+          Button { phone.send(.switchCamera) } label: {
+            Label("Camera: \(cameraLevel)", systemImage: "arrow.triangle.2.circlepath.camera").frame(maxWidth: .infinity)
           }
           Button { phone.send(.finish) } label: {
             Label("Done", systemImage: "checkmark.circle.fill").frame(maxWidth: .infinity)
@@ -97,6 +89,12 @@ struct WatchContentView: View {
       ForEach(options, id: \.0) { option in Text(option.1).tag(option.0) }
     }
     .pickerStyle(.navigationLink)
+  }
+
+  /// "Front", "0.5×" or "1×": the three views that matter, cycled by one button.
+  private var cameraLevel: String {
+    if status.camera == "front" { return "Front" }
+    return status.zoom < 1 ? "0.5×" : "1×"
   }
 
   private var elapsed: String {

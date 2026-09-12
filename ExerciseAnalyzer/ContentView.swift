@@ -296,19 +296,16 @@ struct ContentView: View {
   private var cameraControls: some View {
     HStack {
       Button {
-        session.flipCamera()
+        session.cycleCameraLevel()
       } label: {
-        Label("Flip camera", systemImage: "arrow.triangle.2.circlepath.camera")
+        HStack(spacing: 6) {
+          Image(systemName: "arrow.triangle.2.circlepath.camera")
+          Text(session.cameraLevelLabel).font(.headline.monospacedDigit())
+        }
+        .padding(.horizontal, 10).padding(.vertical, 4)
+        .background(Color(.secondarySystemFill), in: Capsule())
       }
-      .labelStyle(.iconOnly).font(.title3)
-      Button {
-        session.cycleZoom()
-      } label: {
-        Text(Self.zoomLabel(session.cameraZoom)).font(.headline.monospacedDigit())
-          .padding(.horizontal, 10).padding(.vertical, 4)
-          .background(Color(.secondarySystemFill), in: Capsule())
-      }
-      .accessibilityLabel("Zoom \(Self.zoomLabel(session.cameraZoom)), tap for the next level")
+      .accessibilityLabel("Camera \(session.cameraLevelLabel), tap for \(session.nextCameraLevelLabel)")
       Spacer()
       Button {
         session.finishCamera()
@@ -650,8 +647,3 @@ enum OverlayMode: String, CaseIterable {
   var label: String { self == .both ? "Show video and skeleton" : "Show video only" }
 }
 
-extension ContentView {
-  static func zoomLabel(_ zoom: Double) -> String {
-    zoom == zoom.rounded() ? "\(Int(zoom))×" : String(format: "%.1f×", zoom)
-  }
-}

@@ -33,7 +33,7 @@ final class CameraSource: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     self.position = position
     self.device = device
     let wideFactor = device.virtualDeviceSwitchOverVideoZoomFactors.first.map { Double(truncating: $0) } ?? 1
-    zoomPresets = wideFactor > 1 ? [0.5, 1, 2] : [1, 2]
+    zoomPresets = wideFactor > 1 ? [0.5, 1] : [1]
     previewLayer = AVCaptureVideoPreviewLayer(session: session)
     super.init()
 
