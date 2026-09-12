@@ -347,7 +347,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       Task {
         activity = .working("Re-analyzing", progress: nil)
         await analyzeExtracted(url: url, reason: "mode")
-        statusMessage = recordedLine(reps: pipeline.reps.count)
+        statusMessage = "Re-analyzed as \(exercise.definition.name): \(pipeline.reps.count) reps"
         rememberCurrent(clipURL: url)
         activity = .idle
       }
@@ -430,7 +430,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     exercise = pipeline.exercise
     reps = pipeline.reps
     lastQuality = pipeline.reps.last?.quality
-    latestFrame = pipeline.track.frames.first
+    // Show the frame under the playhead, not frame 0: after a re-analysis the HUD must reflect the new result
+    // where the lifter is looking, without waiting for playback to advance.
+    latestFrame = pipeline.track.nearest(to: currentTime, tolerance: 0.2) ?? pipeline.track.frames.first
     lastLoggedPhase = nil
     recentBoxes = []
     personCrop = pipeline.stableCrop
