@@ -8,8 +8,9 @@ import SwiftUI
 /// Inline gallery shown under the video.
 struct RepGalleryWidget: View {
   let reps: [RepRecord]
+  let columns: [PhaseInfo]
   let currentRep: Int?
-  @Binding var focusedPhase: SwingPhase?
+  @Binding var focusedPhase: String?
   @Binding var focusedRep: Int?
   let onSeek: (RepPosition) -> Void
   let onOpen: (RepPosition) -> Void
@@ -22,7 +23,7 @@ struct RepGalleryWidget: View {
             Section {
               ForEach(reps) { rep in
                 RepRow(
-                  rep: rep, isCurrent: rep.number == currentRep, focusedPhase: focusedPhase,
+                  rep: rep, columns: columns, isCurrent: rep.number == currentRep, focusedPhase: focusedPhase,
                   width: geo.size.width, height: rep.number == focusedRep ? 150 : 72,
                   onSeek: onSeek,
                   onFocus: { phase in
@@ -41,7 +42,7 @@ struct RepGalleryWidget: View {
                 .id(rep.number)
               }
             } header: {
-              PhaseHeader(focusedPhase: $focusedPhase, width: geo.size.width)
+              PhaseHeader(columns: columns, focusedPhase: $focusedPhase, width: geo.size.width)
             }
           }
         }
@@ -56,38 +57,41 @@ struct RepGalleryWidget: View {
   }
 }
 
-/// Column layout shared by the widget and the sheet: rep-number gutter plus four phase columns, with the focused
-/// phase taking most of the width.
+/// Column layout shared by the widget and the sheet: rep-number gutter plus one column per phase, with the
+/// focused phase taking most of the width.
 enum GalleryLayout {
   static let gutter: CGFloat = 28
   static let spacing: CGFloat = 4
 
-  static func columnWidth(for phase: SwingPhase, focused: SwingPhase?, totalWidth: CGFloat) -> CGFloat {
-    let available = totalWidth - gutter - spacing * CGFloat(SwingPhase.displayOrder.count)
-    guard let focused else { return available / CGFloat(SwingPhase.displayOrder.count) }
-    return phase == focused ? available * 0.55 : available * 0.45 / 3
+  static func columnWidth(for phase: String, focused: String?, count: Int, totalWidth: CGFloat) -> CGFloat {
+    let available = totalWidth - gutter - spacing * CGFloat(count)
+    guard let focused else { return available / CGFloat(max(count, 1)) }
+    return phase == focused ? available * 0.55 : available * 0.45 / CGFloat(max(count - 1, 1))
   }
 }
 
 struct PhaseHeader: View {
-  @Binding var focusedPhase: SwingPhase?
+  let columns: [PhaseInfo]
+  @Binding var focusedPhase: String?
   let width: CGFloat
 
   var body: some View {
     HStack(spacing: GalleryLayout.spacing) {
       Text("Rep").frame(width: GalleryLayout.gutter)
-      ForEach(SwingPhase.displayOrder, id: \.self) { phase in
+      ForEach(columns, id: \.id) { phase in
         Button {
           withAnimation(.easeInOut(duration: 0.2)) {
-            focusedPhase = focusedPhase == phase ? nil : phase
+            focusedPhase = focusedPhase == phase.id ? nil : phase.id
           }
         } label: {
-          Text(phase.rawValue.capitalized)
+          Text(phase.label)
+            .lineLimit(1)
             .frame(
-              width: GalleryLayout.columnWidth(for: phase, focused: focusedPhase, totalWidth: width))
+              width: GalleryLayout.columnWidth(
+                for: phase.id, focused: focusedPhase, count: columns.count, totalWidth: width))
         }
         .buttonStyle(.plain)
-        .fontWeight(focusedPhase == phase ? .bold : .regular)
+        .fontWeight(focusedPhase == phase.id ? .bold : .regular)
       }
     }
     .font(.caption)
@@ -99,12 +103,13 @@ struct PhaseHeader: View {
 
 struct RepRow: View {
   let rep: RepRecord
+  let columns: [PhaseInfo]
   let isCurrent: Bool
-  let focusedPhase: SwingPhase?
+  let focusedPhase: String?
   let width: CGFloat
   let height: CGFloat
   let onSeek: (RepPosition) -> Void
-  var onFocus: ((SwingPhase) -> Void)? = nil
+  var onFocus: ((String) -> Void)? = nil
   var onOpen: ((RepPosition) -> Void)? = nil
 
   var body: some View {
@@ -114,18 +119,19 @@ struct RepRow: View {
         Text("\(rep.quality.score)").font(.caption2).foregroundStyle(.secondary)
       }
       .frame(width: GalleryLayout.gutter)
-      ForEach(SwingPhase.displayOrder, id: \.self) { phase in
-        PoseThumbnail(position: rep.positions[phase])
+      ForEach(columns, id: \.id) { phase in
+        PoseThumbnail(position: rep.positions[phase.id])
           .frame(
-            width: GalleryLayout.columnWidth(for: phase, focused: focusedPhase, totalWidth: width),
+            width: GalleryLayout.columnWidth(
+              for: phase.id, focused: focusedPhase, count: columns.count, totalWidth: width),
             height: height
           )
-          .onTapGesture(count: 2) { onFocus?(phase) }
+          .onTapGesture(count: 2) { onFocus?(phase.id) }
           .onTapGesture {
-            if let position = rep.positions[phase] { onSeek(position) }
+            if let position = rep.positions[phase.id] { onSeek(position) }
           }
           .onLongPressGesture {
-            if let position = rep.positions[phase] {
+            if let position = rep.positions[phase.id] {
               onSeek(position)
               onOpen?(position)
             }
@@ -141,11 +147,12 @@ struct RepRow: View {
 /// Full-screen gallery with compare mode.
 struct RepGallerySheet: View {
   let reps: [RepRecord]
+  let columns: [PhaseInfo]
   let currentRep: Int?
   let onSeek: (RepPosition) -> Void
 
   @Environment(\.dismiss) private var dismiss
-  @State private var focusedPhase: SwingPhase?
+  @State private var focusedPhase: String?
   @State private var selected: Set<Int> = []
   @State private var comparing = false
 
@@ -196,14 +203,14 @@ struct RepGallerySheet: View {
               }
               .frame(width: 24)
               RepRow(
-                rep: rep, isCurrent: rep.number == currentRep, focusedPhase: focusedPhase,
+                rep: rep, columns: columns, isCurrent: rep.number == currentRep, focusedPhase: focusedPhase,
                 width: width - 32, height: 110, onSeek: onSeek)
             }
           }
         } header: {
           HStack(spacing: 4) {
             Color.clear.frame(width: 24)
-            PhaseHeader(focusedPhase: $focusedPhase, width: width - 32)
+            PhaseHeader(columns: columns, focusedPhase: $focusedPhase, width: width - 32)
           }
         }
       }
@@ -219,14 +226,14 @@ struct RepGallerySheet: View {
         ForEach(chosen) { rep in
           VStack(spacing: 4) {
             Text("Rep \(rep.number) · \(rep.quality.score)").font(.caption.bold())
-            ForEach(SwingPhase.displayOrder, id: \.self) { phase in
+            ForEach(columns, id: \.id) { phase in
               VStack(spacing: 2) {
-                PoseThumbnail(position: rep.positions[phase])
+                PoseThumbnail(position: rep.positions[phase.id])
                   .frame(width: columnWidth, height: columnWidth * 1.2)
                   .onTapGesture {
-                    if let position = rep.positions[phase] { onSeek(position) }
+                    if let position = rep.positions[phase.id] { onSeek(position) }
                   }
-                Text(phase.rawValue.capitalized).font(.caption2).foregroundStyle(.secondary)
+                Text(phase.label).font(.caption2).foregroundStyle(.secondary)
               }
             }
             ForEach(rep.quality.feedback, id: \.self) { line in

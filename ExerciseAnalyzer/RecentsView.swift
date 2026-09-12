@@ -68,8 +68,9 @@ struct RecentRow: View {
       .clipShape(RoundedRectangle(cornerRadius: 6))
 
       VStack(alignment: .leading, spacing: 3) {
+        Text(entry.exerciseKind.definition.name).font(.headline)
         Text(Self.dateFormatter.string(from: entry.recordedAt ?? entry.analyzedAt))
-          .font(.headline)
+          .font(.subheadline)
         HStack(spacing: 6) {
           Text("\(entry.repCount) reps")
           if let best = entry.bestScore { Text("· best \(best)") }

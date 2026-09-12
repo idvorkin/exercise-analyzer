@@ -28,6 +28,9 @@ struct RecentEntry: Codable, Identifiable {
   var bestScore: Int?
   var source: Source
   var thumbnail: String?
+  var exercise: ExerciseKind?
+
+  var exerciseKind: ExerciseKind { exercise ?? .kettlebellSwing }
 
   var isInPhotos: Bool {
     if case .photos = source { return true }
@@ -36,6 +39,9 @@ struct RecentEntry: Codable, Identifiable {
 }
 
 private struct AnalysisSnapshot: Codable {
+  static let currentVersion = 2
+  var version: Int = AnalysisSnapshot.currentVersion
+  let exercise: ExerciseKind
   let frames: [FrameRecord]
   let reps: [RepRecord]
 }
@@ -64,7 +70,7 @@ final class RecentsStore: ObservableObject {
 
   /// Adds or replaces an entry, writing its analysis, rep images, and (for file sources) the clip itself.
   func save(
-    id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: SwingPipeline,
+    id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,
     clipURL: URL?, thumbnail: UIImage?
   ) throws {
     let dir = folder(for: id)
@@ -78,7 +84,7 @@ final class RecentsStore: ObservableObject {
       }
     }
 
-    let snapshot = AnalysisSnapshot(frames: pipeline.track.frames, reps: pipeline.reps)
+    let snapshot = AnalysisSnapshot(exercise: pipeline.exercise, frames: pipeline.track.frames, reps: pipeline.reps)
     try JSONEncoder().encode(snapshot).write(to: dir.appendingPathComponent("analysis.json"))
     for rep in pipeline.reps {
       for (phase, position) in rep.positions {
@@ -95,7 +101,7 @@ final class RecentsStore: ObservableObject {
     let entry = RecentEntry(
       id: id, analyzedAt: Date(), recordedAt: recordedAt, duration: duration,
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
-      source: source, thumbnail: thumbnailName)
+      source: source, thumbnail: thumbnailName, exercise: pipeline.exercise)
     entries.removeAll { $0.id == id }
     entries.insert(entry, at: 0)
     try persistIndex()
@@ -124,10 +130,11 @@ final class RecentsStore: ObservableObject {
   }
 
   /// The stored analysis with rep images re-attached.
-  func loadPipeline(for entry: RecentEntry) -> SwingPipeline? {
+  func loadPipeline(for entry: RecentEntry) -> AnalysisPipeline? {
     let dir = folder(for: entry.id)
     guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),
-      let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data)
+      let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data),
+      snapshot.version == AnalysisSnapshot.currentVersion
     else { return nil }
     let reps = snapshot.reps.map { rep in
       RepRecord(
@@ -140,7 +147,7 @@ final class RecentsStore: ObservableObject {
         },
         quality: rep.quality)
     }
-    return SwingPipeline.restored(frames: snapshot.frames, reps: reps)
+    return AnalysisPipeline.restored(frames: snapshot.frames, reps: reps, exercise: snapshot.exercise)
   }
 
   /// A playable URL for the entry's clip: the in-app file, or the Photos asset (nil if it was deleted).
@@ -174,7 +181,7 @@ final class RecentsStore: ObservableObject {
     PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject?.creationDate
   }
 
-  private static func imageName(rep: Int, phase: SwingPhase) -> String { "rep-\(rep)-\(phase.rawValue).jpg" }
+  private static func imageName(rep: Int, phase: String) -> String { "rep-\(rep)-\(phase).jpg" }
 
   private func persistIndex() throws {
     try JSONEncoder().encode(entries).write(to: indexURL)

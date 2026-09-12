@@ -12,7 +12,7 @@ struct FrameRecord: Codable {
   let pose: Pose?
   /// Tracked person's box, normalized to the image (nil when nobody was detected).
   let box: CGRect?
-  let swing: SwingFrameResult?
+  let analysis: ExerciseFrameResult?
 }
 
 final class PoseTrack {
@@ -47,7 +47,7 @@ final class PoseTrack {
     let track = PoseTrack()
     track.frames = frames.filter { $0.time >= start && $0.time <= end }.map {
       FrameRecord(
-        time: $0.time - start, imageSize: $0.imageSize, pose: $0.pose, box: $0.box, swing: $0.swing)
+        time: $0.time - start, imageSize: $0.imageSize, pose: $0.pose, box: $0.box, analysis: $0.analysis)
     }
     return track
   }

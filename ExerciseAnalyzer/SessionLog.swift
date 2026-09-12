@@ -45,14 +45,10 @@ final class SessionLog: @unchecked Sendable {
       "time": frame.time, "src": source, "infer_ms": inferenceMs, "fps": fps,
     ]
     if let personConf { fields["conf"] = personConf }
-    if let swing = frame.swing {
-      fields["phase"] = swing.phase.rawValue
-      fields["rep"] = swing.repCount
-      fields["arm"] = swing.angles.arm
-      fields["spine"] = swing.angles.spine
-      fields["hip"] = swing.angles.hip
-      fields["knee"] = swing.angles.knee
-      fields["wrist"] = swing.angles.wristHeight
+    if let analysis = frame.analysis {
+      fields["phase"] = analysis.phase
+      fields["rep"] = analysis.repCount
+      for (key, value) in analysis.metrics { fields[key] = value }
     }
     event("frame", fields)
   }
@@ -62,11 +58,9 @@ final class SessionLog: @unchecked Sendable {
       "rep",
       [
         "src": source, "number": rep.number, "score": rep.quality.score,
-        "feedback": rep.quality.feedback, "hinge_depth": rep.quality.hingeDepth,
-        "lockout": rep.quality.lockoutAngle, "knee_flexion": rep.quality.kneeFlexion,
-        "positions": rep.positions.mapValues { $0.time }.reduce(into: [String: Double]()) {
-          $0[$1.key.rawValue] = $1.value
-        },
+        "feedback": rep.quality.feedback,
+        "quality": rep.quality.metrics.mapValues { Self.sanitize($0) },
+        "positions": rep.positions.mapValues { $0.time },
       ])
   }
 

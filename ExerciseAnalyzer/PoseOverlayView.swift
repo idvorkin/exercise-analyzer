@@ -1,7 +1,7 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 //  Skeleton drawing shared by the live overlay and the rep-gallery thumbnails: COCO-17 bones, with the spine and
-//  right arm that drive the swing analysis highlighted.
+//  right arm that drive the analysis highlighted.
 
 import AVFoundation
 import SwiftUI
@@ -23,7 +23,7 @@ enum PoseDrawing {
   ) {
     func mapped(_ k: CocoKeypoint) -> CGPoint? {
       let i = k.rawValue
-      guard i < pose.xyn.count, i < pose.conf.count, pose.conf[i] > SwingSkeleton.visibleThreshold
+      guard i < pose.xyn.count, i < pose.conf.count, pose.conf[i] > BodySkeleton.visibleThreshold
       else { return nil }
       return CGPoint(
         x: rect.minX + CGFloat(pose.xyn[i].x) * rect.width,

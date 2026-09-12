@@ -12,14 +12,6 @@
 //  so a completed rep carries one position per phase for the gallery and navigation.
 
 import UIKit
-import UltralyticsYOLO
-
-enum SwingPhase: String, CaseIterable, Codable {
-  case top, connect, bottom, release
-
-  /// Gallery column order: the visual start of a rep cycle first.
-  static let displayOrder: [SwingPhase] = [.bottom, .release, .top, .connect]
-}
 
 /// Phase-transition thresholds in degrees. Defaults come from analysis of real swing videos.
 struct SwingThresholds {
@@ -35,86 +27,41 @@ struct SwingThresholds {
   var releaseSpineMax = 25.0
 }
 
-struct SwingAngles: Codable {
-  var arm = 0.0
-  var spine = 0.0
-  var hip = 0.0
-  var knee = 0.0
-  var wristHeight = 0.0
-}
+final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
+  static let top = "top"
+  static let connect = "connect"
+  static let bottom = "bottom"
+  static let release = "release"
 
-struct RepQuality: Codable {
-  let score: Int
-  let hingeDepth: Double
-  let lockoutAngle: Double
-  let kneeFlexion: Double
-  let feedback: [String]
-}
+  static let definition = ExerciseDefinition(
+    name: "Kettlebell Swing",
+    phases: [
+      PhaseInfo(id: top, label: "Top"), PhaseInfo(id: connect, label: "Connect"),
+      PhaseInfo(id: bottom, label: "Bottom"), PhaseInfo(id: release, label: "Release"),
+    ],
+    galleryOrder: [
+      PhaseInfo(id: bottom, label: "Bottom"), PhaseInfo(id: release, label: "Release"),
+      PhaseInfo(id: top, label: "Top"), PhaseInfo(id: connect, label: "Connect"),
+    ],
+    hudMetrics: [
+      MetricInfo(key: "spine", label: "SPINE", unit: "°"), MetricInfo(key: "arm", label: "ARM", unit: "°"),
+      MetricInfo(key: "hip", label: "HIP", unit: "°"), MetricInfo(key: "knee", label: "KNEE", unit: "°"),
+    ])
 
-/// The peak frame of one phase within a rep. The image is kept in memory only; Recents stores it as a file.
-struct RepPosition: Codable {
-  let phase: SwingPhase
-  let time: Double
-  let pose: Pose
-  let angles: SwingAngles
-  let score: Double
-  var image: UIImage?
-
-  init(phase: SwingPhase, time: Double, pose: Pose, angles: SwingAngles, score: Double, image: UIImage?) {
-    self.phase = phase
-    self.time = time
-    self.pose = pose
-    self.angles = angles
-    self.score = score
-    self.image = image
-  }
-
-  private enum CodingKeys: String, CodingKey {
-    case phase, time, pose, angles, score
-  }
-
-  func shifted(by offset: Double) -> RepPosition {
-    RepPosition(phase: phase, time: time + offset, pose: pose, angles: angles, score: score, image: image)
-  }
-}
-
-/// A completed rep: one position per phase plus its quality score.
-struct RepRecord: Identifiable, Codable {
-  let number: Int
-  let positions: [SwingPhase: RepPosition]
-  let quality: RepQuality
-
-  var id: Int { number }
-  var checkpoints: [RepPosition] { positions.values.sorted { $0.time < $1.time } }
-  var startTime: Double { checkpoints.first?.time ?? 0 }
-  var endTime: Double { checkpoints.last?.time ?? 0 }
-
-  func shifted(by offset: Double) -> RepRecord {
-    RepRecord(number: number, positions: positions.mapValues { $0.shifted(by: offset) }, quality: quality)
-  }
-}
-
-struct SwingFrameResult: Codable {
-  let phase: SwingPhase
-  let repCount: Int
-  let angles: SwingAngles
-  /// Present on the frame that completes a rep.
-  let completedRep: RepRecord?
-}
-
-final class KettlebellSwingAnalyzer {
-  private(set) var phase: SwingPhase = .top
-  private(set) var repCount = 0
+  let kind = ExerciseKind.kettlebellSwing
 
   private let thresholds: SwingThresholds
-  private var framesInPhase = 0
-  private let minFramesInPhase = 2
-
+  private let machine = PhaseStateMachine(initialPhase: KettlebellSwingAnalyzer.top)
   private var wristHeightHistory: [Double] = []
   private let wristHeightWindowSize = 5
-
   private var currentPhasePeak: RepPosition?
-  private var currentRepPeaks: [SwingPhase: RepPosition] = [:]
+
+  private struct Angles {
+    var arm = 0.0, spine = 0.0, hip = 0.0, knee = 0.0, wristHeight = 0.0
+    var metrics: [String: Double] {
+      ["arm": arm, "spine": spine, "hip": hip, "knee": knee, "wristHeight": wristHeight]
+    }
+  }
 
   private struct RepMetrics {
     var maxSpineAngle = 0.0
@@ -130,123 +77,105 @@ final class KettlebellSwingAnalyzer {
   }
 
   func reset() {
-    phase = .top
-    repCount = 0
-    framesInPhase = 0
+    machine.resetState(to: Self.top)
     wristHeightHistory = []
     currentPhasePeak = nil
-    currentRepPeaks = [:]
     metrics = RepMetrics()
   }
 
-  /// Advances the state machine by one frame. Joints are chosen per frame by confidence (see SwingSkeleton), so
-  /// facing direction and handedness don't matter. `image` is called only when this frame becomes a phase peak.
-  func process(pose: Pose, time: Double, image: () -> UIImage?) -> SwingFrameResult {
-    let skeleton = SwingSkeleton(pose: pose)
-    let angles = SwingAngles(
-      arm: skeleton.armToVerticalAngle,
-      spine: skeleton.spineAngle,
-      hip: skeleton.hipAngle,
-      knee: skeleton.kneeAngle,
-      wristHeight: skeleton.wristHeight)
+  /// Joints are chosen per frame by confidence (see BodySkeleton), so facing direction and handedness don't matter.
+  func process(pose: Pose, time: Double, image: () -> UIImage?) -> ExerciseFrameResult {
+    let skeleton = BodySkeleton(pose: pose)
+    let a = Angles(
+      arm: skeleton.armToVerticalAngle, spine: skeleton.spineAngle, hip: skeleton.hipAngle,
+      knee: skeleton.kneeAngle, wristHeight: skeleton.wristHeight)
 
-    wristHeightHistory.append(angles.wristHeight)
+    wristHeightHistory.append(a.wristHeight)
     if wristHeightHistory.count > wristHeightWindowSize * 2 {
       wristHeightHistory.removeFirst(wristHeightHistory.count - wristHeightWindowSize * 2)
     }
 
-    updateMetrics(angles)
-    updatePhasePeak(pose: pose, time: time, angles: angles, image: image)
-    framesInPhase += 1
+    updateMetrics(a)
+    updatePhasePeak(pose: pose, time: time, angles: a, image: image)
+    machine.framesInPhase += 1
 
     var completedRep: RepRecord?
-
-    switch phase {
-    case .top:
-      if shouldTransitionToConnect(angles) {
+    switch machine.phase {
+    case Self.top:
+      if shouldTransitionToConnect(a) {
         finalizePhasePeak()
-        transition(to: .connect)
+        machine.transition(to: Self.connect)
       }
-    case .connect:
-      if shouldTransitionToBottom(angles) {
+    case Self.connect:
+      if shouldTransitionToBottom(a) {
         finalizePhasePeak()
-        transition(to: .bottom)
+        machine.transition(to: Self.bottom)
       }
-    case .bottom:
-      if shouldTransitionToRelease(angles) {
+    case Self.bottom:
+      if shouldTransitionToRelease(a) {
         finalizePhasePeak()
-        transition(to: .release)
+        machine.transition(to: Self.release)
       }
-    case .release:
-      if shouldTransitionToTop(angles) {
+    default:  // release
+      if shouldTransitionToTop(a) {
         finalizePhasePeak()
-        repCount += 1
-        completedRep = RepRecord(
-          number: repCount, positions: currentRepPeaks, quality: calculateRepQuality())
-        currentRepPeaks = [:]
-        transition(to: .top)
+        completedRep = machine.completeRep(quality: calculateRepQuality())
+        machine.transition(to: Self.top)
         metrics = RepMetrics()
       }
     }
 
-    return SwingFrameResult(
-      phase: phase, repCount: repCount, angles: angles, completedRep: completedRep)
+    return ExerciseFrameResult(
+      phase: machine.phase, repCount: machine.repCount, metrics: a.metrics, completedRep: completedRep)
   }
 
   // MARK: - Peaks
 
   /// CONNECT and RELEASE keep the first qualifying frame (timing matters); TOP and BOTTOM keep the best extreme.
-  private func updatePhasePeak(pose: Pose, time: Double, angles: SwingAngles, image: () -> UIImage?) {
-    let score = peakScore(for: phase, angles: angles)
-    let isTimingPhase = phase == .connect || phase == .release
+  private func updatePhasePeak(pose: Pose, time: Double, angles: Angles, image: () -> UIImage?) {
+    let score = peakScore(for: machine.phase, angles: angles)
+    let isTimingPhase = machine.phase == Self.connect || machine.phase == Self.release
     if let current = currentPhasePeak, isTimingPhase || score <= current.score { return }
     currentPhasePeak = RepPosition(
-      phase: phase, time: time, pose: pose, angles: angles, score: score, image: image())
+      phase: machine.phase, time: time, pose: pose, metrics: angles.metrics, score: score, image: image())
   }
 
-  private func peakScore(for phase: SwingPhase, angles: SwingAngles) -> Double {
+  private func peakScore(for phase: String, angles: Angles) -> Double {
     switch phase {
-    case .top: return angles.arm  // highest arm = best lockout
-    case .connect: return 90 - angles.arm  // arms most vertical before the hinge
-    case .bottom: return angles.spine  // deepest hinge
-    case .release: return 90 - angles.spine  // most upright when the arms release
+    case Self.top: return angles.arm  // highest arm = best lockout
+    case Self.connect: return 90 - angles.arm  // arms most vertical before the hinge
+    case Self.bottom: return angles.spine  // deepest hinge
+    default: return 90 - angles.spine  // release: most upright when the arms release
     }
   }
 
   private func finalizePhasePeak() {
-    if let peak = currentPhasePeak { currentRepPeaks[peak.phase] = peak }
+    if let peak = currentPhasePeak { machine.storePeak(peak) }
     currentPhasePeak = nil
   }
 
   // MARK: - Transitions
 
-  private var canTransition: Bool { framesInPhase >= minFramesInPhase }
-
-  private func transition(to newPhase: SwingPhase) {
-    phase = newPhase
-    framesInPhase = 0
-  }
-
   /// TOP → CONNECT: arms near vertical while the spine is still upright.
-  private func shouldTransitionToConnect(_ a: SwingAngles) -> Bool {
-    canTransition && abs(a.arm) < thresholds.connectArmMax && a.spine < thresholds.connectSpineMax
+  private func shouldTransitionToConnect(_ a: Angles) -> Bool {
+    machine.canTransition && abs(a.arm) < thresholds.connectArmMax && a.spine < thresholds.connectSpineMax
   }
 
   /// CONNECT → BOTTOM: arms behind the body, spine hinged, hips flexed.
-  private func shouldTransitionToBottom(_ a: SwingAngles) -> Bool {
-    canTransition && abs(a.arm) < abs(thresholds.bottomArmMax) + 15
+  private func shouldTransitionToBottom(_ a: Angles) -> Bool {
+    machine.canTransition && abs(a.arm) < abs(thresholds.bottomArmMax) + 15
       && a.spine > thresholds.bottomSpineMin && a.hip < thresholds.bottomHipMax
   }
 
   /// BOTTOM → RELEASE: arms crossing vertical on the way up, spine returning upright.
-  private func shouldTransitionToRelease(_ a: SwingAngles) -> Bool {
-    canTransition && abs(a.arm) < thresholds.releaseArmMax && a.spine < thresholds.releaseSpineMax
+  private func shouldTransitionToRelease(_ a: Angles) -> Bool {
+    machine.canTransition && abs(a.arm) < thresholds.releaseArmMax && a.spine < thresholds.releaseSpineMax
   }
 
   /// RELEASE → TOP (rep complete): standing upright with the arm near horizontal, confirmed either by
   /// the wrist height peaking or by the arm staying horizontal for a few frames.
-  private func shouldTransitionToTop(_ a: SwingAngles) -> Bool {
-    guard canTransition else { return false }
+  private func shouldTransitionToTop(_ a: Angles) -> Bool {
+    guard machine.canTransition else { return false }
     guard a.spine <= thresholds.topSpineMax, a.hip >= thresholds.topHipMin else { return false }
     guard abs(a.arm) > thresholds.topArmMin else { return false }
 
@@ -261,7 +190,7 @@ final class KettlebellSwingAnalyzer {
     }
 
     // Fast swings can miss the exact peak; after a few horizontal frames call it the top anyway.
-    return framesInPhase >= minFramesInPhase + 2
+    return machine.framesInPhase >= machine.minFramesInPhase + 2
   }
 
   private func smoothedWristHeight(center: Int, radius: Int) -> Double {
@@ -274,7 +203,7 @@ final class KettlebellSwingAnalyzer {
 
   // MARK: - Quality
 
-  private func updateMetrics(_ a: SwingAngles) {
+  private func updateMetrics(_ a: Angles) {
     metrics.maxSpineAngle = max(metrics.maxSpineAngle, a.spine)
     metrics.minHipAngle = min(metrics.minHipAngle, a.hip)
     metrics.maxArmAngle = max(metrics.maxArmAngle, a.arm)
@@ -310,7 +239,11 @@ final class KettlebellSwingAnalyzer {
     if feedback.isEmpty { feedback.append("Great rep!") }
 
     return RepQuality(
-      score: max(0, score), hingeDepth: metrics.maxSpineAngle, lockoutAngle: metrics.maxArmAngle,
-      kneeFlexion: metrics.maxKneeFlexion, feedback: feedback)
+      score: max(0, score),
+      metrics: [
+        "hingeDepth": metrics.maxSpineAngle, "lockoutAngle": metrics.maxArmAngle,
+        "kneeFlexion": metrics.maxKneeFlexion,
+      ],
+      feedback: feedback)
   }
 }

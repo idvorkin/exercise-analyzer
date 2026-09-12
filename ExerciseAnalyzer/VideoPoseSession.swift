@@ -1,7 +1,7 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 //  VideoPoseSession orchestrates the app: two frame sources (file playback, live camera), one shared pose
-//  predictor, a SwingPipeline per analysis, the recorder, the offline pass, trimming, saving, rep navigation,
+//  predictor, an AnalysisPipeline per analysis, the recorder, the offline pass, trimming, saving, rep navigation,
 //  and the session log.
 //
 //  Live camera: every frame is recorded and analyzed live (frames drop if inference falls behind). Done trims the
@@ -54,12 +54,20 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var canSave = false
   /// Normalized image rect to zoom to for the "me view": stable over a replayed track, slowly adapting while live.
   @Published private(set) var personCrop: CGRect?
+  /// Which exercise the lifter chose (or Auto), and the exercise currently being analyzed.
+  @Published private(set) var exerciseMode: ExerciseMode
+  @Published private(set) var exercise: ExerciseKind = .kettlebellSwing
+  @Published private(set) var detection: ExerciseDetection?
   @Published var rate: Float = 1.0 {
     didSet { if isPlaying { player.rate = rate } }
   }
 
   private var predictor: BasePredictor?
-  private var pipeline = SwingPipeline()
+  private var pipeline = AnalysisPipeline(exercise: .kettlebellSwing)
+  /// Poses of the loaded clip (offline pass or Recents), kept so a different exercise can be analyzed instantly.
+  private var extractedFrames: [FrameRecord] = []
+  private let liveDetector = ExerciseDetector()
+  private var liveDetectionLocked = false
   private var displayLink: CADisplayLink?
   private let inferenceQueue = DispatchQueue(label: "swing.inference")
   private var inferenceBusy = false
@@ -83,7 +91,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var currentRecordedAt: Date?
   private var pendingLoadURL: URL?
   private var debugFramesToLog = 0
-  private var lastLoggedPhase: SwingPhase?
+  private var lastLoggedPhase: String?
 
   var currentRep: RepRecord? {
     reps.first { currentTime >= $0.startTime - 0.05 && currentTime <= $0.endTime + 0.05 }
@@ -96,7 +104,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   override init() {
+    exerciseMode = ExerciseMode(storageValue: UserDefaults.standard.string(forKey: "exerciseMode"))
     super.init()
+    if case .fixed(let kind) = exerciseMode { exercise = kind }
+    pipeline = AnalysisPipeline(exercise: exercise)
     player.actionAtItemEnd = .pause
     timeObserver = player.addPeriodicTimeObserver(
       forInterval: CMTime(value: 1, timescale: 30), queue: .main
@@ -188,6 +199,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
       currentEntryID = entry.id
       currentRecordedAt = entry.recordedAt
       canSave = !entry.isInPhotos
+      extractedFrames = pipeline.track.frames
+      detection = nil
       installPlayerItem(url: url, pipeline: pipeline)
       statusMessage = recordedLine(reps: pipeline.reps.count)
       log.event("recents_open", ["id": entry.id, "reps": pipeline.reps.count])
@@ -226,8 +239,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     default:
       source = .file(name: "clip." + clipURL.pathExtension)
     }
+    let firstRep = pipeline.reps.first
     let thumbnail =
-      pipeline.reps.first?.positions[.top]?.image ?? pipeline.reps.first?.checkpoints.first?.image
+      pipeline.exercise.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
+      ?? firstRep?.checkpoints.first?.image
     do {
       try recents.save(
         id: id, source: source, recordedAt: currentRecordedAt ?? Date(), duration: duration,
@@ -244,28 +259,25 @@ final class VideoPoseSession: NSObject, ObservableObject {
       statusMessage = "Model not ready"
       return
     }
-    installPlayerItem(url: url, pipeline: SwingPipeline())
+    installPlayerItem(url: url, pipeline: AnalysisPipeline(exercise: exercise))
     liveInferenceEnabled = false
     activity = .working("Analyzing", progress: 0)
     do {
-      let (result, summary) = try await OfflineAnalyzer.run(url: url, predictor: predictor) {
+      let (frames, summary) = try await OfflineAnalyzer.extract(url: url, predictor: predictor) {
         [weak self] fraction in
         Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
       }
-      adopt(pipeline: result)
-      for frame in result.track.frames {
-        log.frame(frame, source: "offline", inferenceMs: summary.averageInferenceMs, fps: 0, personConf: nil)
-      }
-      for rep in result.reps { log.rep(rep, source: "offline") }
+      extractedFrames = frames
       log.event(
         "offline_pass",
         [
           "frames": summary.frames, "elapsed_s": summary.elapsed,
-          "avg_infer_ms": summary.averageInferenceMs, "reps": result.reps.count,
+          "avg_infer_ms": summary.averageInferenceMs,
           "fps": summary.elapsed > 0 ? Double(summary.frames) / summary.elapsed : 0,
         ])
-      statusMessage = recordedLine(reps: result.reps.count) + String(
-        format: " · analyzed %d frames in %.1fs", summary.frames, summary.elapsed)
+      await analyzeExtracted(url: url, reason: "load")
+      statusMessage = recordedLine(reps: pipeline.reps.count) + String(
+        format: " · %d frames in %.1fs", summary.frames, summary.elapsed)
       rememberCurrent(clipURL: url)
     } catch {
       statusMessage = "Analysis failed: \(error.localizedDescription)"
@@ -280,7 +292,60 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
   }
 
-  private func installPlayerItem(url: URL, pipeline: SwingPipeline) {
+  /// Picks the exercise (detects it in Auto), runs its analyzer over the extracted poses, and pulls rep stills
+  /// from the clip. Cheap: no inference.
+  private func analyzeExtracted(url: URL, reason: String) async {
+    let chosen: ExerciseKind
+    switch exerciseMode {
+    case .fixed(let kind):
+      chosen = kind
+      detection = nil
+    case .auto:
+      let result = ExerciseDetector.detect(frames: extractedFrames)
+      detection = result
+      chosen = result.exercise
+      log.event(
+        "detection",
+        ["exercise": result.exercise.rawValue, "confidence": result.confidence, "reason": result.reason]
+          .merging(result.stats.mapValues { $0 as Any }) { a, _ in a })
+    }
+    let analyzed = AnalysisPipeline.analyze(frames: extractedFrames, exercise: chosen)
+    await analyzed.fillRepImages(from: AVURLAsset(url: url), frameDuration: frameDuration)
+    adopt(pipeline: analyzed)
+    for frame in analyzed.track.frames {
+      log.frame(frame, source: "offline", inferenceMs: 0, fps: 0, personConf: nil)
+    }
+    for rep in analyzed.reps { log.rep(rep, source: "offline") }
+    log.event("analyzed", ["exercise": chosen.rawValue, "reps": analyzed.reps.count, "reason": reason])
+  }
+
+  /// Lifter picked an exercise (or Auto): persist it and re-analyze whatever is loaded, without re-running inference.
+  func setExerciseMode(_ mode: ExerciseMode) {
+    exerciseMode = mode
+    UserDefaults.standard.set(mode.storageValue, forKey: "exerciseMode")
+    log.event("exercise_mode", ["mode": mode.storageValue])
+    if case .fixed(let kind) = mode { exercise = kind }
+    switch source {
+    case .file where !extractedFrames.isEmpty:
+      guard let url = trimmedURL ?? currentFileURL else { return }
+      Task {
+        activity = .working("Re-analyzing", progress: nil)
+        await analyzeExtracted(url: url, reason: "mode")
+        statusMessage = recordedLine(reps: pipeline.reps.count)
+        rememberCurrent(clipURL: url)
+        activity = .idle
+      }
+    case .camera:
+      liveDetector.reset()
+      liveDetectionLocked = false
+      pipeline = AnalysisPipeline(exercise: exercise)
+      reps = []
+    default:
+      break
+    }
+  }
+
+  private func installPlayerItem(url: URL, pipeline: AnalysisPipeline) {
     pause()
     let asset = AVURLAsset(url: url)
     // No AVPlayerItemVideoOutput here: attaching a BGRA output routes an HDR item through an SDR conversion and
@@ -344,8 +409,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
       ])
   }
 
-  private func adopt(pipeline: SwingPipeline) {
+  private func adopt(pipeline: AnalysisPipeline) {
     self.pipeline = pipeline
+    exercise = pipeline.exercise
     reps = pipeline.reps
     lastQuality = pipeline.reps.last?.quality
     latestFrame = pipeline.track.frames.first
@@ -422,7 +488,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   func resetAnalysis() {
-    pipeline.reset()
+    pipeline = AnalysisPipeline(exercise: exercise)
     reps = []
     lastQuality = nil
     latestFrame = nil
@@ -491,6 +557,26 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func handle(result: YOLOResult) {
     guard let pending = pendingFrame else { return }
     pendingFrame = nil
+    if source == .camera, exerciseMode == .auto, !liveDetectionLocked,
+      let index = result.boxes.indices.max(by: { result.boxes[$0].conf < result.boxes[$1].conf }),
+      index < result.keypointsList.count
+    {
+      liveDetector.observe(pose: Pose(keypoints: result.keypointsList[index]))
+      let guess = liveDetector.result()
+      let frames = Int(guess.stats["frames"] ?? 0)
+      if frames >= 60 && (guess.confidence >= 70 || frames >= 120) {
+        liveDetectionLocked = true
+        detection = guess
+        log.event(
+          "detection",
+          ["exercise": guess.exercise.rawValue, "confidence": guess.confidence, "reason": guess.reason, "src": "live"])
+        if guess.exercise != pipeline.exercise {
+          exercise = guess.exercise
+          pipeline = AnalysisPipeline(exercise: guess.exercise)
+          reps = []
+        }
+      }
+    }
     let frame = pipeline.process(result: result, time: pending.time) {
       FrameImage.thumbnail(from: pending.pixelBuffer)
     }
@@ -500,7 +586,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     log.frame(
       frame, source: source == .camera ? "live" : "file", inferenceMs: result.inferenceMs, fps: fps,
       personConf: personConf)
-    if let rep = frame.swing?.completedRep {
+    if let rep = frame.analysis?.completedRep {
       reps = pipeline.reps
       lastQuality = rep.quality
       log.rep(rep, source: source == .camera ? "live" : "file")
@@ -526,9 +612,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   private func show(_ frame: FrameRecord) {
     latestFrame = frame
-    if let phase = frame.swing?.phase, phase != lastLoggedPhase {
+    if let phase = frame.analysis?.phase, phase != lastLoggedPhase {
       lastLoggedPhase = phase
-      log.event("phase", ["time": frame.time, "phase": phase.rawValue, "rep": frame.swing?.repCount ?? 0])
+      log.event("phase", ["time": frame.time, "phase": phase, "rep": frame.analysis?.repCount ?? 0])
     }
   }
 
@@ -539,7 +625,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
     player.replaceCurrentItem(with: nil)
     duration = 0
     stopCamera()
-    pipeline = SwingPipeline()
+    pipeline = AnalysisPipeline(exercise: exercise)
+    liveDetector.reset()
+    liveDetectionLocked = false
+    detection = nil
+    extractedFrames = []
     reps = []
     lastQuality = nil
     latestFrame = nil
@@ -649,7 +739,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     Task { await trim(url: url, using: current, thenAnalyze: false) }
   }
 
-  private func trim(url: URL, using analyzed: SwingPipeline, thenAnalyze: Bool) async {
+  private func trim(url: URL, using analyzed: AnalysisPipeline, thenAnalyze: Bool) async {
     let asset = AVURLAsset(url: url)
     let clipDuration = (try? await asset.load(.duration).seconds) ?? duration
     guard let span = analyzed.repSpan(padding: 1.0, duration: clipDuration) else {
@@ -674,6 +764,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       } else {
         installPlayerItem(
           url: clip, pipeline: analyzed.shifted(toStartAt: span.start, end: span.end))
+        extractedFrames = pipeline.track.frames
         statusMessage = String(format: "Trimmed to %.1fs", span.end - span.start)
         currentFileURL = clip
         rememberCurrent(clipURL: clip)

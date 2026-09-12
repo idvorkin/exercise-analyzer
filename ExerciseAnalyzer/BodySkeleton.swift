@@ -1,8 +1,8 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-//  Pixel-space pose with the angle queries the swing analyzer needs. Ported from swing-analyzer's
-//  Skeleton.ts and PoseSkeletonTransformer.ts, remapped from BlazePose-33 to the COCO-17 layout that YOLO pose
-//  models emit. Angles use pixel coordinates (not normalized) so non-square frames don't distort them.
+//  Pixel-space pose with the angle queries the analyzers need. Ported from swing-analyzer's Skeleton.ts and
+//  PoseSkeletonTransformer.ts, remapped from BlazePose-33 to the COCO-17 layout that YOLO pose models emit.
+//  Angles use pixel coordinates (not normalized) so non-square frames don't distort them.
 
 import CoreGraphics
 import UltralyticsYOLO
@@ -15,7 +15,19 @@ enum CocoKeypoint: Int, CaseIterable {
   case leftKnee, rightKnee, leftAnkle, rightAnkle
 }
 
-struct SwingSkeleton {
+enum BodySide: String, Codable {
+  case left, right
+
+  var other: BodySide { self == .left ? .right : .left }
+  var shoulder: CocoKeypoint { self == .left ? .leftShoulder : .rightShoulder }
+  var elbow: CocoKeypoint { self == .left ? .leftElbow : .rightElbow }
+  var wrist: CocoKeypoint { self == .left ? .leftWrist : .rightWrist }
+  var hip: CocoKeypoint { self == .left ? .leftHip : .rightHip }
+  var knee: CocoKeypoint { self == .left ? .leftKnee : .rightKnee }
+  var ankle: CocoKeypoint { self == .left ? .leftAnkle : .rightAnkle }
+}
+
+struct BodySkeleton {
   /// Confidence below which a keypoint is treated as absent (web: `isPointVisible`).
   static let visibleThreshold: Float = 0.2
   /// Stricter confidence used for arm and wrist selection (web: `minConf` in arm/wrist queries).
@@ -29,7 +41,7 @@ struct SwingSkeleton {
     conf = pose.conf
   }
 
-  func point(_ k: CocoKeypoint, minConf: Float = SwingSkeleton.visibleThreshold) -> CGPoint? {
+  func point(_ k: CocoKeypoint, minConf: Float = BodySkeleton.visibleThreshold) -> CGPoint? {
     let i = k.rawValue
     guard i < points.count, i < conf.count, conf[i] > minConf else { return nil }
     return points[i]
@@ -39,22 +51,23 @@ struct SwingSkeleton {
   /// side at once keeps hip/knee angles from mixing a near-side hip with a far-side knee when the pose model's
   /// left/right labels are unreliable (side views, people facing left).
   private func bestSide(_ right: [CocoKeypoint], _ left: [CocoKeypoint]) -> [CGPoint]? {
-    func resolve(_ joints: [CocoKeypoint]) -> (points: [CGPoint], confidence: Float)? {
-      var points: [CGPoint] = []
-      var total: Float = 0
-      for joint in joints {
-        guard let p = point(joint) else { return nil }
-        points.append(p)
-        total += conf[joint.rawValue]
-      }
-      return (points, total / Float(joints.count))
-    }
     switch (resolve(right), resolve(left)) {
     case (let r?, let l?): return r.confidence >= l.confidence ? r.points : l.points
     case (let r?, nil): return r.points
     case (nil, let l?): return l.points
     default: return nil
     }
+  }
+
+  private func resolve(_ joints: [CocoKeypoint]) -> (points: [CGPoint], confidence: Float)? {
+    var points: [CGPoint] = []
+    var total: Float = 0
+    for joint in joints {
+      guard let p = point(joint) else { return nil }
+      points.append(p)
+      total += conf[joint.rawValue]
+    }
+    return (points, total / Float(joints.count))
   }
 
   // MARK: - Angles
@@ -95,19 +108,42 @@ struct SwingSkeleton {
     return 0  // web default when no arm is available
   }
 
-  /// Knee–hip–shoulder angle: ~180 standing, ~90 deep hinge. 0 when no side has all three joints.
+  /// Knee–hip–shoulder angle on the more confident side: ~180 standing, ~90 deep hinge. 0 when missing.
   var hipAngle: Double {
     guard let p = bestSide([.rightKnee, .rightHip, .rightShoulder], [.leftKnee, .leftHip, .leftShoulder])
     else { return 0 }
     return Self.angle(p[0], vertex: p[1], p[2])
   }
 
-  /// Hip–knee–ankle angle: ~180 straight leg, ~90 deep squat. 0 when no side has all three joints.
+  /// Hip–knee–ankle angle on the more confident side: ~180 straight leg, ~90 deep squat. 0 when missing.
   var kneeAngle: Double {
     guard let p = bestSide([.rightHip, .rightKnee, .rightAnkle], [.leftHip, .leftKnee, .leftAnkle])
     else { return 0 }
     return Self.angle(p[0], vertex: p[1], p[2])
   }
+
+  /// Hip–knee–ankle angle for one specific leg (single-leg exercises). 0 when any joint is missing.
+  func kneeAngle(_ side: BodySide) -> Double {
+    guard let hip = point(side.hip), let knee = point(side.knee), let ankle = point(side.ankle) else { return 0 }
+    return Self.angle(hip, vertex: knee, ankle)
+  }
+
+  /// Knee–hip–shoulder angle for one specific side. 0 when any joint is missing.
+  func hipAngle(_ side: BodySide) -> Double {
+    guard let knee = point(side.knee), let hip = point(side.hip), let shoulder = point(side.shoulder) else {
+      return 0
+    }
+    return Self.angle(knee, vertex: hip, shoulder)
+  }
+
+  /// Vertical position of the head (ears, else nose) in pixels; larger = lower on screen.
+  var earY: Double? {
+    let ears = [point(.leftEar), point(.rightEar)].compactMap { $0 }
+    if let c = Self.centroid(ears) { return Double(c.y) }
+    return point(.nose).map { Double($0.y) }
+  }
+
+  func ankleY(_ side: BodySide) -> Double? { point(side.ankle).map { Double($0.y) } }
 
   /// Height of the higher reliable wrist above the shoulder midpoint, in pixels (positive = above shoulders).
   var wristHeight: Double {

@@ -1,18 +1,26 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-//  SwingPipeline turns pose results into analyzed frames: it picks the tracked person, runs the swing state
-//  machine, records the frame in a PoseTrack, and collects completed reps. The live session and the offline pass
-//  each own one, so their state never mixes.
+//  AnalysisPipeline runs one exercise's analyzer over frames: it picks the tracked person, feeds the pose to the
+//  analyzer, records the frame in a PoseTrack, and collects completed reps. Live capture feeds it inference
+//  results as they arrive; the offline path feeds it already-extracted frames, so re-analysis (another exercise,
+//  auto-detect) never touches the model.
 
+import AVFoundation
 import CoreImage
 import CoreVideo
 import UIKit
 import UltralyticsYOLO
 
-final class SwingPipeline: @unchecked Sendable {
-  let analyzer = KettlebellSwingAnalyzer()
+final class AnalysisPipeline: @unchecked Sendable {
+  let exercise: ExerciseKind
+  let analyzer: ExerciseAnalyzer
   let track = PoseTrack()
   private(set) var reps: [RepRecord] = []
+
+  init(exercise: ExerciseKind) {
+    self.exercise = exercise
+    analyzer = exercise.makeAnalyzer()
+  }
 
   func reset() {
     analyzer.reset()
@@ -20,7 +28,7 @@ final class SwingPipeline: @unchecked Sendable {
     reps = []
   }
 
-  /// Analyzes one inference result at `time`. `image` renders the source frame and is called only when the
+  /// Live path: one inference result at `time`. `image` renders the source frame and is called only when the
   /// analyzer keeps it as a phase peak.
   func process(result: YOLOResult, time: Double, image: () -> UIImage?) -> FrameRecord {
     // The analyzer expects a single subject: take the most confident person.
@@ -28,33 +36,69 @@ final class SwingPipeline: @unchecked Sendable {
     let pose = personIndex.flatMap {
       $0 < result.keypointsList.count ? Pose(keypoints: result.keypointsList[$0]) : nil
     }
-    let swing = pose.map { analyzer.process(pose: $0, time: time, image: image) }
-    let frame = FrameRecord(
+    let extracted = FrameRecord(
       time: time, imageSize: result.orig_shape, pose: pose,
-      box: personIndex.map { result.boxes[$0].xywhn }, swing: swing)
+      box: personIndex.map { result.boxes[$0].xywhn }, analysis: nil)
+    return process(extracted: extracted, image: image)
+  }
+
+  /// Runs the analyzer over an already-extracted frame (pose and box, no analysis yet).
+  @discardableResult
+  func process(extracted: FrameRecord, image: () -> UIImage?) -> FrameRecord {
+    let analysis = extracted.pose.map { analyzer.process(pose: $0, time: extracted.time, image: image) }
+    let frame = FrameRecord(
+      time: extracted.time, imageSize: extracted.imageSize, pose: extracted.pose, box: extracted.box,
+      analysis: analysis)
     track.append(frame)
-    if let rep = swing?.completedRep { reps.append(rep) }
+    if let rep = analysis?.completedRep { reps.append(rep) }
     return frame
   }
 
-  /// Rebuilds a pipeline from stored frames and reps (Recents). The analyzer state is not restored; it only
-  /// matters if inference runs on frames the track doesn't cover.
-  static func restored(frames: [FrameRecord], reps: [RepRecord]) -> SwingPipeline {
-    let pipeline = SwingPipeline()
+  /// Analyzes a whole extracted track (offline pass output or a Recents track) as `exercise`.
+  static func analyze(frames: [FrameRecord], exercise: ExerciseKind) -> AnalysisPipeline {
+    let pipeline = AnalysisPipeline(exercise: exercise)
+    for frame in frames { pipeline.process(extracted: frame) { nil } }
+    return pipeline
+  }
+
+  /// Rebuilds a pipeline from stored frames and reps (Recents). The analyzer state is not restored.
+  static func restored(frames: [FrameRecord], reps: [RepRecord], exercise: ExerciseKind) -> AnalysisPipeline {
+    let pipeline = AnalysisPipeline(exercise: exercise)
     pipeline.track.replaceAll(with: frames)
     pipeline.reps = reps
     return pipeline
   }
 
   /// A copy covering `start...end`, re-timed to start at zero (used after trimming a clip).
-  func shifted(toStartAt start: Double, end: Double) -> SwingPipeline {
-    let pipeline = SwingPipeline()
-    let track = self.track.shifted(toStartAt: start, end: end)
-    for frame in track.frames { pipeline.track.append(frame) }
-    pipeline.reps = reps.filter { $0.startTime >= start && $0.endTime <= end }.map {
-      $0.shifted(by: -start)
-    }
+  func shifted(toStartAt start: Double, end: Double) -> AnalysisPipeline {
+    let pipeline = AnalysisPipeline(exercise: exercise)
+    pipeline.track.replaceAll(with: track.shifted(toStartAt: start, end: end).frames)
+    pipeline.reps = reps.filter { $0.startTime >= start && $0.endTime <= end }.map { $0.shifted(by: -start) }
     return pipeline
+  }
+
+  /// Replaces rep positions' images with frames pulled from the clip at each peak time.
+  func fillRepImages(from asset: AVAsset, frameDuration: Double) async {
+    let generator = AVAssetImageGenerator(asset: asset)
+    generator.appliesPreferredTrackTransform = true
+    generator.maximumSize = CGSize(width: 360, height: 360)
+    let tolerance = CMTime(seconds: frameDuration / 2, preferredTimescale: 600)
+    generator.requestedTimeToleranceBefore = tolerance
+    generator.requestedTimeToleranceAfter = tolerance
+    var updated: [RepRecord] = []
+    for rep in reps {
+      var positions = rep.positions
+      for (phase, position) in positions where position.image == nil {
+        let time = CMTime(seconds: position.time, preferredTimescale: 600)
+        if let (cgImage, _) = try? await generator.image(at: time) {
+          var filled = position
+          filled.image = UIImage(cgImage: cgImage)
+          positions[phase] = filled
+        }
+      }
+      updated.append(RepRecord(number: rep.number, positions: positions, quality: rep.quality))
+    }
+    reps = updated
   }
 
   /// One crop covering the person through the set, so playback stays zoomed without following frame by frame.

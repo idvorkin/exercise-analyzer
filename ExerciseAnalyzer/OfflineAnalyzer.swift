@@ -1,7 +1,9 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 //  Post-real-time pass: reads every frame of a clip in order with AVAssetReader (rotation applied via a video
-//  composition), runs pose inference as fast as the Neural Engine allows, and returns a complete SwingPipeline.
+//  composition) and runs pose inference as fast as the Neural Engine allows. It only extracts poses; exercise
+//  analysis runs afterwards over the extracted frames (see AnalysisPipeline.analyze), so detection and
+//  re-analysis never re-run the model.
 
 import AVFoundation
 import UIKit
@@ -26,9 +28,9 @@ enum OfflineAnalyzer {
     func on(inferenceTime: Double, fpsRate: Double) {}
   }
 
-  static func run(
+  static func extract(
     url: URL, predictor: BasePredictor, progress: @escaping @Sendable (Double) -> Void
-  ) async throws -> (SwingPipeline, Summary) {
+  ) async throws -> ([FrameRecord], Summary) {
     let asset = AVURLAsset(url: url)
     guard let track = try await asset.loadTracks(withMediaType: .video).first else {
       throw OfflineError.noVideoTrack
@@ -48,21 +50,25 @@ enum OfflineAnalyzer {
         throw OfflineError.readerFailed(reader.error?.localizedDescription ?? "unknown")
       }
 
-      let pipeline = SwingPipeline()
       let catcher = ResultCatcher()
       let started = CACurrentMediaTime()
-      var frames = 0
+      var frames: [FrameRecord] = []
       var inferenceTotal = 0.0
       var lastProgress = 0.0
 
       while let sampleBuffer = output.copyNextSampleBuffer() {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { continue }
         let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         catcher.result = nil
         predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: catcher)
         guard let result = catcher.result else { continue }
-        _ = pipeline.process(result: result, time: time) { FrameImage.thumbnail(from: pixelBuffer) }
-        frames += 1
+        let personIndex = result.boxes.indices.max { result.boxes[$0].conf < result.boxes[$1].conf }
+        frames.append(
+          FrameRecord(
+            time: time, imageSize: result.orig_shape,
+            pose: personIndex.flatMap {
+              $0 < result.keypointsList.count ? Pose(keypoints: result.keypointsList[$0]) : nil
+            },
+            box: personIndex.map { result.boxes[$0].xywhn }, analysis: nil))
         inferenceTotal += result.inferenceMs
         if duration > 0, time - lastProgress > 0.5 {
           lastProgress = time
@@ -73,9 +79,9 @@ enum OfflineAnalyzer {
         throw OfflineError.readerFailed(reader.error?.localizedDescription ?? "unknown")
       }
       let summary = Summary(
-        frames: frames, elapsed: CACurrentMediaTime() - started,
-        averageInferenceMs: frames > 0 ? inferenceTotal / Double(frames) : 0)
-      return (pipeline, summary)
+        frames: frames.count, elapsed: CACurrentMediaTime() - started,
+        averageInferenceMs: frames.isEmpty ? 0 : inferenceTotal / Double(frames.count))
+      return (frames, summary)
     }.value
   }
 }

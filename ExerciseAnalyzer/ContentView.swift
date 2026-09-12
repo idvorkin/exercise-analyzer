@@ -1,6 +1,6 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-//  Main screen: swing HUD, video with pose overlay, rep gallery, playback and rep navigation, camera flow
+//  Main screen: exercise HUD, video with pose overlay, rep gallery, playback and rep navigation, camera flow
 //  (record → Done → trim → analyze), and video pickers (Photos, Files).
 //  Launch with the SWING_VIDEO environment variable set to a file path to auto-load a video (simulator testing).
 
@@ -18,7 +18,7 @@ struct ContentView: View {
   @State private var showRecents = false
   @State private var showGallery = false
   @State private var showKeyframeViewer = false
-  @State private var focusedPhase: SwingPhase?
+  @State private var focusedPhase: String?
   @State private var focusedRep: Int?
   @State private var scrubTime = 0.0
   @State private var isScrubbing = false
@@ -67,7 +67,8 @@ struct ContentView: View {
         galleryHandle
         if galleryHeight >= 40 {
           RepGalleryWidget(
-            reps: session.reps, currentRep: session.currentRep?.number, focusedPhase: $focusedPhase,
+            reps: session.reps, columns: session.exercise.definition.galleryOrder,
+            currentRep: session.currentRep?.number, focusedPhase: $focusedPhase,
             focusedRep: $focusedRep,
             onSeek: { session.seek(to: $0.time) },
             onOpen: { _ in showKeyframeViewer = true }
@@ -115,7 +116,10 @@ struct ContentView: View {
       KeyframeViewer(session: session)
     }
     .sheet(isPresented: $showGallery) {
-      RepGallerySheet(reps: session.reps, currentRep: session.currentRep?.number) { position in
+      RepGallerySheet(
+        reps: session.reps, columns: session.exercise.definition.galleryOrder,
+        currentRep: session.currentRep?.number
+      ) { position in
         session.seek(to: position.time)
       }
     }
@@ -146,12 +150,14 @@ struct ContentView: View {
   // MARK: - HUD
 
   private var hud: some View {
-    VStack {
+    let definition = session.exercise.definition
+    let analysis = session.latestFrame?.analysis
+    return VStack {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Text("\(session.latestFrame?.swing?.repCount ?? 0)")
+        Text("\(analysis?.repCount ?? 0)")
           .font(.system(size: 34, weight: .bold, design: .rounded))
           .monospacedDigit()
-        Text("reps").font(.subheadline)
+        exerciseMenu
         if session.source == .camera {
           Text("● REC").font(.caption.bold()).foregroundStyle(.red)
         }
@@ -171,9 +177,9 @@ struct ContentView: View {
         .accessibilityLabel(showSkeleton ? "Hide skeleton" : "Show skeleton")
       }
       HStack(spacing: 5) {
-        ForEach(SwingPhase.allCases, id: \.self) { phase in
-          let active = session.latestFrame?.swing?.phase == phase
-          Text(phase.rawValue.uppercased())
+        ForEach(definition.phases, id: \.id) { phase in
+          let active = analysis?.phase == phase.id
+          Text(phase.label.uppercased())
             .font(.caption2.weight(.semibold))
             .fixedSize()
             .padding(.horizontal, 7).padding(.vertical, 3)
@@ -187,10 +193,9 @@ struct ContentView: View {
       Spacer()
 
       HStack(spacing: 14) {
-        metric("SPINE", session.latestFrame?.swing?.angles.spine)
-        metric("ARM", session.latestFrame?.swing?.angles.arm)
-        metric("HIP", session.latestFrame?.swing?.angles.hip)
-        metric("KNEE", session.latestFrame?.swing?.angles.knee)
+        ForEach(definition.hudMetrics, id: \.key) { m in
+          metric(m.label, analysis?.metrics[m.key], unit: m.unit)
+        }
         Spacer()
       }
       if let message = session.statusMessage {
@@ -217,10 +222,48 @@ struct ContentView: View {
     )
   }
 
-  private func metric(_ label: String, _ value: Double?) -> some View {
+  /// "reps · Kettlebell Swing ▾": pick an exercise or Auto. In Auto the detected exercise and its reason show.
+  private var exerciseMenu: some View {
+    Menu {
+      Button {
+        session.setExerciseMode(.auto)
+      } label: {
+        Label("Auto-detect", systemImage: session.exerciseMode == .auto ? "checkmark" : "wand.and.stars")
+      }
+      Divider()
+      ForEach(ExerciseKind.allCases) { kind in
+        Button {
+          session.setExerciseMode(.fixed(kind))
+        } label: {
+          if session.exerciseMode == .fixed(kind) {
+            Label(kind.definition.name, systemImage: "checkmark")
+          } else {
+            Text(kind.definition.name)
+          }
+        }
+      }
+      if let detection = session.detection {
+        Divider()
+        Text("Detected: \(detection.exercise.definition.name) (\(detection.confidence)%)")
+        Text(detection.reason)
+      }
+    } label: {
+      HStack(spacing: 3) {
+        Text("reps · " + session.exercise.definition.name)
+        if session.exerciseMode == .auto {
+          Image(systemName: "wand.and.stars").font(.caption2)
+        }
+        Image(systemName: "chevron.down").font(.caption2)
+      }
+      .font(.subheadline)
+    }
+    .foregroundStyle(.white)
+  }
+
+  private func metric(_ label: String, _ value: Double?, unit: String) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 3) {
       Text(label).font(.caption2).opacity(0.75)
-      Text(value.map { String(format: "%.0f°", $0) } ?? "–")
+      Text(value.map { String(format: "%.0f%@", $0, unit) } ?? "–")
         .font(.callout.weight(.semibold)).monospacedDigit()
     }
   }

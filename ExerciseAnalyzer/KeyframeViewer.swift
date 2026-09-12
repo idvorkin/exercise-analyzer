@@ -30,13 +30,14 @@ struct KeyframeViewer: View {
               Text("Rep \(rep.number) · \(rep.quality.score)/100").font(.headline)
             }
             if let checkpoint = session.currentCheckpoint {
-              Text(checkpoint.phase.rawValue.uppercased()).font(.caption.bold())
+              Text(session.exercise.definition.phase(checkpoint.phase)?.label.uppercased() ?? checkpoint.phase.uppercased())
+                .font(.caption.bold())
             }
-            if let angles = session.latestFrame?.swing?.angles {
+            if let metrics = session.latestFrame?.analysis?.metrics {
               Text(
-                String(
-                  format: "spine %.0f° · arm %.0f° · hip %.0f° · knee %.0f°", angles.spine,
-                  angles.arm, angles.hip, angles.knee)
+                session.exercise.definition.hudMetrics.map { m in
+                  "\(m.label.lowercased()) \(Int((metrics[m.key] ?? 0).rounded()))\(m.unit)"
+                }.joined(separator: " · ")
               )
               .font(.caption)
             }
