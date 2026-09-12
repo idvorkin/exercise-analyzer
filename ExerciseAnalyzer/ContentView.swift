@@ -102,7 +102,7 @@ struct ContentView: View {
       isPresented: $showPhotosPicker, selection: $pickerItem, matching: .videos,
       photoLibrary: .shared())
     .sheet(isPresented: $showRecents) {
-      RecentsView(store: session.recents) { session.open(recent: $0) }
+      WorkoutGalleryView(store: session.recents) { session.open(recent: $0) }
     }
     .fileImporter(
       isPresented: $showFileImporter, allowedContentTypes: [.movie, .video, .mpeg4Movie]
@@ -397,7 +397,7 @@ struct ContentView: View {
           Button {
             showRecents = true
           } label: {
-            Label("Recents", systemImage: "clock.arrow.circlepath")
+            Label("Workouts", systemImage: "calendar")
           }
           Button {
             // Read access lets Recents point back at the asset instead of copying it.
@@ -454,6 +454,7 @@ struct ContentView: View {
     if let note = env["SWING_BUG"], !note.isEmpty {
       session.reportBug(note: note)  // test hook: file a report on launch
     }
+    if env["SWING_SHOW_WORKOUTS"] == "1" { showRecents = true }
     if env["SWING_OPEN_RECENT"] == "1", let newest = session.recents.entries.first {
       session.open(recent: newest)  // test hook: reopen the newest Recents entry
       return
