@@ -8,7 +8,9 @@ import SwiftUI
 struct KeyframeViewer: View {
   @ObservedObject var session: VideoPoseSession
   @Environment(\.dismiss) private var dismiss
-  @AppStorage("showSkeleton") private var showSkeleton = true
+  // Shares the main view's overlay mode so the eye button means the same thing everywhere.
+  @AppStorage("overlayMode") private var overlayModeRaw = OverlayMode.both.rawValue
+  private var showSkeleton: Bool { overlayModeRaw != OverlayMode.video.rawValue }
 
   var body: some View {
     ZStack {
@@ -44,7 +46,7 @@ struct KeyframeViewer: View {
           }
           Spacer()
           Button {
-            showSkeleton.toggle()
+            overlayModeRaw = showSkeleton ? OverlayMode.video.rawValue : OverlayMode.both.rawValue
           } label: {
             Image(systemName: showSkeleton ? "eye" : "eye.slash")
               .font(.title2)
