@@ -459,16 +459,31 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   func pause() {
+    guard isPlaying else { return }
     player.pause()
     isPlaying = false
+    log.event("pause", ["player_time": player.currentTime().seconds])
   }
 
   func togglePlayback() { isPlaying ? pause() : play() }
 
-  func seek(to seconds: Double) {
+  /// Seeks and shows the matching frame. `from` names the control that asked (logged with the seek), and the
+  /// player's time is re-published when the asynchronous seek lands so a late clock tick cannot leave the
+  /// slider on the old time.
+  func seek(to seconds: Double, from source: String = "code") {
     pause()
+    let before = player.currentTime().seconds
     let time = CMTime(seconds: seconds, preferredTimescale: 600)
-    player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+    player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+      Task { @MainActor in
+        guard let self else { return }
+        let after = self.player.currentTime().seconds
+        if finished { self.currentTime = after.isFinite ? after : seconds }
+        self.log.event(
+          "seek",
+          ["from": source, "to": seconds, "player_before": before, "player_after": after, "finished": finished])
+      }
+    }
     currentTime = seconds
     if let frame = pipeline.track.nearest(to: seconds, tolerance: frameDuration) {
       show(frame)
@@ -477,6 +492,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   func stepFrame(_ delta: Int) {
     pause()
+    log.event("ui", ["action": "step", "delta": delta, "player_time": player.currentTime().seconds])
     player.currentItem?.step(byCount: delta)
   }
 
@@ -493,7 +509,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         : (reps.lastIndex { $0.startTime < currentTime } ?? 0)
     }
     let clamped = max(0, min(reps.count - 1, index))
-    seek(to: reps[clamped].startTime)
+    seek(to: reps[clamped].startTime, from: offset > 0 ? "next_rep" : "previous_rep")
   }
 
   func seekToCheckpoint(offset: Int) {
@@ -502,7 +518,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       offset > 0
       ? times.first { $0 > currentTime + 0.05 }
       : times.last { $0 < currentTime - 0.05 }
-    if let target { seek(to: target) }
+    if let target { seek(to: target, from: offset > 0 ? "next_checkpoint" : "previous_checkpoint") }
   }
 
   func resetAnalysis() {
@@ -680,6 +696,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self.cameraPreviewLayer = camera.previewLayer
           self.source = .camera
           self.activity = .working("Recording", progress: nil)
+          UIApplication.shared.isIdleTimerDisabled = true  // a set is longer than the auto-lock timeout
           self.log.event("camera_start", ["position": position == .front ? "front" : "back"])
           camera.start()
         } catch {
@@ -716,6 +733,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     camera?.stop()
     camera = nil
     cameraPreviewLayer = nil
+    UIApplication.shared.isIdleTimerDisabled = false
     if source == .camera { source = .none }
   }
 
@@ -738,6 +756,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     Task {
       guard let url = await recorder.finish() else {
         statusMessage = "Nothing recorded"
+        log.event("error", ["where": "recorder", "message": "finish returned no file"])
         activity = .idle
         return
       }
@@ -766,9 +785,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
       if thenAnalyze { await analyzeAndPlay(url: url) } else { activity = .idle }
       return
     }
-    activity = .working("Trimming", progress: nil)
+    activity = .working("Trimming", progress: 0)
+    log.event(
+      "trim_start",
+      ["start_s": span.start, "end_s": span.end, "reps": analyzed.reps.count, "source_duration_s": clipDuration])
+    let started = Date()
     do {
-      let clip = try await VideoFile.trim(url, start: span.start, end: span.end)
+      let clip = try await VideoFile.trim(url, start: span.start, end: span.end) { [weak self] progress in
+        Task { @MainActor in self?.activity = .working("Trimming", progress: progress) }
+      }
+      log.event("trim_done", ["elapsed_s": Date().timeIntervalSince(started)])
       trimmedURL = clip
       canSave = true
       log.event(

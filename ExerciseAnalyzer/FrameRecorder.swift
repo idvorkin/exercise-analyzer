@@ -84,7 +84,10 @@ enum VideoFile {
   /// Re-encodes `start...end` of the clip into a new temp file. Passthrough export is deliberately avoided: cutting
   /// mid-GOP leaves leading frames with negative timestamps and AVPlayer then starts the item several seconds in,
   /// while AVAssetReader reads it from zero, so the replayed pose track no longer lines up with playback.
-  static func trim(_ url: URL, start: Double, end: Double) async throws -> URL {
+  /// `progress` is called on an arbitrary thread roughly twice a second with the export's 0...1 progress.
+  static func trim(
+    _ url: URL, start: Double, end: Double, progress: (@Sendable (Double) -> Void)? = nil
+  ) async throws -> URL {
     let asset = AVURLAsset(url: url)
     guard
       let export = AVAssetExportSession(
@@ -101,7 +104,15 @@ enum VideoFile {
     export.timeRange = CMTimeRange(
       start: CMTime(seconds: start, preferredTimescale: 600),
       end: CMTime(seconds: end, preferredTimescale: 600))
+    let poller = Task {
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .milliseconds(500))
+        if Task.isCancelled { break }
+        progress?(Double(export.progress))
+      }
+    }
     await export.export()
+    poller.cancel()
     guard export.status == .completed else {
       throw VideoFileError.exportFailed(export.error?.localizedDescription ?? "unknown")
     }

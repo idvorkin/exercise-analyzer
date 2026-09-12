@@ -72,7 +72,7 @@ struct ContentView: View {
             reps: session.reps, columns: session.exercise.definition.galleryOrder,
             currentRep: session.currentRep?.number, focusedPhase: $focusedPhase,
             focusedRep: $focusedRep,
-            onSeek: { session.seek(to: $0.time) },
+            onSeek: { session.seek(to: $0.time, from: "gallery") },
             onOpen: { _ in showKeyframeViewer = true }
           )
           .frame(height: galleryHeight)
@@ -122,7 +122,7 @@ struct ContentView: View {
         reps: session.reps, columns: session.exercise.definition.galleryOrder,
         currentRep: session.currentRep?.number
       ) { position in
-        session.seek(to: position.time)
+        session.seek(to: position.time, from: "keyframe_viewer")
       }
     }
   }
@@ -330,7 +330,7 @@ struct ContentView: View {
           value: $scrubTime, in: 0...max(session.duration, 0.001),
           onEditingChanged: { editing in
             isScrubbing = editing
-            if !editing { session.seek(to: scrubTime) }
+            if !editing { session.seek(to: scrubTime, from: "slider") }
           }
         )
         .disabled(session.duration == 0)
