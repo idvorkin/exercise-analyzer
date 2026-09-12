@@ -27,6 +27,10 @@ public struct SwingThresholds {
   public var connectSpineMax = 25.0
   public var releaseArmMax = 25.0  // arms crossing vertical on the way up
   public var releaseSpineMax = 25.0
+  /// Longest a RELEASE may last, in seconds, before the rep is abandoned. The upswing is ballistic: in real sets
+  /// the arms reach the top 0.15–0.3 s after crossing vertical. Standing up after parking the bell (or after
+  /// picking it up) looks like a release too, but the arms then rise seconds later, if at all.
+  public var releaseMaxDuration = 1.0
 }
 
 public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
@@ -57,6 +61,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
   private var wristHeightHistory: [Double] = []
   private let wristHeightWindowSize = 5
   private var currentPhasePeak: RepPosition?
+  private var releaseStartTime = 0.0
 
   private struct Angles {
     var arm = 0.0, spine = 0.0, hip = 0.0, knee = 0.0, wristHeight = 0.0
@@ -82,6 +87,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
     machine.resetState(to: Self.top)
     wristHeightHistory = []
     currentPhasePeak = nil
+    releaseStartTime = 0
     metrics = RepMetrics()
   }
 
@@ -117,6 +123,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
       if shouldTransitionToRelease(a) {
         finalizePhasePeak()
         machine.transition(to: Self.release)
+        releaseStartTime = time
       }
     default:  // release
       if shouldTransitionToTop(a) {
@@ -124,6 +131,8 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
         completedRep = machine.completeRep(quality: calculateRepQuality())
         machine.transition(to: Self.top)
         metrics = RepMetrics()
+      } else if time - releaseStartTime > thresholds.releaseMaxDuration {
+        abandonRep()
       }
     }
 
@@ -154,6 +163,17 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
   private func finalizePhasePeak() {
     if let peak = currentPhasePeak { machine.storePeak(peak) }
     currentPhasePeak = nil
+  }
+
+  /// A swing is one ballistic movement, so a rep whose arms crossed vertical but never reached the top within
+  /// `releaseMaxDuration` was not a swing: the lifter stood up after picking the bell up or parking it, or a
+  /// stretch of unmeasured joints (angles read 0, which looks like "arms vertical, spine upright") walked the
+  /// machine through the phases. Drop the partial rep and wait for the next real top.
+  private func abandonRep() {
+    machine.transition(to: Self.top)
+    machine.currentRepPeaks = [:]
+    currentPhasePeak = nil
+    metrics = RepMetrics()
   }
 
   // MARK: - Transitions

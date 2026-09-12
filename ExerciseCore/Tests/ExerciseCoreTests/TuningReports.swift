@@ -50,6 +50,26 @@ final class TuningReports: XCTestCase {
 }
 
 extension TuningReports {
+  /// Every swing fixture's reps with phase times, completion time, and quality metrics. A rep whose span is far
+  /// longer than its neighbours' (~1.2 s) was assembled from setup or put-down frames (issue #4).
+  func testSwingRepTraces() throws {
+    for fixture in Fixture.all where fixture.expectedExercise == .kettlebellSwing {
+      let frames = try fixture.frames()
+      let pipeline = AnalysisPipeline.analyze(frames: frames, exercise: .kettlebellSwing)
+      let completions = pipeline.track.frames.filter { $0.analysis?.completedRep != nil }.map(\.time)
+      var lines: [String] = []
+      for (rep, done) in zip(pipeline.reps, completions) {
+        let p = rep.positions
+        let q = rep.quality.metrics
+        lines.append(String(format: "  #%2d top %5.2f con %5.2f bot %5.2f rel %5.2f done %5.2f  span %4.2f  hinge %3.0f lock %3.0f kneeFlex %3.0f  topArm %3.0f topWrist %5.0f",
+          rep.number, p["top"]?.time ?? 0, p["connect"]?.time ?? 0, p["bottom"]?.time ?? 0, p["release"]?.time ?? 0, done,
+          done - (p["top"]?.time ?? 0), q["hingeDepth"] ?? 0, q["lockoutAngle"] ?? 0, q["kneeFlexion"] ?? 0,
+          p["top"]?.metrics["arm"] ?? 0, p["top"]?.metrics["wristHeight"] ?? 0))
+      }
+      print("\(fixture.name): \(pipeline.reps.count) reps\n" + lines.joined(separator: "\n"))
+    }
+  }
+
   /// Raw signals for a fixture at ~4 Hz, plus a naive rep count from smoothed knee-angle dips.
   func testBulgarianPhoneSignals() throws {
     let frames = try Fixture(name: "bulgarian-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 0, humanVerified: false).frames()
