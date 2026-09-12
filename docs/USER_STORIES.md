@@ -1,4 +1,6 @@
-# Exercise Analyzer (iOS) — User Stories
+# Exercise Analyzer (iOS) — User Stories (narrative)
+
+The same features as Cohn-format stories with Gherkin acceptance criteria: [STORIES.md](STORIES.md).
 
 Written from the lifter's side of the phone. The native counterpart of the web app's
 [USER_JOURNEY.md](https://github.com/idvorkin/swing-analyzer/blob/main/docs/USER_JOURNEY.md).
