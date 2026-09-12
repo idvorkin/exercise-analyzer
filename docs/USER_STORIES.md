@@ -1,4 +1,4 @@
-# Swing Analyzer (iOS) — User Stories
+# Exercise Analyzer (iOS) — User Stories
 
 Written from the lifter's side of the phone. The native counterpart of the web app's
 [USER_JOURNEY.md](https://github.com/idvorkin/swing-analyzer/blob/main/docs/USER_JOURNEY.md).
@@ -107,35 +107,81 @@ Answers to the open questions above: no countdown (trim afterwards is enough); s
 checkpoints are right; keep the web gallery order; keep the zoom when stepping; no wrist speed; save clean video;
 add a report button. Slow motion at the bottom of the swing: not wanted.
 
-### 11. Me view (top priority) — building
+### 11. Me view (top priority) — built
 
 You're a small figure in a wide frame. Tap the person icon and the video zooms so you fill the screen, skeleton and
 all. On a replayed clip the zoom is one steady region that covers you through the whole set (the web app's crop).
 Live, it eases toward wherever you've been in the last few seconds.
 
-### 12. Recents — queued
+### 12. Recents — built, then grew into the workout gallery (story 17)
 
 A gallery of clips you've analyzed before, so you never hunt through Photos. Add and remove entries yourself.
 
-### 13. Keep the music playing — queued
+### 13. Keep the music playing — built
 
 Opening the camera shouldn't pause your playlist.
 
-### 14. Date and time — queued
+### 14. Date and time — built
 
 When you're watching something that isn't live, show when it was recorded.
 
-### 15. Report this set — queued
+### 15. Report this set — built as shake-to-report (story 21)
 
 One button that bundles the log and the clip for the developer.
+
+## Added 2026-09-12
+
+### 16. More than swings — built
+
+Pistol squats, Bulgarian split squats and Turkish get-ups count and score too. Leave the exercise on Auto and the
+app works out which one you're doing from the movement (floor time for get-ups, a raised rear foot for split
+squats, one knee bending alone for pistols, arms swinging for swings); or pick one from the menu and the same set
+is re-read instantly, no re-analysis of the video. A get-up is one rep per side and the app notes which arm held
+the bell.
+
+**Question:** for get-ups, are four stopping points (lying, halfway up, standing, halfway down) enough, or do you
+want the classic seven steps?
+
+### 17. Workouts, not files — built
+
+Open Workouts and see your training grouped by day: each day lists the exercises you did, how many sets and reps
+of each, your best score, and a strip of thumbnails per set. Tap a set to reopen it, long-press to remove it.
+Recent videos in Photos that look like sets and haven't been analyzed sit at the top so you don't hunt for them.
+
+**Question:** what else belongs on the day card: weight, how it felt, a note?
+
+### 18. See yourself from the wrist — built, waiting for the watch
+
+While recording, your watch shows whether you're in the picture (and which edge is cutting you off), the rep
+count and the time, with buttons to switch camera, finish or cancel the set and to start one. A tap on the wrist
+tells you when you've stepped out of frame.
+
+**Question:** should the watch also start the set for you, or only control one the phone started?
+
+### 19. Just the skeleton — built
+
+The eye button now cycles: video with skeleton, video only, skeleton on black. The last one shows the movement
+alone. Blurring the background (keeping you and the bell sharp) is possible but costs a lot per frame; parked.
+
+**Question:** is the skeleton-on-black view enough, or is the blur worth the battery?
+
+### 20. Trim in a blink — built
+
+Trimming a clip to the set used to re-encode the video and could take longer than the set itself. It now cuts the
+original stream without re-encoding: same picture quality, HDR kept, done in well under a second.
+
+### 21. Shake to report — built
+
+Something wrong? Shake the phone, type a line, and the report lands in a bug tracker with the clip name, the
+playhead and a link to the session log. The developer picks them up with one command.
 
 ## Candidates, not built
 
 Countdown before recording · landscape camera · wrist speed and height setting · per-set summary (best, worst,
-trend) · keep sets over time · pistol squat mode · spoken rep count · report-this-set bundle.
+trend over weeks) · spoken rep count · background blur · finer get-up steps · notes or weight on a set.
 
-Not planned from the web app: exercise auto-detection, bug-report modal and shake-to-report, version notifications,
-pose-track export (the formats differ: BlazePose-33 vs COCO-17).
+Not planned from the web app: version notifications, pose-track export (the formats differ: BlazePose-33 vs
+COCO-17).
 
 ---
 
@@ -152,4 +198,10 @@ pose-track export (the formats differ: BlazePose-33 vs COCO-17).
 | 7 One thing to fix | thresholds ported line for line | n/a |
 | 8 Old videos count too | env-var import, pass, trim verified | pickers not yet |
 | 9 Keep the clip | export verified; Photos write not yet | not yet |
-| 10 When it gets it wrong | log used to find and fix the trim bug | `just pull-logs` not yet |
+| 10 When it gets it wrong | log used to find and fix the trim bug | `just pull-logs` in daily use |
+| 16 More than swings | every exercise counted on the simulator; host fixtures per exercise | Bulgarian and get-up sets from the gym verified |
+| 17 Workouts | grouping, totals, cards verified; From Photos needs the phone | not yet |
+| 18 Watch | n/a | waiting for Developer Mode on the watch |
+| 19 Just the skeleton | screenshot verified | not yet |
+| 20 Trim in a blink | passthrough cut verified, first frame at zero | HDR clip not yet |
+| 21 Shake to report | hook verified | in daily use |
