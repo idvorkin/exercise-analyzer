@@ -116,7 +116,7 @@ struct RepRow: View {
   var body: some View {
     HStack(spacing: GalleryLayout.spacing) {
       VStack(spacing: 2) {
-        Text("\(rep.number)").font(.headline.monospacedDigit())
+        Text("\(rep.number)\(rep.sideLabel)").font(.headline.monospacedDigit())
         Text("\(rep.quality.score)").font(.caption2).foregroundStyle(.secondary)
       }
       .frame(width: GalleryLayout.gutter)
@@ -246,6 +246,17 @@ struct RepGallerySheet: View {
         }
       }
       .padding(4)
+    }
+  }
+}
+
+extension RepRecord {
+  /// "L" / "R" for exercises that record which side worked (get-ups: the arm holding the bell), else empty.
+  var sideLabel: String {
+    switch quality.metrics["side"] {
+    case 1: return " L"
+    case 2: return " R"
+    default: return ""
     }
   }
 }
