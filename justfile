@@ -81,3 +81,7 @@ screenshots: build-sim
 analyze clip *args:
     cd ExerciseCore && swift build -c release --product posetrack 2>&1 | grep -E "error:" || true
     ExerciseCore/.build/release/posetrack "{{clip}}" --model ExerciseAnalyzer/yolo26n-pose.mlpackage {{args}}
+
+# Archive every pose track on the phone as a compact fixture (Fixtures/tracks/), see docs/TESTING.md.
+pull-tracks:
+    scripts/pull-tracks.sh {{device}}
