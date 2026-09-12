@@ -129,6 +129,41 @@ final class VideoPoseSession: NSObject, ObservableObject {
       Task { @MainActor in self?.isPlaying = false }
     }
     loadModel()
+    Task { await refreshStaleEntries() }
+  }
+
+  /// Re-analyzes every stored set made by an older analyzer (#19), so the gallery's counts match this build even
+  /// for sets never reopened. Runs over stored poses only; rep images are refilled when the clip is reachable.
+  private func refreshStaleEntries() async {
+    let stale = recents.entries.filter { recents.isStale($0) }
+    guard !stale.isEmpty else { return }
+    log.event("recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current])
+    for entry in stale {
+      guard let stored = recents.loadPipeline(for: entry) else { continue }
+      let frames = stored.track.frames
+      var kind = stored.exercise
+      if case .auto = exerciseMode {
+        let fresh = ExerciseDetector.detect(frames: frames)
+        if fresh.exercise != kind, fresh.confidence >= 70 { kind = fresh.exercise }
+      }
+      let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: kind)
+      let clipURL = await recents.clipURL(for: entry)
+      if let clipURL { await analyzed.fillRepImages(from: AVURLAsset(url: clipURL), frameDuration: frameDuration) }
+      let firstRep = analyzed.reps.first
+      let thumbnail =
+        (kind.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
+          ?? firstRep?.checkpoints.first?.image).map { UIImage(cgImage: $0) } ?? recents.thumbnailImage(for: entry)
+      do {
+        try recents.save(
+          id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
+          pipeline: analyzed, clipURL: nil, thumbnail: thumbnail, originalName: entry.originalName)
+        log.event(
+          "recents_refreshed",
+          ["id": entry.id, "was": "\(stored.exercise.rawValue) \(stored.reps.count)", "now": "\(kind.rawValue) \(analyzed.reps.count)"])
+      } catch {
+        log.event("error", ["where": "recents_refresh", "message": "\(error)"])
+      }
+    }
   }
 
   private func loadModel() {
@@ -238,20 +273,27 @@ final class VideoPoseSession: NSObject, ObservableObject {
       installPlayerItem(url: url, pipeline: pipeline)
       statusMessage = recordedLine(reps: pipeline.reps.count)
       log.event("recents_open", ["id": entry.id, "reps": pipeline.reps.count, "exercise": pipeline.exercise.rawValue])
-      // A stored analysis can predate an exercise the detector now knows (issue #17): in Auto, re-detect over the
-      // stored poses and re-analyze when the answer changed. No inference, so this is quick.
-      if case .auto = exerciseMode {
+      // A stored analysis can predate an exercise the detector now knows (#17) or an analyzer fix (#19): re-analyze
+      // over the stored poses when the analyzers moved on or, in Auto, when the detector now says something else.
+      // No inference, so this is quick.
+      var reason: String?
+      if recents.isStale(entry) {
+        reason = "analyzer_version"
+      } else if case .auto = exerciseMode {
         let fresh = ExerciseDetector.detect(frames: extractedFrames)
         if fresh.exercise != pipeline.exercise, fresh.confidence >= 70 {
+          reason = "recents_redetect"
           log.event(
             "recents_redetect",
             ["id": entry.id, "was": pipeline.exercise.rawValue, "now": fresh.exercise.rawValue, "confidence": fresh.confidence])
-          activity = .working("Re-analyzing as \(fresh.exercise.definition.name)", progress: nil)
-          await analyzeExtracted(url: url, reason: "recents_redetect")
-          statusMessage = "Re-analyzed as \(exercise.definition.name): \(self.pipeline.reps.count) reps"
-          rememberCurrent(clipURL: url)
-          activity = .idle
         }
+      }
+      if let reason {
+        activity = .working("Re-analyzing", progress: nil)
+        await analyzeExtracted(url: url, reason: reason)
+        statusMessage = "Re-analyzed as \(exercise.definition.name): \(self.pipeline.reps.count) reps"
+        rememberCurrent(clipURL: url)
+        activity = .idle
       }
       play()
     }

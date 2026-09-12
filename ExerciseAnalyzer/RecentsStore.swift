@@ -51,6 +51,8 @@ struct RecentEntry: Codable, Identifiable {
 private struct AnalysisSnapshot: Codable {
   static let currentVersion = 2
   var version: Int = AnalysisSnapshot.currentVersion
+  /// Analyzer version the reps were computed with (AnalysisVersion.current); nil in files from before it existed.
+  var analysisVersion: String? = AnalysisVersion.current
   let exercise: ExerciseKind
   let frames: [FrameRecord]
   let reps: [RepRecord]
@@ -144,6 +146,15 @@ final class RecentsStore: ObservableObject {
   }
 
   /// The stored analysis with rep images re-attached.
+  /// True when the stored reps were computed by an older analyzer than the one in this build.
+  func isStale(_ entry: RecentEntry) -> Bool {
+    let dir = folder(for: entry.id)
+    guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),
+      let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data)
+    else { return false }
+    return snapshot.analysisVersion != AnalysisVersion.current
+  }
+
   func loadPipeline(for entry: RecentEntry) -> AnalysisPipeline? {
     let dir = folder(for: entry.id)
     guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),

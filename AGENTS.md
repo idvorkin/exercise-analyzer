@@ -9,6 +9,8 @@ squats and Turkish get-ups. `ExerciseCore/` is the platform-free analysis packag
 - **Test ladder**: host `just test` (~1 s) → simulator `just test-sim` (5–8 min) → phone `just run-device`. Verify on
   the cheapest rung that can see the change and say which rung you used. The simulator runs the model on the CPU
   (~20 fps); it has no camera, no HDR, no taps: drive it with `SIMCTL_CHILD_SWING_*` hooks and wait on log events.
+- **Bump `AnalysisVersion.current`** (ExerciseCore/Sources/ExerciseCore/AnalysisVersion.swift) in any commit that
+  changes an analyzer, the detector, or the skeleton math: stored sets re-analyze themselves against it (#19).
 - **Wrong rep count = fixture first.** Export the set's pose track from the phone's `Documents/recents/<id>/analysis.json`
   into `ExerciseCore/Tests/ExerciseCoreTests/Fixtures/`, make `swift test` fail, then fix. Never tune by reinstalling.
   Mark fixtures `humanVerified` only when Igor confirmed the count.
