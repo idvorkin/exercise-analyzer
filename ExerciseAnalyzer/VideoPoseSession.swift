@@ -117,6 +117,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
     pipeline = AnalysisPipeline(exercise: exercise)
     watch.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
+    watch.onExercise = { [weak self] mode in
+      guard let self else { return }
+      self.log.event("ui", ["action": "exercise", "from": "watch", "mode": mode])
+      self.setExerciseMode(ExerciseMode(storageValue: mode))
+      self.pushWatchStatus(force: true)
+    }
+    // Idle heartbeat: the watch marks a status stale after 8 s, and only a recording session pushes on its own.
+    Timer.publish(every: 3, on: .main, in: .common).autoconnect().sink { [weak self] _ in
+      guard let self, self.watch.reachable else { return }
+      self.pushWatchStatus(force: true)
+    }.store(in: &cancellables)
     NotificationCenter.default.addObserver(forName: RecordPrompt.tapped, object: nil, queue: .main) { [weak self] _ in
       Task { @MainActor in
         guard let self, self.source != .camera else { return }
@@ -137,6 +148,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     loadModel()
     RecordPrompt.prepare(log: log)
+    for name in [UIApplication.didBecomeActiveNotification, UIApplication.willResignActiveNotification] {
+      NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+        Task { @MainActor in
+          self?.updateKeepAwake()
+          self?.pushWatchStatus(force: true)
+        }
+      }
+    }
+    watch.$reachable.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in self?.updateKeepAwake() }
+      .store(in: &cancellables)
     Task { await refreshStaleEntries() }
   }
 
@@ -820,7 +841,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         self.attachCamera(position: position)
         if self.source == .camera {
           self.activity = .working("Recording", progress: nil)
-          UIApplication.shared.isIdleTimerDisabled = true  // a set is longer than the auto-lock timeout
+          self.updateKeepAwake()  // a set is longer than the auto-lock timeout
           self.frameStatus = FrameStatus(box: nil, pose: nil)
           self.pushWatchStatus(force: true)
         }
@@ -886,8 +907,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     camera?.stop()
     camera = nil
     cameraPreviewLayer = nil
-    UIApplication.shared.isIdleTimerDisabled = false
     if source == .camera { source = .none }
+    updateKeepAwake()
     pushWatchStatus(force: true)
   }
 

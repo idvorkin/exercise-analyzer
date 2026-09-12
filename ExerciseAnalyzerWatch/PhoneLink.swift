@@ -13,6 +13,8 @@ final class PhoneLink: NSObject, ObservableObject {
   @Published private(set) var reachable = false
   @Published private(set) var lastError: String?
   @Published private(set) var receivedAt: Date?
+  /// Latest preview frame from the phone (about 1 fps while recording).
+  @Published private(set) var preview: UIImage?
   /// Status older than this is stale: the phone app may be gone without having sent an idle status.
   static let maxStatusAge: TimeInterval = 8
 
@@ -100,6 +102,20 @@ extension PhoneLink: WCSessionDelegate {
 
   nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
     Task { @MainActor in self.apply(message) }
+  }
+
+  nonisolated func session(_ session: WCSession, didReceiveMessageData messageData: Data) {
+    let image = UIImage(data: messageData)
+    Task { @MainActor in self.preview = image }
+  }
+
+  func pick(exercise mode: String) {
+    logEvent("command", ["command": "exercise", "exercise": mode])
+    guard WCSession.default.activationState == .activated else { return }
+    WKInterfaceDevice.current().play(.click)
+    WCSession.default.sendMessage(["command": WatchCommand.exercise.rawValue, "exercise": mode], replyHandler: nil) { [weak self] error in
+      Task { @MainActor in self?.lastError = error.localizedDescription }
+    }
   }
 
   nonisolated func session(_ session: WCSession, didReceiveApplicationContext context: [String: Any]) {

@@ -19,7 +19,19 @@ struct WatchContentView: View {
           Text(phone.reachable ? "Waiting for the phone app…" : "Phone not reachable. Open Exercise Analyzer on the phone.")
             .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
           Button { phone.ping() } label: { Label("Retry", systemImage: "arrow.clockwise").frame(maxWidth: .infinity) }
+        } else if !status.phoneActive {
+          Image(systemName: "iphone.gen3").font(.largeTitle).foregroundStyle(.secondary)
+          Text("The phone app is in the background. Unlock the phone and open Exercise Analyzer; it stays awake while the watch is connected.")
+            .font(.caption2).multilineTextAlignment(.center).foregroundStyle(.secondary)
+          Button { phone.send(.start) } label: {
+            Label("Send a reminder to the phone", systemImage: "bell").frame(maxWidth: .infinity)
+          }
         } else if status.recording {
+          if let preview = phone.preview {
+            Image(uiImage: preview).resizable().scaledToFit()
+              .frame(maxWidth: .infinity, maxHeight: 90)
+              .clipShape(RoundedRectangle(cornerRadius: 8))
+          }
           Text(status.frame.hint.uppercased())
             .font(.headline).multilineTextAlignment(.center)
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -58,6 +70,7 @@ struct WatchContentView: View {
           }
           .tint(.red)
           .disabled(!phone.reachable)
+          exercisePicker
         }
         if let error = phone.lastError {
           Text(error).font(.caption2).foregroundStyle(.red).multilineTextAlignment(.center)
@@ -67,6 +80,15 @@ struct WatchContentView: View {
     }
     .onReceive(clock) { now = $0; if !phone.isLive { phone.ping() } }
     .onAppear { phone.ping() }
+  }
+
+  /// Auto or a specific exercise; the phone re-analyzes and reports back through `mode`.
+  private var exercisePicker: some View {
+    let options: [(String, String)] = [("auto", "Auto")] + ExerciseKind.allCases.map { ($0.rawValue, $0.definition.name) }
+    return Picker("Exercise", selection: Binding(get: { status.mode }, set: { phone.pick(exercise: $0) })) {
+      ForEach(options, id: \.0) { option in Text(option.1).tag(option.0) }
+    }
+    .pickerStyle(.navigationLink)
   }
 
   private var elapsed: String {

@@ -66,9 +66,9 @@ enum FrameImage {
   private static let context = CIContext()
 
   /// A small image of the frame for gallery thumbnails (long side ~360 px).
-  static func thumbnail(from pixelBuffer: CVPixelBuffer) -> CGImage? {
+  static func thumbnail(from pixelBuffer: CVPixelBuffer, longSide: CGFloat = 360) -> CGImage? {
     let image = CIImage(cvPixelBuffer: pixelBuffer)
-    let scale = 360 / max(image.extent.width, image.extent.height)
+    let scale = longSide / max(image.extent.width, image.extent.height)
     let scaled = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
     return context.createCGImage(scaled, from: scaled.extent)
   }

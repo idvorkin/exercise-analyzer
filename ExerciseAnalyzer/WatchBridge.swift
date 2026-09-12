@@ -10,6 +10,8 @@ import WatchConnectivity
 @MainActor
 final class WatchBridge: NSObject, ObservableObject {
   var onCommand: ((WatchCommand) -> Void)?
+  /// Exercise picked on the watch: "auto" or an ExerciseKind raw value.
+  var onExercise: ((String) -> Void)?
   var onEvent: ((String, [String: Any]) -> Void)?
   @Published private(set) var reachable = false
 
@@ -43,7 +45,21 @@ final class WatchBridge: NSObject, ObservableObject {
 
   nonisolated private func handle(_ message: [String: Any]) {
     guard let raw = message["command"] as? String, let command = WatchCommand(rawValue: raw) else { return }
+    if command == .exercise, let mode = message["exercise"] as? String {
+      Task { @MainActor in self.onExercise?(mode) }
+      return
+    }
     Task { @MainActor in self.onCommand?(command) }
+  }
+
+  /// A small JPEG of the live frame for the wrist (about once a second while recording); dropped when the
+  /// watch is not reachable.
+  func sendPreview(_ jpeg: Data) {
+    guard WCSession.isSupported(), WCSession.default.activationState == .activated, WCSession.default.isReachable
+    else { return }
+    WCSession.default.sendMessageData(jpeg, replyHandler: nil) { [weak self] error in
+      Task { @MainActor in self?.onEvent?("watch_preview_failed", ["message": "\(error)"]) }
+    }
   }
 }
 
