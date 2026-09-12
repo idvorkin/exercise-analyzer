@@ -120,7 +120,8 @@ public final class ExerciseDetector {
         reason: String(format: "on the floor in %.0f%% of frames and standing in %.0f%%", lyingRatio * 100, standingRatio * 100),
         stats: stats)
     }
-    if armCycles >= 3 && p95 < asymmetryThreshold {
+    // Many arm cycles are a swing even when the legs read a little uneven (a walk-in, a diagonal camera).
+    if (armCycles >= 3 && p95 < asymmetryThreshold) || (armCycles >= 10 && p95 < 50 && highRatio < 0.2) {
       return ExerciseDetection(
         exercise: .kettlebellSwing, confidence: min(100, 80 + armCycles),
         reason: "arms swing up and down \(armCycles) times with symmetric legs (asymmetry \(Int(p95))°)",
@@ -138,9 +139,9 @@ public final class ExerciseDetector {
           format: "one foot held above the other in %.0f%% of frames (asymmetry %.0f°)", elevatedRatio * 100, p95),
         stats: stats)
     }
-    if p95 > asymmetryThreshold && highRatio > 0.3 {
+    if p95 > asymmetryThreshold && highRatio > 0.2 && elevatedRatio < 0.5 {
       return ExerciseDetection(
-        exercise: .pistolSquat, confidence: min(100, 50 + Int(highRatio * 50)),
+        exercise: .pistolSquat, confidence: min(100, 55 + Int(highRatio * 100)),
         reason: String(format: "high knee asymmetry (%.0f°, avg %.0f°)", p95, avg), stats: stats)
     }
     if p95 < asymmetryThreshold * 0.7 {

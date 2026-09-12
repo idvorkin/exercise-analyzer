@@ -13,7 +13,7 @@ final class DetectionTests: XCTestCase {
       XCTAssertEqual(
         detection.exercise, fixture.expectedExercise,
         "\(fixture.name): detected \(detection.exercise.rawValue) because \(detection.reason)")
-      XCTAssertGreaterThanOrEqual(detection.confidence, 60, "\(fixture.name): \(detection.reason)")
+      XCTAssertGreaterThanOrEqual(detection.confidence, 75, "\(fixture.name): \(detection.reason)")
     }
   }
 
