@@ -1,7 +1,8 @@
-# Swing Analyzer (iOS)
+# Exercise Analyzer (iOS)
 
-Kettlebell swing form analysis on top of the `UltralyticsYOLO` pose model. A native port of the analysis core and
-UX from [idvorkin/swing-analyzer](https://github.com/idvorkin/swing-analyzer).
+Exercise form analysis for iPhone on top of the `UltralyticsYOLO` pose model: kettlebell swings today, pistol
+squats and Bulgarian split squats next. A native port of the analysis core and UX from
+[idvorkin/swing-analyzer](https://github.com/idvorkin/swing-analyzer).
 
 User stories with per-feature verification status: [docs/USER_STORIES.md](docs/USER_STORIES.md).
 
@@ -42,11 +43,12 @@ over COCO indices. Pose-track files are not interchangeable between the two apps
 ## Build
 
 ```bash
-bash ../../scripts/download-models.sh   # once, from the repo root: fetches the nano models
-just model                              # copies yolo26n-pose.mlpackage into the app (gitignored)
+just model                              # downloads yolo26n-pose.mlpackage into the app (gitignored)
 just run-sim /path/to/swing.mp4         # simulator, auto-loads the video
 just run-device                         # connected iPhone (needs an Apple ID signed into Xcode)
 ```
+
+The `UltralyticsYOLO` package comes from `ultralytics/yolo-ios-app`, pinned by commit in the Xcode project.
 
 Test hooks for simulator runs (no UI tapping needed): `SWING_VIDEO=/path` auto-loads a file and
 `SWING_AUTO_TRIM=1` trims it right after the first analysis, and `SWING_OPEN_RECENT=1` reopens the newest Recents entry. Pass them through `simctl` as
@@ -62,7 +64,7 @@ convert for iOS with `ffmpeg -i in.webm -c:v libx264 -pix_fmt yuv420p -an out.mp
 | --- | --- |
 | `VideoPoseSession.swift` | Orchestrates sources, predictor, pipeline, recorder, trim, save, navigation, log |
 | `SwingPipeline.swift` | Result → tracked person → analyzer → PoseTrack + reps; frame thumbnails |
-| `KettlebellSwingAnalyzer.swift` | Phase state machine, peaks, rep quality (port of the web analyzer) |
+| `KettlebellExerciseAnalyzer.swift` | Phase state machine, peaks, rep quality (port of the web analyzer) |
 | `SwingSkeleton.swift` | COCO-17 angle math (port of Skeleton.ts) |
 | `PoseTrack.swift` | Time-ordered analyzed frames with nearest lookup and shifting |
 | `OfflineAnalyzer.swift` | AVAssetReader pass over every frame |

@@ -11,13 +11,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		5A1A0000000000000000000C /* SwingAnalyzer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwingAnalyzer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A1A0000000000000000000C /* ExerciseAnalyzer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ExerciseAnalyzer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		5A1A00000000000000000007 /* SwingAnalyzer */ = {
+		5A1A00000000000000000007 /* ExerciseAnalyzer */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = SwingAnalyzer;
+			path = ExerciseAnalyzer;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -37,7 +37,7 @@
 		5A1A00000000000000000005 = {
 			isa = PBXGroup;
 			children = (
-				5A1A00000000000000000007 /* SwingAnalyzer */,
+				5A1A00000000000000000007 /* ExerciseAnalyzer */,
 				5A1A00000000000000000006 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -45,7 +45,7 @@
 		5A1A00000000000000000006 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				5A1A0000000000000000000C /* SwingAnalyzer.app */,
+				5A1A0000000000000000000C /* ExerciseAnalyzer.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -53,9 +53,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		5A1A00000000000000000008 /* SwingAnalyzer */ = {
+		5A1A00000000000000000008 /* ExerciseAnalyzer */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 5A1A00000000000000000009 /* Build configuration list for PBXNativeTarget "SwingAnalyzer" */;
+			buildConfigurationList = 5A1A00000000000000000009 /* Build configuration list for PBXNativeTarget "ExerciseAnalyzer" */;
 			buildPhases = (
 				5A1A0000000000000000000D /* Sources */,
 				5A1A0000000000000000000E /* Frameworks */,
@@ -66,14 +66,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				5A1A00000000000000000007 /* SwingAnalyzer */,
+				5A1A00000000000000000007 /* ExerciseAnalyzer */,
 			);
-			name = SwingAnalyzer;
+			name = ExerciseAnalyzer;
 			packageProductDependencies = (
 				5A1A00000000000000000011 /* UltralyticsYOLO */,
 			);
-			productName = SwingAnalyzer;
-			productReference = 5A1A0000000000000000000C /* SwingAnalyzer.app */;
+			productName = ExerciseAnalyzer;
+			productReference = 5A1A0000000000000000000C /* ExerciseAnalyzer.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -91,7 +91,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 5A1A00000000000000000002 /* Build configuration list for PBXProject "SwingAnalyzer" */;
+			buildConfigurationList = 5A1A00000000000000000002 /* Build configuration list for PBXProject "ExerciseAnalyzer" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -101,14 +101,14 @@
 			mainGroup = 5A1A00000000000000000005;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				5A1A00000000000000000010 /* XCLocalSwiftPackageReference "../.." */,
+				5A1A00000000000000000010 /* XCRemoteSwiftPackageReference "yolo-ios-app" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5A1A00000000000000000006 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				5A1A00000000000000000008 /* SwingAnalyzer */,
+				5A1A00000000000000000008 /* ExerciseAnalyzer */,
 			);
 		};
 /* End PBXProject section */
@@ -264,6 +264,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Exercise Analyzer";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Swing Analyzer uses the camera to analyze your kettlebell swing in real time.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swing Analyzer reads the videos you pick to analyze your swing.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -277,7 +278,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.idvorkin.swinganalyzer;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idvorkin.exerciseanalyzer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -296,6 +297,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Exercise Analyzer";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Swing Analyzer uses the camera to analyze your kettlebell swing in real time.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Swing Analyzer reads the videos you pick to analyze your swing.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -309,7 +311,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.idvorkin.swinganalyzer;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idvorkin.exerciseanalyzer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -320,7 +322,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		5A1A00000000000000000002 /* Build configuration list for PBXProject "SwingAnalyzer" */ = {
+		5A1A00000000000000000002 /* Build configuration list for PBXProject "ExerciseAnalyzer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5A1A00000000000000000003 /* Debug */,
@@ -329,7 +331,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		5A1A00000000000000000009 /* Build configuration list for PBXNativeTarget "SwingAnalyzer" */ = {
+		5A1A00000000000000000009 /* Build configuration list for PBXNativeTarget "ExerciseAnalyzer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5A1A0000000000000000000A /* Debug */,
@@ -340,16 +342,21 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		5A1A00000000000000000010 /* XCLocalSwiftPackageReference "../.." */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../..;
+/* Begin XCRemoteSwiftPackageReference section */
+		5A1A00000000000000000010 /* XCRemoteSwiftPackageReference "yolo-ios-app" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ultralytics/yolo-ios-app.git";
+			requirement = {
+				kind = revision;
+				revision = 90df40ee2e5e2f30b40ac7518e43712f9a906381;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		5A1A00000000000000000011 /* UltralyticsYOLO */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 5A1A00000000000000000010 /* XCRemoteSwiftPackageReference "yolo-ios-app" */;
 			productName = UltralyticsYOLO;
 		};
 /* End XCSwiftPackageProductDependency section */

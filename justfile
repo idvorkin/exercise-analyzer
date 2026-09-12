@@ -1,20 +1,20 @@
-# Swing Analyzer build helpers. Run from ExampleApps/SwingAnalyzer.
+# Exercise Analyzer build helpers.
 
 sim := env("SIM", "iPhone 17")
 device := env("DEVICE", "00008150-000A31D10CF2401C")
-bundle := "com.idvorkin.swinganalyzer"
-sim_app := "Build/Build/Products/Debug-iphonesimulator/SwingAnalyzer.app"
-device_app := "Build/Build/Products/Debug-iphoneos/SwingAnalyzer.app"
+bundle := "com.idvorkin.exerciseanalyzer"
+sim_app := "Build/Build/Products/Debug-iphonesimulator/ExerciseAnalyzer.app"
+device_app := "Build/Build/Products/Debug-iphoneos/ExerciseAnalyzer.app"
 
 default:
     @just --list
 
-# Copy the bundled pose model from the package test resources (run scripts/download-models.sh first).
+# Download the bundled pose model (yolo26n-pose) from the Ultralytics release into the app folder.
 model:
-    cp -R ../../Tests/YOLOTests/Resources/yolo26n-pose.mlpackage SwingAnalyzer/
+    bash scripts/download-model.sh
 
 build-sim:
-    xcodebuild -project SwingAnalyzer.xcodeproj -scheme SwingAnalyzer -sdk iphonesimulator \
+    xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer -sdk iphonesimulator \
       -derivedDataPath Build/ -destination "platform=iOS Simulator,name={{sim}}" \
       CODE_SIGNING_ALLOWED=NO build | grep -E "error:|BUILD"
 
@@ -27,7 +27,7 @@ run-sim video="": build-sim
     SIMCTL_CHILD_SWING_VIDEO="{{video}}" xcrun simctl launch "{{sim}}" {{bundle}}
 
 build-device:
-    xcodebuild -project SwingAnalyzer.xcodeproj -scheme SwingAnalyzer -sdk iphoneos \
+    xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer -sdk iphoneos \
       -derivedDataPath Build/ -destination "platform=iOS,id={{device}}" \
       -allowProvisioningUpdates -allowProvisioningDeviceRegistration build | grep -E "error:|BUILD"
 

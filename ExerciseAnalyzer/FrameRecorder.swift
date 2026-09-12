@@ -36,13 +36,13 @@ final class FrameRecorder: @unchecked Sendable {
           input.expectsMediaDataInRealTime = true
           writer.add(input)
           guard writer.startWriting() else {
-            print("[SwingAnalyzer] recorder failed to start: \(String(describing: writer.error))")
+            print("[ExerciseAnalyzer] recorder failed to start: \(String(describing: writer.error))")
             return
           }
           self.writer = writer
           self.input = input
         } catch {
-          print("[SwingAnalyzer] recorder init failed: \(error)")
+          print("[ExerciseAnalyzer] recorder init failed: \(error)")
           return
         }
       }

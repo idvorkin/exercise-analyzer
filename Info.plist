@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Swing Analyzer saves your trimmed swing clips to Photos.</string>
+	<string>Exercise Analyzer saves your trimmed swing clips to Photos.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

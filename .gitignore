@@ -1,0 +1,6 @@
+Build/
+*.mlpackage
+*.mlmodelc
+xcuserdata/
+*.xcuserstate
+.DS_Store

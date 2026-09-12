@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5A1A00000000000000000008"
-               BuildableName = "SwingAnalyzer.app"
-               BlueprintName = "SwingAnalyzer"
-               ReferencedContainer = "container:SwingAnalyzer.xcodeproj">
+               BuildableName = "ExerciseAnalyzer.app"
+               BlueprintName = "ExerciseAnalyzer"
+               ReferencedContainer = "container:ExerciseAnalyzer.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "5A1A00000000000000000008"
-            BuildableName = "SwingAnalyzer.app"
-            BlueprintName = "SwingAnalyzer"
-            ReferencedContainer = "container:SwingAnalyzer.xcodeproj">
+            BuildableName = "ExerciseAnalyzer.app"
+            BlueprintName = "ExerciseAnalyzer"
+            ReferencedContainer = "container:ExerciseAnalyzer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "5A1A00000000000000000008"
-            BuildableName = "SwingAnalyzer.app"
-            BlueprintName = "SwingAnalyzer"
-            ReferencedContainer = "container:SwingAnalyzer.xcodeproj">
+            BuildableName = "ExerciseAnalyzer.app"
+            BlueprintName = "ExerciseAnalyzer"
+            ReferencedContainer = "container:ExerciseAnalyzer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
