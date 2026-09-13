@@ -863,11 +863,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       frameStatus = status
       pushWatchStatus()
-      if watch.reachable, watch.watchActive, Date().timeIntervalSince(lastPreviewSent) >= 1 {
+      // Reachable already means the watch app is in front (watchOS only reports reachability then), so that is the
+      // whole gate: the scene-active message was missed at launch and starved the preview (#38).
+      if watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
         lastPreviewSent = Date()
         if let small = FrameImage.thumbnail(from: pending.pixelBuffer, longSide: 176),
           let jpeg = UIImage(cgImage: small).jpegData(compressionQuality: 0.45)
         {
+          if !previewSentThisSet {
+            previewSentThisSet = true
+            log.event("watch_preview", ["bytes": jpeg.count, "watch_active": watch.watchActive])
+          }
           watch.sendPreview(jpeg)
         }
       }
@@ -875,6 +881,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   private var lastPreviewSent = Date.distantPast
+  /// Logged once per recording so the log shows whether previews flowed at all.
+  private var previewSentThisSet = false
 
   // MARK: - Watch companion
 
@@ -1023,6 +1031,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       cameraZoom = 1
       cameraPreviewLayer = camera.previewLayer
       source = .camera
+      previewSentThisSet = false
       log.event("camera_start", ["position": position == .front ? "front" : "back"])
       camera.start()
     } catch {

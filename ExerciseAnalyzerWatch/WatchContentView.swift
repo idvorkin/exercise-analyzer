@@ -88,7 +88,7 @@ struct WatchContentView: View {
       .padding(.horizontal, 4)
     }
     .onReceive(clock) { now = $0; if !phone.isLive { phone.ping() } }
-    .onAppear { phone.ping() }
+    .onAppear { phone.sceneActive(true) }  // also pings; the phone learns the app is in front even without a scene change
     .onChange(of: scenePhase) { _, phase in phone.sceneActive(phase == .active) }
   }
 

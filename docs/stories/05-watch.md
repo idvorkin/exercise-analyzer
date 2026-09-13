@@ -21,7 +21,9 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** the phone app is open and recording
 - **and Given:** the watch app is open and connected
 - **When:** I stand where my feet are below the bottom edge of the frame
-- **Then:** the watch shows "Feet cut off" within a second and taps my wrist
+- **Then:** the watch shows "Feet cut off" within a second and taps my wrist, over a small picture from the camera that refreshes about once a second whenever the watch app is in front
+
+- **Issues:** [#38](https://github.com/idvorkin/exercise-analyzer/issues/38) preview never started (gated on a scene message the watch does not send at launch)
 
 ---
 
