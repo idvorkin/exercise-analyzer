@@ -66,6 +66,8 @@ struct WatchContentView: View {
           }
           .tint(.red)
           .disabled(!phone.reachable)
+          restStatus
+          restPicker
           exercisePicker
         }
         if let error = phone.lastError {
@@ -185,6 +187,26 @@ struct WatchContentView: View {
         .frame(maxWidth: .infinity)
     }
     .tint(status.watchMode ? .blue : nil)
+  }
+
+  /// Rest since Done, counting up; orange past the rest length (story 046). The 2 s clock above refreshes it.
+  @ViewBuilder private var restStatus: some View {
+    if let restEnded = phone.rest.restEnded {
+      (Text("Rest ") + Text(restEnded, style: .timer))
+        .font(.headline).monospacedDigit()
+        .foregroundStyle(
+          Date().timeIntervalSince(restEnded) >= Double(phone.rest.length) ? .orange : .primary)
+    }
+  }
+
+  /// Rest length between sets, a watch setting (story 046).
+  private var restPicker: some View {
+    Picker("Rest", selection: Binding(get: { phone.rest.length }, set: { phone.rest.length = $0 })) {
+      ForEach(RestTimer.choices, id: \.self) { seconds in
+        Text(String(format: "%d:%02d", seconds / 60, seconds % 60)).tag(seconds)
+      }
+    }
+    .pickerStyle(.navigationLink)
   }
 
   /// Auto or a specific exercise; the phone re-analyzes and reports back through `mode`.
