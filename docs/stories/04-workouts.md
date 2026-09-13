@@ -125,7 +125,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 035:
 
 - **Summary:** A set made by older models is run through the new ones when I reopen it (technical)
-- **Status:** implemented (commit named in the next docs commit); verified by build; needs the phone (reopen a set from before the bell detector: `recents_rerun` then `analyzed` with reason rerun_models, same entry, bell dot on)
+- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952); verified by build; needs the phone (reopen a set from before the bell detector: `recents_rerun` then `analyzed` with reason rerun_models, same entry, bell dot on)
 
 #### Use Case:
 - **As a** developer shipping a new model (a detector, a bigger pose model)
