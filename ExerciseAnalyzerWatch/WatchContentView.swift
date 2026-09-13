@@ -14,7 +14,10 @@ struct WatchContentView: View {
 
   var body: some View {
     Group {
-      if phone.isLive && status.phoneActive && status.recording {
+      // The picture page whenever the camera is live: `recording` means the camera is up. `phoneActive` is the
+      // follow-the-wrist decision (041), never a gate on the picture (2026-09-13 regression: the wrist dropped to
+      // the idle pages whenever the phone app was not .active, and lost its framing controls with it).
+      if phone.isLive && status.recording {
         recordingPages
       } else {
         idlePages
