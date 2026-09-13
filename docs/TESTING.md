@@ -10,6 +10,7 @@ camera, a display, or a wrist goes higher.
 | 1 Host | `ExerciseCore` XCTest against stored pose tracks | `just test` | ~1 s | detection, rep counts, phases, checkpoints, quality, crops, frame status, message types |
 | 1.5 Mac model | `posetrack`: the pose model plus the analyzers on a clip; `scripts/model-trials/` for candidate models | `just analyze clip.mov`, `scripts/model-trials/*.py` | ~clip length ÷ 4 | what the phone would count for any clip on the Mac (AirDropped or sample); makes fixtures without the phone; whether a new model (a bell detector) works at all |
 | 2 Simulator | the app, driven by env hooks, judged from its log | `just test-sim` | 5–8 min | loading, offline pose pass, analysis in the app, trim (`AVAssetExportSession`), player start, Recents |
+| 2b Watch simulator | the watch app, one fixed status per state, judged by eye | `just watch-screens` | ~1 min | every watch page and button without a phone; the regression rung for #74 |
 | 3 Phone | the app on the iPhone, a human at the gym | `just run-device` then `just pull-logs` | minutes + a person | Neural Engine speed, camera and recorder, HDR playback, Photos, the watch, everything visual |
 
 ## What kind of test goes where
@@ -28,6 +29,7 @@ camera, a display, or a wrist goes higher.
 | Camera, recorder, camera switch, idle timer | Phone only | record a set, `just pull-logs`, check `camera_*`, `recording_partial`, `error` events |
 | HDR washout, EDR, layer transforms | Phone only | `video_track` (`hdr`, `edr_headroom`) and `player_layer` events; the eye |
 | Apple Watch companion | Phone + watch | `watch_session`, `watch_reachable`, `ui` events with `from: watch` |
+| Watch pages, buttons, readouts | Watch simulator | `just watch-screens`, compare each shot with the control inventory at the top of [`05-watch.md`](stories/05-watch.md) |
 | Lock-screen / Control Center button | Phone only (the simulator has no lock-screen controls to press; the extension must at least build) | add the Exercise control, press it, `just pull-logs`, check `launch_control` (`action: live`) and the camera running |
 | Audio never interrupted | Phone only | play music, record, listen |
 
@@ -164,6 +166,17 @@ Sample clips live outside the repo in `~/tmp/agent/swing-samples/` (`$SAMPLES`);
 **Screenshots** for the README come from the same machinery:
 [`scripts/screenshots.sh`](../scripts/screenshots.sh) presets view modes through user defaults (`overlayMode`,
 `meView`, `galleryHeight`), launches each clip, waits for `analyzed`, and captures with `simctl io screenshot`.
+
+## Rung 2b: the watch simulator
+
+Every watch change runs [`scripts/watch-screens.sh`](../scripts/watch-screens.sh) (`just watch-screens`,
+after `just build-sim`): it finds the watch app inside the phone build, installs it on the watch simulator,
+and relaunches it once per state with `WATCH_STATE` naming a fixed status (`SIMCTL_CHILD_WATCH_STATE`, the
+same launch-hook pattern as rung 2) — no phone, no pairing, no taps. Each state sleeps 3 s for first render,
+then screenshots to `~/tmp/agent/sim/watch-<state>.png`. The seven shots are compared by eye against the
+control inventory at the top of [`05-watch.md`](stories/05-watch.md); a missing button is a failed rung. This
+is the rung that would have caught #74 (the picture page gated on the phone being active): three watch changes
+shipped on green builds and nobody saw a watch screen.
 
 ## Rung 3: phone
 
