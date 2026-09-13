@@ -923,7 +923,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     log.event("analyzed", ["exercise": chosen.rawValue, "reps": analyzed.reps.count, "reason": reason])
     // The recording's own pass just settled the final count: land it on the watch idle screen (045). Any other
     // pass (a file opened, a re-analysis) leaves the last set alone.
-    if currentOrigin == .recording, reason == "load" {
+    if case .recording = currentOrigin, reason == "load" {
       let clipSeconds = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? duration
       lastSet = LastSet(
         reps: analyzed.reps.count, exercise: chosen.definition.name, seconds: clipSeconds,
