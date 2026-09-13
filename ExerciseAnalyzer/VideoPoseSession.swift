@@ -267,8 +267,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
     planTasks = []
   }
 
+  /// Igor, 2026-09-12: the detector was fun but made nothing better yet, and it halves the offline pass (94 → 44
+  /// fps). Off by default; `SWING_BELLS=1` in the environment or the `bellDetector` default turns it on for a trial.
+  static var bellDetectorEnabled: Bool {
+    ProcessInfo.processInfo.environment["SWING_BELLS"] == "1" || UserDefaults.standard.bool(forKey: "bellDetector")
+  }
+
   /// The bell detector is optional: the app counts without it, it just does not see the bell.
   private func loadBellDetector() {
+    guard Self.bellDetectorEnabled else {
+      log.event("model_skipped", ["model": "yoloe-26n-kettlebell", "reason": "disabled"])
+      return
+    }
     guard let url = Bundle.main.url(forResource: "yoloe-26n-kettlebell", withExtension: "mlmodelc") else {
       log.event("model_missing", ["model": "yoloe-26n-kettlebell"])
       return
@@ -390,8 +400,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
       log.event("recents_open", ["id": entry.id, "reps": pipeline.reps.count, "exercise": pipeline.exercise.rawValue])
       // A stored track made by other models than this build runs (a new detector, a new pose model) is run through
       // the models again from its video, with the clip at hand. Same entry, so Workouts keeps one set (story 035).
-      let storedModels = recents.models(for: entry)
-      if storedModels != loadedModels {
+      // Only a model this build has and the set lacks means a re-run; a set made with more models than this build
+      // runs (the detector off again) keeps what it has. Files from before the field were pose-only.
+      let storedModels = recents.models(for: entry).isEmpty ? ["yolo26n-pose"] : recents.models(for: entry)
+      if !Set(loadedModels).isSubset(of: storedModels) {
         log.event(
           "recents_rerun",
           ["id": entry.id, "reason": "models_changed", "stored": storedModels, "current": loadedModels, "exercise": pipeline.exercise.rawValue])

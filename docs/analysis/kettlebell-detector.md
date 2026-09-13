@@ -173,6 +173,14 @@ padded the earlier percentages. With the dense head and the gates:
 Compute plan on the Mac (`POSETRACK_PLAN=1`): pose model 303 ops on the Neural Engine, 19 CPU; detector 316
 and 2; the rest are constants. The phone logs the same as `model_plan` (#44).
 
+## 2026-09-12: parked
+
+Igor: "a lot of fun, but it didn't really make anything particularly better; disable it for now and get the speed
+back." The detector stays bundled and the code stays, off by default (`model_skipped` in the log); `SWING_BELLS=1`
+or the `bellDetector` user default turns it on for a trial. Sets analyzed with it keep their bells (a build that
+runs fewer models does not re-run them). The pass is back at ~94 fps. What would make it worth turning on is the
+plan below: the swing on the bell's path and the get-up's stacking, neither built.
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),
