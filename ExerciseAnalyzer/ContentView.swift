@@ -17,6 +17,8 @@ struct ContentView: View {
   @State private var showFileImporter = false
   @State private var showPhotosPicker = false
   @State private var showRecents = false
+  @State private var showOpenDialog = false
+  @State private var lastClockLog = Date.distantPast
   @State private var showBugReport = false
   @State private var showGallery = false
   @State private var showKeyframeViewer = false
@@ -100,6 +102,13 @@ struct ContentView: View {
     }
     .onChange(of: session.currentTime) { _, time in
       if !isScrubbing { scrubTime = time }
+      // Why the slider might not follow the clock (#23): log the view's side every 5 s.
+      if Date().timeIntervalSince(lastClockLog) > 5 {
+        lastClockLog = Date()
+        session.log.event(
+          "clock",
+          ["current": time, "slider": scrubTime, "scrubbing": isScrubbing, "duration": session.duration, "playing": session.isPlaying])
+      }
     }
     .photosPicker(
       isPresented: $showPhotosPicker, selection: $pickerItem, matching: .videos,
