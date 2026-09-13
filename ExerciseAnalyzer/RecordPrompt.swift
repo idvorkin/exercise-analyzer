@@ -46,6 +46,23 @@ enum RecordPrompt {
   }
 }
 
+/// Lock-screen / Control Center button (#70): the control's intent runs in the app's process and sets this
+/// flag; the session consumes it on activation, logs `launch_control` and starts the camera, the same as a
+/// RecordPrompt tap. Plain UserDefaults, not an App Group: both sides run in the app. The extension holds a
+/// mirror that writes the same key (it cannot import the host app).
+enum ControlLaunch {
+  private static let key = "ExerciseAnalyzer.controlLaunchLive"
+
+  static func requestLive() { UserDefaults.standard.set(true, forKey: key) }
+
+  /// True once per request: clears the flag whether or not the camera was already running.
+  static func consumeLive() -> Bool {
+    guard UserDefaults.standard.bool(forKey: key) else { return false }
+    UserDefaults.standard.set(false, forKey: key)
+    return true
+  }
+}
+
 /// Routes a tap on the record notification to the session.
 final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
   static let shared = NotificationRouter()

@@ -164,6 +164,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
         self.startCamera(position: self.cameraPosition)
       }
     }
+    // Lock-screen / Control Center button (#70): the intent sets the flag and opens the app; activation (cold
+    // or warm) picks it up. Consumed first so the flag clears even when the camera is already running.
+    NotificationCenter.default.addObserver(
+      forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        guard let self, ControlLaunch.consumeLive(), self.source != .camera else { return }
+        self.log.event("launch_control", ["action": "live"])
+        self.startCamera(position: self.cameraPosition)
+      }
+    }
     player.actionAtItemEnd = .pause
     timeObserver = player.addPeriodicTimeObserver(
       forInterval: CMTime(value: 1, timescale: 30), queue: .main

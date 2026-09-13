@@ -224,31 +224,37 @@ Part of the [user stories](README.md); persona and format are described there.
 
 ### User Story 044:
 
-- **Summary:** A Live Activity on the phone's lock screen while recording
-- **Status:** requested ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the phone"); not planned: the platform makes the live half impossible, see the notes; Igor decides whether the after-the-set card is worth a widget target
-- **Why:** Igor asked for "a live stream or a lock screen application"; this is what a lock-screen application on the recording phone could and could not be.
+- **Summary:** A lock-screen button opens the app into Live
+- **Status:** implemented in [bec3c45](https://github.com/idvorkin/exercise-analyzer/commit/bec3c45); needs the phone
+- **Why:** Igor: "There's a ChatGPT button I can put on my lock screen. Give me an exercise button I can put on
+  my lock screen that pops me open." A Live Activity was researched first and rejected: the recording phone is
+  never on its lock screen (locking backgrounds the app and iOS stops the camera; story 019 keeps the phone
+  awake for exactly this reason), so a live lock-screen scoreboard is impossible and only an after-the-set card
+  could exist. A button that opens the app is what the lock screen can do, and it is what Igor asked for.
 
 #### Use Case:
-- **As a** lifter glancing at the phone from the rack
-- **I want to** see reps, elapsed time and the exercise on the phone's lock screen while it records
-- **so that** the phone reads like a scoreboard without being unlocked
+- **As a** lifter at the rack with a locked phone
+- **I want to** press one button on the lock screen and land in the app with the camera already running
+- **so that** starting a set costs one press, not unlock, find the app, open it, tap Live
 
 #### Acceptance Criteria:
-- **Scenario:** The set ends and the phone locks
-- **Given:** a set was recorded and finished
-- **When:** the phone locks
-- **Then:** the lock screen shows a card with the set's final count, the exercise and its length until the next set starts or the card is dismissed
+- **Scenario:** The Exercise control on the lock screen
+- **Given:** the Exercise control was added to the lock screen once (long-press → Customize)
+- **When:** I press it later, phone locked
+- **Then:** the app opens on Live with the camera running, and the log carries `launch_control` (`action: live`)
 
-- **Notes:** The recording phone is never on its lock screen: locking backgrounds the app and iOS stops the camera
-  (story 019 keeps the phone awake for exactly this reason). A Live Activity can therefore only show the set after
-  it ended, which is why the scenario above is the after-the-set card and not the live one. A live video stream on
-  the lock screen is not possible at all. If the card is wanted, ActivityKit allows: iOS 16.1+ (the target is 17),
-  `NSSupportsLiveActivities` in Info.plist, a new iOS widget extension target (the only extension today is the
-  watchOS complication), an `ActivityAttributes` with a `ContentState` of at most 4 KB, so the 1 fps preview JPEG
-  (8–12 KB at 176 px, more after 042) cannot ride in the state; a small still can be read by the extension's view
-  from an App Group file and is re-rendered on each `Activity.update`, which has no published budget for a running
-  app but is throttled in bursts; elapsed time costs no updates (`Text(timerInterval:)`). The watch face (043) and
-  watch mode on the phone (027, 041) are the readings of #70 that show a live set.
+- **Scenario:** The Exercise control in Control Center
+- **Given:** the Exercise control was added to Control Center
+- **When:** I tap it
+- **Then:** the app opens on Live with the camera running, same as from the lock screen
+
+- **Notes:** An iOS 18 `ControlWidget` in a new widget extension target `ExerciseAnalyzerControls` (bundle id
+  `com.idvorkin.exerciseanalyzer.controls`, embedded in the app; the watch complication target is the pbxproj
+  pattern; watch targets untouched). The action is an `AppIntent` with `openAppWhenRun` that sets a UserDefaults
+  flag; the session consumes it on activation, logs `launch_control` and starts the camera — the same route as
+  the `RecordPrompt` notification tap. No App Group: the intent runs in the app's process. The extension's
+  deployment target is iOS 18.0 (the app stays 17.0) and every declaration carries `@available(iOS 18, *)`. The
+  lock screen needs nothing beyond the Control: whatever Igor can add in Customize, Control Center takes too.
 
 ---
 

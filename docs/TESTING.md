@@ -28,6 +28,7 @@ camera, a display, or a wrist goes higher.
 | Camera, recorder, camera switch, idle timer | Phone only | record a set, `just pull-logs`, check `camera_*`, `recording_partial`, `error` events |
 | HDR washout, EDR, layer transforms | Phone only | `video_track` (`hdr`, `edr_headroom`) and `player_layer` events; the eye |
 | Apple Watch companion | Phone + watch | `watch_session`, `watch_reachable`, `ui` events with `from: watch` |
+| Lock-screen / Control Center button | Phone only (the simulator has no lock-screen controls to press; the extension must at least build) | add the Exercise control, press it, `just pull-logs`, check `launch_control` (`action: live`) and the camera running |
 | Audio never interrupted | Phone only | play music, record, listen |
 
 Bugs in analysis are reproduced on the host first, never tuned on the phone: export the set as a fixture (below),

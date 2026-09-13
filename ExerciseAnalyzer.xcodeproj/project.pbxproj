@@ -12,6 +12,7 @@
 		5A1A0000000000000000003A /* ExerciseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1A00000000000000000039 /* ExerciseCore */; };
 		5A1A0000000000000000003C /* ExerciseAnalyzerWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5A1A00000000000000000035 /* ExerciseAnalyzerWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5A1A0000000000000000004C /* ExerciseAnalyzerWatchComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5A1A00000000000000000045 /* ExerciseAnalyzerWatchComplication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5C1A00000000000000000050 /* ExerciseAnalyzerControls.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5C1A00000000000000000053 /* ExerciseAnalyzerControls.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,6 +29,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 5A1A00000000000000000041;
 			remoteInfo = ExerciseAnalyzerWatchComplication;
+		};
+		5C1A00000000000000000051 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5A1A00000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5C1A00000000000000000056;
+			remoteInfo = ExerciseAnalyzerControls;
 		};
 /* End PBXContainerItemProxy section */
 /* Begin PBXCopyFilesBuildPhase section */
@@ -53,11 +61,23 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5C1A00000000000000000052 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5C1A00000000000000000050 /* ExerciseAnalyzerControls.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 /* Begin PBXFileReference section */
 		5A1A0000000000000000000C /* ExerciseAnalyzer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ExerciseAnalyzer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A1A00000000000000000035 /* ExerciseAnalyzerWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ExerciseAnalyzerWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A1A00000000000000000045 /* ExerciseAnalyzerWatchComplication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ExerciseAnalyzerWatchComplication.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5C1A00000000000000000053 /* ExerciseAnalyzerControls.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ExerciseAnalyzerControls.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -74,6 +94,11 @@
 		5A1A00000000000000000040 /* ExerciseAnalyzerWatchComplication */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ExerciseAnalyzerWatchComplication;
+			sourceTree = "<group>";
+		};
+		5C1A00000000000000000054 /* ExerciseAnalyzerControls */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ExerciseAnalyzerControls;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -103,6 +128,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5C1A00000000000000000055 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -112,6 +144,7 @@
 				5A1A00000000000000000007 /* ExerciseAnalyzer */,
 				5A1A00000000000000000030 /* ExerciseAnalyzerWatch */,
 				5A1A00000000000000000040 /* ExerciseAnalyzerWatchComplication */,
+				5C1A00000000000000000054 /* ExerciseAnalyzerControls */,
 				5A1A00000000000000000006 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -122,6 +155,7 @@
 				5A1A0000000000000000000C /* ExerciseAnalyzer.app */,
 				5A1A00000000000000000035 /* ExerciseAnalyzerWatch.app */,
 				5A1A00000000000000000045 /* ExerciseAnalyzerWatchComplication.appex */,
+				5C1A00000000000000000053 /* ExerciseAnalyzerControls.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -137,11 +171,13 @@
 				5A1A0000000000000000000E /* Frameworks */,
 				5A1A0000000000000000000F /* Resources */,
 				5A1A0000000000000000003B /* Embed Watch Content */,
+				5C1A00000000000000000052 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				5A1A0000000000000000003D /* PBXTargetDependency */,
+				5C1A00000000000000000059 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				5A1A00000000000000000007 /* ExerciseAnalyzer */,
@@ -202,6 +238,28 @@
 			productReference = 5A1A00000000000000000045 /* ExerciseAnalyzerWatchComplication.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		5C1A00000000000000000056 /* ExerciseAnalyzerControls */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5C1A0000000000000000005C /* Build configuration list for PBXNativeTarget "ExerciseAnalyzerControls" */;
+			buildPhases = (
+				5C1A00000000000000000058 /* Sources */,
+				5C1A00000000000000000055 /* Frameworks */,
+				5C1A00000000000000000057 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5C1A00000000000000000054 /* ExerciseAnalyzerControls */,
+			);
+			name = ExerciseAnalyzerControls;
+			packageProductDependencies = (
+			);
+			productName = ExerciseAnalyzerControls;
+			productReference = 5C1A00000000000000000053 /* ExerciseAnalyzerControls.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -219,6 +277,9 @@
 						CreatedOnToolsVersion = 16.2;
 					};
 					5A1A00000000000000000041 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					5C1A00000000000000000056 = {
 						CreatedOnToolsVersion = 16.2;
 					};
 				};
@@ -244,6 +305,7 @@
 				5A1A00000000000000000008 /* ExerciseAnalyzer */,
 				5A1A00000000000000000031 /* ExerciseAnalyzerWatch */,
 				5A1A00000000000000000041 /* ExerciseAnalyzerWatchComplication */,
+				5C1A00000000000000000056 /* ExerciseAnalyzerControls */,
 			);
 		};
 /* End PBXProject section */
@@ -264,6 +326,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5A1A00000000000000000048 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5C1A00000000000000000057 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -294,6 +363,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5C1A00000000000000000058 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -306,6 +382,11 @@
 			isa = PBXTargetDependency;
 			target = 5A1A00000000000000000041 /* ExerciseAnalyzerWatchComplication */;
 			targetProxy = 5A1A0000000000000000004E /* PBXContainerItemProxy */;
+		};
+		5C1A00000000000000000059 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5C1A00000000000000000056 /* ExerciseAnalyzerControls */;
+			targetProxy = 5C1A00000000000000000051 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 /* Begin XCBuildConfiguration section */
@@ -602,6 +683,60 @@
 			};
 			name = Release;
 		};
+		5C1A0000000000000000005A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 45P6D3439T;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ControlsInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Exercise;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idvorkin.exerciseanalyzer.controls;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5C1A0000000000000000005B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 45P6D3439T;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ControlsInfo.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Exercise;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.idvorkin.exerciseanalyzer.controls;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -637,6 +772,15 @@
 			buildConfigurations = (
 				5A1A00000000000000000043 /* Debug */,
 				5A1A00000000000000000044 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5C1A0000000000000000005C /* Build configuration list for PBXNativeTarget "ExerciseAnalyzerControls" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C1A0000000000000000005A /* Debug */,
+				5C1A0000000000000000005B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
