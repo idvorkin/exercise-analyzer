@@ -47,7 +47,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 003:
 
 - **Summary:** Override the detector when it guesses wrong, without re-running the video
-- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f); verified on the phone
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f); verified on the phone; interrupted-pass fix in [4543828](https://github.com/idvorkin/exercise-analyzer/commit/4543828) (simulator rung pending: `ONLY=interrupt just test-sim`)
 
 #### Use Case:
 - **As a** lifter whose set was mislabelled
