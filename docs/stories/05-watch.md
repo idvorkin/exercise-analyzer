@@ -55,7 +55,9 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Phone app closed while the watch app is open
 - **Given:** the watch app is open
 - **When:** the phone app has not reported for 8 s
-- **Then:** the watch shows the not-reachable screen with how long since it last heard, and retries every 2 s until the phone reports again
+- **Then:** the watch shows the not-reachable screen with how long since it last heard and the last rep count, and retries every 2 s until the phone reports again
+
+- **Issues:** [#32](https://github.com/idvorkin/exercise-analyzer/issues/32) drops on wrist-down, fixed by running each set as a workout session
 
 ---
 

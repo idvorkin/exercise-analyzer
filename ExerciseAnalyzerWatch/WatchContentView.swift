@@ -5,6 +5,7 @@ import SwiftUI
 
 struct WatchContentView: View {
   @ObservedObject var phone: PhoneLink
+  @Environment(\.scenePhase) private var scenePhase
   /// Ticks so a status that stops arriving turns stale on screen.
   @State private var now = Date()
   private let clock = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
@@ -16,8 +17,11 @@ struct WatchContentView: View {
       VStack(spacing: 8) {
         if !phone.isLive {
           Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
-          Text(phone.reachable ? "Waiting for the phone app…" : "Phone not reachable. Open Exercise Analyzer on the phone.")
+          Text(phone.reachable ? "Waiting for the phone…" : "Not connected to the phone. It reconnects on its own; if it doesn't, open Exercise Analyzer on the phone.")
             .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
+          if status.recording {
+            Text("Last seen recording: \(status.reps) reps").font(.caption2).foregroundStyle(.tertiary)
+          }
           if let since = phone.receivedAt {
             // Reconnects by itself (retries every 2 s); this just says how long it has been.
             Text("Last heard \(Int(max(0, now.timeIntervalSince(since)))) s ago").font(.caption2).foregroundStyle(.tertiary)
@@ -86,6 +90,7 @@ struct WatchContentView: View {
     }
     .onReceive(clock) { now = $0; if !phone.isLive { phone.ping() } }
     .onAppear { phone.ping() }
+    .onChange(of: scenePhase) { _, phase in phone.sceneActive(phase == .active) }
   }
 
   /// Watch mode on the phone: big digits on its screen, everything driven from here.

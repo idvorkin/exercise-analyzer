@@ -17,7 +17,11 @@ final class WatchBridge: NSObject, ObservableObject {
 
   private var lastSent: WatchStatus?
   private var lastSentAt = Date.distantPast
+  private var lastContextAt = Date.distantPast
+  private var unreachableLogged = false
   private let minInterval = 0.3
+  /// The watch app is in front (it says so on scene changes); previews are only worth sending then.
+  @Published private(set) var watchActive = false
 
   override init() {
     super.init()
@@ -34,17 +38,31 @@ final class WatchBridge: NSObject, ObservableObject {
     lastSent = status
     lastSentAt = now
     guard let data = try? JSONEncoder().encode(status) else { return }
-    if WCSession.default.isReachable {
-      WCSession.default.sendMessage(["status": data], replyHandler: nil) { [weak self] error in
-        Task { @MainActor in self?.onEvent?("watch_send_failed", ["message": "\(error)"]) }
+    // Application context always (at most once a second): it is delivered when the watch wakes, so a raised
+    // wrist shows the right state within a second even after a long unreachable spell.
+    if force || now.timeIntervalSince(lastContextAt) >= 1 {
+      lastContextAt = now
+      try? WCSession.default.updateApplicationContext(["status": data, "sentAt": now.timeIntervalSince1970])
+    }
+    guard WCSession.default.isReachable else { return }
+    WCSession.default.sendMessage(["status": data], replyHandler: nil) { [weak self] error in
+      Task { @MainActor in
+        guard let self, !self.unreachableLogged else { return }
+        self.unreachableLogged = true  // once per unreachable spell, not once per queued message
+        self.onEvent?("watch_send_failed", ["message": "\(error)"])
       }
-    } else {
-      try? WCSession.default.updateApplicationContext(["status": data])
     }
   }
 
   nonisolated private func handle(_ message: [String: Any]) {
     guard let raw = message["command"] as? String, let command = WatchCommand(rawValue: raw) else { return }
+    if command == .watchActive || command == .watchInactive {
+      Task { @MainActor in
+        self.watchActive = command == .watchActive
+        self.onEvent?("watch_scene", ["active": command == .watchActive])
+      }
+      return
+    }
     if command == .exercise, let mode = message["exercise"] as? String {
       Task { @MainActor in self.onExercise?(mode) }
       return
@@ -85,6 +103,7 @@ extension WatchBridge: WCSessionDelegate {
     let reachable = session.isReachable
     Task { @MainActor in
       self.reachable = reachable
+      if reachable { self.unreachableLogged = false }
       self.onEvent?("watch_reachable", ["reachable": reachable])
     }
   }

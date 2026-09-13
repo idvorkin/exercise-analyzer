@@ -839,7 +839,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       frameStatus = status
       pushWatchStatus()
-      if watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
+      if watch.reachable, watch.watchActive, Date().timeIntervalSince(lastPreviewSent) >= 1 {
         lastPreviewSent = Date()
         if let small = FrameImage.thumbnail(from: pending.pixelBuffer, longSide: 176),
           let jpeg = UIImage(cgImage: small).jpegData(compressionQuality: 0.45)
@@ -905,7 +905,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     case .status: pushWatchStatus(force: true)
     case .zoom: cycleCameraLevel()
     case .watchMode: setWatchMode(!watchMode, from: "watch")
-    case .exercise: break  // carries a payload; handled by onExercise
+    case .exercise, .watchActive, .watchInactive: break  // handled in the bridge
     }
   }
 

@@ -128,4 +128,6 @@ public enum WatchCommand: String, Codable, CaseIterable, Sendable {
   case zoom
   /// Toggle watch mode: the phone shows a big-digits screen meant to be read from across the room.
   case watchMode
+  /// The watch app came to the front / left it: the phone streams previews only while it is active.
+  case watchActive, watchInactive
 }

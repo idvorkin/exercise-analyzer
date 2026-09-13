@@ -502,6 +502,7 @@
 				DEVELOPMENT_TEAM = 45P6D3439T;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatch.entitlements;
 				INFOPLIST_FILE = WatchInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Exercise Analyzer";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -529,6 +530,7 @@
 				DEVELOPMENT_TEAM = 45P6D3439T;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatch.entitlements;
 				INFOPLIST_FILE = WatchInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Exercise Analyzer";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
