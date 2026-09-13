@@ -20,8 +20,14 @@ wait_for() {
   done
   return 1
 }
-check() {  # clip expected-exercise expected-reps timeout-seconds
+# A mode-switching check must not leak its exercise into later launches (#57): terminate, then drop the
+# persisted mode default (absent on a fresh simulator; deleting a missing key is fine).
+reset_mode() {
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+  xcrun simctl spawn "$SIM" defaults delete "$BUNDLE" exerciseMode 2>/dev/null || true
+}
+check() {  # clip expected-exercise expected-reps timeout-seconds
+  reset_mode
   local before; before=$(newest_log)
   SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
   sleep 3
@@ -34,7 +40,7 @@ check() {  # clip expected-exercise expected-reps timeout-seconds
   else echo "FAIL  $1: got $ex/$reps reps, wanted $2/$3"; fail=1; fi
 }
 check_trim() {  # clip expected-reps wait-seconds: auto-trims after analysis, expects a lossless cut that plays from 0
-  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+  reset_mode
   SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" SIMCTL_CHILD_SWING_AUTO_TRIM=1 xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
   sleep 3
   wait_for trim "$3" || echo "      (timed out after $3 s waiting for the trim)"
@@ -52,7 +58,7 @@ check_trim() {  # clip expected-reps wait-seconds: auto-trims after analysis, ex
   else echo "FAIL  trim $1: passthrough=$pass start=$start asked=$req first_frame=$first reps=$reps (wanted $2)"; fail=1; fi
 }
 check_cancel() {  # clip wait-seconds: cancels one second into the analysis (#37), expects the pass to stop within 3 s
-  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+  reset_mode
   SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" SIMCTL_CHILD_SWING_CANCEL_ANALYSIS=1 xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
   sleep 3
   wait_for analysis_cancelled "$2" || echo "      (timed out after $2 s waiting for the cancel to land)"
@@ -68,7 +74,7 @@ check_cancel() {  # clip wait-seconds: cancels one second into the analysis (#37
 check_interrupt() {  # clip interrupt-frame mode expected-reps wait-seconds: fails the first pass the way a
   # backgrounded decoder does (#57); the mode switch must then re-run the clip, so an offline_pass comes before
   # any analyzed and the failed pass alone analyzes nothing.
-  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+  reset_mode
   SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" SIMCTL_CHILD_SWING_INTERRUPT_READER="$2" SIMCTL_CHILD_SWING_MODE="$3" \
     xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
   sleep 3
@@ -85,6 +91,10 @@ check_interrupt() {  # clip interrupt-frame mode expected-reps wait-seconds: fai
     && [ "$interrupted" -lt "$mode" ] && [ "$mode" -lt "$pass" ] && [ "$pass" -lt "$analyzed" ]; then
     echo "ok    interrupt $1: failed at $interrupted, mode at $mode, pass at $pass, analyzed at $analyzed ($reps reps)"
   else echo "FAIL  interrupt $1: interrupted=$interrupted mode=$mode pass=$pass analyzed=$analyzed reps=$reps (wanted $4)"; fail=1; fi
+  # The hook must not persist its mode: the next launch has to detect again (#57 pollution).
+  local mode_default
+  mode_default=$(xcrun simctl spawn "$SIM" defaults read "$BUNDLE" exerciseMode 2>/dev/null || true)
+  if [ -n "$mode_default" ]; then echo "FAIL  interrupt $1: hook persisted exerciseMode=$mode_default"; fail=1; fi
 }
 # ONLY=<substring> runs just the matching checks (e.g. ONLY=trim).
 run() { if [ -z "${ONLY:-}" ] || [[ "$*" == *"${ONLY}"* ]]; then "$@"; fi; }

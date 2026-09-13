@@ -357,6 +357,20 @@ colour sample per box); furniture from any 3 s window a box sits still in, not 6
 box); size identity for the rack bell beside the hinge (0.043 × 0.09 against 0.037 × 0.049). Lab record:
 [lab/2026-09-12-bell-lab-notebook.md](lab/2026-09-12-bell-lab-notebook.md), H26–H28.
 
+**Room for a box at the hands (H26, #18, shipped as the default).** The cap keeps the twelve by
+confidence, then adds any remaining box above the floor whose centre is within 0.2 of a visible wrist
+(the tracker's `handDistance`), up to 4 extra: `BellDetector.select` (pure, host-covered), `detect`
+taking the frame's wrists, `maxSightings` 12, `handExtra` 4, `handReach` 0.2. The detector's model name
+is now `yoloe-26n-kettlebell@0.15x12+4`, so every stored set re-runs through the models once; the same
+rule runs in posetrack (sequential: same-frame wrists; `POSETRACK_PARALLEL=1`: previous frame's, the
+overlap stays). The app keeps the overlap too (3ba7902 stays): the bell runs on its second thread with
+the previous frame's wrists — one frame of lag at 30+ fps is far under the 0.2 reach — so the phone's
+pass should hold its 77 fps; the instrumented run confirms. Prediction before the Mac run: blind frames
+155 → under 60, by-eye circles on his
+bell 7 → ~14, false circles unchanged (they are H27/H25: the walk-in box and the rack bell), repo
+fixtures (4reps, 1h, TGU, pistols, Bulgarian) unchanged within a point — their clips never reach the
+cap. AnalysisVersion 2026-09-13.3. Numbers: _pending Igor's Mac run (posetrack + dots grade below)._
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),
