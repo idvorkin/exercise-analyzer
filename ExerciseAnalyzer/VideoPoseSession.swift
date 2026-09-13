@@ -477,8 +477,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
   }
 
-  private func installPlayerItem(url: URL, pipeline: AnalysisPipeline) {
+  private func installPlayerItem(url: URL, pipeline: AnalysisPipeline, keepUndo: Bool = false) {
     pause()
+    if !keepUndo {
+      // Any other clip coming in ends the trim's undo (#27).
+      untrimmed = nil
+      canUndoTrim = false
+    }
     let asset = AVURLAsset(url: url)
     // No AVPlayerItemVideoOutput here: attaching a BGRA output routes an HDR item through an SDR conversion and
     // the player layer shows the washed-out result. Playback replays the stored track from the player clock.
@@ -1121,7 +1126,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     trimmedURL = nil
     currentFileURL = before.url
     currentOrigin = before.origin
-    installPlayerItem(url: before.url, pipeline: before.pipeline)
+    installPlayerItem(url: before.url, pipeline: before.pipeline, keepUndo: true)
     extractedFrames = before.frames
     statusMessage = "Trim undone"
     log.event("trim_undo", ["dropped": dropped?.lastPathComponent ?? ""])
@@ -1164,7 +1169,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         await analyzeAndPlay(url: clip)
       } else {
         installPlayerItem(
-          url: clip, pipeline: analyzed.shifted(toStartAt: trimmed.start, end: span.end))
+          url: clip, pipeline: analyzed.shifted(toStartAt: trimmed.start, end: span.end), keepUndo: true)
         extractedFrames = pipeline.track.frames
         statusMessage = String(format: "Trimmed to %.1fs", span.end - trimmed.start)
         currentFileURL = clip
