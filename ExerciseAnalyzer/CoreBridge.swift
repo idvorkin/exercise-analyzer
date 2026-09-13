@@ -37,6 +37,15 @@ extension AnalysisPipeline {
     process(extracted: FrameRecord(result: result, time: time), image: image)
   }
 
+  /// Live path with bell sightings (#69): the tracker runs live over them, so the dot shows in the preview.
+  func process(result: YOLOResult, bells: [BellSighting], time: Double, image: () -> CGImage?) -> FrameRecord {
+    let base = FrameRecord(result: result, time: time)
+    return process(
+      extracted: FrameRecord(
+        time: base.time, imageSize: base.imageSize, pose: base.pose, box: base.box, analysis: nil, bells: bells),
+      image: image)
+  }
+
   /// Replaces rep positions' images with frames pulled from the clip at each peak time, each still cut to
   /// the person crop (#61). The generator applies the preferred track transform, so its stills are upright in
   /// the same top-left-origin space as the crop and the pose keypoints: cut the pixels and remap the pose

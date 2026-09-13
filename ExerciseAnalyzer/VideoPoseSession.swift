@@ -96,6 +96,22 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var inferenceBusy = false
   private var liveInferenceEnabled = true
   private var pendingFrame: (time: Double, pixelBuffer: CVPixelBuffer)?
+  /// Live bells while recording (#69): previous frame's wrists for the wrist reserve (as the offline
+  /// pass), one detector run at a time, and the per-recording counts for `camera_done`. `bellBusy` is
+  /// main-confined: set in ingest, cleared on the main hop from the detector's completion.
+  private var liveLastWrists: [CGPoint] = []
+  private var bellBusy = false
+  private var liveBellFrames = 0
+  private var liveBellTotalMs = 0.0
+  private var liveBellsDropped = 0
+  /// Sightings for the frame under analysis, set on the main hop just before handle(result:).
+  private var pendingBells: [BellSighting] = []
+  private var pendingBellMs: Double?
+  private var pendingBellDropped = false
+  /// How long the live pose path waits for the overlapped detector past the pose result: pose runs
+  /// ~10 ms and the detector 11–15 ms from the same start, so this covers thermal wobble while a
+  /// slow detector loses the frame instead of the frame rate.
+  private static let liveBellWait = DispatchTimeInterval.milliseconds(20)
   private var frameDuration = 1.0 / 30
   private var timeObserver: Any?
   private var endObserver: NSObjectProtocol?
@@ -1121,19 +1137,74 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   // MARK: - Shared frame ingest
 
+  /// Captures the result `predict` delivers synchronously on the calling thread, so the live
+  /// bells path can wait for the overlapped detector before handling it (#69).
+  private final class LiveResultCatcher: ResultsListener {
+    var result: YOLOResult?
+    func on(result: YOLOResult) { self.result = result }
+  }
+
   private func ingest(pixelBuffer: CVPixelBuffer, time: Double) {
     guard liveInferenceEnabled, let predictor = models.predictor, !inferenceBusy,
       let sampleBuffer = Self.makeSampleBuffer(pixelBuffer, time: time)
     else { return }
     inferenceBusy = true
     pendingFrame = (time, pixelBuffer)
+    pendingBells = []
+    pendingBellMs = nil
+    pendingBellDropped = false
     cameraFramesAnalyzed += source == .camera ? 1 : 0
+    // Live bells (#69): camera only, behind the detector switch plus the live switch. One detector
+    // run at a time: a frame that arrives while the previous run is still going goes pose-only and
+    // counts as dropped, like one whose run is slower than the wait below.
+    let bellDetector = (source == .camera && ModelSet.liveBellsEnabled) ? models.bellDetector : nil
+    let runBell = bellDetector != nil && !bellBusy
+    if bellDetector != nil {
+      if runBell {
+        bellBusy = true
+      } else {
+        liveBellsDropped += 1
+      }
+    }
+    guard runBell, let bellDetector else {
+      inferenceQueue.async { [weak self] in
+        guard let self else { return }
+        // `predict` runs Vision synchronously and calls the listeners before returning, so the busy flag can be
+        // cleared here whether or not a result was delivered.
+        predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: self, onInferenceTime: self)
+        Task { @MainActor in self.inferenceBusy = false }
+      }
+      return
+    }
+    let wrists = liveLastWrists
     inferenceQueue.async { [weak self] in
       guard let self else { return }
-      // `predict` runs Vision synchronously and calls the listeners before returning, so the busy flag can be
-      // cleared here whether or not a result was delivered.
-      predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: self, onInferenceTime: self)
-      Task { @MainActor in self.inferenceBusy = false }
+      let catcher = LiveResultCatcher()
+      let group = DispatchGroup()
+      var found: [BellSighting] = []
+      group.enter()
+      DispatchQueue.global(qos: .userInitiated).async {
+        found = bellDetector.detect(in: pixelBuffer, wrists: wrists)
+        group.leave()
+        Task { @MainActor [weak self] in self?.bellBusy = false }
+      }
+      predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: self)
+      // The detector started with pose, so by now it is usually done; a late one loses this frame
+      // instead of the frame rate (one frame in flight stays one in flight).
+      let ran = group.wait(timeout: .now() + Self.liveBellWait) == .success
+      let inferMs = ran ? bellDetector.lastInferenceMs : nil
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        if let result = catcher.result {
+          self.pendingBells = ran ? found : []
+          self.pendingBellMs = inferMs
+          self.pendingBellDropped = !ran
+          self.handle(result: result)
+        } else if !ran {
+          self.liveBellsDropped += 1
+        }
+        self.inferenceBusy = false
+      }
     }
   }
 
@@ -1179,9 +1250,20 @@ final class VideoPoseSession: NSObject, ObservableObject {
         }
       }
     }
-    let frame = pipeline.process(result: result, time: pending.time) {
+    let frame = pipeline.process(result: result, bells: pendingBells, time: pending.time) {
       FrameImage.thumbnail(from: pending.pixelBuffer)
     }
+    // Live bells (#69): the tracker's verdict rides in frame.bell, which the overlay draws; count
+    // this frame for camera_done and remember its wrists for the next frame's reserve.
+    if pendingBellDropped { liveBellsDropped += 1 }
+    if let ms = pendingBellMs {
+      liveBellFrames += 1
+      liveBellTotalMs += ms
+    }
+    pendingBells = []
+    pendingBellMs = nil
+    pendingBellDropped = false
+    liveLastWrists = BellDetector.wrists(of: frame.pose)
     show(frame)
     updateLiveCrop(frame)
     let personConf = result.boxes.map(\.conf).max()
@@ -1342,6 +1424,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
     cameraFirstTime = nil
     cameraFramesDelivered = 0
     cameraFramesAnalyzed = 0
+    liveLastWrists = []
+    bellBusy = false
+    liveBellFrames = 0
+    liveBellTotalMs = 0
+    liveBellsDropped = 0
     recordedSegments = []
 
     AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
@@ -1533,7 +1620,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
       "camera_done",
       [
         "duration_s": recordedDuration, "frames_delivered": delivered, "frames_analyzed": analyzed,
-        "live_reps": livePipeline.reps.count,
+        "live_reps": livePipeline.reps.count, "live_bell_frames": liveBellFrames,
+        "live_bell_avg_infer_ms": liveBellFrames == 0 ? 0 : liveBellTotalMs / Double(liveBellFrames),
+        "live_fps": fps, "live_bells_dropped": liveBellsDropped,
       ])
     Task {
       let finished = await recorder.finish()

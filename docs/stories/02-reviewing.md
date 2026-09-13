@@ -230,4 +230,9 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** the detector blinks for a frame or two on the fast bottom of a swing, or reads the overhead bell faintly through a get-up phase
 - **Then:** the dot stays on the bell (carried for up to three frames while a hand is still near it, and followed on faint readings once it has started on a confident one), it passes over the floor bell at the bottom of a hinge without jumping to it, and on a set with no bell in the hands (a pistol, a Bulgarian) no dot appears on the rack behind me
 
-- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)
+- **Scenario:** The dot rides the bell in the preview while I record
+- **Given:** the detector switch and live bells are on
+- **When:** I record a swing set
+- **Then:** a dot in the bell's colour rides on the bell in the preview and the recording's HUD as I move; the set is still trimmed and analyzed by the offline pass afterwards as before, and with the switches off the recording is unchanged
+
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#69](https://github.com/idvorkin/exercise-analyzer/issues/69)

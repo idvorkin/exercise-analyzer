@@ -377,6 +377,17 @@ ungraded from a Muse transport error; cap 30 had 14 of 25), misses 9 → 2, fals
 The cap prediction held; the false circles are the walk-in box and the rack bell beside the hinge (H27, H25).
 Repo fixtures unchanged (their stored sightings never reached the cap).
 
+**Live bells while recording (#69).** Igor: "can I run both models while recording?" The live ingest
+runs the detector on the same buffer on its own queue overlapping pose, with the previous frame's
+wrists for the reserve (as the offline overlap), behind the detector switch plus a `liveBells` default
+(`SWING_LIVE_BELLS=1`), off by default; the sightings go to `pipeline.process` so the tracker runs live
+and the dot shows in the preview and the recording's HUD. One frame in flight stays one in flight: past
+a 20 ms wait the frame goes without bells (`live_bells_dropped` in `camera_done`, with `live_bell_frames`,
+`live_bell_avg_infer_ms` and `live_fps`). The recording is still trimmed and analyzed by the offline pass
+afterwards, so stored sets are untouched (no version bump, no model-name change). Prediction: live holds
+30 fps with the switch on (pose ~10 ms and detector 11–15 ms overlapped fit the 33 ms budget, as the
+offline overlap held 77 fps); numbers pending the phone.
+
 **Furniture from any window a box sits still in (H27, #18, rejected).** A cell is
 furniture if it holds a box in ≥ 60 % of the frames of *some* 3 s window, not only 60 % of the whole clip
 (union of both, `BellTracker.staticZones(..., window: 3.0)`, time-based so any frame rate works): the walk-in

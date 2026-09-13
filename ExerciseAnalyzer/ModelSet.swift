@@ -129,6 +129,13 @@ final class ModelSet {
     ProcessInfo.processInfo.environment["SWING_BELLS"] == "1" || UserDefaults.standard.bool(forKey: "bellDetector")
   }
 
+  /// Live bells while recording (#69): behind the detector switch above plus its own, off by default.
+  /// `SWING_LIVE_BELLS=1` or the `liveBells` default turns it on for a trial.
+  static var liveBellsEnabled: Bool {
+    bellDetectorEnabled
+      && (ProcessInfo.processInfo.environment["SWING_LIVE_BELLS"] == "1" || UserDefaults.standard.bool(forKey: "liveBells"))
+  }
+
   /// The bell detector is optional: the app counts without it, it just does not see the bell. `force` loads it
   /// regardless of the switch (an instrumented run always measures with it).
   private func loadBellDetector(force: Bool = false) {
