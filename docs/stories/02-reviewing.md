@@ -128,7 +128,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 039:
 
 - **Summary:** Hold the middle of the picture to get both edges' keys at once, and hold a key to repeat it
-- **Status:** requested (Igor by voice, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds"); not built
+- **Status:** implemented in [1fcdc3c](https://github.com/idvorkin/exercise-analyzer/commit/1fcdc3c); needs the phone (gestures: hold the middle, slide to a key, hold to repeat); requested (Igor by voice, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds")
 
 #### Use Case:
 - **As a** lifter scrubbing with one thumb
