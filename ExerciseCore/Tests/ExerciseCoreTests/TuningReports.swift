@@ -169,6 +169,36 @@ extension TuningReports {
 }
 
 extension TuningReports {
+  /// Generic-rep experiment (#71, docs/analysis/generic-reps.md): for every known-count fixture and every
+  /// archived track, the exercise-blind count beside the known count and the detector's confidence. The number
+  /// that decides: how many fixtures land within ±1 of the known count. Prints, never asserts.
+  func testGenericRepCounter() throws {
+    for fixture in Fixture.all {
+      let frames = try fixture.frames()
+      print(genericLine(label: fixture.name, known: "\(fixture.expectedReps)", frames: frames))
+      for interval in GenericRepCounter.count(frames: frames).intervals {
+        print(String(format: "    rep %.1f–%.1fs", interval.start, interval.end))
+      }
+    }
+    let urls = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? [])
+      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    for url in urls {
+      print(genericLine(label: "tracks/" + url.lastPathComponent, known: "—", frames: try Fixture.frames(at: url)))
+    }
+    print("fixtures: \(Fixture.all.count), archived tracks: \(urls.count)")
+  }
+
+  private func genericLine(label: String, known: String, frames: [FrameRecord]) -> String {
+    let g = GenericRepCounter.count(frames: frames)
+    let d = ExerciseDetector.detect(frames: frames)
+    return String(
+      format: "%-48@ known %2@ generic %2d  signal %-6@ period %4.1fs r %.2f conf %3d  detector %-22@ %3d%%",
+      label as NSString, known as NSString, g.count, (g.signal?.rawValue ?? "none") as NSString,
+      g.period, g.periodicity, g.confidence, d.exercise.rawValue as NSString, d.confidence)
+  }
+}
+
+extension TuningReports {
   /// Held-bell evidence for the kettlebell-detector lab (docs/analysis/kettlebell-detector.md): for every
   /// fixture with sightings, hand frames, detector recall at the hands, tracker hold, and the loss classes,
   /// under the tracker's defaults through AnalysisPipeline.analyze. Prints, never asserts. BELL_LAB_FIXTURES
