@@ -109,7 +109,7 @@ struct ContentView: View {
       controls
     }
     .background(Color(.systemBackground))
-    .background(ShakeDetector { showBugReport = true })
+    .background(ShakeDetector { session.captureBugScreenshot(); showBugReport = true })
     .sheet(isPresented: $showBugReport) { BugReportSheet(session: session) }
     .confirmationDialog(
       "No reps found in this recording", isPresented: $session.emptyRecordingPrompt, titleVisibility: .visible
@@ -402,7 +402,7 @@ struct ContentView: View {
           }
         }
         startRow("Files", "folder") { showOpenDialog = false; showFileImporter = true }
-        startRow("Report a problem", "ladybug") { showOpenDialog = false; showBugReport = true }
+        startRow("Report a problem", "ladybug") { showOpenDialog = false; session.captureBugScreenshot(); showBugReport = true }
         startRow("GitHub", "chevron.left.forwardslash.chevron.right") {
           showOpenDialog = false
           openURL(URL(string: "https://github.com/idvorkin/exercise-analyzer")!)
@@ -583,7 +583,13 @@ struct ContentView: View {
   private func loadFromEnvironment() {
     let env = ProcessInfo.processInfo.environment
     if let note = env["SWING_BUG"], !note.isEmpty {
-      session.reportBug(note: note)  // test hook: file a report on launch
+      // Test hook: file a report 8 s after launch (after the clip is up), screenshot and frame included.
+      Task {
+        try? await Task.sleep(for: .seconds(8))
+        session.captureBugScreenshot()
+        try? await Task.sleep(for: .seconds(1))
+        session.reportBug(note: note)
+      }
     }
     if env["SWING_SHOW_WORKOUTS"] == "1" { showRecents = true }
     if env["SWING_OPEN_RECENT"] == "1", let newest = session.recents.entries.first {

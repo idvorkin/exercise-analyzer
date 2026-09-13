@@ -27,7 +27,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 026:
 
 - **Summary:** Attach what I was looking at to a bug report
-- **Status:** not implemented ([#24](https://github.com/idvorkin/exercise-analyzer/issues/24))
+- **Status:** implemented (commit named in the next docs commit); verified on the simulator (`SWING_BUG` hook: screen.png and frame.jpg written and embedded by `file-bugs`)
 
 #### Use Case:
 - **As a** lifter reporting a wrong count or a display glitch
@@ -38,6 +38,6 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Reporting a glitch on screen
 - **Given:** a clip is open and something looks wrong on screen
 - **When:** I shake the phone and send a report
-- **Then:** the report carries a screenshot taken at the moment of the shake, and the developer can open it next to the log
+- **Then:** the report carries a screenshot taken at the moment of the shake and, in playback, the clip's frame at the playhead; `just pull-logs` brings both to the Mac and the issue filed from the report shows them under the note
 
-- **Issues:** [#24](https://github.com/idvorkin/exercise-analyzer/issues/24) (not built yet)
+- **Issues:** [#24](https://github.com/idvorkin/exercise-analyzer/issues/24)

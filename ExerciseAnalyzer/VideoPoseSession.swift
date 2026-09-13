@@ -1389,6 +1389,63 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   // MARK: - Bug reports
 
+  /// What the screen showed when the shake landed: a snapshot of the window (HUD, pills, gallery; video layers
+  /// may come out black) and, in playback, the clip's own frame at the playhead. Saved with the report (#24).
+  private var bugScreenshot: UIImage?
+  private var bugFrame: CGImage?
+
+  func captureBugScreenshot() {
+    let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+    if let window = windows.first(where: \.isKeyWindow) ?? windows.first {
+      bugScreenshot = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+        window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
+      }
+    }
+    bugFrame = nil
+    guard source != .camera, let url = currentFileURL else { return }
+    let time = CMTime(seconds: currentTime, preferredTimescale: 600)
+    Task { [weak self] in
+      let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+      generator.appliesPreferredTrackTransform = true
+      generator.maximumSize = CGSize(width: 720, height: 720)
+      generator.requestedTimeToleranceBefore = .zero
+      generator.requestedTimeToleranceAfter = .zero
+      if let (image, _) = try? await generator.image(at: time) { self?.bugFrame = image }
+    }
+  }
+
+  private static let bugFolderFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = TimeZone(identifier: "UTC")
+    f.dateFormat = "yyyyMMdd-HHmmss"
+    return f
+  }()
+
+  /// Writes the captured screenshot and frame under Documents/bugs/<stamp>/ and returns their relative paths.
+  private func saveBugImages(stamp: String) -> [String: String] {
+    var saved: [String: String] = [:]
+    let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    let folder = documents.appendingPathComponent("bugs", isDirectory: true).appendingPathComponent(stamp, isDirectory: true)
+    let files: [(String, Data?, String)] = [
+      ("screen.png", bugScreenshot?.pngData(), "screenshot"),
+      ("frame.jpg", bugFrame.map { UIImage(cgImage: $0).jpegData(compressionQuality: 0.8) } ?? nil, "frame"),
+    ]
+    for (name, data, key) in files {
+      guard let data else { continue }
+      do {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try data.write(to: folder.appendingPathComponent(name))
+        saved[key] = "bugs/\(stamp)/\(name)"
+      } catch {
+        log.event("error", ["where": "bug_images", "message": "\(error)"])
+      }
+    }
+    bugScreenshot = nil
+    bugFrame = nil
+    return saved
+  }
+
   /// What a report carries besides the note: enough to find the moment in the log and the clip in Recents.
   func bugContext() -> [String: String] {
     var context: [String: String] = [
@@ -1408,11 +1465,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Writes the report into the session log and to Documents/bugs.jsonl (one line per report, newest last).
   func reportBug(note: String) {
-    let context = bugContext()
+    let now = Date()
+    let images = saveBugImages(stamp: Self.bugFolderFormatter.string(from: now))
+    let context = bugContext().merging(images) { a, _ in a }
     log.event("bug_report", context.merging(["note": note]) { a, _ in a })
     var record: [String: Any] = context
     record["note"] = note
-    record["reported_at"] = ISO8601DateFormatter().string(from: Date())
+    record["reported_at"] = ISO8601DateFormatter().string(from: now)
     record["session_t_ms"] = Int(Date().timeIntervalSince(log.startedAt) * 1000)
     let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("bugs.jsonl")
