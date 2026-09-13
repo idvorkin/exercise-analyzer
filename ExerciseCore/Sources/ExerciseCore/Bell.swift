@@ -146,10 +146,13 @@ public final class BellTracker {
         lastLost = (last, 0)
         current = nil
       } else if missed <= thresholds.coastFrames {
-        let carried = CGPoint(x: last.center.x + velocity.x * steps, y: last.center.y + velocity.y * steps)
+        // Carried, not seen: conf 0 says so to anyone reading it as detection strength; the colour is the same
+        // bell's. The centre stays inside the frame.
+        let carried = CGPoint(
+          x: min(max(last.center.x + velocity.x * steps, 0), 1), y: min(max(last.center.y + velocity.y * steps, 0), 1))
         if nearAHand(carried) {
           return BellSighting(
-            box: last.box.offsetBy(dx: carried.x - last.center.x, dy: carried.y - last.center.y), conf: last.conf, color: last.color)
+            box: last.box.offsetBy(dx: carried.x - last.center.x, dy: carried.y - last.center.y), conf: 0, color: last.color)
         }
       }
     }

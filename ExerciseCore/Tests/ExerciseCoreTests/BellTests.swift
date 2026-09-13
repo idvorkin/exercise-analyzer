@@ -108,8 +108,10 @@ final class BellTests: XCTestCase {
   func testCoastingNeedsAHandNearTheCarriedBox() {
     let tracker = BellTracker()
     _ = tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
-    // Hands still at the bell: the blink is coasted over.
-    XCTAssertNotNil(tracker.track([], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6))))
+    // Hands still at the bell: the blink is coasted over, and the carried box says it was not seen (conf 0).
+    let coasted = tracker.track([], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
+    XCTAssertNotNil(coasted)
+    XCTAssertEqual(coasted?.conf, 0)
     // Hands gone elsewhere: no coast, and nothing to start on either.
     let tracker2 = BellTracker()
     _ = tracker2.track([bell(0.5, 0.6, conf: 0.9)], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
