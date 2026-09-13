@@ -16,16 +16,18 @@ squats and Turkish get-ups. `ExerciseCore/` is the platform-free analysis packag
   Mark fixtures `humanVerified` only when Igor confirmed the count.
 - **Instrument before theorizing.** For any phone-only symptom add a log event, deploy, `just pull-logs`, then fix
   from evidence. Never ship a second guessed fix. Session logs are JSON Lines with a `type` per event.
-- **Bugs live in GitHub issues.** Shake reports → `just pull-logs` → `just file-bugs`; evidence and analysis go on the
-  issue as a comment. `just bugs-check` is the quick dirty check (exit 1 when unfiled reports exist); run
-  `/loop 5m just bugs-check` while Igor is testing on the phone.
+- **Bugs live in GitHub issues; stories say what they cover.** Shake reports → `just pull-logs` → `just file-bugs`,
+  then, for every report, find or write the story in `docs/stories/` that covers it before fixing anything: a
+  request becomes a new story, a bug gets an `Issues:` line on the story it violates, and a report no story covers
+  means the spec has a hole, so write the story first. Evidence and analysis go on the issue as a comment.
+  `just bugs-check` is the quick dirty check (exit 1 when unfiled reports exist); run `/loop 5m just bugs-check`
+  while Igor is testing on the phone.
 - **Every feature or behaviour change updates the user stories** (`docs/stories/`) in the same commit or the
   next: a new capability gets a story in its journey (Cohn + Gherkin, `user-story` skill) with a `Status:` line
   naming its commit and where it was verified; a changed behaviour edits the story's acceptance criteria and adds
   its commit to the `Status:` line. Status lives only on the stories (no table). No story, not done.
-- **Every pulled report also updates the user stories** (`docs/stories/`). A feature request becomes a new story in
-  the journey it belongs to, in the Cohn + Gherkin form (`user-story` skill), with its issue linked; a bug gets an
-  `Issues:` line on the story it violates. Stories are the spec; issues are the trail.
+- **Stories are the spec; issues are the trail.** New stories use the Cohn + Gherkin form (`user-story` skill) in
+  the journey they belong to, with their issue linked.
 - **One commit per issue**, `Fixes #N` only when verified at the right rung, otherwise `#N` plus what remains.
   Never bundle fixes. Never `git add -A` (`.build/`, `Build/`, `.claude/worktrees/` must stay untracked).
 - **Analyzer semantics**: a swing rep is top→top in 1.1–2.1 s (longer is the walk-in or setup, discard); an upswing

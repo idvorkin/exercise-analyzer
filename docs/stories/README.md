@@ -2,8 +2,8 @@
 
 Mike Cohn use case plus Gherkin acceptance criteria, one scenario per story, one When and one Then
 (deanpeters/Product-Manager-Skills `user-story`). Persona throughout: **Igor, a kettlebell lifter training alone
-at the gym**, phone on a tripod, Apple Watch on his wrist, music playing. The narrative predecessor with one open
-question per story is [../USER_STORIES.md](../USER_STORIES.md).
+at the gym**, phone on a tripod, Apple Watch on his wrist, music playing. These files are the whole spec: there is
+no separate narrative page.
 
 Every story carries its own `Status:` line: **implemented** with the commits that built it and where it was
 verified (host tests, simulator, or phone), or **not implemented** with the issue that asks for it. The stories
