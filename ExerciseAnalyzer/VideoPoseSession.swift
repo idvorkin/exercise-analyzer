@@ -234,7 +234,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       guard let stored = recents.loadPipeline(for: entry) else { continue }
       let frames = stored.track.frames
       let plan = StoredSetPlan.decide(
-        storedVersion: recents.version(for: entry), storedModels: storedModels(entry),
+        storedVersion: entry.analysisVersion, storedModels: storedModels(entry),
         currentVersion: AnalysisVersion.current, currentModels: loadedModels,
         mode: exerciseMode, storedExercise: stored.exercise, detection: nil)
       if case .rerunFromClip = plan, await rerunFromClip(entry, stored: stored, where: "refresh") {
@@ -602,7 +602,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         fresh = nil
       }
       switch StoredSetPlan.decide(
-        storedVersion: recents.version(for: entry), storedModels: storedModels,
+        storedVersion: entry.analysisVersion, storedModels: storedModels,
         currentVersion: AnalysisVersion.current, currentModels: loadedModels,
         mode: exerciseMode, storedExercise: pipeline.exercise, detection: fresh)
       {

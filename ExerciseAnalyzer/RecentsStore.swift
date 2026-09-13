@@ -10,82 +10,24 @@ import Foundation
 import Photos
 import UIKit
 
-struct RecentEntry: Codable, Identifiable {
-  enum Source: Codable {
-    case photos(identifier: String)
-    case file(name: String)
-
-    var isPhotos: Bool {
-      if case .photos = self { return true }
-      return false
-    }
-  }
-
-  let id: String
-  var analyzedAt: Date
-  var recordedAt: Date?
-  var duration: Double
-  var repCount: Int
-  var bestScore: Int?
-  var source: Source
-  var thumbnail: String?
-  var exercise: ExerciseKind?
-  /// Name of the clip as it was opened (Photos file name or the imported file), used to spot re-analyses.
-  var originalName: String?
-  /// File in the entry's folder holding the original clip after a trim replaced it in Photos, so the trim can be
-  /// undone; nil once the undo is gone.
-  var originalBackup: String?
-
-  var exerciseKind: ExerciseKind { exercise ?? .kettlebellSwing }
-
-  /// Same Photos asset, or the same imported file name with the same length (within a frame or two).
-  func isSameClip(source other: Source, originalName name: String?, duration length: Double) -> Bool {
-    if case .photos(let a) = source, case .photos(let b) = other { return a == b }
-    guard let name, let mine = originalName, name == mine else { return false }
-    return abs(duration - length) < 0.1
-  }
-
-  /// The Photos identifier when the clip lives in Photos, nil for an in-app file.
-  var photosIdentifier: String? {
-    if case .photos(let identifier) = source { return identifier }
-    return nil
-  }
-
-  var isInPhotos: Bool {
-    if case .photos = source { return true }
-    return false
-  }
-}
-
-private struct AnalysisSnapshot: Codable {
-  static let currentVersion = 2
-  var version: Int = AnalysisSnapshot.currentVersion
-  /// Analyzer version the reps were computed with (AnalysisVersion.current); nil in files from before it existed.
-  var analysisVersion: String? = AnalysisVersion.current
-  /// The models that produced the stored track (pose model, detector); a set made by a different model set is run
-  /// through the models again from its video when reopened (story 035). Nil in files from before it existed.
-  var models: [String]? = nil
-  let exercise: ExerciseKind
-  let frames: [FrameRecord]
-  let reps: [RepRecord]
-}
-
 @MainActor
 final class RecentsStore: ObservableObject {
   @Published private(set) var entries: [RecentEntry] = []
 
   private let root: URL
-  private var indexURL: URL { root.appendingPathComponent("index.json") }
 
-  init() {
-    root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+  /// `root` is the recents directory itself; nil keeps Documents/recents. A caller-supplied root exists so the
+  /// index flow is host-testable — the entry metadata lives in ExerciseCore (RecentsIndex) and its tests run
+  /// the whole flow on a temporary directory.
+  init(root: URL? = nil) {
+    self.root =
+      root
+      ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("recents", isDirectory: true)
-    try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    if let data = try? Data(contentsOf: indexURL),
-      let decoded = try? JSONDecoder().decode([RecentEntry].self, from: data)
-    {
-      entries = decoded.sorted { $0.analyzedAt > $1.analyzedAt }
-    }
+    try? FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
+    var index = RecentsIndex.load(root: self.root)
+    if index.backfill(root: self.root) { try? index.save(root: self.root) }
+    entries = index.entries
   }
 
   func folder(for id: String) -> URL { root.appendingPathComponent(id, isDirectory: true) }
@@ -130,7 +72,8 @@ final class RecentsStore: ObservableObject {
     let entry = RecentEntry(
       id: id, analyzedAt: Date(), recordedAt: recordedAt, duration: duration,
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
-      source: source, thumbnail: thumbnailName, exercise: pipeline.exercise, originalName: originalName)
+      source: source, thumbnail: thumbnailName, exercise: pipeline.exercise, originalName: originalName,
+      analysisVersion: AnalysisVersion.current, models: models)
     entries.removeAll { $0.id == id }
     entries.insert(entry, at: 0)
     try persistIndex()
@@ -192,32 +135,16 @@ final class RecentsStore: ObservableObject {
   }
 
   /// The stored analysis with rep images re-attached.
-  /// True when the stored reps were computed by an older analyzer than the one in this build.
-  /// The models the stored track came from (empty for files from before this was recorded).
+  /// The models the stored track came from (empty for files from before this was recorded); read off the entry,
+  /// backfilled once from the snapshot on first read — no frames decoded.
   func models(for entry: RecentEntry) -> [String] {
-    let dir = folder(for: entry.id)
-    guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),
-      let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data)
-    else { return [] }
-    return snapshot.models ?? []
+    entry.models ?? []
   }
 
+  /// True when the stored reps were computed by an older analyzer than the one in this build; read off the entry,
+  /// backfilled once from the snapshot on first read — no frames decoded.
   func isStale(_ entry: RecentEntry) -> Bool {
-    let dir = folder(for: entry.id)
-    guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),
-      let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data)
-    else { return false }
-    return snapshot.analysisVersion != AnalysisVersion.current
-  }
-
-  /// The analyzer version the stored reps were computed with (nil in files from before it existed, and when the
-  /// snapshot is unreadable). Step 2 (#52) moves this into index.json; until then it decodes like the two above.
-  func version(for entry: RecentEntry) -> String? {
-    let dir = folder(for: entry.id)
-    guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),
-      let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data)
-    else { return nil }
-    return snapshot.analysisVersion
+    entry.isStale(currentVersion: AnalysisVersion.current)
   }
 
   func loadPipeline(for entry: RecentEntry) -> AnalysisPipeline? {
@@ -299,6 +226,6 @@ final class RecentsStore: ObservableObject {
   private static func imageName(rep: Int, phase: String) -> String { "rep-\(rep)-\(phase).jpg" }
 
   private func persistIndex() throws {
-    try JSONEncoder().encode(entries).write(to: indexURL)
+    try RecentsIndex(entries: entries).save(root: root)
   }
 }
