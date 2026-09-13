@@ -153,7 +153,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 041:
 
 - **Summary:** The phone follows the wrist into watch mode
-- **Status:** requested ([#68](https://github.com/idvorkin/exercise-analyzer/issues/68), Igor by voice, 2026-09-13: "If I start my watch, switch the iPhone to watch mode")
+- **Status:** implemented in [d6b2963](https://github.com/idvorkin/exercise-analyzer/commit/d6b2963); needs phone + watch ([#68](https://github.com/idvorkin/exercise-analyzer/issues/68), Igor by voice, 2026-09-13: "If I start my watch, switch the iPhone to watch mode")
 - **Why:** once the watch is in use the phone's full screen is never wanted; today watch mode needs a tap on the phone or a scroll on the watch.
 
 #### Use Case:
