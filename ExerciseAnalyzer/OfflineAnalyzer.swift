@@ -111,24 +111,13 @@ enum OfflineAnalyzer {
         windowDecode += (decoded - frameStart) * 1000
         let (result, frame): (YOLOResult?, FrameRecord?) = autoreleasepool {
           catcher.result = nil
-          // The detector runs on a second thread while the pose model runs: both only read the frame, and the two
-          // passes overlap instead of adding up (Igor, 2026-09-13: "could we run both image models at once?";
-          // on the Mac 60 → 85 fps, the same tracker result; the phone's number is offline_pass's fps).
-          var bells: [BellSighting] = []
-          let pixelBuffer = bellDetector == nil ? nil : CMSampleBufferGetImageBuffer(sampleBuffer)
-          let group = DispatchGroup()
-          if let bellDetector, let pixelBuffer {
-            group.enter()
-            DispatchQueue.global(qos: .userInitiated).async {
-              bells = bellDetector.detect(in: pixelBuffer)
-              group.leave()
-            }
-          }
           predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: catcher)
-          group.wait()
           guard let result = catcher.result else { return (nil, nil) }
           var frame = FrameRecord(result: result, time: time)
-          if let bellDetector, pixelBuffer != nil {
+          if let bellDetector, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            // Same-frame wrists first: the cap's wrist reserve needs the pose, so the bell runs after it
+            // here instead of overlapped (H26; the phone's fps cost lands in the instrumented run).
+            let bells = bellDetector.detect(in: pixelBuffer, wrists: BellDetector.wrists(of: frame.pose))
             bellTotal += bellDetector.lastInferenceMs
             windowBell += bellDetector.lastInferenceMs
             bellFrames += 1

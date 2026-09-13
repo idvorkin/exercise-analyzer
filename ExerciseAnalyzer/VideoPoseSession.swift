@@ -81,12 +81,14 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var rerunExercise: ExerciseKind?
   /// Names of the models this build runs on a clip: the pose model and, when bundled, the detector. Stored with
   /// every analysis; a stored set made by a different set is re-run from its video on reopen (story 035).
-  /// The models a track is made with. The detector's name carries its floor and box cap: a set analyzed at other
-  /// settings holds different sightings (yesterday's six a frame at 0.25 left the new tracker little to hold), so
-  /// a settings change counts as a changed model and the set runs through the detector again.
+  /// The models a track is made with. The detector's name carries its floor, box cap and wrist reserve: a set
+  /// analyzed at other settings holds different sightings (yesterday's six a frame at 0.25 left the new tracker
+  /// little to hold), so a settings change counts as a changed model and the set runs through the detector again.
   private var loadedModels: [String] {
     ["yolo26n-pose"]
-      + (bellDetector.map { [String(format: "yoloe-26n-kettlebell@%.2fx%d", $0.minConfidence, $0.maxSightings)] } ?? [])
+      + (bellDetector.map {
+        [String(format: "yoloe-26n-kettlebell@%.2fx%d+%d", $0.minConfidence, $0.maxSightings, $0.handExtra)]
+      } ?? [])
   }
 
   private func storedModels(_ entry: RecentEntry) -> [String] {

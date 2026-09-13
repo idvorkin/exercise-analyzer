@@ -170,6 +170,7 @@ if ProcessInfo.processInfo.environment["POSETRACK_PLAN"] == "1" {
 let asset = AVURLAsset(url: URL(fileURLWithPath: options.video))
 let semaphore = DispatchSemaphore(value: 0)
 var frames: [FrameRecord] = []
+var lastWrists: [CGPoint] = []  // previous frame's wrists, for the parallel bell path below
 var elapsed = 0.0
 let traceTracker: BellTracker = {  // trace only: what the pipeline's tracker will pick
   var t = BellTracker.Thresholds()
@@ -207,8 +208,11 @@ Task {
       let group = DispatchGroup()
       if parallel, let detector = bellDetector {
         group.enter()
+        // Overlapped as ever, so with the previous frame's wrists: the same-frame pose is not known yet,
+        // and waiting for it would serialize the two models (the app runs the bell after the pose, H26).
+        let wrists = lastWrists
         DispatchQueue.global(qos: .userInitiated).async {
-          bells = detector.detect(in: pixelBuffer)
+          bells = detector.detect(in: pixelBuffer, wrists: wrists)
           group.leave()
         }
       }
@@ -219,7 +223,8 @@ Task {
       {
         person = parse(array, letterbox: letterbox, confidence: options.confidence)
       }
-      if parallel { group.wait() } else { bells = bellDetector?.detect(in: pixelBuffer) ?? [] }
+      lastWrists = BellDetector.wrists(of: person?.pose)
+      if parallel { group.wait() } else { bells = bellDetector?.detect(in: pixelBuffer, wrists: lastWrists) ?? [] }
       if ProcessInfo.processInfo.environment["POSETRACK_TRACE"] == "1" {
         let tracked = traceTracker.track(bells, pose: person?.pose)
         let wrists = person.map { p in [9, 10].map { String(format: "%.2f,%.2f", p.pose.xyn[$0].x, p.pose.xyn[$0].y) }.joined(separator: "/") } ?? "-"
