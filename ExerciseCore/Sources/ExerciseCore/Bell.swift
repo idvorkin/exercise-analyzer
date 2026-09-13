@@ -112,6 +112,37 @@ public final class BellTracker {
     }
   }
 
+  /// How a track did, in the lab's terms: of the frames with a visible wrist, how many had any sighting within
+  /// `reach` of one (the detector's ceiling) and how many had the reported bell there (held), and the same inside
+  /// the detected reps, where the bell is in the hands by definition. The Mac tool, the tuning report and the
+  /// phone's log all print this one (docs/analysis/kettlebell-detector.md).
+  public struct HeldSummary: Equatable {
+    public var handFrames = 0, seenAtHand = 0, heldAtHand = 0, handFramesInReps = 0, heldInReps = 0
+    public var fields: [String: Int] {
+      ["hand_frames": handFrames, "bell_seen_at_hand": seenAtHand, "bell_held": heldAtHand,
+       "hand_frames_in_reps": handFramesInReps, "bell_held_in_reps": heldInReps]
+    }
+  }
+
+  public static func heldSummary(frames: [FrameRecord], reps: [(start: Double, end: Double)], reach: CGFloat = 0.2) -> HeldSummary {
+    var s = HeldSummary()
+    for f in frames {
+      let wrists = wrists(of: f.pose)
+      guard !wrists.isEmpty else { continue }
+      func near(_ b: BellSighting) -> Bool { wrists.contains { distance(b.center, $0) <= reach } }
+      let inRep = reps.contains { f.time >= $0.start && f.time <= $0.end }
+      let held = f.bell.map(near) ?? false
+      s.handFrames += 1
+      if f.bells.contains(where: near) { s.seenAtHand += 1 }
+      if held { s.heldAtHand += 1 }
+      if inRep {
+        s.handFramesInReps += 1
+        if held { s.heldInReps += 1 }
+      }
+    }
+    return s
+  }
+
   static func gridKey(_ p: CGPoint, cell: Double) -> Int {
     Int(Double(p.x) / cell) * 4096 + Int(Double(p.y) / cell)
   }

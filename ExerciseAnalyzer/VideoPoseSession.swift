@@ -81,7 +81,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var rerunExercise: ExerciseKind?
   /// Names of the models this build runs on a clip: the pose model and, when bundled, the detector. Stored with
   /// every analysis; a stored set made by a different set is re-run from its video on reopen (story 035).
-  private var loadedModels: [String] { ["yolo26n-pose"] + (bellDetector == nil ? [] : ["yoloe-26n-kettlebell"]) }
+  /// The models a track is made with. The detector's name carries its floor and box cap: a set analyzed at other
+  /// settings holds different sightings (yesterday's six a frame at 0.25 left the new tracker little to hold), so
+  /// a settings change counts as a changed model and the set runs through the detector again.
+  private var loadedModels: [String] {
+    ["yolo26n-pose"]
+      + (bellDetector.map { [String(format: "yoloe-26n-kettlebell@%.2fx%d", $0.minConfidence, $0.maxSightings)] } ?? [])
+  }
+
+  private func storedModels(_ entry: RecentEntry) -> [String] {
+    let models = recents.models(for: entry)
+    return models.isEmpty ? ["yolo26n-pose"] : models  // files from before the field were pose-only
+  }
   private var pipeline = AnalysisPipeline(exercise: .kettlebellSwing)
   /// Poses of the loaded clip (offline pass or Recents), kept so a different exercise can be analyzed instantly.
   private var extractedFrames: [FrameRecord] = []
@@ -180,17 +191,41 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     watch.$reachable.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in self?.updateKeepAwake() }
       .store(in: &cancellables)
-    Task { await refreshStaleEntries() }
+    Task {
+      await refreshStaleEntries()
+      // Test hook: SWING_DEBUG_RUN=1 starts an instrumented run once the gallery has caught up (simulator runs
+      // can't tap the UI).
+      if ProcessInfo.processInfo.environment["SWING_DEBUG_RUN"] == "1" { await startInstrumentedRun() }
+    }
   }
 
   /// Re-analyzes every stored set made by an older analyzer (#19), so the gallery's counts match this build even
   /// for sets never reopened. Runs over stored poses only; rep images are refilled when the clip is reachable.
+  /// A set whose track lacks a model this build runs (the detector, or the detector at other settings) goes
+  /// through the models again from its clip instead, one set at a time in the background (Igor, 2026-09-13:
+  /// "force the rerun"), so the gallery does not wait for each set to be opened.
   private func refreshStaleEntries() async {
-    let stale = recents.entries.filter { recents.isStale($0) }
-    guard !stale.isEmpty else { return }
-    log.event("recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current])
+    // The models load after init (the detector's model_loaded lands about a second in); judged before that, every
+    // set looks made with this build's models and nothing re-runs (the first forced-rerun build did exactly that).
+    var waited = 0
+    while predictor == nil, waited < 100 {
+      try? await Task.sleep(for: .milliseconds(100))
+      waited += 1
+    }
+    log.event("recents_refresh_wait", ["predictor": predictor != nil, "waited_ms": waited * 100, "plans": planTasks.count])
+    await waitForPlans()
+    log.event("recents_refresh_wait", ["plans": "done", "models": loadedModels])
+    let stale = recents.entries.filter { recents.isStale($0) || !Set(loadedModels).isSubset(of: storedModels($0)) }
+    guard !stale.isEmpty else {
+      log.event("recents_refresh_start", ["count": 0, "version": AnalysisVersion.current, "models": loadedModels])
+      return
+    }
+    log.event("recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current, "models": loadedModels])
     for entry in stale {
       guard let stored = recents.loadPipeline(for: entry) else { continue }
+      if !Set(loadedModels).isSubset(of: storedModels(entry)), await rerunFromClip(entry, stored: stored, where: "refresh") {
+        continue
+      }
       let frames = stored.track.frames
       var kind = stored.exercise
       if case .auto = exerciseMode {
@@ -200,14 +235,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
       let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: kind)
       let clipURL = await recents.clipURL(for: entry)
       if let clipURL { await analyzed.fillRepImages(from: AVURLAsset(url: clipURL), frameDuration: frameDuration) }
-      let firstRep = analyzed.reps.first
-      let thumbnail =
-        (kind.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
-          ?? firstRep?.checkpoints.first?.image).map { UIImage(cgImage: $0) } ?? recents.thumbnailImage(for: entry)
       do {
         try recents.save(
           id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
-          pipeline: analyzed, clipURL: nil, thumbnail: thumbnail, originalName: entry.originalName,
+          pipeline: analyzed, clipURL: nil, thumbnail: galleryThumbnail(analyzed, kind: kind, entry: entry),
+          originalName: entry.originalName,
           models: recents.models(for: entry))  // poses replayed, not re-extracted: the model set is the stored one
         log.event(
           "recents_refreshed",
@@ -215,6 +247,137 @@ final class VideoPoseSession: NSObject, ObservableObject {
       } catch {
         log.event("error", ["where": "recents_refresh", "message": "\(error)"])
       }
+    }
+  }
+
+  private func galleryThumbnail(_ analyzed: AnalysisPipeline, kind: ExerciseKind, entry: RecentEntry) -> UIImage? {
+    let firstRep = analyzed.reps.first
+    return (kind.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
+      ?? firstRep?.checkpoints.first?.image).map { UIImage(cgImage: $0) } ?? recents.thumbnailImage(for: entry)
+  }
+
+  /// Every stored set with a reachable clip through the models, detector on, one after another, with the banner up
+  /// and shake disabled: an instrumented run. The log gets `debug_run` at both ends, and per set the same events
+  /// as an opened set marked `where: debug`, plus `bell_held` (the lab's held-bell numbers). Cancel stops after the
+  /// set in progress.
+  func startInstrumentedRun() async {
+    guard instrumentedRun == nil, analysisTask == nil else { return }
+    instrumentedRunCancelled = false
+    var waited = 0
+    while predictor == nil, waited < 100 {
+      try? await Task.sleep(for: .milliseconds(100))
+      waited += 1
+    }
+    if bellDetector == nil { loadBellDetector(force: true) }
+    await waitForPlans()
+    UIDevice.current.isBatteryMonitoringEnabled = true  // batteryLevel reads -1 until this is on
+    let entries = recents.entries
+    log.event("debug_run", ["phase": "start", "sets": entries.count, "models": loadedModels])
+    instrumentedRun = InstrumentedRun(index: 0, total: entries.count, name: "", line: "loading")
+    var done = 0, passes: [Double] = []
+    for (i, entry) in entries.enumerated() {
+      if instrumentedRunCancelled { break }
+      guard let stored = recents.loadPipeline(for: entry) else { continue }
+      let name = entry.originalName ?? "\(stored.exercise.definition.name) \(stored.reps.count)"
+      instrumentedRun = InstrumentedRun(index: i + 1, total: entries.count, name: name, line: "running the models")
+      if await rerunFromClip(entry, stored: stored, where: "debug") {
+        done += 1
+        if let fps = lastPassFps { passes.append(fps) }
+      }
+    }
+    log.event(
+      "debug_run",
+      ["phase": instrumentedRunCancelled ? "cancelled" : "end", "sets": entries.count, "done": done,
+       "fps_mean": passes.isEmpty ? 0 : passes.reduce(0, +) / Double(passes.count)])
+    instrumentedRun = nil
+  }
+
+  func cancelInstrumentedRun() {
+    instrumentedRunCancelled = true
+    refreshTask?.cancel()
+  }
+
+  private var lastPassFps: Double?
+
+  /// The models again over a stored set's clip, with no player and no status line: the same pass and the same
+  /// log events as an opened set, marked with `where` (refresh, debug). False (the caller replays the stored poses
+  /// instead) while a pass the user started is running, when the clip is out of reach, or before the models have
+  /// loaded. Opening a set cancels it; the set it was on falls back to its stored poses until the next launch.
+  private func rerunFromClip(_ entry: RecentEntry, stored: AnalysisPipeline, where: String) async -> Bool {
+    guard analysisTask == nil, let predictor, let url = await recents.clipURL(for: entry) else { return false }
+    log.event(
+      "recents_rerun",
+      ["id": entry.id, "reason": `where` == "debug" ? "instrumented" : "models_changed", "where": `where`,
+       "stored": storedModels(entry), "current": loadedModels, "exercise": stored.exercise.rawValue])
+    let task = Task { [weak self] () -> ([FrameRecord], OfflineAnalyzer.Summary)? in
+      guard let self else { return nil }
+      return try? await OfflineAnalyzer.extract(
+        url: url, predictor: predictor, bellDetector: bellDetector,
+        progress: { [weak self] fraction in
+          if `where` == "debug" { Task { @MainActor in self?.instrumentedRun?.progress = fraction } }
+        },
+        heartbeat: { [weak self] h in
+          self?.log.event(
+            "offline_progress",
+            [
+              "where": `where`, "frames": h.frames, "footprint_mb": h.footprintMB, "available_mb": h.availableMB,
+              "pose_ms": h.poseMs, "bell_ms": h.bellMs, "decode_ms": h.decodeMs, "fps": h.fps,
+            ])
+          if `where` == "debug" {
+            Task { @MainActor in
+              self?.instrumentedRun?.line = String(format: "%d frames · %.0f fps · pose %.1f ms · bell %.1f ms", h.frames, h.fps, h.poseMs, h.bellMs)
+            }
+          }
+        })
+    }
+    refreshTask = task
+    updateKeepAwake()
+    defer {
+      refreshTask = nil
+      updateKeepAwake()
+    }
+    guard let (frames, summary) = await task.value else {
+      log.event("error", ["where": "recents_rerun_\(`where`)", "id": entry.id, "message": "extraction failed or was cancelled"])
+      return false
+    }
+    let fps = summary.elapsed > 0 ? Double(summary.frames) / summary.elapsed : 0
+    lastPassFps = fps
+    let memory = OfflineAnalyzer.memoryMB()
+    log.event(
+      "offline_pass",
+      [
+        "where": `where`, "id": entry.id, "frames": summary.frames, "elapsed_s": summary.elapsed,
+        "avg_infer_ms": summary.averageInferenceMs, "fps": fps,
+        "bell_frames": summary.bellFrames, "bell_avg_infer_ms": summary.bellAverageInferenceMs,
+        "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
+        // The instrumentation a lab run wants beside the timings: what the detector was set to, and what the
+        // phone was doing to itself (a throttled or low-power phone runs the same models slower).
+        "bell_floor": bellDetector?.minConfidence ?? 0, "bell_cap": bellDetector?.maxSightings ?? 0,
+        "thermal": ProcessInfo.processInfo.thermalState.rawValue, "low_power": ProcessInfo.processInfo.isLowPowerModeEnabled,
+        "battery": UIDevice.current.batteryLevel, "footprint_mb": memory.footprint, "available_mb": memory.available,
+      ])
+    let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: stored.exercise)
+    var held: [String: Any] = BellTracker.heldSummary(
+      frames: analyzed.track.frames, reps: analyzed.reps.map { ($0.startTime, $0.endTime) }
+    ).fields.mapValues { $0 as Any }
+    held["id"] = entry.id
+    held["where"] = `where`
+    held["exercise"] = stored.exercise.rawValue
+    log.event("bell_held", held)
+    await analyzed.fillRepImages(from: AVURLAsset(url: url), frameDuration: frameDuration)
+    do {
+      try recents.save(
+        id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
+        pipeline: analyzed, clipURL: nil, thumbnail: galleryThumbnail(analyzed, kind: stored.exercise, entry: entry),
+        originalName: entry.originalName, models: loadedModels)
+      log.event(
+        "recents_refreshed",
+        ["id": entry.id, "where": `where`, "was": "\(stored.exercise.rawValue) \(stored.reps.count)",
+         "now": "\(stored.exercise.rawValue) \(analyzed.reps.count)", "models": loadedModels])
+      return true
+    } catch {
+      log.event("error", ["where": "recents_rerun_\(`where`)", "id": entry.id, "message": "\(error)"])
+      return false
     }
   }
 
@@ -273,9 +436,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     ProcessInfo.processInfo.environment["SWING_BELLS"] == "1" || UserDefaults.standard.bool(forKey: "bellDetector")
   }
 
-  /// The bell detector is optional: the app counts without it, it just does not see the bell.
-  private func loadBellDetector() {
-    guard Self.bellDetectorEnabled else {
+  /// The bell detector is optional: the app counts without it, it just does not see the bell. `force` loads it
+  /// regardless of the switch (an instrumented run always measures with it).
+  private func loadBellDetector(force: Bool = false) {
+    guard Self.bellDetectorEnabled || force else {
       log.event("model_skipped", ["model": "yoloe-26n-kettlebell", "reason": "disabled"])
       return
     }
@@ -494,6 +658,25 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// The running offline pass, so Cancel can stop it.
   private var analysisTask: Task<Void, Never>?
+  /// A background re-run of a stored set through the models (refreshStaleEntries, the instrumented run); opening a
+  /// set cancels it.
+  private var refreshTask: Task<([FrameRecord], OfflineAnalyzer.Summary)?, Never>?
+
+  /// An instrumented run in progress (Igor, 2026-09-13: "a debug run that pre-picks the clips, shake is disabled,
+  /// and there's UI on the screen"): every stored set with a reachable clip goes through the models with the
+  /// detector on, one after another, with the lab's held-bell numbers in the log. The banner shows this.
+  struct InstrumentedRun: Equatable {
+    var index: Int
+    var total: Int
+    var name: String
+    var line: String
+    /// Of the set under way, 0–1 (the pass's own progress).
+    var progress = 0.0
+    /// Of the whole run: sets done plus the current set's fraction, over the total.
+    var overall: Double { total > 0 ? (Double(index - 1) + progress) / Double(total) : 0 }
+  }
+  @Published private(set) var instrumentedRun: InstrumentedRun?
+  private var instrumentedRunCancelled = false
   @Published private(set) var canCancelAnalysis = false
   /// Set after an analysis that found no reps in a recording made by this app: offer to delete it.
   @Published var emptyRecordingPrompt = false
@@ -506,6 +689,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   private func analyzeAndPlay(url: URL) async {
+    // One pass at a time: a background re-run of a stored set yields to the set the user opened.
+    refreshTask?.cancel()
     // A set opened in the first second after launch (a Recents tap, the reopen hook) arrives before the model has
     // loaded; wait for it rather than abandoning the pass with "Model not ready" (#45).
     var waited = 0
@@ -1012,7 +1197,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let active = UIApplication.shared.applicationState == .active
     // An offline pass on a two-minute clip outlasts auto-lock; a locked phone backgrounds the app and AVFoundation
     // interrupts the reader ("Operation Interrupted" at 43 s, #46), so the pass keeps the screen on too.
-    let wanted = active && (source == .camera || watch.reachable || watchMode || analysisTask != nil)
+    let wanted = active && (source == .camera || watch.reachable || watchMode || analysisTask != nil || refreshTask != nil)
     guard wanted != keepAwake else { return }
     keepAwake = wanted
     UIApplication.shared.isIdleTimerDisabled = wanted

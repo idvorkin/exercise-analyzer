@@ -63,3 +63,21 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Then:** the new session's log has a `crash_report` event naming a JSON file under `crashes/` with the exception, signal and reason, the file is pulled with the logs, and `just symbolicate <file>` prints the app's frames as symbols
 
 - **Issues:** none (Igor: "let's get a crash log library")
+
+### User Story 037:
+
+- **Summary:** An instrumented run of my stored sets, on the phone, with the numbers in the log (technical)
+- **Status:** implemented in (pending); verified in the simulator (`scripts/sim-debug-run.sh`: the run starts from the launch hook, the banner shows, the set goes through the detector, `bell_held` and `debug_run` end land in the log); the phone is next
+
+#### Use Case:
+- **As a** developer measuring the bell detector and the tracker on the phone
+- **I want to** start one run that takes every stored set through the models with the detector on, shows me it is running, ignores my shaking the phone meanwhile, and writes the same numbers the Mac lab prints
+- **so that** a phone measurement is one tap and one log pull, not a set opened by hand at a time with bug reports going off in my pocket
+
+#### Acceptance Criteria:
+- **Scenario:** An instrumented run from the start panel
+- **Given:** sets in Workouts with their clips reachable, the detector on or off
+- **When:** I tap "Instrumented run" on the start panel (or the app launches with `SWING_DEBUG_RUN=1`)
+- **Then:** a banner reads "Instrumented run · n of N · <set>" with the frames, fps and per-model milliseconds of the pass under way, a shake shows no report sheet, each set goes through the pose model and the detector from its clip and replaces its own entry, the log carries `debug_run` (start and end, with the mean fps), and per set `offline_pass` (with `where: debug`, the detector's floor and cap, thermal state, low power, battery and memory) and `bell_held` (hand frames, the detector's sightings at the hands, the tracker's holds, and both inside detected reps); Cancel on the banner stops after the set in progress
+
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)

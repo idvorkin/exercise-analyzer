@@ -92,6 +92,9 @@ struct ContentView: View {
           .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
         }
         hud
+        if let run = session.instrumentedRun {
+          instrumentedRunBanner(run)
+        }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       if !session.reps.isEmpty && session.source != .camera {
@@ -113,6 +116,7 @@ struct ContentView: View {
     .background(Color(.systemBackground))
     .background(
       ShakeDetector {
+        guard session.instrumentedRun == nil else { return }  // a shake mid-run is the phone being carried, not a report
         session.captureBugScreenshot()
         if showRecents { showWorkoutsBugReport = true } else { showBugReport = true }
       })
@@ -295,6 +299,31 @@ struct ContentView: View {
     )
   }
 
+  /// "Instrumented run · 2 of 8 · IMG_4342 · 612 frames · 61 fps": every stored set through the models with the
+  /// detector on, shake off, numbers in the log. Cancel stops after the set in progress.
+  private func instrumentedRunBanner(_ run: VideoPoseSession.InstrumentedRun) -> some View {
+    VStack {
+      HStack(spacing: 10) {
+        Image(systemName: "waveform.path.ecg").foregroundStyle(.yellow)
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Instrumented run · \(run.index) of \(run.total) · \(run.name)").font(.footnote.bold())
+          ProgressView(value: min(max(run.progress, 0), 1)).tint(.yellow)
+          Text(run.line).font(.caption).monospacedDigit()
+        }
+        .foregroundStyle(.white)
+        Spacer()
+        Button("Cancel") { session.cancelInstrumentedRun() }
+          .buttonStyle(.bordered).tint(.white).font(.footnote)
+      }
+      .padding(12)
+      .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 12))
+      .padding(.horizontal, 12)
+      .padding(.top, 8)
+      .accessibilityIdentifier("instrumentedRunBanner")
+      Spacer()
+    }
+  }
+
   /// "reps · Kettlebell Swing ▾": pick an exercise or Auto. In Auto the detected exercise and its reason show.
   private var exerciseMenu: some View {
     Menu {
@@ -409,6 +438,10 @@ struct ContentView: View {
         }
         startRow("Files", "folder") { showOpenDialog = false; showFileImporter = true }
         startRow("Report a problem", "ladybug") { showOpenDialog = false; session.captureBugScreenshot(); showBugReport = true }
+        startRow("Instrumented run", "waveform.path.ecg") {
+          showOpenDialog = false
+          Task { await session.startInstrumentedRun() }
+        }
         startRow("GitHub", "chevron.left.forwardslash.chevron.right") {
           showOpenDialog = false
           openURL(URL(string: "https://github.com/idvorkin/exercise-analyzer")!)
