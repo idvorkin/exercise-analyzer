@@ -42,13 +42,24 @@ struct WatchModeView: View {
             .font(.title3).foregroundStyle(.gray)
         }
         Spacer()
-        Text("Hold anywhere to leave watch mode").font(.footnote).foregroundStyle(.gray).padding(.bottom, 16)
+        Button {
+          session.setWatchMode(false, from: "phone_button")
+        } label: {
+          Label("Leave watch mode", systemImage: "xmark.circle")
+            .font(.headline)
+            .padding(.horizontal, 20).padding(.vertical, 12)
+            .background(Color.white.opacity(0.15), in: Capsule())
+            .foregroundStyle(.white)
+        }
+        Text("Or double-tap anywhere, or press and hold").font(.footnote).foregroundStyle(.gray).padding(.bottom, 16)
       }
       .padding(.horizontal, 24)
       .multilineTextAlignment(.center)
     }
     .contentShape(Rectangle())
-    .onLongPressGesture(minimumDuration: 0.8) { session.setWatchMode(false, from: "phone_longpress") }
+    // Three ways out: the button, a double tap, or a half-second hold. A single tap does nothing on purpose.
+    .onTapGesture(count: 2) { session.setWatchMode(false, from: "phone_doubletap") }
+    .onLongPressGesture(minimumDuration: 0.5) { session.setWatchMode(false, from: "phone_longpress") }
     .statusBarHidden(true)
     .preferredColorScheme(.dark)
   }
