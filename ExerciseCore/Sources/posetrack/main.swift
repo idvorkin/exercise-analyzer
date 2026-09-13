@@ -200,6 +200,18 @@ Task {
       }
       let request = VNCoreMLRequest(model: visionModel)
       request.imageCropAndScaleOption = .scaleFit
+      // POSETRACK_PARALLEL=1: the detector runs on a second thread while the pose model runs (Igor, 2026-09-13:
+      // "could we run both image models at once?"); both only read the frame. Sequential otherwise, as the app.
+      var bells: [BellSighting] = []
+      let parallel = ProcessInfo.processInfo.environment["POSETRACK_PARALLEL"] == "1"
+      let group = DispatchGroup()
+      if parallel, let detector = bellDetector {
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+          bells = detector.detect(in: pixelBuffer)
+          group.leave()
+        }
+      }
       try VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:]).perform([request])
       var person: (pose: Pose, box: CGRect)?
       if let observation = request.results?.first as? VNCoreMLFeatureValueObservation,
@@ -207,7 +219,7 @@ Task {
       {
         person = parse(array, letterbox: letterbox, confidence: options.confidence)
       }
-      let bells = bellDetector?.detect(in: pixelBuffer) ?? []
+      if parallel { group.wait() } else { bells = bellDetector?.detect(in: pixelBuffer) ?? [] }
       if ProcessInfo.processInfo.environment["POSETRACK_TRACE"] == "1" {
         let tracked = traceTracker.track(bells, pose: person?.pose)
         let wrists = person.map { p in [9, 10].map { String(format: "%.2f,%.2f", p.pose.xyn[$0].x, p.pose.xyn[$0].y) }.joined(separator: "/") } ?? "-"

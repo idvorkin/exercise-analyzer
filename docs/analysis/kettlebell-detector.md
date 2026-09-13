@@ -295,8 +295,16 @@ detector at the old settings (floor 0.25, six boxes) 11.8–12.2 s (49–50 fps)
 0.15, twelve boxes) 12.2–12.4 s (48 fps). The detector halves the pass as before; tonight's settings add about
 3 %; the tracker, the backward pass and the colour samples do not register: a `sample` of posetrack shows the
 process waiting on the Neural Engine, then vImage converting the 1080p frame to each model's planar float input
-(twice a frame, once per model), then BNNS. The phone's number comes from the `offline_pass` event of the next
-run with the detector on.
+(twice a frame, once per model), then BNNS. The phone's number came from the instrumented run (story 037):
+35–41 fps sequential with the detector at 12.5–15 ms, against 43.7 fps before tonight, so the settings cost
+nothing there either.
+
+**Both models at once (Igor: "could we run both image models at once?").** The detector on a second thread
+while the pose model runs, both reading the same frame: on the Mac 60→85 fps on the one-hand clip, and on the
+phone, the same eight sets minutes apart, **38.6→77.1 fps** (65–87 per set), pose 9–12 ms and detector 11–15 ms
+overlapping, memory 52 MB, thermal nominal. The pass with the detector now runs at nearly the detector-off
+speed. `OfflineAnalyzer.extract` and posetrack (`POSETRACK_PARALLEL=1` for the sequential comparison). The
+tracker's result is unchanged (held 98 % on the one-hand clip either way).
 Tooling: `scripts/model-trials/cut-dot-frames.sh` and `grade-dots.sh` (docs/TESTING.md).
 
 Coasting, by eye: the same 35 swing frames with 0, 1 and 3 coasted frames grade 17/23, 15/22 and 17/24 on the
