@@ -10,7 +10,8 @@
 //  reports and the gallery keeps: Elbow → Hand → Kneel → Lunge on the way up, Lunge → Kneel → Elbow on the way
 //  down. Elbow versus Hand is the support arm's elbow angle; the kneel is a plateau at a third upright; the lunge
 //  is what follows it. The bands come from four reps under two cameras (docs/analysis/turkish-get-up.md). The
-//  tracker only moves forward within a direction and never touches the count.
+//  tracker only moves forward within a direction and never touches the count. Floor brackets the rep: flat lying
+//  just before the first movement, and back flat after the last descent; lying flat reports floor.
 
 import CoreGraphics
 import Foundation
@@ -45,6 +46,9 @@ public struct TurkishGetUpThresholds {
   public var lungeMin = 0.45
   /// The bridge / leg sweep between hand and kneel pokes above `lungeMin` for about a second; the lunge holds longer.
   public var lungeHoldSeconds = 1.0
+  /// The floor the rep starts from: flat lying this far before the rep-start floor frame, right before the
+  /// first movement (Igor). 2 s sits on flat floor in all four study reps with margin.
+  public var floorLeadSeconds = 2.0
 }
 
 public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
@@ -53,7 +57,10 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   public static let rising = "rising"
   public static let standing = "standing"
   public static let lowering = "lowering"
-  // Stages (what a frame reports while rising or lowering, and what the gallery keeps).
+  // Stages (what a frame reports while rising or lowering, and what the gallery keeps). Floor brackets the
+  // rep: flat lying just before the first movement, and back flat after the last descent (#48).
+  public static let floor = "floor"
+  public static let floorDown = "floor_down"
   public static let elbow = "elbow"
   public static let hand = "hand"
   public static let kneel = "kneel"
@@ -67,15 +74,16 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   public static let definition = ExerciseDefinition(
     name: "Turkish Get-Up",
     phases: [
-      PhaseInfo(id: lying, label: "Lying"), PhaseInfo(id: elbow, label: "Elbow", aliases: [elbowDown]),
+      PhaseInfo(id: floor, label: "Floor", aliases: [floorDown]), PhaseInfo(id: elbow, label: "Elbow", aliases: [elbowDown]),
       PhaseInfo(id: hand, label: "Hand"), PhaseInfo(id: kneel, label: "Kneel", aliases: [kneelDown]),
       PhaseInfo(id: lunge, label: "Lunge", aliases: [lungeDown]), PhaseInfo(id: standing, label: "Standing"),
     ],
     galleryOrder: [
-      PhaseInfo(id: lying, label: "Lying"), PhaseInfo(id: elbow, label: "Elbow"), PhaseInfo(id: hand, label: "Hand"),
+      PhaseInfo(id: floor, label: "Floor"), PhaseInfo(id: lying, label: "Lying"), PhaseInfo(id: elbow, label: "Elbow"),
+      PhaseInfo(id: hand, label: "Hand"),
       PhaseInfo(id: kneel, label: "Kneel"), PhaseInfo(id: lunge, label: "Lunge"), PhaseInfo(id: standing, label: "Standing"),
       PhaseInfo(id: lungeDown, label: "↓ Lunge"), PhaseInfo(id: kneelDown, label: "↓ Kneel"),
-      PhaseInfo(id: elbowDown, label: "↓ Elbow"),
+      PhaseInfo(id: elbowDown, label: "↓ Elbow"), PhaseInfo(id: floorDown, label: "↓ Floor"),
     ],
     hudMetrics: [
       MetricInfo(key: "upright", label: "UP", unit: "%"), MetricInfo(key: "bellArm", label: "ARM", unit: "°"),
@@ -118,6 +126,10 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   private var coarseHold = Hold()
   private var stageHold = Hold()
   private var lastLying: Frame?
+  /// Flat-lying frames of the current floor episode (upright at or below `lyingMax`), so the floor position
+  /// can look just before the first movement. An abandoned false start never leaves the floor, so the window
+  /// survives it; a completed rep starts a new episode.
+  private var lyingWindow: [Frame] = []
   private var repFrames: [Frame] = []
   private var standingPeak: Frame?
   private var standingImage: CGImage?
@@ -144,6 +156,7 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
     coarseHold = Hold()
     stageHold = Hold()
     lastLying = nil
+    lyingWindow = []
     repFrames = []
     standingPeak = nil
     standingImage = nil
@@ -165,7 +178,9 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
 
   private var reportedPhase: String {
     if let stage { return stage }
-    if machine.phase == Self.lying, elbowCandidate != nil { return Self.elbow }
+    // Flat on the floor reads floor, so the Floor pill lights while lying; the roll to the elbow still
+    // takes over as soon as the support elbow bends (#48).
+    if machine.phase == Self.lying { return elbowCandidate != nil ? Self.elbow : Self.floor }
     return machine.phase
   }
 
@@ -205,6 +220,8 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
     case Self.lying:
       if upright <= thresholds.lyingMax {
         lyingSeen = true
+        lyingWindow.append(frame)
+        if lyingWindow.count > 600 { lyingWindow.removeFirst(lyingWindow.count - 600) }
         if elbowCandidate == nil { lastLying = frame }  // the lying position stays before the elbow step
       }
       // The elbow step can be over in half a second, while the median still reads lying: judge it on the raw value.
@@ -221,6 +238,10 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
         stage = nil
         kneelEntered = nil
         lungeEntered = nil
+        if let floor = floorFrame(before: lying.time) {
+          machine.storePeak(
+            RepPosition(phase: Self.floor, time: floor.time, pose: floor.pose, metrics: floor.metrics, score: -floor.upright, image: nil))
+        }
         machine.storePeak(
           RepPosition(phase: Self.lying, time: lying.time, pose: lying.pose, metrics: lying.metrics, score: -lying.upright, image: nil))
         machine.transition(to: Self.rising)
@@ -280,12 +301,14 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
           return result(m)
         }
         trace?(String(format: "%.2fs rep %d done: upright %.2f", time, machine.repCount + 1, upright))
+        store(Self.floorDown, frame)  // back flat after the elbow; the floor run restarts here
         fillDownStages(end: frame)
         completedRep = machine.completeRep(quality: calculateRepQuality())
         machine.transition(to: Self.lying)
         stage = nil
         kneelEntered = nil
         lastLying = frame
+        lyingWindow = []
         repFrames = []
         armAngles = []
         overheadSideVotes = [:]
@@ -399,16 +422,25 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   private func fillUpStages() {
     if stage == Self.kneel, let last = repFrames.last { storeKneelMidpoint(Self.kneel, until: last) }
     fillMissing(
-      [(Self.elbow, 0.2), (Self.hand, 0.3), (Self.kneel, 0.35), (Self.lunge, 0.6)], frames: repFrames,
-      floor: machine.currentRepPeaks[Self.lying]?.time ?? 0, ceiling: repFrames.last?.time ?? 0)
+      [(Self.floor, 0.0), (Self.elbow, 0.2), (Self.hand, 0.3), (Self.kneel, 0.35), (Self.lunge, 0.6)], frames: repFrames,
+      floor: (machine.currentRepPeaks[Self.lying]?.time ?? 0) - 10, ceiling: repFrames.last?.time ?? 0)
   }
 
   private func fillDownStages(end: Frame) {
     if stage == Self.kneelDown { storeKneelMidpoint(Self.kneelDown, until: end) }
     let down = repFrames.filter { $0.time > (standingPeak?.time ?? 0) }
     fillMissing(
-      [(Self.lungeDown, 0.6), (Self.kneelDown, 0.35), (Self.elbowDown, 0.2)], frames: down,
+      [(Self.lungeDown, 0.6), (Self.kneelDown, 0.35), (Self.elbowDown, 0.2), (Self.floorDown, 0.0)], frames: down,
       floor: standingPeak?.time ?? 0, ceiling: end.time)
+  }
+
+  /// The floor the rep starts from: the latest flat-lying frame at least `floorLeadSeconds` before the
+  /// rep-start floor frame (right before the first movement); the flattest buffered frame when the lying
+  /// run is shorter than the lead.
+  private func floorFrame(before anchor: Double) -> Frame? {
+    let target = anchor - thresholds.floorLeadSeconds
+    if let frame = lyingWindow.last(where: { $0.time <= target }) { return frame }
+    return lyingWindow.min(by: { $0.upright < $1.upright })
   }
 
   /// Drops the partial rep without touching the rep count.
