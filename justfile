@@ -81,6 +81,16 @@ pull-crashes:
 symbolicate file:
     scripts/symbolicate.sh {{file}}
 
+# Instruments from the command line: attach to the running app on the phone for `seconds` with an Instruments
+# template (Allocations, Leaks, Time Profiler, Core ML, Activity Monitor) and write the .trace under
+# ~/tmp/agent/traces/. Launch the app first; do the action (reopen the set) inside the window. Open the .trace in
+# Instruments, or `xcrun xctrace export --input <trace> --toc` to list its tables.
+trace-device template="Allocations" seconds="90":
+    mkdir -p ~/tmp/agent/traces
+    xcrun xctrace record --template "{{template}}" --device {{device}} --attach ExerciseAnalyzer \
+      --time-limit {{seconds}}s --output ~/tmp/agent/traces/$(date +%Y%m%d-%H%M%S)-{{template}}.trace
+    ls -t ~/tmp/agent/traces | head -1
+
 # Copy session logs from the simulator instead.
 pull-logs-sim:
     mkdir -p ~/tmp/agent/swing-logs/sim

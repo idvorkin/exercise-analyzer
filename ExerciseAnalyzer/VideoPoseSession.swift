@@ -507,10 +507,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let task = Task { [weak self] in
       guard let self else { return }
       do {
-        let (frames, summary) = try await OfflineAnalyzer.extract(url: url, predictor: predictor, bellDetector: bellDetector) {
-          [weak self] fraction in
-          Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
-        }
+        let (frames, summary) = try await OfflineAnalyzer.extract(
+          url: url, predictor: predictor, bellDetector: bellDetector,
+          progress: { [weak self] fraction in
+            Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
+          },
+          heartbeat: { [weak self] frames, footprint, available in
+            // Memory every two seconds of clip: a pass that dies without a signal was killed for memory (#43).
+            self?.log.event("offline_progress", ["frames": frames, "footprint_mb": footprint, "available_mb": available])
+          })
         try Task.checkCancellation()
         await self.finishAnalysis(url: url, frames: frames, summary: summary)
       } catch is CancellationError {

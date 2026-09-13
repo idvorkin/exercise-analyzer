@@ -32,7 +32,7 @@ means the phone was busy or locked, so run it again. The current session's file 
 |---|---|
 | Launch | `session_start` (device, system, app, build, analysis: the AnalysisVersion, started), `model_loaded` (model: yolo26n-pose, yoloe-26n-kettlebell; compute_units), `model_plan` (where Core ML scheduled the model's ops: ane, gpu, cpu, unassigned counts and the total, from MLComputePlan, #44), `model_missing` (the detector package is not bundled: no bells), `notification_auth` |
 | Loading a clip | `load` (url, source), `import` (path: photos_suggestion / photos_in_place / picker), `install_item` (track_frames), `video_track` (hdr, transfer, edr_headroom, transform), `player_layer` (video_rect, gravity), `display_frame` (first frames per item: player_time, rate) |
-| Analysis | `offline_pass` (frames, fps, avg_infer_ms, bell_frames, bell_avg_infer_ms, bell_seen), `detection` (exercise, confidence, reason), `analyzed` (exercise, reps, reason: load / analyzer_version / recents_redetect), `crop`, `analysis_cancel` → `analysis_cancelled`, `exercise_mode`, `frame` (per analyzed frame: time, src live/file/offline, infer_ms, phase, rep, the HUD metrics) |
+| Analysis | `offline_progress` (every 60 frames of the pass: frames, footprint_mb, available_mb), `offline_pass` (frames, fps, avg_infer_ms, bell_frames, bell_avg_infer_ms, bell_seen), `detection` (exercise, confidence, reason), `analyzed` (exercise, reps, reason: load / analyzer_version / recents_redetect), `crop`, `analysis_cancel` → `analysis_cancelled`, `exercise_mode`, `frame` (per analyzed frame: time, src live/file/offline, infer_ms, phase, rep, the HUD metrics) |
 | Playback | `play`, `pause`, `phase` (transitions while the clock moves), `seek` (from: which control, player_before, player_after, finished), `clock` (every 5 s: current, slider, scrubbing; #23), `ui` (action: step / edge gestures, from: watch) |
 | Recording | `camera_start`, `camera_switch`, `camera_level`, `camera_done` (duration_s, frames_delivered/analyzed, live_reps), `camera_cancel`, `recording_partial`, `stitch` (rotation segments), `empty_recording`, `recording_deleted`, `keep_awake` |
 | Trim, save, Photos | `trim_start`, `trim` (requested_start_s, start_s, reps), `trim_done` (passthrough), `trim_skipped`, `trim_undo`, `saved`, `photos_replaced`, `photos_restored`, `photos_suggestions` (matched, already_analyzed, shown), `photos_suggestion_open`, `photos_fetch` (seconds, in_cloud, found, error) |
@@ -82,6 +82,30 @@ the numbers, then fix. Never ship a second guessed fix. Examples that paid off: 
 6. **Reports that arrive by voice** (Igor says it in the session rather than shaking) still get an issue, filed by
    hand with the same evidence, so the trail is complete.
 
+## Getting a clip to the Mac
+
+A phone-only symptom in the offline pass is reproduced on the Mac with `posetrack` when the clip is here:
+
+- **Photos on the Mac** (iCloud Photos): find it by name and export the original with Photos' scripting,
+  ```bash
+  osascript -e 'tell application "Photos" to get {filename, id} of (every media item whose filename contains "IMG_4342")'
+  osascript -e 'tell application "Photos" to export {media item id "<id>/L0/001"} to POSIX file "/Users/idvorkin/tmp/agent/swing-samples/tgu" with using originals'
+  ```
+  then `ExerciseCore/.build/release/posetrack <clip> --model ExerciseAnalyzer/yolo26n-pose.mlpackage`. Traps: a
+  Live Photo's `.mov` shares the still's name and is a 3 s clip, not the set (IMG_4345 taught us); an original
+  that iCloud has not downloaded exports slowly or not at all; not every phone clip is in the library.
+- **AirDrop** the clip from the phone; it lands in `~/Downloads`.
+- **Recents pose track** (`just pull-tracks`) when only the analysis is in question, not decoding or the models.
+
+## Instruments from the command line
+
+`just trace-device` attaches Instruments to the running app on the phone for 90 s with the Allocations template
+(`just trace-device "Core ML" 60` for model loads and predictions, `"Time Profiler"` for CPU); do the action inside
+the window. The `.trace` lands under `~/tmp/agent/traces/`; open it in Instruments, or list its tables with
+`xcrun xctrace export --input <trace> --toc` and export one with `--xpath`. For memory questions the cheaper first
+look is the session log: the offline pass logs `offline_progress` every two seconds of clip with the process
+footprint and what iOS still allows.
+
 ## Crash reports
 
 The app has no crash service; it uses MetricKit, which hands an app its own crash and hang diagnostics on the
@@ -91,8 +115,11 @@ the new session's log as `crash_report` (kind crash or hang, exception type, sig
 app's frames against the dSYM of the last `just build-device` (system frames print as offsets). The phone's own
 `.ips` reports are a second source: `just pull-crashes` uses libimobiledevice and needs the phone paired over USB.
 
-A session log that simply stops mid-work is the other crash signature: the last events say what was running.
-First crash caught this way: the detector's output tensor is Float16 on the phone and was read as Float32.
+A session log that simply stops mid-work is the other crash signature: the last events say what was running. A
+crash with no MetricKit diagnostic and no `signal-*.txt` from the handler is a kill from outside the process,
+most often the memory limit (SIGKILL, uncatchable): read `offline_progress` for the footprint climb, and confirm
+with `just trace-device` (Allocations). First crashes caught this way: the detector's output tensor is Float16 on
+the phone and was read as Float32; then an export with a data-dependent NMS output (#43).
 
 ## Device tooling
 

@@ -33,8 +33,20 @@ enum OfflineAnalyzer {
     func on(inferenceTime: Double, fpsRate: Double) {}
   }
 
+  /// Resident memory of the process in MB (phys_footprint, what Jetsam judges) and what iOS still allows.
+  static func memoryMB() -> (footprint: Double, available: Double) {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size) / 4
+    let result = withUnsafeMutablePointer(to: &info) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
+    }
+    let footprint = result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
+    return (footprint, Double(os_proc_available_memory()) / 1_048_576)
+  }
+
   static func extract(
-    url: URL, predictor: BasePredictor, bellDetector: BellDetector? = nil, progress: @escaping @Sendable (Double) -> Void
+    url: URL, predictor: BasePredictor, bellDetector: BellDetector? = nil, progress: @escaping @Sendable (Double) -> Void,
+    heartbeat: (@Sendable (Int, Double, Double) -> Void)? = nil
   ) async throws -> ([FrameRecord], Summary) {
     let asset = AVURLAsset(url: url)
     guard let track = try await asset.loadTracks(withMediaType: .video).first else {
@@ -82,6 +94,10 @@ enum OfflineAnalyzer {
           frame = FrameRecord(time: frame.time, imageSize: frame.imageSize, pose: frame.pose, box: frame.box, analysis: nil, bells: bells)
         }
         frames.append(frame)
+        if frames.count % 60 == 1, let heartbeat {
+          let memory = memoryMB()
+          heartbeat(frames.count, memory.footprint, memory.available)
+        }
         inferenceTotal += result.inferenceMs
         if duration > 0, time - lastProgress > 0.5 {
           lastProgress = time
