@@ -3,8 +3,10 @@
 //  Edge controls over the video (story 030): a quick tap on the left or right edge steps one frame; press and
 //  hold on an edge shows three keys stacked on that edge (Rep / Frame / Position), and releasing over one fires it
 //  in that edge's direction. No chrome until you press, and the targets are the full height of the picture.
-//  Middle hold (story 039): press and hold the middle to bring up both stacks, slide onto a key to fire it on
-//  arrival, keep holding to repeat it every 2 s. A quick middle tap still toggles playback (story 024).
+//  Middle hold (story 039, follow-up #60): press and hold the middle to bring up both stacks, which stay up
+//  after the finger lifts; slide onto a key to fire it on arrival, keep holding to repeat it every 1 s; a tap
+//  on the picture that hits no key dismisses the stacks and does nothing else. A quick middle tap with the
+//  stacks down still toggles playback (story 024).
 
 import SwiftUI
 
@@ -37,14 +39,75 @@ enum StepKey: CaseIterable {
   }
 }
 
+/// Arrival-fire + repeat engine behind the hold keys (story 039). One engine per touch-owning
+/// view; each owner stops its engine on lift, gesture cancel, scene change and disappear, so no
+/// timer outlives its touch.
+final class KeyRepeatEngine {
+  static let repeatSeconds = 1.0
+  /// Playhead moves smaller than this between presses count as no movement (same-time seeks republish).
+  static let stuckEpsilon = 1e-6
+
+  var onFire: (Int, Bool) -> Void = { _, _ in }
+  var clock: () -> Double = { 0 }
+
+  private var timer: Timer?
+  private var repeatIndex = 0
+  private var lastTime = 0.0
+
+  var isRunning: Bool { timer != nil }
+
+  /// Arrival: fires at once (repeat 0, never at_end) and starts the cadence.
+  func start() {
+    repeatIndex = 0
+    fire()
+    restart()
+  }
+
+  func stop() {
+    timer?.invalidate()
+    timer = nil
+  }
+
+  private func restart() {
+    timer?.invalidate()
+    // The timer must fire while the finger is down (a tracking-mode runloop), so it goes on
+    // the common modes; each arrival owns its timer, invalidated on slide-off, arrival or lift.
+    let next = Timer(timeInterval: Self.repeatSeconds, repeats: true) { [weak self] _ in
+      guard let self else { return }
+      self.repeatIndex += 1
+      self.fire()
+    }
+    RunLoop.main.add(next, forMode: .common)
+    timer = next
+  }
+
+  private func fire() {
+    let now = clock()
+    let atEnd = repeatIndex > 0 && abs(now - lastTime) < Self.stuckEpsilon
+    lastTime = now
+    onFire(repeatIndex, atEnd)
+  }
+}
+
 struct EdgeStepper: View {
   let side: StepSide
   let onTap: () -> Void
   let onKey: (StepKey) -> Void
+  /// Story 039 hold-up mode: while the middle stacks are up, an edge touch fires arrivals for
+  /// this side instead of 030's tap/hold. Defaults keep 030 call sites unchanged.
+  var stacksUp = false
+  var upClock: () -> Double = { 0 }
+  var onUpFire: (StepKey, Int, Bool) -> Void = { _, _, _ in }
+  var onUpLit: (StepKey?) -> Void = { _ in }
+
+  @Environment(\.scenePhase) private var scenePhase
+  @GestureState private var touching = false
 
   @State private var holding = false
   @State private var highlighted: StepKey?
   @State private var touchStart: Date?
+  @State private var engine = KeyRepeatEngine()
+  @State private var upRow: Int?
 
   var body: some View {
     GeometryReader { geo in
@@ -60,6 +123,7 @@ struct EdgeStepper: View {
         LongPressGesture(minimumDuration: 0.3)
           .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
           .onChanged { value in
+            if stacksUp { return }
             if case .second(true, let drag) = value {
               withAnimation(.easeOut(duration: 0.12)) { holding = true }
               let y = drag?.location.y ?? geo.size.height / 2
@@ -76,8 +140,15 @@ struct EdgeStepper: View {
       // triple tap three times. A hold (0.3 s) is the key overlay instead.
       .simultaneousGesture(
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
-          .onChanged { _ in if touchStart == nil { touchStart = Date() } }
+          .updating($touching) { _, state, _ in state = true }
+          .onChanged { value in
+            if stacksUp { upTrack(value.location, height: geo.size.height); return }
+            if upRow != nil { upCancel() }
+            if touchStart == nil { touchStart = Date() }
+          }
           .onEnded { value in
+            if stacksUp { upEnd(); return }
+            if upRow != nil { upCancel() }
             defer { touchStart = nil }
             guard let start = touchStart, !holding, Date().timeIntervalSince(start) < 0.3,
               abs(value.translation.width) < 20, abs(value.translation.height) < 20
@@ -88,6 +159,39 @@ struct EdgeStepper: View {
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(side == .next ? "Next: tap for a frame, hold for rep, frame or position" : "Previous: tap for a frame, hold for rep, frame or position")
+    .onChange(of: touching) { _, down in if !down, engine.isRunning { upCancel() } }
+    .onChange(of: scenePhase) { _, phase in if phase != .active { upCancel() } }
+    .onDisappear { upCancel() }
+  }
+
+  /// Hold-up arrival tracking (story 039): the 24 % zone is exactly the cards, so any touch down
+  /// here is on a key; rows stick ± the shared margin like the middle hold.
+  private func upTrack(_ location: CGPoint, height: CGFloat) {
+    let rowHeight = height / CGFloat(StepKey.allCases.count)
+    var row = Int(location.y / rowHeight)
+    if let current = upRow,
+      location.y >= CGFloat(current) * rowHeight - MiddleHold.reentryMargin,
+      location.y < CGFloat(current + 1) * rowHeight + MiddleHold.reentryMargin {
+      row = current
+    }
+    row = min(StepKey.allCases.count - 1, max(0, row))
+    if upRow == row { return }
+    upRow = row
+    let key = StepKey.allCases[row]
+    onUpLit(key)
+    engine.onFire = { [key] repeatIndex, atEnd in onUpFire(key, repeatIndex, atEnd) }
+    engine.clock = upClock
+    engine.start()
+  }
+
+  private func upEnd() {
+    upCancel()
+  }
+
+  private func upCancel() {
+    engine.stop()
+    upRow = nil
+    onUpLit(nil)
   }
 }
 
@@ -118,29 +222,30 @@ struct KeyStackView: View {
   }
 }
 
-/// Middle hold over the video (story 039): press and hold the middle of the picture to bring up both
-/// edge key stacks, slide onto a key to fire it on arrival, keep holding to repeat it every 2 s.
-/// A hold that never touches a key fires nothing on release, and moving before the hold threshold
-/// kills the gesture outright (no stacks, no scrub). Lifting stops the timer and fires nothing.
+/// Middle hold over the video (stories 039, #60): press and hold the middle of the picture to bring
+/// up both edge key stacks, which stay up after the finger lifts; slide onto a key to fire it on
+/// arrival, keep holding to repeat it every 1 s. A tap on the picture that hits no key while the
+/// stacks are up dismisses them and does nothing else. A hold that never touches a key fires nothing
+/// on release, and moving before the hold threshold kills the gesture outright (no stacks, no scrub).
 struct MiddleHold: View {
   static let holdSeconds = 0.3
   static let tapSlop: CGFloat = 20
-  static let repeatSeconds = 2.0
   /// How far past a key region's edge the finger must travel before the key lets go, so a jittery
   /// thumb on the border cannot double-fire.
   static let reentryMargin: CGFloat = 12
-  /// Playhead moves smaller than this between presses count as no movement (same-time seeks republish).
-  static let stuckEpsilon = 1e-6
 
   /// Every press: side, key, repeat index (0 on arrival), and whether the playhead moved since the
   /// last press of this touch. Release fires nothing.
   let onFire: (StepSide, StepKey, Int, Bool) -> Void
-  /// Quick tap in the middle (play/pause, story 024's path).
+  /// Quick tap in the middle with the stacks down (play/pause, story 024's path).
   let onTap: () -> Void
+  /// Tap on the picture that hits no key while the stacks are up: dismiss, nothing else.
+  let onDismiss: () -> Void
   /// Live playhead for atEnd detection.
   let clock: () -> Double
-  /// Driven stack display (ContentView shows MiddleStacks at the true edges while holding).
-  @Binding var holding: Bool
+  /// The stacks stay up after the finger lifts; cleared by a dismissing tap, a new clip,
+  /// the clip ending, the view disappearing, or the scene going inactive.
+  @Binding var stacksUp: Bool
   @Binding var leftLit: StepKey?
   @Binding var rightLit: StepKey?
   @Binding var pulse: Int
@@ -148,13 +253,12 @@ struct MiddleHold: View {
   @Environment(\.scenePhase) private var scenePhase
   @GestureState private var touching = false
 
+  @State private var holding = false
   @State private var touchStart: Date?
   @State private var killed = false
   @State private var activeSide: StepSide?
   @State private var activeKey: StepKey?
-  @State private var repeatIndex = 0
-  @State private var lastTime = 0.0
-  @State private var repeatTimer: Timer?
+  @State private var engine = KeyRepeatEngine()
 
   var body: some View {
     GeometryReader { geo in
@@ -166,7 +270,7 @@ struct MiddleHold: View {
               guard case .second(true, let drag) = value else { return }
               if !holding, killed { return }
               if !holding {
-                withAnimation(.easeOut(duration: 0.12)) { holding = true }
+                withAnimation(.easeOut(duration: 0.12)) { holding = true; stacksUp = true }
                 pulse = 0
               }
               track(drag?.location ?? CGPoint(x: geo.size.width / 2, y: geo.size.height / 2), in: geo.size)
@@ -188,7 +292,7 @@ struct MiddleHold: View {
                 Date().timeIntervalSince(start) < Self.holdSeconds,
                 abs(value.translation.width) < Self.tapSlop, abs(value.translation.height) < Self.tapSlop
               else { return }
-              onTap()
+              if stacksUp { onDismiss() } else { onTap() }
             }
         )
     }
@@ -196,9 +300,10 @@ struct MiddleHold: View {
     .accessibilityLabel("Middle: hold for back and forward keys")
     // Watchdog: SwiftUI resets the gesture state (but calls no gesture callback) when the system
     // takes the touch away, so end the touch there — otherwise the repeat timer keeps stepping.
-    .onChange(of: touching) { _, down in if !down, holding || repeatTimer != nil { endTouch() } }
-    .onChange(of: scenePhase) { _, phase in if phase != .active { endTouch() } }
-    .onDisappear { endTouch() }
+    // A cancelled touch keeps the stacks up; leaving the scene takes them down (#60).
+    .onChange(of: touching) { _, down in if !down, holding || engine.isRunning { endTouch() } }
+    .onChange(of: scenePhase) { _, phase in if phase != .active { endTouch(); stacksUp = false } }
+    .onDisappear { endTouch(); stacksUp = false }
   }
 
   /// Follows the finger in middle-local coordinates: past the middle's edge is a stack, y thirds
@@ -229,26 +334,13 @@ struct MiddleHold: View {
   private func arrive(side: StepSide, key: StepKey) {
     activeSide = side
     activeKey = key
-    repeatIndex = 0
     setLit(side: side, key: key)
-    fire(side: side, key: key)
-    // The timer must fire while the finger is down (a tracking-mode runloop), so it goes on
-    // the common modes; each arrival owns its timer, invalidated on slide-off, arrival or lift.
-    repeatTimer?.invalidate()
-    let timer = Timer(timeInterval: Self.repeatSeconds, repeats: true) { _ in
-      repeatIndex += 1
-      fire(side: side, key: key)
+    engine.onFire = { [side, key] repeatIndex, atEnd in
+      pulse += 1
+      onFire(side, key, repeatIndex, atEnd)
     }
-    RunLoop.main.add(timer, forMode: .common)
-    repeatTimer = timer
-  }
-
-  private func fire(side: StepSide, key: StepKey) {
-    let t = clock()
-    let atEnd = repeatIndex > 0 && abs(t - lastTime) < Self.stuckEpsilon
-    lastTime = t
-    pulse += 1
-    onFire(side, key, repeatIndex, atEnd)
+    engine.clock = clock
+    engine.start()
   }
 
   private func setLit(side: StepSide, key: StepKey) {
@@ -256,8 +348,7 @@ struct MiddleHold: View {
   }
 
   private func deactivate() {
-    repeatTimer?.invalidate()
-    repeatTimer = nil
+    engine.stop()
     activeSide = nil
     activeKey = nil
     leftLit = nil
