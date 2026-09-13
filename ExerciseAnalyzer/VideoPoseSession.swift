@@ -124,6 +124,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var cameraFirstTime: Double?
   private var cameraFramesDelivered = 0
   private var cameraFramesAnalyzed = 0
+  /// Pause state (#67): the clip, the count and the elapsed time freeze while the camera keeps running.
+  @Published private(set) var paused = false
+  /// Seconds cut out by pauses so far, and the camera pts when the current pause began (nil between pauses).
+  private var pausedTotal = 0.0
+  private var pausedAt: Double?
+  /// Last camera pts seen, paused or not: bounds the open pause at Done and anchors the resume math.
+  private var lastCameraPts: Double?
 
   private var recentBoxes: [(time: Double, box: CGRect)] = []
   private var currentFileURL: URL?
@@ -1246,6 +1253,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func handle(result: YOLOResult) {
     guard let pending = pendingFrame else { return }
     pendingFrame = nil
+    if paused {
+      // While paused the picture and the in-frame hint keep refreshing, but nothing is counted, shown or
+      // logged per frame: the box and pose are picked exactly the way the live path picks them (#67).
+      guard source == .camera else { return }
+      let sighting = FrameRecord(result: result, time: pending.time)
+      frameStatus = FrameStatus(box: sighting.box, pose: sighting.pose)
+      pushWatchStatus()
+      sendPreviewIfDue(pixelBuffer: pending.pixelBuffer)
+      return
+    }
     if source == .camera, exerciseMode == .auto, !liveDetectionLocked,
       let index = result.boxes.indices.max(by: { result.boxes[$0].conf < result.boxes[$1].conf }),
       index < result.keypointsList.count
@@ -1306,19 +1323,24 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       frameStatus = status
       pushWatchStatus()
-      // Reachable already means the watch app is in front (watchOS only reports reachability then), so that is the
-      // whole gate: the scene-active message was missed at launch and starved the preview (#38).
-      if watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
-        lastPreviewSent = Date()
-        if let small = FrameImage.thumbnail(from: pending.pixelBuffer, longSide: 176),
-          let jpeg = UIImage(cgImage: small).jpegData(compressionQuality: 0.45)
-        {
-          if !previewSentThisSet {
-            previewSentThisSet = true
-            log.event("watch_preview", ["bytes": jpeg.count, "watch_active": watch.watchActive])
-          }
-          watch.sendPreview(jpeg)
+      sendPreviewIfDue(pixelBuffer: pending.pixelBuffer)
+    }
+  }
+
+  /// A small JPEG of the live frame for the wrist, about once a second; shared by the live and paused paths.
+  private func sendPreviewIfDue(pixelBuffer: CVPixelBuffer) {
+    // Reachable already means the watch app is in front (watchOS only reports reachability then), so that is the
+    // whole gate: the scene-active message was missed at launch and starved the preview (#38).
+    if watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
+      lastPreviewSent = Date()
+      if let small = FrameImage.thumbnail(from: pixelBuffer, longSide: 176),
+        let jpeg = UIImage(cgImage: small).jpegData(compressionQuality: 0.45)
+      {
+        if !previewSentThisSet {
+          previewSentThisSet = true
+          log.event("watch_preview", ["bytes": jpeg.count, "watch_active": watch.watchActive])
         }
+        watch.sendPreview(jpeg)
       }
     }
   }
@@ -1359,6 +1381,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     status.zoom = camera?.zoom ?? 1
     status.zoomPresets = camera?.zoomPresets ?? [1]
     status.watchMode = watchMode
+    status.paused = paused
     watch.send(status, force: force || heartbeat)
   }
 
@@ -1377,6 +1400,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
         RecordPrompt.post(log: log)
       }
     case .switchCamera: cycleCameraLevel()
+    case .pause: pauseCamera(from: "watch")
+    case .resume: resumeCamera(from: "watch")
     case .finish: if source == .camera { finishCamera() }
     case .cancel: if source == .camera { cancelCamera() }
     case .status: pushWatchStatus(force: true)
@@ -1446,6 +1471,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     liveBellTotalMs = 0
     liveBellsDropped = 0
     recordedSegments = []
+    paused = false
+    pausedTotal = 0
+    pausedAt = nil
+    lastCameraPts = nil
 
     AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
       Task { @MainActor in
@@ -1513,8 +1542,25 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func cameraFrame(pixelBuffer: CVPixelBuffer, pts: Double) {
     guard source == .camera else { return }
     if cameraFirstTime == nil { cameraFirstTime = pts }
+    lastCameraPts = pts
+    if !paused, let at = pausedAt {
+      // First frame after a resume: cut the pause out of live time in camera time, not wall time (#67).
+      let gap = pts - at
+      pausedTotal += gap
+      pausedAt = nil
+      let time = pts - (cameraFirstTime ?? pts) - pausedTotal
+      duration = time
+      currentTime = time
+      log.event("camera_resume", ["at_s": duration, "paused_s": gap, "segment": recordedSegments.count])
+    }
     cameraFramesDelivered += 1
-    let time = pts - (cameraFirstTime ?? pts)
+    guard !paused else {
+      // Frozen: the recorder stays suspended and the pipeline sees nothing, but the in-frame hint and the watch
+      // preview keep flowing on the frozen clock so the lifter can check the reframing (#67).
+      ingest(pixelBuffer: pixelBuffer, time: duration)
+      return
+    }
+    let time = pts - (cameraFirstTime ?? pts) - pausedTotal
     duration = time
     currentTime = time
     ingest(pixelBuffer: pixelBuffer, time: time)
@@ -1540,6 +1586,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let finished = recorder
     let next = FrameRecorder()
     next.onError = finished?.onError
+    next.setSuspended(paused)  // a rotation mid-pause must not wake the new segment (#67)
     recorder = next
     log.event(
       "camera_rotate",
@@ -1617,6 +1664,36 @@ final class VideoPoseSession: NSObject, ObservableObject {
     pushWatchStatus(force: true)
   }
 
+  /// Freezes the clip, the count and the elapsed time; the camera keeps running so the framing stays live.
+  /// The pause is a segment boundary, the same mechanism as rotating the phone mid-set (#22): the current
+  /// recorder is finished off and a fresh suspended one takes its place (#67).
+  func pauseCamera(from: String) {
+    guard source == .camera, !paused else { return }
+    let finished = recorder
+    let next = FrameRecorder()
+    next.onError = finished?.onError
+    next.setSuspended(true)
+    recorder = next
+    paused = true
+    pausedAt = lastCameraPts
+    log.event("camera_pause", ["at_s": duration, "reps": pipeline.reps.count, "segment": recordedSegments.count])
+    pushWatchStatus(force: true)
+    Task {
+      if let finished, let url = await finished.finish() ?? finished.partialURL {
+        recordedSegments.append(url)
+      }
+    }
+  }
+
+  /// Carries on where the pause began: the gap leaves live time on the next frame, and the suspended recorder
+  /// wakes on its own queue so no paused frame can overtake the resume (#67).
+  func resumeCamera(from: String) {
+    guard source == .camera, paused else { return }
+    paused = false
+    recorder?.setSuspended(false)
+    pushWatchStatus(force: true)
+  }
+
   /// Stops the camera without keeping the recording.
   func cancelCamera() {
     stopCamera()
@@ -1629,6 +1706,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     camera?.stop()
     camera = nil
     cameraPreviewLayer = nil
+    paused = false
+    pausedAt = nil
+    pausedTotal = 0
+    lastCameraPts = nil
     if source == .camera {
       source = .none
       setWatchMode(false, from: "set_ended")
@@ -1643,6 +1724,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let recordedDuration = duration
     let delivered = cameraFramesDelivered
     let analyzed = cameraFramesAnalyzed
+    // A pause open at Done ends here: its tail counts as paused time (#67).
+    var pausedTime = pausedTotal
+    if paused, let at = pausedAt, let last = lastCameraPts { pausedTime += last - at }
     stopCamera()
     guard let recorder else { return }
     self.recorder = nil
@@ -1654,34 +1738,47 @@ final class VideoPoseSession: NSObject, ObservableObject {
         "live_reps": livePipeline.reps.count, "live_bell_frames": liveBellFrames,
         "live_bell_avg_infer_ms": liveBellFrames == 0 ? 0 : liveBellTotalMs / Double(liveBellFrames),
         "live_fps": fps, "live_bells_dropped": liveBellsDropped,
+        "paused_s": pausedTime, "segments": recordedSegments.count + 1,
       ])
     Task {
       let finished = await recorder.finish()
-      guard let url = finished ?? recorder.partialURL else {
+      var segments = recordedSegments
+      recordedSegments = []
+      if let url = finished ?? recorder.partialURL {
+        if finished == nil {
+          statusMessage = "Recording was cut short, keeping what was captured"
+          log.event("recording_partial", ["url": url.lastPathComponent, "duration_s": recordedDuration])
+        }
+        segments.append(url)
+      }
+      guard !segments.isEmpty else {
         statusMessage = "Nothing recorded"
         log.event("error", ["where": "recorder", "message": "finish returned no file"])
         activity = .idle
         return
       }
-      if finished == nil {
-        statusMessage = "Recording was cut short, keeping what was captured"
-        log.event("recording_partial", ["url": url.lastPathComponent, "duration_s": recordedDuration])
-      }
-      var clipURL = url
-      if !recordedSegments.isEmpty {
-        // Rotated mid-set: join the segments into one clip before trimming and analysis.
-        let segments = recordedSegments + [url]
-        recordedSegments = []
+      var clipURL = segments[0]
+      if segments.count > 1 {
+        // Rotated mid-set (#22) or paused (#67): join the segments into one clip before trimming and analysis.
+        let progress: (@Sendable (Double) -> Void)? = { [weak self] progress in
+          Task { @MainActor in self?.activity = .working("Joining segments", progress: progress) }
+        }
         activity = .working("Joining \(segments.count) segments", progress: 0)
         let started = Date()
         do {
-          clipURL = try await VideoFile.stitch(segments) { [weak self] progress in
-            Task { @MainActor in self?.activity = .working("Joining segments", progress: progress) }
+          // Same display size throughout: a passthrough join (seconds, no quality loss); a rotation across a
+          // pause changes the size and still takes the re-encoding stitch.
+          let passthrough = await VideoFile.sameDisplaySize(segments)
+          if passthrough {
+            clipURL = try await VideoFile.join(segments, progress: progress)
+          } else {
+            clipURL = try await VideoFile.stitch(segments, progress: progress)
           }
-          log.event("stitch", ["segments": segments.count, "elapsed_s": Date().timeIntervalSince(started), "clip": clipURL.lastPathComponent])
+          log.event("stitch", ["segments": segments.count, "elapsed_s": Date().timeIntervalSince(started), "clip": clipURL.lastPathComponent, "passthrough": passthrough])
         } catch {
           log.event("error", ["where": "stitch", "message": "\(error)"])
-          statusMessage = "Couldn't join the rotated segments; keeping the last one"
+          statusMessage = "Couldn't join the segments; keeping the last one"
+          clipURL = segments[segments.count - 1]
         }
       }
       currentFileURL = clipURL

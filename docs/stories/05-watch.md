@@ -126,7 +126,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 040:
 
 - **Summary:** Pause and resume a set from the wrist
-- **Status:** requested ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "Give me the ability to pause and resume on my watch")
+- **Status:** implemented in 5fe2561; needs phone + watch ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "Give me the ability to pause and resume on my watch")
 - **Why:** a set gets interrupted (chalk, someone crossing the frame, a tripod that needs moving) and today the only choices are to keep recording the interruption or to cancel the set.
 
 #### Use Case:

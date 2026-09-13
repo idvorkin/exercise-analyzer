@@ -21,10 +21,20 @@ final class FrameRecorder: @unchecked Sendable {
       "swing-recording-\(Int(Date().timeIntervalSince1970)).mov")
   }
 
+  /// Drops appended frames until resumed: a pause must not start the new segment's session mid-pause (#67).
+  /// Both directions go through the queue, so a suspend can never overtake an earlier append or be overtaken by
+  /// a later resume — no flag is ever read off the capture queue.
+  func setSuspended(_ suspended: Bool) {
+    queue.async { [self] in self.suspended = suspended }
+  }
+
+  private var suspended = false
+
   /// Appends a frame. Safe to call from the capture queue; the first frame sizes the encoder and starts the
   /// session at its timestamp, so file time == capture time minus the first frame's time.
   func append(_ sampleBuffer: CMSampleBuffer) {
     queue.async { [self] in
+      guard !suspended else { return }
       guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
       if writer == nil {
         do {
@@ -162,6 +172,63 @@ enum VideoFile {
       throw VideoFileError.exportFailed(export.error?.localizedDescription ?? "unknown")
     }
     return Trimmed(url: output, start: alignedStart, passthrough: false)
+  }
+
+  /// Whether every segment shows the same display size (natural size under its preferred transform): only
+  /// then can they be joined without re-encoding. A rotation across a pause still takes the re-encoding stitch.
+  static func sameDisplaySize(_ urls: [URL]) async -> Bool {
+    var size: CGSize?
+    for url in urls {
+      let asset = AVURLAsset(url: url)
+      guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+        let natural = try? await track.load(.naturalSize),
+        let transform = try? await track.load(.preferredTransform)
+      else { return false }
+      let display = natural.applying(transform)
+      let displaySize = CGSize(width: abs(display.width), height: abs(display.height))
+      if let size, size != displaySize { return false }
+      size = displaySize
+    }
+    return size != nil
+  }
+
+  /// Joins same-orientation segments without re-encoding: one composition track, each segment's full range in
+  /// turn, a passthrough export, the first segment's preferred transform kept on the track. A plain pause
+  /// mid-set joins this way (seconds, no quality loss); rotating across it still takes `stitch` (#67).
+  static func join(_ urls: [URL], progress: (@Sendable (Double) -> Void)? = nil) async throws -> URL {
+    let composition = AVMutableComposition()
+    guard let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+    else { throw VideoFileError.exportFailed("no composition track") }
+    var cursor = CMTime.zero
+    var keptTransform: CGAffineTransform?
+    for url in urls {
+      let asset = AVURLAsset(url: url)
+      guard let source = try await asset.loadTracks(withMediaType: .video).first else { continue }
+      let duration = try await asset.load(.duration)
+      if keptTransform == nil { keptTransform = try await source.load(.preferredTransform) }
+      try track.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: source, at: cursor)
+      cursor = cursor + duration
+    }
+    guard cursor != .zero else { throw VideoFileError.exportFailed("no video in segments") }
+    track.preferredTransform = keptTransform ?? .identity
+    guard let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough)
+    else { throw VideoFileError.exportFailed("no export session") }
+    let output = tempURL()
+    export.outputURL = output
+    export.outputFileType = .mov
+    let poller = Task {
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .milliseconds(500))
+        if Task.isCancelled { break }
+        progress?(Double(export.progress))
+      }
+    }
+    await export.export()
+    poller.cancel()
+    guard export.status == .completed else {
+      throw VideoFileError.exportFailed(export.error?.localizedDescription ?? "unknown")
+    }
+    return output
   }
 
   /// Joins recordings made in different orientations into one clip: each segment is scaled to fit the first

@@ -81,6 +81,9 @@ final class PhoneLink: NSObject, ObservableObject {
     if previous.recording != next.recording || previous.reps != next.reps {
       logEvent("status", ["recording": next.recording, "reps": next.reps, "in_frame": next.frame.inFrame])
     }
+    if previous.paused != next.paused {
+      logEvent("status", ["paused": next.paused])
+    }
     if next.recording {
       if previous.frame.inFrame && !next.frame.inFrame { WKInterfaceDevice.current().play(.notification) }
       if next.reps > previous.reps { WKInterfaceDevice.current().play(.success) }

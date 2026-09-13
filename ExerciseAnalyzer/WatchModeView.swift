@@ -21,6 +21,14 @@ struct WatchModeView: View {
           .minimumScaleFactor(0.4).lineLimit(1)
           .foregroundStyle(.white)
         Text(session.reps.count == 1 ? "rep" : "reps").font(.title).foregroundStyle(.gray)
+        if session.paused {
+          Text("PAUSED")
+            .font(.system(size: 40, weight: .heavy))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 24).padding(.vertical, 10)
+            .background(Color.orange, in: RoundedRectangle(cornerRadius: 16))
+            .minimumScaleFactor(0.5).lineLimit(1)
+        }
         if !session.frameStatus.inFrame {
           Text(session.frameStatus.hint.uppercased())
             .font(.system(size: 40, weight: .heavy))

@@ -40,7 +40,7 @@ struct WatchContentView: View {
               .frame(maxWidth: .infinity, maxHeight: 90)
               .clipShape(RoundedRectangle(cornerRadius: 8))
           }
-          Text(status.frame.hint.uppercased())
+          Text(status.paused ? "PAUSED · \(status.frame.hint.uppercased())" : status.frame.hint.uppercased())
             .font(.headline).multilineTextAlignment(.center)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(status.frame.inFrame ? Color.green.opacity(0.35) : Color.red.opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
@@ -62,6 +62,10 @@ struct WatchContentView: View {
           Button { phone.send(.switchCamera) } label: {
             Label("Camera: \(cameraLevel)", systemImage: "arrow.triangle.2.circlepath.camera").frame(maxWidth: .infinity)
           }
+          Button { phone.send(status.paused ? .resume : .pause) } label: {
+            Label(status.paused ? "Resume" : "Pause", systemImage: status.paused ? "play.fill" : "pause.fill").frame(maxWidth: .infinity)
+          }
+          .tint(status.paused ? .orange : nil)
           Button { phone.send(.finish) } label: {
             Label("Done", systemImage: "checkmark.circle.fill").frame(maxWidth: .infinity)
           }

@@ -240,7 +240,11 @@ struct ContentView: View {
           .monospacedDigit()
         exerciseMenu
         if session.source == .camera {
-          Text("● REC").font(.caption.bold()).foregroundStyle(.red)
+          if session.paused {
+            Text("❚❚ PAUSED").font(.caption.bold()).foregroundStyle(.orange)
+          } else {
+            Text("● REC").font(.caption.bold()).foregroundStyle(.red)
+          }
         }
         Spacer()
         Text(String(format: "%.0f fps", session.fps)).font(.caption2).monospacedDigit().opacity(0.7)
@@ -605,6 +609,12 @@ struct ContentView: View {
       }
       .accessibilityLabel("Camera \(session.cameraLevelLabel), tap for \(session.nextCameraLevelLabel)")
       Spacer()
+      Button {
+        session.paused ? session.resumeCamera(from: "phone") : session.pauseCamera(from: "phone")
+      } label: {
+        Label(session.paused ? "Resume" : "Pause", systemImage: session.paused ? "play.fill" : "pause.fill")
+      }
+      .accessibilityLabel(session.paused ? "Resume the set" : "Pause the set")
       Button {
         session.finishCamera()
       } label: {
