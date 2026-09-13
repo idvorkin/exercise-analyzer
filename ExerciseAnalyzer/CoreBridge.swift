@@ -37,14 +37,20 @@ extension AnalysisPipeline {
     process(extracted: FrameRecord(result: result, time: time), image: image)
   }
 
-  /// Replaces rep positions' images with frames pulled from the clip at each peak time.
+  /// Replaces rep positions' images with frames pulled from the clip at each peak time, each still cut to
+  /// the person crop (#61). The generator applies the preferred track transform, so its stills are upright in
+  /// the same top-left-origin space as the crop and the pose keypoints: cut the pixels and remap the pose
+  /// together. With no crop (no person) the whole frame stays, as it does when the cut misses.
   func fillRepImages(from asset: AVAsset, frameDuration: Double) async {
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true
-    generator.maximumSize = CGSize(width: 360, height: 360)
+    // Long side 720: a person crop of a wide frame stays sharp in the enlarged phase row, while the stored
+    // JPEGs stay small (the crop, not the frame, is what gets saved).
+    generator.maximumSize = CGSize(width: 720, height: 720)
     let tolerance = CMTime(seconds: frameDuration / 2, preferredTimescale: 600)
     generator.requestedTimeToleranceBefore = tolerance
     generator.requestedTimeToleranceAfter = tolerance
+    let crop = stableCrop
     var updated: [RepRecord] = []
     for rep in reps {
       var positions = rep.positions
@@ -53,6 +59,15 @@ extension AnalysisPipeline {
         if let (cgImage, _) = try? await generator.image(at: time) {
           var filled = position
           filled.image = cgImage
+          if let crop, !crop.isEmpty {
+            let rect = PersonCrop.pixelRect(crop, in: CGSize(width: cgImage.width, height: cgImage.height))
+            if let cut = cgImage.cropping(to: rect) {
+              filled = RepPosition(
+                phase: position.phase, time: position.time,
+                pose: position.pose.cropped(to: crop, imageSize: CGSize(width: cut.width, height: cut.height)),
+                metrics: position.metrics, score: position.score, image: cut)
+            }
+          }
           positions[phase] = filled
         }
       }

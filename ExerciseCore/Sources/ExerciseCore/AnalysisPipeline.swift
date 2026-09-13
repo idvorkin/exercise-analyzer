@@ -121,6 +121,16 @@ public enum PersonCrop {
     return padded(box: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY))
   }
 
+  /// The normalized crop as integral pixel coordinates in an image of `size`: me-view space, top-left
+  /// origin, the same space the oriented `AVAssetImageGenerator` stills and the pose keypoints live in (#61).
+  /// Clamped to the image; empty when the crop covers nothing.
+  public static func pixelRect(_ crop: CGRect, in size: CGSize) -> CGRect {
+    let rect = CGRect(
+      x: (crop.minX * size.width).rounded(.down), y: (crop.minY * size.height).rounded(.down),
+      width: (crop.width * size.width).rounded(.up), height: (crop.height * size.height).rounded(.up))
+    return rect.intersection(CGRect(origin: .zero, size: size))
+  }
+
   private static func padded(box: CGRect) -> CGRect {
     let padded = CGRect(
       x: box.midX - box.width * 0.7, y: box.midY - box.height * 0.65,
