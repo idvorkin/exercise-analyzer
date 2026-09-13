@@ -261,7 +261,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 045:
 
 - **Summary:** The final count reaches the wrist
-- **Status:** implemented in [<sha>](https://github.com/idvorkin/exercise-analyzer/commit/<sha>); needs phone + watch
+- **Status:** implemented in [0ea930c](https://github.com/idvorkin/exercise-analyzer/commit/0ea930c); needs phone + watch
 - **Why:** the watch drops to "Phone ready" the moment the camera stops, and the live count it showed is not the one the offline pass settles on a few seconds later; Igor walks to the phone to learn the set.
 
 #### Use Case:
