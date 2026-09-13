@@ -93,8 +93,8 @@ struct WatchContentView: View {
 
   /// Page one: the preview filling the screen, chips over its top corners, the hint bar and the round buttons
   /// over its bottom edge. No picture yet: the same overlays on black. Only the picture ignores the safe area:
-  /// the chips live in the VStack and the button row in a bottom safeAreaInset, so the Ultra 2 keeps both on
-  /// screen (refs #74).
+  /// the chips sit below the system clock line, and the button row lives in a bottom safeAreaInset lifted 20 pt,
+  /// so the bezel keeps neither (refs #74).
   private var recordingPicturePage: some View {
     ZStack {
       if let preview = phone.preview {
@@ -116,6 +116,7 @@ struct WatchContentView: View {
             .background(.ultraThinMaterial, in: Capsule())
         }
         .padding(.horizontal, 8)
+        .padding(.top, 40)
         Spacer()
         Text(hintText)
           .font(.caption).multilineTextAlignment(.center)
@@ -164,7 +165,7 @@ struct WatchContentView: View {
           .buttonStyle(.plain)
           .accessibilityLabel("Cancel")
         }
-        .padding(.bottom, 2)
+        .padding(.bottom, 20)
       }
     }
   }
