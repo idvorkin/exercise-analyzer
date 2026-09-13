@@ -80,7 +80,8 @@ func compiled(_ modelURL: URL) throws -> URL {
 let modelURL = URL(fileURLWithPath: options.model)
 let config = MLModelConfiguration()
 config.computeUnits = .all
-let mlModel = try MLModel(contentsOf: try compiled(modelURL), configuration: config)
+let poseCompiled = try compiled(modelURL)
+let mlModel = try MLModel(contentsOf: poseCompiled, configuration: config)
 let visionModel = try VNCoreMLModel(for: mlModel)
 
 /// The bell detector, when its package is there (a missing default is simply "no bells").
@@ -94,7 +95,13 @@ let bellDetector: BellDetector? = try {
     path = modelURL.deletingLastPathComponent().appendingPathComponent("yoloe-26n-kettlebell.mlpackage").path
     guard FileManager.default.fileExists(atPath: path) else { return nil }
   }
-  return try BellDetector(compiledModelURL: try compiled(URL(fileURLWithPath: path)))
+  let units: MLComputeUnits
+  switch ProcessInfo.processInfo.environment["POSETRACK_BELL_UNITS"] {
+  case "cpu": units = .cpuOnly
+  case "gpu": units = .cpuAndGPU
+  default: units = .all
+  }
+  return try BellDetector(compiledModelURL: try compiled(URL(fileURLWithPath: path)), computeUnits: units)
 }()
 guard let imageInput = mlModel.modelDescription.inputDescriptionsByName.values.first(where: { $0.type == .image }),
   let constraint = imageInput.imageConstraint
@@ -136,12 +143,33 @@ func parse(_ array: MLMultiArray, letterbox: Letterbox, confidence: Float) -> (p
   return (Pose(xyn: xyn, conf: conf, imageSize: size), box)
 }
 
+// MARK: - Compute plan (where the ops run on this Mac; the phone logs the same as model_plan)
+
+if ProcessInfo.processInfo.environment["POSETRACK_PLAN"] == "1" {
+  let planSemaphore = DispatchSemaphore(value: 0)
+  Task {
+    let pose = await ModelPlan.summary(compiledModelURL: poseCompiled)
+    print("plan yolo26n-pose: \(pose.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))")
+    if let bellDetector {
+      let bell = await ModelPlan.summary(compiledModelURL: bellDetector.compiledModelURL)
+      print("plan bell detector: \(bell.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))")
+    }
+    planSemaphore.signal()
+  }
+  planSemaphore.wait()
+}
+
 // MARK: - Frames
 
 let asset = AVURLAsset(url: URL(fileURLWithPath: options.video))
 let semaphore = DispatchSemaphore(value: 0)
 var frames: [FrameRecord] = []
 var elapsed = 0.0
+let traceTracker: BellTracker = {  // trace only: what the pipeline's tracker will pick
+  var t = BellTracker.Thresholds()
+  if let hand = ProcessInfo.processInfo.environment["POSETRACK_HAND"].flatMap(Double.init) { t.handDistance = hand }
+  return BellTracker(thresholds: t)
+}()
 Task {
   do {
     guard let track = try await asset.loadTracks(withMediaType: .video).first else { fail("no video track") }
@@ -150,7 +178,8 @@ Task {
     let output = AVAssetReaderVideoCompositionOutput(
       videoTracks: [track], videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
     output.videoComposition = composition
-    output.alwaysCopiesSampleData = false
+    output.alwaysCopiesSampleData = ProcessInfo.processInfo.environment["POSETRACK_COPY_SAMPLES"] == "1"
+    bellDetector?.samplesColor = ProcessInfo.processInfo.environment["POSETRACK_NO_COLOR"] != "1"
     reader.add(output)
     guard reader.startReading() else { fail("reader: \(String(describing: reader.error))") }
     let started = Date()
@@ -158,6 +187,11 @@ Task {
       guard let pixelBuffer = CMSampleBufferGetImageBuffer(sample) else { continue }
       let time = CMSampleBufferGetPresentationTimeStamp(sample).seconds
       let size = CGSize(width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
+      if frames.isEmpty {
+        let f = CVPixelBufferGetPixelFormatType(pixelBuffer)
+        let fourcc = String(bytes: [UInt8(f >> 24 & 0xff), UInt8(f >> 16 & 0xff), UInt8(f >> 8 & 0xff), UInt8(f & 0xff)], encoding: .ascii) ?? "?"
+        FileHandle.standardError.write("  first frame \(Int(size.width))×\(Int(size.height)) format \(fourcc) planes \(CVPixelBufferGetPlaneCount(pixelBuffer))\n".data(using: .utf8)!)
+      }
       let request = VNCoreMLRequest(model: visionModel)
       request.imageCropAndScaleOption = .scaleFit
       try VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:]).perform([request])
@@ -168,6 +202,12 @@ Task {
         person = parse(array, letterbox: letterbox, confidence: options.confidence)
       }
       let bells = bellDetector?.detect(in: pixelBuffer) ?? []
+      if ProcessInfo.processInfo.environment["POSETRACK_TRACE"] == "1" {
+        let tracked = traceTracker.track(bells, pose: person?.pose)
+        let wrists = person.map { p in [9, 10].map { String(format: "%.2f,%.2f", p.pose.xyn[$0].x, p.pose.xyn[$0].y) }.joined(separator: "/") } ?? "-"
+        let line = "  frame \(frames.count) t=\(String(format: "%.2f", time)) bells=\(bells.count) \(bells.prefix(3).map { String(format: "%.2f@%.2f,%.2f", $0.conf, $0.box.midX, $0.box.midY) }.joined(separator: " ")) wrists \(wrists) tracked \(tracked.map { String(format: "%.2f@%.2f,%.2f", $0.conf, $0.box.midX, $0.box.midY) } ?? "-")\n"
+        FileHandle.standardError.write(line.data(using: .utf8)!)
+      }
       frames.append(FrameRecord(time: time, imageSize: size, pose: person?.pose, box: person?.box, analysis: nil, bells: bells))
       if frames.count % 300 == 0 { FileHandle.standardError.write("  \(frames.count) frames…\n".data(using: .utf8)!) }
     }

@@ -36,12 +36,30 @@ final class BellTests: XCTestCase {
     XCTAssertEqual(tracker.track([rack, bell(0.55, 0.5, conf: 0.4)], pose: nil)?.center.x ?? 0, 0.55, accuracy: 0.001)
   }
 
+  func testDoesNotFollowABoxTheHandsHaveLeft() {
+    let tracker = BellTracker()
+    _ = tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
+    // Next frame the hands are at the top of the swing; the box under them was not the bell in play after all.
+    XCTAssertNil(tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: pose(wrist: CGPoint(x: 0.55, y: 0.2))))
+  }
+
   func testNeverStartsOnARackBellOrALowConfidenceBox() {
     let tracker = BellTracker()
     let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
     XCTAssertNil(tracker.track([bell(0.9, 0.9, conf: 0.95)], pose: hands), "rack bell far from the wrists")
-    XCTAssertNil(tracker.track([bell(0.5, 0.6, conf: 0.4)], pose: hands), "not confident enough to start")
+    XCTAssertNil(tracker.track([bell(0.5, 0.6, conf: 0.3)], pose: hands), "not confident enough to start")
     XCTAssertNil(tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: nil), "no wrists to anchor on")
+  }
+
+  func testABellAtRestNeverStartsATrackButAMovingOneDoes() {
+    let tracker = BellTracker()
+    let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
+    // A floor bell sits under the hands for three seconds: the hinge passes over it.
+    for _ in 0..<90 { XCTAssertNil(tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: nil)) }
+    XCTAssertNil(tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: hands), "at rest for 90 frames")
+    // The swung bell arrives beside it, moving: it starts, the floor bell does not.
+    let started = tracker.track([bell(0.5, 0.6, conf: 0.9), bell(0.46, 0.62, conf: 0.6)], pose: hands)
+    XCTAssertEqual(started?.center.x ?? 0, 0.46, accuracy: 0.001)
   }
 
   func testDropsTheTrackAfterEnoughUnseenFrames() {

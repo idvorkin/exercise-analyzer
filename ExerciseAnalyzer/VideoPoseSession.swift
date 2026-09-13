@@ -229,7 +229,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
         case .success(let predictor):
           self.predictor = predictor
           self.modelStatus = "yolo26n-pose"
-          self.log.event("model_loaded", ["model": "yolo26n-pose"])
+          self.log.event("model_loaded", ["model": "yolo26n-pose", "compute_units": "all"])
+          self.logPlan(model: "yolo26n-pose", url: url)
           self.loadBellDetector()
           if let url = self.pendingLoadURL {
             self.pendingLoadURL = nil
@@ -243,6 +244,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
   }
 
+  /// Where Core ML schedules the model's ops (CPU / GPU / Neural Engine), the same assignment Xcode's performance
+  /// report shows (#44). Logged as model_plan with per-device op counts.
+  private func logPlan(model: String, url: URL) {
+    Task { [weak self] in
+      let counts = await ModelPlan.summary(compiledModelURL: url)
+      guard let self, !counts.isEmpty else { return }
+      var fields: [String: Any] = ["model": model]
+      for (k, v) in counts { fields[k] = v }
+      self.log.event("model_plan", fields)
+    }
+  }
+
   /// The bell detector is optional: the app counts without it, it just does not see the bell.
   private func loadBellDetector() {
     guard let url = Bundle.main.url(forResource: "yoloe-26n-kettlebell", withExtension: "mlmodelc") else {
@@ -251,7 +264,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     do {
       bellDetector = try BellDetector(compiledModelURL: url)
-      log.event("model_loaded", ["model": "yoloe-26n-kettlebell"])
+      // Core ML picks the unit per layer within the configured set and never reports which; "all" means CPU,
+      // GPU and the Neural Engine. bell_avg_infer_ms in offline_pass is the only placement evidence.
+      log.event("model_loaded", ["model": "yoloe-26n-kettlebell", "compute_units": "all"])
+      logPlan(model: "yoloe-26n-kettlebell", url: url)
     } catch {
       log.event("error", ["where": "bell_model", "message": "\(error)"])
     }

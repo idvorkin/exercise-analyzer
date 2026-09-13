@@ -112,6 +112,44 @@ kettlebell,dumbbell,barbell,weight plate,bench,plyo box`) and ran `equipment_tri
   those prompts on it. If dumbbells in hand detect, the tracker generalises to "the weight that moves with the
   wrists" and the bench becomes a second signal for the split-squat detector (rear foot on a bench).
 
+## 2026-09-12: the first phone run crashed; three exports of one checkpoint (#43)
+
+The first re-run of a stored get-up from its video crashed the app (the log stops after `recents_rerun`), and the
+Mac reproduced it on the same clip (exported from Photos with `osascript`): `EXC_BAD_ACCESS` in `memmove` on
+Vision's transformer queue at frame 398, every run, stack not unwindable. Pose-only ran the whole clip at 124 fps.
+Isolation by switches in `posetrack`: colour sampling off, copied sample buffers, detector on CPU: still crashes;
+detector on GPU: runs, and Core ML prints "Invalid blob shape: data-dependent shapes were disabled: gather_nd". A
+half-second cut around frame 398 and a blank clip both run clean, so the trigger is runtime state after hundreds of
+frames of varying output sizes, not one frame's content.
+
+What the Ultralytics exporter does with `nms` for a YOLO26 checkpoint, which carries two heads:
+
+| `export(nms=…)` | Graph | Output | Verdict |
+|---|---|---|---|
+| `True` | dense one-to-many head + an NMS op traced into the graph | rows per frame vary | the crash above; GPU refuses it |
+| `False` | the end-to-end one-to-one head with top-300 | `[1, 300, 38]`, static | static, but this head scores the blurred bell in hand at 0.08 where the dense head says 0.39 |
+| `None` | dense one-to-many head, no NMS op | `[1, 37, 8400]` (4 box, 1 score, 32 mask coefficients), static | **bundled**: `BellDetector.parseDense` decodes it and suppresses overlaps in Swift |
+
+Also found on the way: the phone's Neural Engine hands the output back as Float16 while the Mac gives Float32;
+`BellDetector` now reads by data type (`BellDetectorParseTests`). And a self-inflicted detour: a second export
+moved *into* the first package's folder instead of replacing it, so one run loaded the old model.
+
+Tracker after the study (`BellTests`): a box still within 0.02 for 90 frames is a bell at rest and is never
+started on or followed; following also requires the box within 0.2 of a visible wrist (the bell in play is in the
+hands by definition). Measured with the gate off, half the "tracked" frames on the swing clips sat 0.2 or more
+from any wrist: rack bells, which had padded the earlier percentages. With the dense head and the gates:
+
+| Clip | Bell in play | Count |
+|---|---|---|
+| swing-4reps | 83 % | 4 |
+| igor-1h-swing | 62 % (28 kg by colour) | 9 |
+| pistols (floor bell) | 1 % | 6 |
+| bulgarian | 6 % | 8 |
+| tgu-phone-2min (IMG_4342) | 47 % (28 kg by colour) | 2 |
+
+Compute plan on the Mac (`POSETRACK_PLAN=1`): pose model 303 ops on the Neural Engine, 19 CPU; detector 316
+and 2; the rest are constants. The phone logs the same as `model_plan` (#44).
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),

@@ -30,18 +30,27 @@ public final class BellTracker {
   public struct Thresholds {
     public init() {}
     /// A track starts on a box at least this confident, within `startDistance` of a visible wrist.
-    public var startConf: Float = 0.5
+    public var startConf: Float = 0.4
     public var startDistance = 0.12
-    /// It continues on the nearest box within `followDistance` of the last position, at least this confident.
+    /// It continues on the nearest box within `followDistance` of the last position, at least this confident, and,
+    /// while a wrist is visible, within `handDistance` of one: the bell in play is in the hands by definition.
     public var followConf: Float = 0.25
     public var followDistance = 0.1
+    public var handDistance = 0.2
     /// Frames the bell may go unseen before the track is dropped.
     public var lostAfter = 10
+    /// A box seen within `stillRadius` of the same spot for `stillFrames` frames (3 s at 30 fps) is a bell at rest
+    /// (floor, rack) and is never the one in play: the hands pass within reach of the floor bell at the bottom of
+    /// every hinge. A get-up's bell held overhead while lying moves within 3 s, so it is not mistaken for one.
+    public var stillFrames = 90
+    public var stillRadius = 0.02
   }
 
   private let thresholds: Thresholds
   private var current: BellSighting?
   private var missed = 0
+  /// Where bells have been sitting still, and for how many consecutive frames.
+  private var resting: [(center: CGPoint, frames: Int)] = []
 
   public init(thresholds: Thresholds = Thresholds()) {
     self.thresholds = thresholds
@@ -50,13 +59,24 @@ public final class BellTracker {
   public func reset() {
     current = nil
     missed = 0
+    resting = []
   }
 
   /// The bell in play this frame, or nil when none is (or the tracked one is briefly unseen).
   public func track(_ sightings: [BellSighting], pose: Pose?) -> BellSighting? {
+    let still = updateResting(with: sightings)
+    let wrists = Self.wrists(of: pose)
+    func nearAHand(_ s: BellSighting) -> Bool {
+      wrists.isEmpty || wrists.contains { Self.distance(s.center, $0) <= thresholds.handDistance }
+    }
     if let last = current {
+      // Follow the nearest moving box in reach that is still at a hand; a bell at rest is never followed, so at the
+      // bottom of a hinge the track stays with the swung bell and not the floor bell beside it.
       let followed = sightings
-        .filter { $0.conf >= thresholds.followConf && Self.distance($0.center, last.center) <= thresholds.followDistance }
+        .filter {
+          $0.conf >= thresholds.followConf && !still.contains($0) && nearAHand($0)
+            && Self.distance($0.center, last.center) <= thresholds.followDistance
+        }
         .min { Self.distance($0.center, last.center) < Self.distance($1.center, last.center) }
       if let followed {
         current = followed
@@ -66,10 +86,9 @@ public final class BellTracker {
       missed += 1
       if missed > thresholds.lostAfter { current = nil }
     }
-    let wrists = Self.wrists(of: pose)
     guard !wrists.isEmpty else { return nil }
     let started = sightings
-      .filter { $0.conf >= thresholds.startConf }
+      .filter { $0.conf >= thresholds.startConf && !still.contains($0) }
       .map { s in (s, wrists.map { Self.distance(s.center, $0) }.min() ?? .infinity) }
       .filter { $0.1 <= thresholds.startDistance }
       .min { $0.1 < $1.1 }?.0
@@ -78,6 +97,22 @@ public final class BellTracker {
       missed = 0
     }
     return started
+  }
+
+  /// Advances the rest bookkeeping one frame and returns the sightings that count as at rest.
+  private func updateResting(with sightings: [BellSighting]) -> [BellSighting] {
+    var next: [(center: CGPoint, frames: Int)] = []
+    var still: [BellSighting] = []
+    for s in sightings {
+      if let match = resting.first(where: { Self.distance($0.center, s.center) <= thresholds.stillRadius }) {
+        next.append((match.center, match.frames + 1))
+        if match.frames + 1 >= thresholds.stillFrames { still.append(s) }
+      } else {
+        next.append((s.center, 1))
+      }
+    }
+    resting = next
+    return still
   }
 
   private static func wrists(of pose: Pose?) -> [CGPoint] {

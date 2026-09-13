@@ -24,9 +24,13 @@ model:
     bash scripts/download-model.sh
 
 build-sim:
-    xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer \
+    #!/usr/bin/env bash
+    set -uo pipefail
+    out=$(xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer \
       -derivedDataPath Build/ -destination "platform=iOS Simulator,name={{sim}}" \
-      CODE_SIGNING_ALLOWED=NO build | grep -E "error:|BUILD"
+      CODE_SIGNING_ALLOWED=NO build 2>&1)
+    echo "$out" | grep -E "error:|BUILD"
+    echo "$out" | grep -q "BUILD SUCCEEDED"
 
 # Build, install, and launch on the simulator; pass a video path to auto-load it.
 run-sim video="": build-sim
@@ -37,9 +41,14 @@ run-sim video="": build-sim
     SIMCTL_CHILD_SWING_VIDEO="{{video}}" xcrun simctl launch "{{sim}}" {{bundle}}
 
 build-device:
-    xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer \
+    #!/usr/bin/env bash
+    # The grep alone would exit 0 on "BUILD FAILED" and let run-device install the previous bundle (#43 taught us).
+    set -uo pipefail
+    out=$(xcodebuild -project ExerciseAnalyzer.xcodeproj -scheme ExerciseAnalyzer \
       -derivedDataPath Build/ -destination "platform=iOS,id={{device}}" \
-      -allowProvisioningUpdates -allowProvisioningDeviceRegistration build | grep -E "error:|BUILD"
+      -allowProvisioningUpdates -allowProvisioningDeviceRegistration build 2>&1)
+    echo "$out" | grep -E "error:|BUILD"
+    echo "$out" | grep -q "BUILD SUCCEEDED"
 
 # Build, install, and launch on the connected iPhone.
 run-device: build-device
