@@ -203,6 +203,16 @@ extension TuningReports {
       print(Self.bellHeldLine(
         label: source.label, frames: pipeline.track.frames, zones: pipeline.bellTracker.staticZones,
         reps: pipeline.reps.map { ($0.startTime, $0.endTime) }))
+      // BELL_LAB_COLOURS=1: how the held frames vote on the bell's weight (the set's line takes the majority).
+      if ProcessInfo.processInfo.environment["BELL_LAB_COLOURS"] == "1" {
+        var votes: [String: Int] = [:]
+        for f in pipeline.track.frames {
+          guard let bell = f.bell else { continue }
+          let key = bell.color.map { c in BellColor.weightKg(rgb: c).map { "\($0) kg" } ?? "no code" } ?? "no colour"
+          votes[key, default: 0] += 1
+        }
+        print("COLOURS \(source.label): " + votes.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
+      }
       // BELL_LAB_DOTS=1: one line per frame with the reported bell and the wrists, for cutting frames with the
       // dot drawn in so a person (or a vision model) can grade whether it sits on the bell in the hands.
       if ProcessInfo.processInfo.environment["BELL_LAB_DOTS"] == "1" {

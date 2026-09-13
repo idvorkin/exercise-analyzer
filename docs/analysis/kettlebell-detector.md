@@ -280,6 +280,23 @@ to 7 with the circle-on-bell count unchanged at 16 of 40, and 40 more one-hand f
 (28 of 37 on the bell, 11 false against 10). The proxy reads it as a loss, whole-clip get-up 82→61 with inside
 reps unchanged at 91, because those 21 points were false holds near a wrist. Swings and controls unchanged.
 AnalysisVersion 2026-09-12.12.
+
+**A hand-centred crop pass, tried and rejected (03:00).** The second Fable's idea: run the same nano again on a
+0.3-frame square around each wrist, so the small far get-up bell is three times the pixels; crop boxes may be
+followed but never start a track. On the Mac (posetrack `POSETRACK_CROP`, fixtures with the poses kept): the
+detector sees the get-up bell at the hands in 90 % of frames instead of 83, held inside reps 91→93, swings and
+the Bulgarian unchanged, and the **pistols go from 4 % to 87 %**: once any track exists (the floor bell's 37
+frames), the crop finds a "bell" at the hands in 81 % of frames and the follow gate takes them. A crop is a
+phantom machine for a live track; it needs an identity gate (the tracked bell's size and colour) before it can
+be used, and two points on the get-up do not pay for that. The code is not in the tree; the notebook keeps it.
+
+**What the improvements cost.** On the Mac, the one-hand clip three runs each: no detector 6.1 s (98 fps);
+detector at the old settings (floor 0.25, six boxes) 11.8–12.2 s (49–50 fps); at the shipped settings (floor
+0.15, twelve boxes) 12.2–12.4 s (48 fps). The detector halves the pass as before; tonight's settings add about
+3 %; the tracker, the backward pass and the colour samples do not register: a `sample` of posetrack shows the
+process waiting on the Neural Engine, then vImage converting the 1080p frame to each model's planar float input
+(twice a frame, once per model), then BNNS. The phone's number comes from the `offline_pass` event of the next
+run with the detector on.
 Tooling: `scripts/model-trials/cut-dot-frames.sh` and `grade-dots.sh` (docs/TESTING.md).
 
 Coasting, by eye: the same 35 swing frames with 0, 1 and 3 coasted frames grade 17/23, 15/22 and 17/24 on the
