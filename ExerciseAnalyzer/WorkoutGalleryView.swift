@@ -19,6 +19,12 @@ struct WorkoutGalleryView: View {
   @State private var collapsed: Set<Date> = []
   @State private var collapseSeeded = false
 
+  private static let dayKey: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    return f
+  }()
+
   private var knownPhotosIDs: Set<String> {
     Set(store.entries.compactMap { entry -> String? in
       if case .photos(let identifier) = entry.source { return identifier }
@@ -63,8 +69,10 @@ struct WorkoutGalleryView: View {
                   }
                 } header: {
                   DayHeader(day: day, collapsed: collapsed.contains(day.date)) {
+                    let opening = collapsed.contains(day.date)
+                    onEvent?("workouts_day", ["day": Self.dayKey.string(from: day.date), "opened": opening])
                     withAnimation(.easeInOut(duration: 0.2)) {
-                      if collapsed.contains(day.date) { collapsed.remove(day.date) } else { collapsed.insert(day.date) }
+                      if opening { collapsed.remove(day.date) } else { collapsed.insert(day.date) }
                     }
                   }
                 }
@@ -206,11 +214,21 @@ struct DayHeader: View {
     f.setLocalizedDateFormatFromTemplate("EEEE d MMM")
     return f
   }()
+  private static let yearFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("yy")
+    return f
+  }()
+
+  /// "Wednesday, Apr 10 ’24": always with the year, so a set from two springs ago does not read as this one (#35).
+  private var dateLine: String {
+    "\(Self.dayFormatter.string(from: day.date)) ’\(Self.yearFormatter.string(from: day.date))"
+  }
 
   private var title: String {
     if Calendar.current.isDateInToday(day.date) { return "Today" }
     if Calendar.current.isDateInYesterday(day.date) { return "Yesterday" }
-    return Self.dayFormatter.string(from: day.date)
+    return dateLine
   }
 
   var body: some View {
@@ -224,7 +242,7 @@ struct DayHeader: View {
           .foregroundStyle(.secondary)
         Text(title).font(.title3.bold())
         if title == "Today" || title == "Yesterday" {
-          Text(Self.dayFormatter.string(from: day.date)).font(.subheadline).foregroundStyle(.secondary)
+          Text(dateLine).font(.subheadline).foregroundStyle(.secondary)
         }
         Spacer()
         Text(summary).font(.subheadline).foregroundStyle(.secondary)

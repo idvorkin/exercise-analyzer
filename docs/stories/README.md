@@ -10,7 +10,7 @@ question per story is [../USER_STORIES.md](../USER_STORIES.md).
 | [Recording and counting](01-recording.md) | 001, 002, 003, 004, 020, 021, 029 | Getting a trusted count out of a set recorded at the gym. |
 | [Reviewing a set](02-reviewing.md) | 005, 006, 007, 008, 024, 030 | Seeing what the camera measured and finding the rep where form slipped. |
 | [Clips and Photos](03-clips.md) | 009, 010, 011, 025, 028 | Trimming, opening and saving video without copies or quality loss. |
-| [Workouts](04-workouts.md) | 012, 013, 014, 015 | Training as sets per day and exercise, kept honest over time. |
+| [Workouts](04-workouts.md) | 012, 013, 014, 015, 031 | Training as sets per day and exercise, kept honest over time. |
 | [From the wrist](05-watch.md) | 016, 017, 018, 019, 023, 027 | Running a session from the Apple Watch with the phone on a tripod. |
 | [Reporting problems](06-feedback.md) | 022, 026 | Getting a wrong count in front of the developer with the evidence attached. |
 
@@ -49,3 +49,4 @@ Built and where each story was verified (host tests, simulator, or phone).
 | 028 Cancel an analysis | yes | simulator (cancel hook) |
 | 029 Throw away a false start | yes | needs phone (recording) |
 | 030 Edge controls | yes | needs phone (gestures) |
+| 031 Open from iCloud | yes | needs phone (an iCloud-only clip) |

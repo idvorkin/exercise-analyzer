@@ -223,17 +223,42 @@ final class RecentsStore: ObservableObject {
   }
 
   static func photosClipURL(identifier: String) async -> URL? {
+    await fetchPhotosClip(identifier: identifier).url
+  }
+
+  /// What a Photos fetch came back with: the playable URL, whether iCloud had to send the clip first, how long it
+  /// took and the error if any. A set from months ago often lives only in iCloud, so the wait needs a face and
+  /// a log line (#35).
+  struct PhotosFetch {
+    var url: URL?
+    var inCloud = false
+    var error: String?
+    var seconds: Double = 0
+  }
+
+  static func fetchPhotosClip(identifier: String, progress: (@MainActor (Double) -> Void)? = nil) async -> PhotosFetch {
     guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject
-    else { return nil }
+    else { return PhotosFetch(error: "not in Photos") }
+    let started = Date()
     let options = PHVideoRequestOptions()
     options.isNetworkAccessAllowed = true
     options.deliveryMode = .highQualityFormat
+    var inCloud = false
+    // Photos only reports progress while iCloud is sending the clip; a local one goes straight to the result.
+    options.progressHandler = { fraction, _, _, _ in
+      inCloud = true
+      Task { @MainActor in progress?(fraction) }
+    }
     return await withCheckedContinuation { continuation in
       var resumed = false
-      PHImageManager.default().requestAVAsset(forVideo: asset, options: options) { avAsset, _, _ in
+      PHImageManager.default().requestAVAsset(forVideo: asset, options: options) { avAsset, _, info in
         guard !resumed else { return }
         resumed = true
-        continuation.resume(returning: (avAsset as? AVURLAsset)?.url)
+        continuation.resume(
+          returning: PhotosFetch(
+            url: (avAsset as? AVURLAsset)?.url, inCloud: inCloud,
+            error: (info?[PHImageErrorKey] as? Error).map { "\($0)" },
+            seconds: Date().timeIntervalSince(started)))
       }
     }
   }

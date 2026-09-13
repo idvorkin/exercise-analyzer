@@ -19,7 +19,9 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Viewing today's workout
 - **Given:** today I analyzed three swing sets and two get-up sets
 - **When:** I open Workouts
-- **Then:** today shows Kettlebell Swing with 3 sets and their total reps, Turkish Get-Up with 2 sets, and each set as a thumbnail with its reps, score and time
+- **Then:** today shows Kettlebell Swing with 3 sets and their total reps, Turkish Get-Up with 2 sets, and each set as a thumbnail with its reps, score and time; every other day is headed by its weekday, date and year ("Wednesday, Apr 10 ’24")
+
+- **Issues:** [#35](https://github.com/idvorkin/exercise-analyzer/issues/35)
 
 ---
 
@@ -71,3 +73,22 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** Workouts holds sets analyzed by a previous version
 - **When:** I launch the updated app
 - **Then:** those sets are re-analyzed in the background and their counts in Workouts update without me opening them
+
+---
+
+### User Story 031:
+
+- **Summary:** Open an old set whose clip now lives only in iCloud
+
+#### Use Case:
+- **As a** lifter looking back at a set from months ago
+- **I want to** tap it in Workouts and watch it download from iCloud
+- **so that** an old set opens like a recent one instead of a tap that seems to do nothing
+
+#### Acceptance Criteria:
+- **Scenario:** A set from last spring, optimized off the phone
+- **Given:** a set in Workouts whose clip Photos keeps only in iCloud
+- **When:** I tap it
+- **Then:** the screen shows "Downloading from iCloud" with its progress until the clip plays, or says the clip is no longer in Photos, and the session log records the fetch (`recents_tap`, `photos_fetch` with seconds, in_cloud and any error)
+
+- **Issues:** [#35](https://github.com/idvorkin/exercise-analyzer/issues/35)

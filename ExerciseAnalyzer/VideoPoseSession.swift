@@ -294,8 +294,27 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// Reopens a Recents entry with its stored analysis: no inference, instant.
   func open(recent entry: RecentEntry) {
     stopCamera()
+    log.event("recents_tap", ["id": entry.id, "in_photos": entry.isInPhotos])
     Task {
-      guard let url = await recents.clipURL(for: entry) else {
+      let url: URL?
+      if case .photos(let identifier) = entry.source {
+        // An old set may live only in iCloud: show the download rather than a tap that seems to do nothing (#35).
+        activity = .working("Loading from Photos", progress: nil)
+        let fetch = await RecentsStore.fetchPhotosClip(identifier: identifier) { [weak self] fraction in
+          self?.activity = .working("Downloading from iCloud", progress: fraction)
+        }
+        log.event(
+          "photos_fetch",
+          [
+            "id": entry.id, "seconds": fetch.seconds, "in_cloud": fetch.inCloud, "found": fetch.url != nil,
+            "error": fetch.error ?? "",
+          ])
+        url = fetch.url
+      } else {
+        url = await recents.clipURL(for: entry)
+      }
+      guard let url else {
+        activity = .idle
         statusMessage = entry.isInPhotos ? "That clip is no longer in Photos" : "That clip's file is missing"
         log.event("recents_missing", ["id": entry.id])
         return
@@ -314,6 +333,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       extractedFrames = pipeline.track.frames
       detection = nil
       installPlayerItem(url: url, pipeline: pipeline)
+      activity = .idle
       statusMessage = recordedLine(reps: pipeline.reps.count)
       log.event("recents_open", ["id": entry.id, "reps": pipeline.reps.count, "exercise": pipeline.exercise.rawValue])
       // A stored analysis can predate an exercise the detector now knows (#17) or an analyzer fix (#19): re-analyze
