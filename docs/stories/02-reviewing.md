@@ -22,6 +22,8 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I scrub to the bottom of rep 5
 - **Then:** the HUD highlights the Bottom phase and shows that frame's spine, arm, hip and knee angles
 
+- **Issues:** [#62](https://github.com/idvorkin/exercise-analyzer/issues/62) low priority: the skeleton should not draw the eyes, the nose is plenty
+
 ---
 
 ### User Story 006:
