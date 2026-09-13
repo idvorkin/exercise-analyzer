@@ -77,6 +77,7 @@ public struct LastSet: Codable, Equatable, Sendable {
 
 /// What the phone tells the watch while recording, and what the watch sends back.
 public struct WatchStatus: Codable, Equatable, Sendable {
+  /// The camera is live, from the first frame of Live. The watch shows its recording pages off this alone.
   public var recording: Bool
   public var frame: FrameStatus
   public var reps: Int
@@ -92,7 +93,8 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   /// The phone is in watch mode (big-digits screen, controlled from the wrist).
   public var watchMode: Bool = false
   /// False when the phone app is in the background: iOS then allows neither the camera nor coming to the front,
-  /// so the watch shows what to do instead of a dead Record button.
+  /// so the watch shows what to do instead of a dead Record button. For the follow-the-wrist decision only;
+  /// never a gate on the picture (#74).
   public var phoneActive: Bool
   /// The set is paused from the phone or the watch: the clip, the count and the elapsed time are frozen (#67).
   public var paused: Bool = false

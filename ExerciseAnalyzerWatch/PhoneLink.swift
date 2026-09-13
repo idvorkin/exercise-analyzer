@@ -22,15 +22,20 @@ final class PhoneLink: NSObject, ObservableObject {
   /// Status older than this is stale: the phone app may be gone without having sent an idle status.
   static let maxStatusAge: TimeInterval = 8
 
+  /// Fixed screenshot state (WATCH_STATE at launch): the link presents it and never talks to WCSession.
+  private var screenshot: WatchScreenshotState?
+
   /// The phone is reachable and has reported within the last few seconds; only then are its status and the
   /// recording controls trustworthy (a stored application context can say "recording" long after the fact).
   var isLive: Bool {
+    if let screenshot { return screenshot.isLive }
     guard reachable, let receivedAt else { return false }
     return Date().timeIntervalSince(receivedAt) < Self.maxStatusAge
   }
 
   /// Asks the phone for a fresh status (a reachable phone app answers with one).
   func ping() {
+    guard screenshot == nil else { return }
     guard WCSession.default.activationState == .activated, WCSession.default.isReachable else { return }
     send(.status)
   }
@@ -38,6 +43,16 @@ final class PhoneLink: NSObject, ObservableObject {
   override init() {
     super.init()
     rest = RestTimer { [weak self] type, fields in self?.logEvent(type, fields) }
+    if let state = WatchScreenshotState.launch {
+      screenshot = state
+      let fixed = state.fixed
+      status = fixed.status
+      reachable = fixed.reachable
+      receivedAt = fixed.reachable ? Date() : nil
+      preview = fixed.preview
+      if let endedAt = state.restEndedAt { rest.fixEnded(at: endedAt) }
+      return
+    }
     guard WCSession.isSupported() else { return }
     WCSession.default.delegate = self
     WCSession.default.activate()
@@ -45,6 +60,7 @@ final class PhoneLink: NSObject, ObservableObject {
 
   /// Called from the view's scene phase: tells the phone whether to stream previews, and pings on wake.
   func sceneActive(_ active: Bool) {
+    guard screenshot == nil else { return }
     logEvent("scene", ["active": active])
     guard WCSession.default.activationState == .activated else { return }
     WCSession.default.sendMessage(["command": (active ? WatchCommand.watchActive : .watchInactive).rawValue], replyHandler: nil) { _ in }
@@ -54,6 +70,7 @@ final class PhoneLink: NSObject, ObservableObject {
   /// Watch-side log: forwarded to the phone's session log as `watch_<type>` (queued user info, so it arrives even
   /// if the phone is unreachable right now).
   func logEvent(_ type: String, _ fields: [String: Any] = [:]) {
+    guard screenshot == nil else { return }
     var info: [String: Any] = ["watch_log": type, "watch_t": Date().timeIntervalSince1970]
     for (k, v) in fields { info[k] = v }
     guard WCSession.default.activationState == .activated else { return }
@@ -61,6 +78,7 @@ final class PhoneLink: NSObject, ObservableObject {
   }
 
   func send(_ command: WatchCommand) {
+    guard screenshot == nil else { return }
     let session = WCSession.default
     logEvent("command", ["command": command.rawValue, "reachable": session.isReachable, "activation": session.activationState.rawValue, "live": isLive])
     guard session.activationState == .activated else { return }
@@ -132,6 +150,7 @@ extension PhoneLink: WCSessionDelegate {
   }
 
   func pick(exercise mode: String) {
+    guard screenshot == nil else { return }
     logEvent("command", ["command": "exercise", "exercise": mode])
     guard WCSession.default.activationState == .activated else { return }
     WKInterfaceDevice.current().play(.click)

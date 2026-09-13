@@ -36,6 +36,9 @@ final class RestTimer: ObservableObject {
     schedule()
   }
 
+  /// Screenshot rung: backdate the count without scheduling taps or asking for notification permission.
+  func fixEnded(at date: Date) { restEnded = date }
+
   /// Record (or a new set going true): stop counting, drop the tap.
   func clear() {
     guard restEnded != nil else { cancel(); return }
