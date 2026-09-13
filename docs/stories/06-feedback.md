@@ -62,7 +62,12 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** it is launched again and I run `just pull-logs`
 - **Then:** the new session's log has a `crash_report` event naming a JSON file under `crashes/` with the exception, signal and reason, the file is pulled with the logs, and `just symbolicate <file>` prints the app's frames as symbols
 
-- **Issues:** none (Igor: "let's get a crash log library")
+- **Scenario:** Old session logs are pruned at launch
+- **Given:** session logs older than 30 days, one of them named by a report in bugs.jsonl
+- **When:** the app launches
+- **Then:** the new session's log carries `logs_pruned` (count, bytes freed, kept_for_reports) and the old logs are gone except the reported one
+
+- **Issues:** [#72](https://github.com/idvorkin/exercise-analyzer/issues/72) (prune session logs older than 30 days); previously none (Igor: "let's get a crash log library")
 
 ### User Story 037:
 
