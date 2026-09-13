@@ -225,7 +225,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 044:
 
 - **Summary:** A lock-screen button opens the app into Live
-- **Status:** implemented in [bec3c45](https://github.com/idvorkin/exercise-analyzer/commit/bec3c45); needs the phone
+- **Status:** implemented in [e9d47f1](https://github.com/idvorkin/exercise-analyzer/commit/e9d47f1); needs the phone
 - **Why:** Igor: "There's a ChatGPT button I can put on my lock screen. Give me an exercise button I can put on
   my lock screen that pops me open." A Live Activity was researched first and rejected: the recording phone is
   never on its lock screen (locking backgrounds the app and iOS stops the camera; story 019 keeps the phone
