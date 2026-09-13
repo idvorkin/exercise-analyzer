@@ -1,8 +1,9 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-//  "From Photos" (issue #8): recent videos in the library that look like sets (10 s to 10 min) and have not been
-//  analyzed yet, so the lifter does not have to hunt through the picker. Read-only; nothing is copied until a clip
-//  is opened, and then it is opened in place like the picker does.
+//  "From Photos" (issue #8): recent videos in the library that look like sets (10 s to 10 min), so the lifter does
+//  not have to hunt through the picker. Clips already in Workouts stay in the strip, dimmed and marked Analyzed,
+//  so it is clear they are not new sets to import (Igor). Read-only; nothing is copied until a clip is opened, and
+//  then it is opened in place like the picker does.
 
 import Photos
 import SwiftUI
@@ -11,6 +12,8 @@ import SwiftUI
 final class PhotosSuggestions: ObservableObject {
   struct Clip: Identifiable {
     let asset: PHAsset
+    /// Already in Workouts: shown dimmed and marked, and a tap opens that set instead of importing again.
+    var analyzed = false
     var id: String { asset.localIdentifier }
     var date: Date { asset.creationDate ?? Date.distantPast }
     var duration: Double { asset.duration }
@@ -23,14 +26,20 @@ final class PhotosSuggestions: ObservableObject {
 
   private let imageManager = PHCachingImageManager()
   private var thumbnails: [String: UIImage] = [:]
+  /// Photos identifiers already in Workouts, kept so a refresh after granting access marks them too.
+  private var known: Set<String> = []
+
+  var unanalyzedCount: Int { clips.filter { !$0.analyzed }.count }
 
   static let lookBack: TimeInterval = 14 * 24 * 3600
   static let minDuration = 10.0
   static let maxDuration = 10 * 60.0
   static let limit = 12
 
-  /// Videos from the last two weeks that are set-sized and not already in `known` (Photos identifiers).
-  func refresh(excluding known: Set<String>) {
+  /// Videos from the last two weeks that are set-sized; those in `known` (Photos identifiers already in Workouts)
+  /// are kept and marked analyzed.
+  func refresh(known: Set<String>) {
+    self.known = known
     status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     guard status == .authorized || status == .limited else {
       clips = []
@@ -47,17 +56,18 @@ final class PhotosSuggestions: ObservableObject {
     var found: [Clip] = []
     let matched = PHAsset.fetchAssets(with: options)
     matched.enumerateObjects { asset, _, stop in
-      if !known.contains(asset.localIdentifier) { found.append(Clip(asset: asset)) }
+      found.append(Clip(asset: asset, analyzed: known.contains(asset.localIdentifier)))
       if found.count >= Self.limit { stop.pointee = true }
     }
     clips = found
+    let analyzed = found.filter(\.analyzed).count
     let allVideos = PHAsset.fetchAssets(with: .video, options: nil)
     let newest = (0..<min(allVideos.count, 3)).compactMap { allVideos.object(at: $0).creationDate?.description }
     onEvent?(
       "photos_suggestions",
       [
         "status": status.rawValue, "videos_in_library": allVideos.count, "matched": matched.count,
-        "already_analyzed": matched.count - found.count, "shown": found.count, "newest_dates": newest,
+        "already_analyzed": analyzed, "shown": found.count, "newest_dates": newest,
       ])
     imageManager.startCachingImages(
       for: found.map(\.asset), targetSize: Self.thumbnailSize, contentMode: .aspectFill, options: nil)
@@ -65,7 +75,7 @@ final class PhotosSuggestions: ObservableObject {
 
   func requestAccess() {
     PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] _ in
-      Task { @MainActor in self?.refresh(excluding: []) }
+      Task { @MainActor in self?.refresh(known: self?.known ?? []) }
     }
   }
 
@@ -90,7 +100,7 @@ final class PhotosSuggestions: ObservableObject {
   }
 }
 
-/// Thumbnail card for a Photos video that has not been analyzed yet.
+/// Thumbnail card for a Photos video; dimmed and marked when it is already a set in Workouts.
 struct PhotosClipCard: View {
   let clip: PhotosSuggestions.Clip
   @ObservedObject var suggestions: PhotosSuggestions
@@ -116,6 +126,7 @@ struct PhotosClipCard: View {
         }
         .frame(width: 104, height: 74)
         .clipped()
+        .opacity(clip.analyzed ? 0.4 : 1)
         Text(Self.duration(clip.duration))
           .font(.caption2.bold().monospacedDigit())
           .padding(.horizontal, 5).padding(.vertical, 2)
@@ -125,10 +136,22 @@ struct PhotosClipCard: View {
       }
       .frame(width: 104, height: 74)
       .clipShape(RoundedRectangle(cornerRadius: 8))
+      .overlay(alignment: .topLeading) {
+        if clip.analyzed {
+          Label("Analyzed", systemImage: "checkmark")
+            .font(.caption2.bold())
+            .padding(.horizontal, 5).padding(.vertical, 2)
+            .background(Color.green.opacity(0.85), in: Capsule())
+            .foregroundStyle(.white)
+            .padding(4)
+        }
+      }
       Text(Self.timeFormatter.string(from: clip.date)).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
     }
     .onAppear { suggestions.thumbnail(for: clip) { image = $0 } }
-    .accessibilityLabel("Video from \(Self.timeFormatter.string(from: clip.date)), \(Self.duration(clip.duration)), not analyzed")
+    .accessibilityLabel(
+      "Video from \(Self.timeFormatter.string(from: clip.date)), \(Self.duration(clip.duration)), \(clip.analyzed ? "already analyzed" : "not analyzed")"
+    )
   }
 
   private static func duration(_ seconds: Double) -> String {

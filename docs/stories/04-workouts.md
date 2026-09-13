@@ -46,7 +46,7 @@ Part of the [user stories](README.md); persona and format are described there.
 
 ### User Story 014:
 
-- **Summary:** Surface the gym videos I haven't analyzed yet
+- **Summary:** Surface the gym videos I haven't analyzed yet, and mark the ones I have
 - **Status:** implemented in [f4da4a2](https://github.com/idvorkin/exercise-analyzer/commit/f4da4a2); needs the phone (the simulator cannot grant Photos)
 
 #### Use Case:
@@ -55,10 +55,10 @@ Part of the [user stories](README.md); persona and format are described there.
 - **so that** I don't hunt through the picker for the clip I shot this morning
 
 #### Acceptance Criteria:
-- **Scenario:** Unanalyzed clips from this morning
-- **Given:** Photos holds two videos from today between 10 s and 10 min long that are not in Workouts
+- **Scenario:** This morning's clips, one of them already analyzed
+- **Given:** Photos holds three videos from today between 10 s and 10 min long, one of which is already a set in Workouts
 - **When:** I open Workouts
-- **Then:** a From Photos strip shows both, and tapping one opens it in place
+- **Then:** a From Photos strip shows all three with "2 not analyzed" in its header; the analyzed one is dimmed and marked Analyzed and tapping it opens its set, while tapping either of the others opens that clip in place
 
 ---
 

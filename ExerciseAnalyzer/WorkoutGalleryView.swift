@@ -25,12 +25,7 @@ struct WorkoutGalleryView: View {
     return f
   }()
 
-  private var knownPhotosIDs: Set<String> {
-    Set(store.entries.compactMap { entry -> String? in
-      if case .photos(let identifier) = entry.source { return identifier }
-      return nil
-    })
-  }
+  private var knownPhotosIDs: Set<String> { Set(store.entries.compactMap(\.photosIdentifier)) }
 
   var body: some View {
     NavigationStack {
@@ -45,7 +40,13 @@ struct WorkoutGalleryView: View {
               if !suggestions.clips.isEmpty, let onImport {
                 PhotosSuggestionsRow(suggestions: suggestions) { clip in
                   dismiss()
-                  onImport(clip.id, clip.asset.creationDate)
+                  // An analyzed clip is already a set: open that instead of importing it a second time.
+                  if clip.analyzed, let entry = store.entries.first(where: { $0.photosIdentifier == clip.id }) {
+                    onEvent?("photos_suggestion_open", ["id": entry.id])
+                    onOpen(entry)
+                  } else {
+                    onImport(clip.id, clip.asset.creationDate)
+                  }
                 }
               } else if suggestions.status == .notDetermined, onImport != nil {
                 Button {
@@ -95,7 +96,7 @@ struct WorkoutGalleryView: View {
           collapsed = Set(WorkoutDay.group(store.entries).map(\.date).filter { $0 < weekAgo })
         }
         suggestions.onEvent = onEvent
-        suggestions.refresh(excluding: knownPhotosIDs)
+        suggestions.refresh(known: knownPhotosIDs)
         // Test hook: ask for Photos access on open so a simulator run can answer the system dialog.
         if ProcessInfo.processInfo.environment["SWING_PHOTOS_ACCESS"] == "1", suggestions.status == .notDetermined {
           suggestions.requestAccess()
@@ -105,7 +106,7 @@ struct WorkoutGalleryView: View {
   }
 }
 
-/// Recent set-sized videos in Photos that have not been analyzed: one tap opens them in place.
+/// Recent set-sized videos in Photos: one tap opens a new one in place, or the set an analyzed one became.
 struct PhotosSuggestionsRow: View {
   @ObservedObject var suggestions: PhotosSuggestions
   let onImport: (PhotosSuggestions.Clip) -> Void
@@ -120,7 +121,8 @@ struct PhotosSuggestionsRow: View {
           .foregroundStyle(.blue)
         Text("From Photos").font(.headline)
         Spacer(minLength: 8)
-        Text("\(suggestions.clips.count) not analyzed").font(.caption).foregroundStyle(.secondary)
+        Text(suggestions.unanalyzedCount == 0 ? "all analyzed" : "\(suggestions.unanalyzedCount) not analyzed")
+          .font(.caption).foregroundStyle(.secondary)
       }
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {

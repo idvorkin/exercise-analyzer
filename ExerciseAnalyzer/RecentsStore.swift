@@ -45,6 +45,12 @@ struct RecentEntry: Codable, Identifiable {
     return abs(duration - length) < 0.1
   }
 
+  /// The Photos identifier when the clip lives in Photos, nil for an in-app file.
+  var photosIdentifier: String? {
+    if case .photos(let identifier) = source { return identifier }
+    return nil
+  }
+
   var isInPhotos: Bool {
     if case .photos = source { return true }
     return false
