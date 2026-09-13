@@ -252,6 +252,18 @@ and tested three (its notes: `~/tmp/agent/notes/2026-09-13-bell-lab-second-opini
 - **The tracker sees empty frames.** The pipeline skipped the tracker on frames with no sighting, so a track
   neither aged nor coasted through them. Fixed; TGU 77→78.
 
+**Ground truth caught a fake gain.** Cutting sampled frames with the tracker's bell drawn in (lab script
+`cut-dot-frames.sh` over the report's `BELL_LAB_DOTS=1` dump) showed the circle on the ski-erg wheel behind the
+lifter in the 4-rep clip and on a green rack bell in the one-hand clip, both within 0.2 of a wrist and so
+scored "held". The report now prints `inZone`, held frames whose bell sits in a furniture cell: 72 of 165 and
+76 of 594. The cause was the rule above that let a follow enter a furniture cell (its "+15 on the 4-rep swing"
+was the wheel); restored: furniture cells veto follows as well as starts, and with the follow gate, coasting
+and the backward fill in place the honest numbers are 4reps 98, 1h 98, TGU 82, pistols 4, Bulgarian 0 with
+inZone 5 / 0 / 0 / 0 / 0. The second Fable instance reached the same warning independently: a box placed near
+the wrist by a rule is scored by the rule that placed it; against a crop-detector reference its carried boxes
+were off by 0.13 of the frame at the median. Muse (which can view images) is grading 95 sampled frames as
+labelled ground truth; the grades go here when they land.
+
 Rejected by its own numbers: classifying box shape in source pixels instead of normalized units (Bulgarian
 0→19, the gate is a camera-calibrated classifier, not geometry), and seeding a start from a sustained overhead
 arm (no recoverable gap has such a box). Its untested ideas, worth a later round: bridge a gap by the bell's

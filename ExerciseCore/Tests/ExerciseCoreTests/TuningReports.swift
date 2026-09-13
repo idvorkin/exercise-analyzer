@@ -201,6 +201,19 @@ extension TuningReports {
     for source in sources {
       let pipeline = AnalysisPipeline.analyze(frames: source.frames, exercise: source.exercise)
       print(Self.bellHeldLine(label: source.label, frames: pipeline.track.frames, zones: pipeline.bellTracker.staticZones))
+      // BELL_LAB_DOTS=1: one line per frame with the reported bell and the wrists, for cutting frames with the
+      // dot drawn in so a person (or a vision model) can grade whether it sits on the bell in the hands.
+      if ProcessInfo.processInfo.environment["BELL_LAB_DOTS"] == "1" {
+        for (i, f) in pipeline.track.frames.enumerated() {
+          let wrists = f.pose.map { p in
+            [9, 10].compactMap { k -> String? in
+              p.conf[k] > BodySkeleton.visibleThreshold ? String(format: "%.3f,%.3f", p.xyn[k].x, p.xyn[k].y) : nil
+            }.joined(separator: "/")
+          } ?? ""
+          let dot = f.bell.map { String(format: "%.3f %.3f %.3f %.3f %.2f", $0.center.x, $0.center.y, $0.box.width, $0.box.height, $0.conf) } ?? "- - - - -"
+          print("DOT \(source.label) \(i) \(String(format: "%.3f", f.time)) \(dot) \(wrists.isEmpty ? "-" : wrists)")
+        }
+      }
     }
   }
 
@@ -210,7 +223,7 @@ extension TuningReports {
   /// reach (= blind gap) or something in reach refused (= follow gate)).
   private static func bellHeldLine(label: String, frames: [FrameRecord], zones: Set<Int>) -> String {
     let startConf = BellTracker.Thresholds().startConf
-    var handFrames = 0, seenAtHand = 0, trackedAtHand = 0
+    var handFrames = 0, seenAtHand = 0, trackedAtHand = 0, heldInZone = 0
     var noSight = 0, zone = 0, cold = 0, restartBlocked = 0, dropGap = 0, followRej = 0
     var lastHeld: BellSighting? = nil
     var framesSinceHeld = 9999
@@ -231,6 +244,8 @@ extension TuningReports {
       if !near.isEmpty { seenAtHand += 1 }
       if held {
         trackedAtHand += 1
+        // A held bell sitting in a furniture cell is suspect: the rack behind the hands counts as "near a wrist".
+        if let b = f.bell, zones.contains(BellTracker.gridKey(b.center, cell: 0.02)) { heldInZone += 1 }
         lastHeld = f.bell
         framesSinceHeld = 0
         continue
@@ -249,6 +264,6 @@ extension TuningReports {
     }
     func pct(_ n: Int) -> Int { handFrames > 0 ? 100 * n / handFrames : 0 }
     return
-      "bell-held \(label): hands \(handFrames) seen \(pct(seenAtHand))% held \(pct(trackedAtHand))% | noSight=\(noSight) zone=\(zone) cold=\(cold) restartBlocked=\(restartBlocked) dropGap=\(dropGap) followRej=\(followRej)"
+      "bell-held \(label): hands \(handFrames) seen \(pct(seenAtHand))% held \(pct(trackedAtHand))% (inZone \(heldInZone)) | noSight=\(noSight) zone=\(zone) cold=\(cold) restartBlocked=\(restartBlocked) dropGap=\(dropGap) followRej=\(followRej)"
   }
 }

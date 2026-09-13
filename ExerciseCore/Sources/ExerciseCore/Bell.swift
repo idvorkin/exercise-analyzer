@@ -134,8 +134,9 @@ public final class BellTracker {
       return s.box.width > s.box.height && s.box.height < thresholds.flatStartMaxHeight * personHeight
     }
     let resting = updateResting(with: sightings)
-    // Static zones (rack, floor cells for the whole clip) veto starts only: a live track keeps the swung bell
-    // through the floor bell's cell at the bottom of every hinge, since it is still bound to the hands.
+    // A box at rest or in a furniture cell is never the bell in play, for a start or a follow. Letting a follow
+    // enter a furniture cell looked like +15 % on the 4-rep swing until the frames were looked at: the track had
+    // stepped onto the ski-erg wheel behind the hands (2026-09-13 ground truth).
     let still = sightings.filter { resting.contains($0) || staticZones.contains(Self.gridKey($0.center, cell: 0.02)) }
     let wrists = Self.wrists(of: pose)
     func nearAHand(_ p: CGPoint) -> Bool {
@@ -147,7 +148,7 @@ public final class BellTracker {
       let steps = CGFloat(missed + 1)
       let followed = sightings
         .filter {
-          $0.conf >= thresholds.followConf && !resting.contains($0) && nearAHand($0.center)
+          $0.conf >= thresholds.followConf && !still.contains($0) && nearAHand($0.center)
             && !Self.colorsDiffer($0, last) && Self.distance($0.center, last.center) <= thresholds.followDistance
         }
         .min { Self.distance($0.center, last.center) < Self.distance($1.center, last.center) }
