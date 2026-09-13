@@ -8,7 +8,7 @@ xcrun simctl boot "$SIM" 2>/dev/null || true
 xcrun simctl install "$SIM" "$APP"
 LOGS="$(xcrun simctl get_app_container "$SIM" "$BUNDLE" data)/Documents/logs"
 fail=0
-newest_log() { ls -t "$LOGS"/*.jsonl 2>/dev/null | head -1; }
+newest_log() { ls -t "$LOGS"/*.jsonl 2>/dev/null | head -1; return 0; }  # no logs yet on a fresh install
 # Waits (up to $2 s) until the newest log has an event of type $1; the simulator runs the model on the CPU, so a
 # clip can take a few times its own length to analyze.
 wait_for() {
