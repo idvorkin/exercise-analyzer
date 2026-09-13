@@ -91,8 +91,10 @@ struct WatchContentView: View {
     .tabViewStyle(.verticalPage)
   }
 
-  /// Page one: the preview filling the screen, chips over its top corners, the hint bar and three round buttons
-  /// over its bottom edge. No picture yet: the same overlays on black.
+  /// Page one: the preview filling the screen, chips over its top corners, the hint bar and the round buttons
+  /// over its bottom edge. No picture yet: the same overlays on black. Only the picture ignores the safe area:
+  /// the chips live in the VStack and the button row in a bottom safeAreaInset, so the Ultra 2 keeps both on
+  /// screen (refs #74).
   private var recordingPicturePage: some View {
     ZStack {
       if let preview = phone.preview {
@@ -121,6 +123,8 @@ struct WatchContentView: View {
           .padding(.vertical, 6)
           .background(status.frame.inFrame ? Color.green.opacity(0.5) : Color.red.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
           .padding(.horizontal, 8)
+      }
+      .safeAreaInset(edge: .bottom) {
         HStack(spacing: 16) {
           Button { phone.send(status.paused ? .resume : .pause) } label: {
             Image(systemName: status.paused ? "play.fill" : "pause.fill")
@@ -150,6 +154,15 @@ struct WatchContentView: View {
           }
           .buttonStyle(.plain)
           .accessibilityLabel("Done")
+          Button { phone.send(.cancel) } label: {
+            Image(systemName: "xmark")
+              .font(.body.bold())
+              .frame(width: 36, height: 36)
+              .background(Color.red.opacity(0.7), in: Circle())
+              .foregroundStyle(.white)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Cancel")
         }
         .padding(.bottom, 2)
       }
