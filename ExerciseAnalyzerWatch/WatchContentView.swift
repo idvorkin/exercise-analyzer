@@ -78,6 +78,15 @@ struct WatchContentView: View {
           Image(systemName: "figure.strengthtraining.traditional").font(.largeTitle).foregroundStyle(.secondary)
           Text(phone.reachable ? "Phone ready" : "Open Exercise Analyzer on the phone")
             .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
+          // The offline pass's final count (045): "Analyzing…" while it runs, then the last set's line. The
+          // next recording status carries neither and the line goes.
+          if status.phase == "analyzing" {
+            Text("Analyzing…").font(.caption).foregroundStyle(.secondary)
+          } else if let last = status.lastSet {
+            Text("Last set").font(.caption2).foregroundStyle(.secondary)
+            Text("\(last.reps) reps · \(last.exercise) · \(Self.duration(last.seconds))")
+              .font(.headline).monospacedDigit()
+          }
           Button { phone.send(.start) } label: {
             Label("Record", systemImage: "record.circle").frame(maxWidth: .infinity)
           }
@@ -145,6 +154,11 @@ struct WatchContentView: View {
 
   private var elapsed: String {
     let total = Int(status.elapsed)
+    return String(format: "%d:%02d", total / 60, total % 60)
+  }
+
+  private static func duration(_ seconds: Double) -> String {
+    let total = Int(seconds)
     return String(format: "%d:%02d", total / 60, total % 60)
   }
 }

@@ -15,8 +15,9 @@ final class PhoneLink: NSObject, ObservableObject {
   @Published private(set) var receivedAt: Date?
   /// Latest preview frame from the phone (about 1 fps while recording).
   @Published private(set) var preview: UIImage?
-  /// Rest since the last set ended; driven by recording transitions below, cleared on Record.
-  let rest: RestTimer
+  /// Rest since the last set ended; driven by recording transitions below, cleared on Record. Assigned right
+  /// after `super.init` (its closure captures `self`), so it cannot be a `let`.
+  private(set) var rest: RestTimer!
 
   /// Status older than this is stale: the phone app may be gone without having sent an idle status.
   static let maxStatusAge: TimeInterval = 8

@@ -59,6 +59,22 @@ public struct FrameStatus: Codable, Equatable, Sendable {
   }
 }
 
+/// The set that just finished, as the idle watch screen shows it: the offline pass's final count, long after
+/// the live count went stale (story 045). Nil until the first analyzed recording, and cleared by the next one.
+public struct LastSet: Codable, Equatable, Sendable {
+  public let reps: Int
+  public let exercise: String
+  public let seconds: Double
+  public let at: Double
+
+  public init(reps: Int, exercise: String, seconds: Double, at: Double) {
+    self.reps = reps
+    self.exercise = exercise
+    self.seconds = seconds
+    self.at = at
+  }
+}
+
 /// What the phone tells the watch while recording, and what the watch sends back.
 public struct WatchStatus: Codable, Equatable, Sendable {
   public var recording: Bool
@@ -80,6 +96,8 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   public var phoneActive: Bool
   /// The set is paused from the phone or the watch: the clip, the count and the elapsed time are frozen (#67).
   public var paused: Bool = false
+  /// The last analyzed recording (story 045); nil clears the idle screen's line. Old payloads decode as nil.
+  public var lastSet: LastSet? = nil
 
   public init(
     recording: Bool, frame: FrameStatus, reps: Int, phase: String, elapsed: Double, camera: String, exercise: String,
@@ -97,7 +115,7 @@ public struct WatchStatus: Codable, Equatable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case recording, frame, reps, phase, elapsed, camera, exercise, phoneActive, mode, zoom, zoomPresets, watchMode,
-      paused
+      paused, lastSet
   }
 
   public init(from decoder: Decoder) throws {
@@ -115,6 +133,7 @@ public struct WatchStatus: Codable, Equatable, Sendable {
     zoomPresets = try c.decodeIfPresent([Double].self, forKey: .zoomPresets) ?? [1]
     watchMode = try c.decodeIfPresent(Bool.self, forKey: .watchMode) ?? false
     paused = try c.decodeIfPresent(Bool.self, forKey: .paused) ?? false
+    lastSet = try c.decodeIfPresent(LastSet.self, forKey: .lastSet)
   }
 
   public static let idle = WatchStatus(

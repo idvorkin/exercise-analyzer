@@ -57,6 +57,7 @@ final class FrameStatusTests: XCTestCase {
       recording: true, frame: FrameStatus(personSeen: true, clippedEdges: [.bottom], coverage: 0.9), reps: 3,
       phase: "bottom", elapsed: 12.5, camera: "front", exercise: "Kettlebell Swing")
     status.paused = true
+    status.lastSet = LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62, at: 1718280000)
     let data = try JSONEncoder().encode(status)
     XCTAssertEqual(try JSONDecoder().decode(WatchStatus.self, from: data), status)
   }
@@ -71,6 +72,7 @@ final class FrameStatusTests: XCTestCase {
     XCTAssertTrue(status.recording)
     XCTAssertEqual(status.reps, 3)
     XCTAssertFalse(status.paused)
+    XCTAssertNil(status.lastSet)
     XCTAssertTrue(status.phoneActive)
     XCTAssertEqual(status.mode, "auto")
   }
