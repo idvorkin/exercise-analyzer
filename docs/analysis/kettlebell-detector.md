@@ -369,7 +369,13 @@ pass should hold its 77 fps; the instrumented run confirms. Prediction before th
 155 → under 60, by-eye circles on his
 bell 7 → ~14, false circles unchanged (they are H27/H25: the walk-in box and the rack bell), repo
 fixtures (4reps, 1h, TGU, pistols, Bulgarian) unchanged within a point — their clips never reach the
-cap. AnalysisVersion 2026-09-13.3. Numbers: _pending Igor's Mac run (posetrack + dots grade below)._
+cap. AnalysisVersion 2026-09-13.4 (shared with the get-up's floor stage). **Measured (Mac, the 13-rep
+clip with the phone's poses kept, the same 30 frames graded by Muse):** the reserve reproduces the cap-30
+result exactly at 12 + 4: seen 75 → 90 %, held 55 → 67 %, inside reps 45 → 61 %, blind frames 155 → 43, zone
+loss 157 → 121. By eye, circles on Igor's bell 7 → 12 of the graded in-hands frames (three frames came back
+ungraded from a Muse transport error; cap 30 had 14 of 25), misses 9 → 2, false circles 11 → 12, as predicted.
+The cap prediction held; the false circles are the walk-in box and the rack bell beside the hinge (H27, H25).
+Repo fixtures unchanged (their stored sightings never reached the cap).
 
 ## Plan (offline only; live and the watch unchanged)
 

@@ -568,6 +568,10 @@ proxy cannot say whether the 11 lost points are false holds or real ones; the sa
 (`/tmp/bell-lab/gt-13-h28b`) decide: ship only if recall stays ~14/25 and the false circles fall. Otherwise
 the honest levers are the cap (H26, shipped as "room for a box at the hands") and identity (H25: the rack bell
 at (0.70, 0.70) is 0.043 × 0.09 and Igor's is 0.037 × 0.049 at the hinge; H27 for the walk-in box).
+**H26 shipped (08:45, pass-lab Muse, a9065a5 + 4059f55 on main):** top 12 by confidence plus up to 4 boxes
+within 0.2 of a visible wrist, previous frame's wrists in the overlapped app pass. Mac replay of the 13-rep
+clip: identical to cap 30 (seen 90, held 67, inReps 61, noSight 43); by eye 12 of the graded in-hands frames
+circled (3 frames ungraded, transport error), misses 2, false 12. Prediction met; false circles are H27/H25.
 **H28b by eye (05:40): a wash, not shipped.** Circles on Igor's bell 14→13, false circles 12→9 (the rack side
 533/622/677/801 gone, 719 and 309 stay, 394 newly wrong), misses 3→6. Precision 54→59 %, recall 56→52 %:
 inside the grader's noise, and the proxy's 11-point drop was mostly false holds it had been counting as
