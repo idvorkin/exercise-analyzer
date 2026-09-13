@@ -132,19 +132,39 @@ Part of the [user stories](README.md); persona and format are described there.
 
 #### Use Case:
 - **As a** lifter scrubbing with one thumb
-- **I want to** press and hold anywhere in the middle of the picture and see the left and right edge keys (Rep, Frame, Position, both directions) appear together, slide onto one, and have it fire again every two seconds while I keep holding
+- **I want to** press and hold the middle of the picture to bring up both edges' keys, slide onto one, and have it keep firing while I hold it
 - **so that** stepping through a set is one hold and a slide, in either direction, without hunting for an edge or tapping over and over
 
 #### Acceptance Criteria:
-- **Scenario:** Holding the middle
+- **Scenario:** Holding the middle brings up both stacks
 - **Given:** a set is open and paused
-- **When:** I press and hold in the middle third of the picture
-- **Then:** both edges' key stacks appear (the left edge's keys step back, the right edge's forward), the one my finger slides onto lights, and letting go fires it once; a quick tap in the middle still plays or pauses
+- **When:** I press and hold the middle of the picture
+- **Then:** the left stack (steps back) and the right stack (steps forward) appear as in story 030, and lifting without sliding onto a key fires nothing
 
-- **Scenario:** Holding a key repeats it
-- **Given:** the keys are up and my finger rests on the right edge's Rep key
-- **When:** I keep holding
-- **Then:** the playhead moves to the next rep immediately and again every two seconds until I lift or slide off, with the key pulsing on each press, and the session log records each press (`ui` action: step, from: hold)
+- **Scenario:** Sliding onto a key fires it on arrival
+- **Given:** both stacks are up from a middle hold
+- **When:** I slide onto the right edge's Rep key
+- **Then:** the playhead moves to the next rep at once and the key pulses
+
+- **Scenario:** Holding a key repeats it every two seconds
+- **Given:** my finger rests on a key with the stacks up
+- **When:** I keep holding it
+- **Then:** it fires again every two seconds until I lift or slide off, and lifting fires nothing more
+
+- **Scenario:** Holding forward on the last rep
+- **Given:** the playhead is on the last rep with the stacks up
+- **When:** I hold the forward Rep key
+- **Then:** the playhead stays on the last rep while the key keeps pulsing every two seconds
+
+- **Scenario:** A quick middle tap still plays or pauses
+- **Given:** a set is open
+- **When:** I tap (not hold) the middle of the picture
+- **Then:** playback toggles as in story 024
+
+- **Scenario:** A hold pauses and stays paused
+- **Given:** a set is playing
+- **When:** I hold the middle until a key fires and then lift
+- **Then:** the set is paused and stays paused
 
 - **Issues:** [#59](https://github.com/idvorkin/exercise-analyzer/issues/59)
 
