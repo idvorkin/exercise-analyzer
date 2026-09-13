@@ -41,7 +41,9 @@ squats and Turkish get-ups. `ExerciseCore/` is the platform-free analysis packag
   next: a new capability gets a story in its journey (Cohn + Gherkin, `user-story` skill) with a `Status:` line
   naming its commit and where it was verified; a changed behaviour edits the story's acceptance criteria and adds
   its commit to the `Status:` line. Status lives only on the stories. No story, not done.
-- **One commit per issue**, `Fixes #N` only when verified at the right rung, otherwise `#N` plus what remains.
+- **One commit per issue**, referencing it. Close the issue once the fix is on the phone (`Fixes #N` in the commit
+  when the verifying rung already ran, otherwise close it by hand after `just run-device`) with a comment saying
+  what was verified where and what Igor should feel; Igor reopens if it is not fixed. Never leave a fixed bug open.
   Never bundle fixes. Never `git add -A` (`.build/`, `Build/`, `.claude/worktrees/` must stay untracked).
 - **Analyzer semantics** (details and evidence in `docs/analysis/`): a swing rep is top→top, about 1.2 s, over 4 s is
   the walk-in or setup and is discarded; an upswing over 1 s is not a swing; unmeasured joints read 0° and must not

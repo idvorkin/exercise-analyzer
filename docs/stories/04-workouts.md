@@ -115,4 +115,5 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap Hide analyzed in the strip's header
 - **Then:** only the unanalyzed clip remains, the choice sticks across launches, and the trimmed set stays hidden because its new Photos identity is the one Workouts knows
 
+- **Status:** implemented in [48d4c33](https://github.com/idvorkin/exercise-analyzer/commit/48d4c33); needs the phone (Photos)
 - **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41)

@@ -123,7 +123,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 033:
 
 - **Summary:** See a get-up step by step: elbow, hand, kneel, lunge, stand, and back down
-- **Status:** implemented (commit named in the next docs commit); verified on the host (`GetUpStageTests`: four reps under two cameras land in the study's windows); the pills and the nine-column gallery need the phone
+- **Status:** implemented in [1f815f5](https://github.com/idvorkin/exercise-analyzer/commit/1f815f5); verified on the host (`GetUpStageTests`: four reps under two cameras land in the study's windows); the pills and the nine-column gallery need the phone
 
 #### Use Case:
 - **As a** lifter reviewing a get-up

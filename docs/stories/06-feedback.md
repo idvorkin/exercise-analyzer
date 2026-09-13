@@ -29,7 +29,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 026:
 
 - **Summary:** Attach what I was looking at to a bug report
-- **Status:** implemented (commit named in the next docs commit); verified on the simulator (`SWING_BUG` hook: screen.png and frame.jpg written and embedded by `file-bugs`)
+- **Status:** implemented in [523765b](https://github.com/idvorkin/exercise-analyzer/commit/523765b); verified on the simulator (`SWING_BUG` hook: screen.png and frame.jpg written and embedded by `file-bugs`)
 
 #### Use Case:
 - **As a** lifter reporting a wrong count or a display glitch
