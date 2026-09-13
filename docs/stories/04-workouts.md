@@ -125,7 +125,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 035:
 
 - **Summary:** A set made by older models is run through the new ones when I reopen it (technical)
-- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952); verified on the phone (a get-up stored before the detector reopened: `recents_rerun` with the stored and current model sets, the pass from the video, `analyzed` with reason rerun_models on the same entry)
+- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952); verified on the phone (a get-up stored before the detector reopened: `recents_rerun` with the stored and current model sets, the pass from the video, `analyzed` with reason rerun_models on the same entry); a replay running today's tracker in [a37440b](https://github.com/idvorkin/exercise-analyzer/commit/a37440b), verified on the host (#49)
 
 #### Use Case:
 - **As a** developer shipping a new model (a detector, a bigger pose model)

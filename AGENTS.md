@@ -12,6 +12,11 @@ squats and Turkish get-ups. `ExerciseCore/` is the platform-free analysis packag
 | [docs/DEBUGGING.md](docs/DEBUGGING.md) | the session log and every event type, pulling logs, the bug monitor loop, filing and closing reports, device tooling |
 | [docs/analysis/README.md](docs/analysis/README.md) | how poses become phases, reps and scores; one file per exercise with thresholds, fixtures and the experiments behind every rule |
 | [docs/stories/README.md](docs/stories/README.md) | the spec: user stories per journey, each with its status and commits |
+| [docs/analysis/performance.md](docs/analysis/performance.md) | how the offline pass is measured (Mac A/B, `sample`, the instrumented run) and what each change cost |
+| [docs/architecture/](docs/architecture/) | the 2026-09-13 architecture reviews (Codex, Fable) and the decision: keep the core, take `VideoPoseSession` apart in small steps (#52); the parked plan is #51 |
+
+Lab notebooks (hypotheses, predictions, numbers, rejected ideas) live in `docs/analysis/lab/`; the analysis notes
+carry only what was decided.
 
 ## Rules
 
