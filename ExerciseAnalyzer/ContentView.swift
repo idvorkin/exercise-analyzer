@@ -522,8 +522,8 @@ struct ContentView: View {
 
   /// One hold-key press: seek like the matching edge key, then log it (#60).
   private func fireHold(side: StepSide, key: StepKey, repeatIndex: Int, atEnd: Bool) {
+    let delta = side == .next ? 1 : -1
     chromeAction {
-      let delta = side == .next ? 1 : -1
       switch key {
       case .rep: session.seekToRep(offset: delta)
       case .frame: session.stepFrame(delta)
