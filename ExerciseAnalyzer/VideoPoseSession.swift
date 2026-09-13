@@ -75,10 +75,6 @@ final class VideoPoseSession: NSObject, ObservableObject {
     didSet { if isPlaying { player.rate = rate } }
   }
 
-  /// Set while a stored set is being run through the models again from its video: its exercise, so a fixed mode
-  /// does not re-read it as something else (#42), and the reason logged with the result.
-  private var rerunExercise: ExerciseKind?
-
   private func storedModels(_ entry: RecentEntry) -> [String] {
     let models = recents.models(for: entry)
     return models.isEmpty ? ["yolo26n-pose"] : models  // files from before the field were pose-only
@@ -228,8 +224,23 @@ final class VideoPoseSession: NSObject, ObservableObject {
         storedVersion: entry.analysisVersion, storedModels: storedModels(entry),
         currentVersion: AnalysisVersion.current, currentModels: models.names,
         mode: exerciseMode, storedExercise: stored.exercise, detection: nil)
-      if case .rerunFromClip = plan, await rerunFromClip(entry, stored: stored, where: "refresh") {
-        continue
+      if case .rerunFromClip = plan,
+        !userPassActive, let predictor = models.predictor,
+        let clipURL = await recents.clipURL(for: entry)
+      {
+        let job = describeJob(
+          url: clipURL, kind: .replay(entry: entry, where: "refresh", exercise: stored.exercise),
+          predictor: predictor, bellDetector: models.bellDetector)
+        defer { clearJob(job); updateKeepAwake() }
+        switch await run(job) {
+        case .done(let jobFrames, let summary):
+          if await renderReplay(job: job, frames: jobFrames, summary: summary) != nil { continue }
+          // Render failed or superseded: fall through to the stored poses below, as a failed re-run always did.
+        case .cancelled, .failed:
+          log.event(
+            "error",
+            ["where": "recents_rerun_refresh", "id": entry.id, "message": "extraction failed or was cancelled"])
+        }
       }
       // Replaying the stored poses: the plan's exercise — except a re-run that fell back for an out-of-reach
       // clip, which replays the stored exercise re-detected in Auto, as before.
@@ -273,7 +284,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// as an opened set marked `where: debug`, plus `bell_held` (the lab's held-bell numbers). Cancel stops after the
   /// set in progress.
   func startInstrumentedRun() async {
-    guard instrumentedRun == nil, analysisTask == nil else { return }
+    guard instrumentedRun == nil, !userPassActive else { return }
     instrumentedRunCancelled = false
     await models.ready()
     models.ensureBellDetector()
@@ -288,9 +299,22 @@ final class VideoPoseSession: NSObject, ObservableObject {
       guard let stored = recents.loadPipeline(for: entry) else { continue }
       let name = entry.originalName ?? "\(stored.exercise.definition.name) \(stored.reps.count)"
       instrumentedRun = InstrumentedRun(index: i + 1, total: entries.count, name: name, line: "running the models")
-      if await rerunFromClip(entry, stored: stored, where: "debug") {
-        done += 1
-        if let fps = lastPassFps { passes.append(fps) }
+      guard !userPassActive, let predictor = models.predictor,
+        let clipURL = await recents.clipURL(for: entry)
+      else { continue }
+      let job = describeJob(
+        url: clipURL, kind: .replay(entry: entry, where: "debug", exercise: stored.exercise),
+        predictor: predictor, bellDetector: models.bellDetector)
+      defer { clearJob(job); updateKeepAwake() }
+      switch await run(job) {
+      case .done(let jobFrames, let summary):
+        if let outcome = await renderReplay(job: job, frames: jobFrames, summary: summary) {
+          done += 1
+          passes.append(outcome.fps)
+        }
+      case .cancelled, .failed:
+        log.event(
+          "error", ["where": "recents_rerun_debug", "id": entry.id, "message": "extraction failed or was cancelled"])
       }
     }
     log.event(
@@ -302,79 +326,119 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   func cancelInstrumentedRun() {
     instrumentedRunCancelled = true
-    refreshTask?.cancel()
+    if currentJob?.isUserPass == false { currentTask?.cancel() }
   }
 
-  private var lastPassFps: Double?
-
-  /// The models again over a stored set's clip, with no player and no status line: the same pass and the same
-  /// log events as an opened set, marked with `where` (refresh, debug). False (the caller replays the stored poses
-  /// instead) while a pass the user started is running, when the clip is out of reach, or before the models have
-  /// loaded. Opening a set cancels it; the set it was on falls back to its stored poses until the next launch.
-  private func rerunFromClip(_ entry: RecentEntry, stored: AnalysisPipeline, where: String) async -> Bool {
-    guard analysisTask == nil, let predictor = models.predictor, let url = await recents.clipURL(for: entry) else { return false }
-    log.event(
-      "recents_rerun",
-      ["id": entry.id, "reason": `where` == "debug" ? "instrumented" : "models_changed", "where": `where`,
-       "stored": storedModels(entry), "current": models.names, "exercise": stored.exercise.rawValue])
-    let task = Task { [weak self] () -> ([FrameRecord], OfflineAnalyzer.Summary)? in
-      guard let self else { return nil }
-      return try? await OfflineAnalyzer.extract(
-        url: url, predictor: predictor, bellDetector: self.models.bellDetector,
-        progress: { [weak self] fraction in
-          if `where` == "debug" { Task { @MainActor in self?.instrumentedRun?.progress = fraction } }
-        },
-        heartbeat: { [weak self] h in
-          self?.log.event(
-            "offline_progress",
-            [
-              "where": `where`, "frames": h.frames, "footprint_mb": h.footprintMB, "available_mb": h.availableMB,
-              "pose_ms": h.poseMs, "bell_ms": h.bellMs, "decode_ms": h.decodeMs, "fps": h.fps,
-            ])
-          if `where` == "debug" {
-            Task { @MainActor in
-              self?.instrumentedRun?.line = String(format: "%d frames · %.0f fps · pose %.1f ms · bell %.1f ms", h.frames, h.fps, h.poseMs, h.bellMs)
+  /// Run one extraction for a job: progress, heartbeat and the unified offline_pass event. Takes the slot
+  /// (callers cancel any occupant first); the extract task stays cancellable until it settles. Rendering and
+  /// clearing are the caller's.
+  private func run(_ job: ClipJob) async -> ClipResult {
+    if case .replay(let entry, let replayWhere, let exercise) = job.kind {
+      log.event(
+        "recents_rerun",
+        ["id": entry.id, "reason": replayWhere == "debug" ? "instrumented" : "models_changed",
+         "where": replayWhere, "stored": storedModels(entry), "current": models.names,
+         "exercise": exercise.rawValue])
+    }
+    let task = Task<ClipResult, Never> { [weak self] in
+      guard let self else { return .cancelled }
+      do {
+        let (frames, summary) = try await OfflineAnalyzer.extract(
+          url: job.url, predictor: job.predictor, bellDetector: job.bellDetector,
+          progress: { [weak self] fraction in
+            if job.isUserPass {
+              Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
+            } else if job.replayWhere == "debug" {
+              Task { @MainActor in self?.instrumentedRun?.progress = fraction }
             }
-          }
-        })
+          },
+          heartbeat: { [weak self] h in
+            if job.isUserPass {
+              Task { @MainActor in self?.passFramesSeen = h.frames }
+              self?.log.event(
+                "offline_progress",
+                [
+                  "frames": h.frames, "footprint_mb": h.footprintMB, "available_mb": h.availableMB,
+                  "pose_ms": h.poseMs, "bell_ms": h.bellMs, "decode_ms": h.decodeMs, "fps": h.fps,
+                ])
+            } else if case .replay(_, let replayWhere, _) = job.kind {
+              self?.log.event(
+                "offline_progress",
+                [
+                  "where": replayWhere, "frames": h.frames, "footprint_mb": h.footprintMB,
+                  "available_mb": h.availableMB, "pose_ms": h.poseMs, "bell_ms": h.bellMs,
+                  "decode_ms": h.decodeMs, "fps": h.fps,
+                ])
+              if replayWhere == "debug" {
+                Task { @MainActor in
+                  self?.instrumentedRun?.line = String(
+                    format: "%d frames · %.0f fps · pose %.1f ms · bell %.1f ms", h.frames, h.fps, h.poseMs, h.bellMs)
+                }
+              }
+            }
+          })
+        try Task.checkCancellation()
+        self.logOfflinePass(job: job, frames: frames, summary: summary)
+        return .done(frames: frames, summary: summary)
+      } catch is CancellationError {
+        return .cancelled
+      } catch OfflineAnalyzer.OfflineError.cancelled {
+        return .cancelled
+      } catch {
+        return .failed(error)
+      }
     }
-    refreshTask = task
+    currentJob = job
+    currentTask = task
     updateKeepAwake()
-    defer {
-      refreshTask = nil
-      updateKeepAwake()
-    }
-    guard let (frames, summary) = await task.value else {
-      log.event("error", ["where": "recents_rerun_\(`where`)", "id": entry.id, "message": "extraction failed or was cancelled"])
-      return false
-    }
+    return await task.value
+  }
+
+  /// One offline_pass shape for the user pass and the replays: the timings both share, plus the replay's id,
+  /// marker and the lab context (detector settings, thermal and power state). The user pass carries neither.
+  private func logOfflinePass(job: ClipJob, frames: [FrameRecord], summary: OfflineAnalyzer.Summary) {
     let fps = summary.elapsed > 0 ? Double(summary.frames) / summary.elapsed : 0
-    lastPassFps = fps
-    let memory = OfflineAnalyzer.memoryMB()
-    log.event(
-      "offline_pass",
-      [
-        "where": `where`, "id": entry.id, "frames": summary.frames, "elapsed_s": summary.elapsed,
-        "avg_infer_ms": summary.averageInferenceMs, "fps": fps,
-        "bell_frames": summary.bellFrames, "bell_avg_infer_ms": summary.bellAverageInferenceMs,
-        "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
-        // The instrumentation a lab run wants beside the timings: what the detector was set to, and what the
-        // phone was doing to itself (a throttled or low-power phone runs the same models slower).
-        "bell_floor": models.bellDetector?.minConfidence ?? 0, "bell_cap": models.bellDetector?.maxSightings ?? 0,
-        "thermal": ProcessInfo.processInfo.thermalState.rawValue, "low_power": ProcessInfo.processInfo.isLowPowerModeEnabled,
-        "battery": UIDevice.current.batteryLevel, "footprint_mb": memory.footprint, "available_mb": memory.available,
-      ])
+    var fields: [String: Any] = [
+      "frames": summary.frames, "elapsed_s": summary.elapsed,
+      "avg_infer_ms": summary.averageInferenceMs, "fps": fps,
+      "bell_frames": summary.bellFrames, "bell_avg_infer_ms": summary.bellAverageInferenceMs,
+      "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
+    ]
+    if case .replay(let entry, let replayWhere, _) = job.kind {
+      fields["where"] = replayWhere
+      fields["id"] = entry.id
+      // The instrumentation a lab run wants beside the timings: what the detector was set to, and what the
+      // phone was doing to itself (a throttled or low-power phone runs the same models slower).
+      let memory = OfflineAnalyzer.memoryMB()
+      fields["bell_floor"] = job.bellDetector?.minConfidence ?? 0
+      fields["bell_cap"] = job.bellDetector?.maxSightings ?? 0
+      fields["thermal"] = ProcessInfo.processInfo.thermalState.rawValue
+      fields["low_power"] = ProcessInfo.processInfo.isLowPowerModeEnabled
+      fields["battery"] = UIDevice.current.batteryLevel
+      fields["footprint_mb"] = memory.footprint
+      fields["available_mb"] = memory.available
+    }
+    log.event("offline_pass", fields)
+  }
+
+  /// Finish a replay: analyze the extracted frames as the job's exercise, log bell_held, refill stills, save back
+  /// to the entry. Returns the outcome for the instrumented tally, or nil when a newer job superseded this one
+  /// (a stale job saves nothing) or the save failed.
+  private func renderReplay(job: ClipJob, frames: [FrameRecord], summary: OfflineAnalyzer.Summary) async -> RepOutcome? {
+    guard case .replay(let entry, let replayWhere, let exercise) = job.kind,
+      currentJob?.generation == job.generation
+    else { return nil }
     // A re-run analyzes the set's own exercise whatever the mode: no detection here (#42).
-    let kind = StoredSetPlan.exercise(mode: exerciseMode, stored: stored.exercise, detection: nil)
+    let kind = StoredSetPlan.exercise(mode: exerciseMode, stored: exercise, detection: nil)
     let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: kind)
     var held: [String: Any] = BellTracker.heldSummary(
       frames: analyzed.track.frames, reps: analyzed.reps.map { ($0.startTime, $0.endTime) }
     ).fields.mapValues { $0 as Any }
     held["id"] = entry.id
-    held["where"] = `where`
+    held["where"] = replayWhere
     held["exercise"] = kind.rawValue
     log.event("bell_held", held)
-    await analyzed.fillRepImages(from: AVURLAsset(url: url), frameDuration: frameDuration)
+    await analyzed.fillRepImages(from: AVURLAsset(url: job.url), frameDuration: frameDuration)
     do {
       try recents.save(
         id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
@@ -382,12 +446,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
         originalName: entry.originalName, models: models.names)
       log.event(
         "recents_refreshed",
-        ["id": entry.id, "where": `where`, "was": "\(stored.exercise.rawValue) \(stored.reps.count)",
+        ["id": entry.id, "where": replayWhere, "was": "\(exercise.rawValue) \(entry.repCount)",
          "now": "\(kind.rawValue) \(analyzed.reps.count)", "models": models.names])
-      return true
+      let fps = summary.elapsed > 0 ? Double(summary.frames) / summary.elapsed : 0
+      return RepOutcome(reps: analyzed.reps.count, fps: fps)
     } catch {
-      log.event("error", ["where": "recents_rerun_\(`where`)", "id": entry.id, "message": "\(error)"])
-      return false
+      log.event("error", ["where": "recents_rerun_\(replayWhere)", "id": entry.id, "message": "\(error)"])
+      return nil
     }
   }
 
@@ -528,8 +593,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         log.event(
           "recents_rerun",
           ["id": entry.id, "reason": "models_changed", "stored": storedModels, "current": models.names, "exercise": exercise.rawValue])
-        rerunExercise = exercise
-        await analyzeAndPlay(url: url)
+        await analyzeAndPlay(url: url, reason: StoredSetReason.rerunModels.rawValue, stored: exercise)
         return
       case .replay(let exercise, let reason):
         // A stored analysis can predate an exercise the detector now knows (#17) or an analyzer fix (#19): re-analyze
@@ -606,11 +670,32 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
   }
 
-  /// The running offline pass, so Cancel can stop it.
-  private var analysisTask: Task<Void, Never>?
-  /// A background re-run of a stored set through the models (refreshStaleEntries, the instrumented run); opening a
-  /// set cancels it.
-  private var refreshTask: Task<([FrameRecord], OfflineAnalyzer.Summary)?, Never>?
+  /// The job occupying the single extraction slot and its cancellable extract task. A newer registration
+  /// supersedes whatever is in flight; only the current generation's render touches the session or the store.
+  private var currentJob: ClipJob?
+  private var currentTask: Task<ClipResult, Never>?
+  private var jobGeneration = 0
+
+  /// True while the user's pass holds the slot: replays wait (refresh falls back to stored poses).
+  private var userPassActive: Bool { currentJob?.isUserPass ?? false }
+
+  /// Forget the slot when its job settles, leaving a superseding job's registration alone. The extract task
+  /// clears with it, so Cancel during render still reports (it cancels a settled task, as before).
+  private func clearJob(_ job: ClipJob) {
+    if currentJob?.generation == job.generation {
+      currentJob = nil
+      currentTask = nil
+    }
+  }
+
+  /// Claim the next generation and describe one extraction. Registration happens in run().
+  private func describeJob(
+    url: URL, kind: ClipJob.Kind, predictor: BasePredictor, bellDetector: BellDetector?
+  ) -> ClipJob {
+    jobGeneration += 1
+    return ClipJob(
+      generation: jobGeneration, kind: kind, url: url, predictor: predictor, bellDetector: bellDetector)
+  }
 
   /// An instrumented run in progress (Igor, 2026-09-13: "a debug run that pre-picks the clips, shake is disabled,
   /// and there's UI on the screen"): every stored set with a reachable clip goes through the models with the
@@ -633,20 +718,23 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Stops the offline pass; the clip stays loaded (paused) with no analysis and nothing saved.
   func cancelAnalysis() {
-    guard let analysisTask else { return }
+    guard let task = currentTask, currentJob?.isUserPass == true else { return }
     log.event("analysis_cancel", ["url": currentFileURL?.lastPathComponent ?? ""])
-    analysisTask.cancel()
+    task.cancel()
   }
 
   /// Re-runs the offline pass from the clip after an interruption (status tap or retry button, #57).
   func retryAnalysis() {
-    guard source == .file, analysisTask == nil, let url = trimmedURL ?? currentFileURL else { return }
+    guard source == .file, !userPassActive, let url = trimmedURL ?? currentFileURL else { return }
     Task { await analyzeAndPlay(url: url) }
   }
 
-  private func analyzeAndPlay(url: URL) async {
-    // One pass at a time: a background re-run of a stored set yields to the set the user opened.
-    refreshTask?.cancel()
+  private func analyzeAndPlay(
+    url: URL, reason: String = StoredSetReason.load.rawValue, stored: ExerciseKind? = nil
+  ) async {
+    // One pass at a time: a background re-run of a stored set yields to the set the user opened (and a previous
+    // user pass, orphaned today, is discarded at its gate).
+    currentTask?.cancel()
     // A set opened in the first second after launch (a Recents tap, the reopen hook) arrives before the model has
     // loaded; wait for it rather than abandoning the pass with "Model not ready" (#45).
     guard let predictor = await models.ready() else {
@@ -654,6 +742,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
       log.event("error", ["where": "offline_pass", "message": "model not loaded after 10 s"])
       return
     }
+    let job = describeJob(
+      url: url, kind: .userPass(exercise: stored, reason: reason),
+      predictor: predictor, bellDetector: models.bellDetector)
     installPlayerItem(url: url, pipeline: AnalysisPipeline(exercise: exercise))
     // A new pass owns the track: stale poses from the previous clip must not survive a failure (#57).
     extractedFrames = []
@@ -665,61 +756,36 @@ final class VideoPoseSession: NSObject, ObservableObject {
     canCancelAnalysis = true
     defer {
       canCancelAnalysis = false
-      analysisTask = nil
+      clearJob(job)
       updateKeepAwake()
     }
-    let task = Task { [weak self] in
-      guard let self else { return }
-      do {
-        let (frames, summary) = try await OfflineAnalyzer.extract(
-          url: url, predictor: predictor, bellDetector: self.models.bellDetector,
-          progress: { [weak self] fraction in
-            Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
-          },
-          heartbeat: { [weak self] h in
-            // Every 60 frames: memory (a pass that dies without a signal was killed for memory, #43) and the last
-            // window's per-frame cost of each model, decoding, and the frame rate.
-            Task { @MainActor in self?.passFramesSeen = h.frames }
-            self?.log.event(
-              "offline_progress",
-              [
-                "frames": h.frames, "footprint_mb": h.footprintMB, "available_mb": h.availableMB,
-                "pose_ms": h.poseMs, "bell_ms": h.bellMs, "decode_ms": h.decodeMs, "fps": h.fps,
-              ])
-          })
-        try Task.checkCancellation()
-        await self.finishAnalysis(url: url, frames: frames, summary: summary)
-      } catch is CancellationError {
-        self.statusMessage = "Analysis cancelled"
-        self.log.event("analysis_cancelled", ["url": url.lastPathComponent])
-      } catch OfflineAnalyzer.OfflineError.cancelled {
-        self.statusMessage = "Analysis cancelled"
-        self.log.event("analysis_cancelled", ["url": url.lastPathComponent])
-      } catch {
-        // A failed pass leaves no partial track: the mode switch re-runs from the clip (#57).
-        self.extractedFrames = []
-        self.extractionComplete = false
-        self.adopt(pipeline: AnalysisPipeline(exercise: self.exercise))
-        self.analysisInterrupted = true
-        self.statusMessage = "Analysis interrupted – tap to retry"
-        self.log.event("offline_interrupted", ["frames": self.passFramesSeen, "message": "\(error)"])
-        // Test hook: SWING_MODE=<exercise|auto> switches exercise after an interrupted pass, proving a mode
-        // switch re-runs the clip instead of re-reading partial frames (simulator runs can't tap the menu, #57).
-        if let mode = ProcessInfo.processInfo.environment["SWING_MODE"], !mode.isEmpty {
-          Task {
-            try? await Task.sleep(for: .seconds(2))
-            self.setExerciseMode(ExerciseMode(storageValue: mode), persist: false)
-          }
-        }
-      }
-    }
-    analysisTask = task
-    updateKeepAwake()
     // Test hook: SWING_CANCEL_ANALYSIS=1 cancels one second in (simulator runs can't tap the UI).
     if ProcessInfo.processInfo.environment["SWING_CANCEL_ANALYSIS"] == "1" {
       Task { try? await Task.sleep(for: .seconds(1)); self.cancelAnalysis() }
     }
-    await task.value
+    switch await run(job) {
+    case .done(let frames, let summary):
+      await finishAnalysis(job: job, frames: frames, summary: summary)
+    case .cancelled:
+      statusMessage = "Analysis cancelled"
+      log.event("analysis_cancelled", ["url": url.lastPathComponent])
+    case .failed(let error):
+      // A failed pass leaves no partial track: the mode switch re-runs from the clip (#57).
+      extractedFrames = []
+      extractionComplete = false
+      adopt(pipeline: AnalysisPipeline(exercise: exercise))
+      analysisInterrupted = true
+      statusMessage = "Analysis interrupted – tap to retry"
+      log.event("offline_interrupted", ["frames": passFramesSeen, "message": "\(error)"])
+      // Test hook: SWING_MODE=<exercise|auto> switches exercise after an interrupted pass, proving a mode
+      // switch re-runs the clip instead of re-reading partial frames (simulator runs can't tap the menu, #57).
+      if let mode = ProcessInfo.processInfo.environment["SWING_MODE"], !mode.isEmpty {
+        Task {
+          try? await Task.sleep(for: .seconds(2))
+          setExerciseMode(ExerciseMode(storageValue: mode), persist: false)
+        }
+      }
+    }
     activity = .idle
     liveInferenceEnabled = true
     play()
@@ -729,29 +795,23 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
   }
 
-  private func finishAnalysis(url: URL, frames: [FrameRecord], summary: OfflineAnalyzer.Summary) async {
+  /// Render a finished user pass: only the current generation touches the session, so a superseded pass
+  /// adopts, saves and plays nothing.
+  private func finishAnalysis(job: ClipJob, frames: [FrameRecord], summary: OfflineAnalyzer.Summary) async {
+    guard case .userPass(let exercise, let reason) = job.kind,
+      currentJob?.generation == job.generation
+    else { return }
     do {
       extractedFrames = frames
-      log.event(
-        "offline_pass",
-        [
-          "frames": summary.frames, "elapsed_s": summary.elapsed,
-          "avg_infer_ms": summary.averageInferenceMs,
-          "fps": summary.elapsed > 0 ? Double(summary.frames) / summary.elapsed : 0,
-          "bell_frames": summary.bellFrames, "bell_avg_infer_ms": summary.bellAverageInferenceMs,
-          "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
-        ])
-      let rerun = rerunExercise
-      rerunExercise = nil
-      await analyzeExtracted(url: url, reason: (rerun == nil ? StoredSetReason.load : .rerunModels).rawValue, stored: rerun)
+      await analyzeExtracted(url: job.url, reason: reason, stored: exercise)
       extractionComplete = true
       analysisInterrupted = false
       statusMessage = recordedLine(reps: pipeline.reps.count) + String(
         format: " · %d frames in %.1fs", summary.frames, summary.elapsed)
-      rememberCurrent(clipURL: url)
+      rememberCurrent(clipURL: job.url)
       // A recording with no reps is usually a false start: offer to throw it away (nothing was saved to Photos).
       if pipeline.reps.count == 0, case .recording = currentOrigin {
-        log.event("empty_recording", ["url": url.lastPathComponent, "frames": frames.count])
+        log.event("empty_recording", ["url": job.url.lastPathComponent, "frames": frames.count])
         emptyRecordingPrompt = true
       }
     } catch {
@@ -830,7 +890,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     case .file where !extractionComplete:
       // No complete extraction (an interrupted pass left none, #57): re-run from the clip instead of
       // re-reading partial frames. A pass already running picks the new mode up when it finishes.
-      guard analysisTask == nil, let url = trimmedURL ?? currentFileURL else { return }
+      guard !userPassActive, let url = trimmedURL ?? currentFileURL else { return }
       Task { await analyzeAndPlay(url: url) }
     case .camera:
       liveDetector.reset()
@@ -1181,7 +1241,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let active = UIApplication.shared.applicationState == .active
     // An offline pass on a two-minute clip outlasts auto-lock; a locked phone backgrounds the app and AVFoundation
     // interrupts the reader ("Operation Interrupted" at 43 s, #46), so the pass keeps the screen on too.
-    let wanted = active && (source == .camera || watch.reachable || watchMode || analysisTask != nil || refreshTask != nil)
+    let wanted = active && (source == .camera || watch.reachable || watchMode || currentJob != nil)
     guard wanted != keepAwake else { return }
     keepAwake = wanted
     UIApplication.shared.isIdleTimerDisabled = wanted
