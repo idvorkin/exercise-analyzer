@@ -765,7 +765,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
           heartbeat: { [weak self] h in
             // Every 60 frames: memory (a pass that dies without a signal was killed for memory, #43) and the last
             // window's per-frame cost of each model, decoding, and the frame rate.
-            self?.passFramesSeen = h.frames
+            Task { @MainActor in self?.passFramesSeen = h.frames }
             self?.log.event(
               "offline_progress",
               [
