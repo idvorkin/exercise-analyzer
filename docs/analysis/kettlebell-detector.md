@@ -84,6 +84,34 @@ What the numbers say (small model, first trial):
   build, Vision on the Mac's GPU/ANE). Simulator (CPU): pose 27 ms, detector 74 ms per frame, 9 fps for the pass.
   Phone cost: pending the first `offline_pass` with the detector bundled. Commit 3b997e1.
 
+## 2026-09-12: other equipment (dumbbells, barbells, bench) with the same nano
+
+Igor: can it extract dumbbells and barbells too, and whatever helps the Bulgarian split squat? With YOLOE the
+classes are text prompts fixed at export, so a wider vocabulary costs nothing per frame. Exported the nano with
+"kettlebell, dumbbell, barbell, weight plate, bench, plyo box" (`export_bell_detector.py yoloe 26n 640
+kettlebell,dumbbell,barbell,weight plate,bench,plyo box`) and ran `equipment_trial.py`:
+
+| Clip | kettlebell | dumbbell | barbell | weight plate | bench | plyo box |
+|---|---|---|---|---|---|---|
+| swing-4reps | 100 % (0.54) | – | – | – | – | – |
+| igor-1h-swing | 100 % (0.91) | – | – | – | – | – |
+| pistols | 100 % (0.77) | – | – | 65 % (0.47) | – | – |
+| bulgarian | 86 % (0.34) | – | – | – | – | – |
+
+![Bulgarian split squat: the bench under the rear foot and the dumbbell rack behind, none detected](images/equipment-nano-bulgarian.jpg)
+![Pistol: "weight plate" is the kettlebell's own handle; the plates on the wall rack are not found](images/equipment-nano-pistols.jpg)
+
+- The kettlebell class is as good as in the single-class export (better on the one-hand clip), so a wider
+  vocabulary does not cost the bell anything.
+- The other classes did not deliver on these clips: the Bulgarian clip (464 × 848, dim) has a bench under the rear
+  foot and a dumbbell rack in the background and the nano found neither, even at 0.15; "weight plate" in the pistol
+  clip is the kettlebell's handle, while the real plates on the wall rack are missed. No clip has a dumbbell or a
+  barbell in hand, so the in-hand case is untested.
+- Decision: the bundled model stays single-class kettlebell for now. To revisit: record one Bulgarian set with a
+  dumbbell in each hand and the bench in frame at full resolution, then try the nano and the small (`26s`) with
+  those prompts on it. If dumbbells in hand detect, the tracker generalises to "the weight that moves with the
+  wrists" and the bench becomes a second signal for the split-squat detector (rear foot on a bench).
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),

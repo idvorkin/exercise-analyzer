@@ -5,7 +5,7 @@
 """Export an open-vocabulary YOLO detector with the single class "kettlebell" to Core ML (what the phone runs).
 
 Usage: export_bell_detector.py world [imgsz]        # YOLO-World v2 small (no nano exists)
-       export_bell_detector.py yoloe 26n [imgsz]    # YOLOE, sizes 26n/26s/26m/11s/11m/v8s/... (nano exists)
+       export_bell_detector.py yoloe 26n [imgsz] [class,class,...]   # YOLOE, sizes 26n/26s/26m/11s/... (nano exists)
        export_bell_detector.py coco                 # plain COCO yolo11n, a control (COCO has no kettlebell class)
 
 numpy is pinned below 2: coremltools' torch frontend fails in the YOLOE segmentation head otherwise
@@ -29,11 +29,12 @@ elif which == "yoloe":
 
     size = sys.argv[2] if len(sys.argv) > 2 else "26n"
     imgsz = int(sys.argv[3]) if len(sys.argv) > 3 else 640
+    # Extra prompts cost nothing per frame (same network, wider head): "yoloe 26n 640 kettlebell,dumbbell,bench".
+    names = sys.argv[4].split(",") if len(sys.argv) > 4 else ["kettlebell"]
     m = YOLOE(f"yoloe-{size}-seg.pt")
-    names = ["kettlebell"]
     m.set_classes(names, m.get_text_pe(names))
     out = m.export(format="coreml", imgsz=imgsz, nms=True, half=True)
-    dest = f"yoloe-{size}-kettlebell-{imgsz}.mlpackage"
+    dest = f"yoloe-{size}-{'-'.join(n.replace(' ', '') for n in names)}-{imgsz}.mlpackage"
 else:
     m = YOLO("yolo11n.pt")
     out = m.export(format="coreml", imgsz=640, nms=True, half=True)
