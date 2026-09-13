@@ -45,7 +45,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 007:
 
 - **Summary:** Step by frame and by phase with targets big enough for the gym
-- **Status:** implemented in [564a753](https://github.com/idvorkin/exercise-analyzer/commit/564a753); verified by simulator screenshot; the scrubber follow-up [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) needs the phone
+- **Status:** implemented in [564a753](https://github.com/idvorkin/exercise-analyzer/commit/564a753); verified by simulator screenshot; the scrubber follow-up [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) needs the phone; [#54](https://github.com/idvorkin/exercise-analyzer/issues/54): a seek from the gallery, pills, edge keys or step buttons ends the scrub state and the clock follows the playhead, the HUD shows the gallery's rep in review (the completed count live), and `phase` events log the gallery's rep
 
 #### Use Case:
 - **As a** lifter holding a phone with chalky hands

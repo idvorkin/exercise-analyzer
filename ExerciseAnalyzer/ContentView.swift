@@ -104,7 +104,7 @@ struct ContentView: View {
             reps: session.reps, columns: session.exercise.definition.galleryOrder,
             currentRep: session.currentRep?.number, focusedPhase: $focusedPhase,
             focusedRep: $focusedRep,
-            onSeek: { session.seek(to: $0.time, from: "gallery") },
+            onSeek: { chromeSeek(to: $0.time, from: "gallery") },
             onOpen: { _ in showKeyframeViewer = true }
           )
           .frame(height: galleryHeight)
@@ -138,6 +138,13 @@ struct ContentView: View {
       }
     }
     .onChange(of: session.currentTime) { _, time in
+      if isScrubbing && !session.isPlaying {
+        // A seek from outside the slider landed while a drag looked live (gallery, pills, steps, or the
+        // full-screen viewer's buttons): the drag is stale, so end it and follow the playhead (#54). An
+        // active drag while paused never moves currentTime, and the slider's own seek already cleared the
+        // flag, so this only fires for someone else's seek.
+        isScrubbing = false
+      }
       if !isScrubbing { scrubTime = time }
       // Why the slider might not follow the clock (#23): log the view's side every 5 s.
       if Date().timeIntervalSince(lastClockLog) > 5 {
@@ -177,7 +184,7 @@ struct ContentView: View {
         reps: session.reps, columns: session.exercise.definition.galleryOrder,
         currentRep: session.currentRep?.number
       ) { position in
-        session.seek(to: position.time, from: "keyframe_viewer")
+        chromeSeek(to: position.time, from: "keyframe_viewer")
       }
     }
   }
@@ -211,7 +218,7 @@ struct ContentView: View {
     let analysis = session.latestFrame?.analysis
     return VStack {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Text("\(analysis?.repCount ?? 0)")
+        Text("\(displayedRepCount)")
           .font(.system(size: 34, weight: .bold, design: .rounded))
           .monospacedDigit()
         exerciseMenu
@@ -245,7 +252,7 @@ struct ContentView: View {
         ForEach(definition.phases, id: \.id) { phase in
           let active = phase.matches(analysis?.phase)
           Button {
-            session.seekToPhase(phase)
+            chromeAction { session.seekToPhase(phase) }
           } label: {
             Text(phase.label.uppercased())
               .font(.caption2.weight(.semibold))
@@ -362,6 +369,29 @@ struct ContentView: View {
     .foregroundStyle(.white)
   }
 
+  /// The big number over the video (#54): while reviewing, the gallery's rep — the one the playhead is
+  /// in, the completed total past the last rep — so the HUD and the gallery agree; live, completed reps.
+  private var displayedRepCount: Int {
+    if session.source == .camera {
+      return session.latestFrame?.analysis?.repCount ?? 0
+    }
+    return session.currentRep?.number ?? session.latestFrame?.analysis?.repCount ?? 0
+  }
+
+  /// A seek from anything but the slider (gallery, pills, edge steps, phase/rep buttons): the
+  /// scrub-in-progress state belongs to a drag, so a tap elsewhere ends it and the clock follows the
+  /// playhead instead of a stale slider value (#54).
+  private func chromeSeek(to time: Double, from source: String) {
+    isScrubbing = false
+    scrubTime = time
+    session.seek(to: time, from: source)
+  }
+
+  private func chromeAction(_ action: () -> Void) {
+    isScrubbing = false
+    action()
+  }
+
   private func metric(_ label: String, _ value: Double?, unit: String) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 3) {
       Text(label).font(.caption2).opacity(0.75)
@@ -392,24 +422,28 @@ struct ContentView: View {
       let inset = geo.size.height * 0.16
       HStack {
         EdgeStepper(
-          side: .previous, onTap: { session.stepFrame(-1) },
+          side: .previous, onTap: { chromeAction { session.stepFrame(-1) } },
           onKey: { key in
-            switch key {
-            case .rep: session.seekToRep(offset: -1)
-            case .frame: session.stepFrame(-1)
-            case .position: session.seekToCheckpoint(offset: -1)
+            chromeAction {
+              switch key {
+              case .rep: session.seekToRep(offset: -1)
+              case .frame: session.stepFrame(-1)
+              case .position: session.seekToCheckpoint(offset: -1)
+              }
             }
           }
         )
         .frame(width: width)
         Spacer()
         EdgeStepper(
-          side: .next, onTap: { session.stepFrame(1) },
+          side: .next, onTap: { chromeAction { session.stepFrame(1) } },
           onKey: { key in
-            switch key {
-            case .rep: session.seekToRep(offset: 1)
-            case .frame: session.stepFrame(1)
-            case .position: session.seekToCheckpoint(offset: 1)
+            chromeAction {
+              switch key {
+              case .rep: session.seekToRep(offset: 1)
+              case .frame: session.stepFrame(1)
+              case .position: session.seekToCheckpoint(offset: 1)
+              }
             }
           }
         )
@@ -508,16 +542,16 @@ struct ContentView: View {
     Group {
       // Frame and phase steps get big, captioned targets; reps are navigated from the gallery (issue #11).
       HStack(spacing: 6) {
-        navButton("chevron.left.2", "phase", "Previous checkpoint") { session.seekToCheckpoint(offset: -1) }
-        navButton("chevron.left", "frame", "Previous frame") { session.stepFrame(-1) }
+        navButton("chevron.left.2", "phase", "Previous checkpoint") { chromeAction { session.seekToCheckpoint(offset: -1) } }
+        navButton("chevron.left", "frame", "Previous frame") { chromeAction { session.stepFrame(-1) } }
         Button(action: session.togglePlayback) {
           Image(systemName: session.isPlaying ? "pause.fill" : "play.fill")
             .font(.title)
             .frame(maxWidth: .infinity, minHeight: 52)
         }
         .disabled(session.duration == 0)
-        navButton("chevron.right", "frame", "Next frame") { session.stepFrame(1) }
-        navButton("chevron.right.2", "phase", "Next checkpoint") { session.seekToCheckpoint(offset: 1) }
+        navButton("chevron.right", "frame", "Next frame") { chromeAction { session.stepFrame(1) } }
+        navButton("chevron.right.2", "phase", "Next checkpoint") { chromeAction { session.seekToCheckpoint(offset: 1) } }
       }
       .frame(maxWidth: .infinity)
 
@@ -530,7 +564,7 @@ struct ContentView: View {
           }
         )
         .disabled(session.duration == 0)
-        Text(timeString(scrubTime) + " / " + timeString(session.duration))
+        Text(timeString(isScrubbing ? scrubTime : session.currentTime) + " / " + timeString(session.duration))
           .font(.caption).monospacedDigit().foregroundStyle(.secondary)
         Menu {
           Picker("Speed", selection: $session.rate) {
