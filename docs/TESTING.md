@@ -8,7 +8,7 @@ camera, a display, or a wrist goes higher.
 | Rung | What runs | Command | Time | Answers |
 |---|---|---|---|---|
 | 1 Host | `ExerciseCore` XCTest against stored pose tracks | `just test` | ~1 s | detection, rep counts, phases, checkpoints, quality, crops, frame status, message types |
-| 1.5 Mac model | `posetrack`: the pose model plus the analyzers on a clip | `just analyze clip.mov` | ~clip length ÷ 4 | what the phone would count for any clip on the Mac (AirDropped or sample); makes fixtures without the phone |
+| 1.5 Mac model | `posetrack`: the pose model plus the analyzers on a clip; `scripts/model-trials/` for candidate models | `just analyze clip.mov`, `scripts/model-trials/*.py` | ~clip length ÷ 4 | what the phone would count for any clip on the Mac (AirDropped or sample); makes fixtures without the phone; whether a new model (a bell detector) works at all |
 | 2 Simulator | the app, driven by env hooks, judged from its log | `just test-sim` | 5–8 min | loading, offline pose pass, analysis in the app, trim (`AVAssetExportSession`), player start, Recents |
 | 3 Phone | the app on the iPhone, a human at the gym | `just run-device` then `just pull-logs` | minutes + a person | Neural Engine speed, camera and recorder, HDR playback, Photos, the watch, everything visual |
 
@@ -81,6 +81,24 @@ M4 it runs at 130 fps or more (the simulator does 20). Poses match the phone's t
 writes a host-test fixture from any clip: this is how a clip that only exists on the Mac (AirDrop, a sample) gets
 into rung 1. The model comes from `just model` (`ExerciseAnalyzer/yolo26n-pose.mlpackage`, gitignored) and is
 compiled once into `~/tmp/agent/skill/posetrack/`.
+
+### Model trials (rung 1.5 too)
+
+Any question about a *different* model (a detector for the bell, a bigger pose model, a new export) is answered on
+the Mac with Core ML before anything touches the app: export the candidate to `.mlpackage` the way the phone
+would run it, run it over the sample clips, and measure against the pose fixtures for the same clips. Scripts live
+in [`scripts/model-trials/`](../scripts/model-trials/) as uv scripts (declared dependencies, run them directly):
+
+```bash
+scripts/model-trials/export_bell_detector.py world      # YOLO-World with the class "kettlebell" → Core ML
+scripts/model-trials/bell_trial.py yolov8s-worldv2.mlpackage \
+  ~/tmp/agent/swing-samples/swing-sample-4reps.mp4:ExerciseCore/Tests/ExerciseCoreTests/Fixtures/swing-4reps.json ...
+```
+
+A trial reports detection rate, confidence, inference time on the Mac, and, with a fixture, how far the box sits
+from the nearest wrist; the numbers and the verdict go into `docs/analysis/` (the detector's file) before any app
+work starts. The phone's Neural Engine timing is a separate measurement (the `offline_pass` event's
+`avg_infer_ms`): the Mac says whether a model works, the phone says what it costs.
 
 ## Rung 2: simulator smoke
 
