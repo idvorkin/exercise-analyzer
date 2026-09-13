@@ -443,8 +443,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
         await self.finishAnalysis(url: url, frames: frames, summary: summary)
       } catch is CancellationError {
         self.statusMessage = "Analysis cancelled"
+        self.log.event("analysis_cancelled", ["url": url.lastPathComponent])
       } catch OfflineAnalyzer.OfflineError.cancelled {
         self.statusMessage = "Analysis cancelled"
+        self.log.event("analysis_cancelled", ["url": url.lastPathComponent])
       } catch {
         self.statusMessage = "Analysis failed: \(error.localizedDescription)"
         self.log.event("error", ["where": "offline_pass", "message": "\(error)"])

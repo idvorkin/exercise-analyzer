@@ -100,4 +100,4 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap Cancel on the overlay
 - **Then:** the analysis stops within a second, the clip stays open and paused with no reps, and nothing is added to Workouts
 
-- **Issues:** #30
+- **Issues:** #30, [#37](https://github.com/idvorkin/exercise-analyzer/issues/37) Cancel only landed after the whole pass (detached task never saw the cancellation)

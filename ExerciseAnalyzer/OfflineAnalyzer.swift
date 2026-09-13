@@ -40,7 +40,9 @@ enum OfflineAnalyzer {
     let duration = try await asset.load(.duration).seconds
     let composition = try await AVMutableVideoComposition.videoComposition(withPropertiesOf: asset)
 
-    return try await Task.detached(priority: .userInitiated) {
+    // Detached so the reader loop never blocks the main actor. A detached task does not inherit cancellation, so
+    // Cancel is forwarded by hand; without this the pass ran to the end and only then reported "cancelled" (#37).
+    let work = Task.detached(priority: .userInitiated) {
       let reader = try AVAssetReader(asset: asset)
       let output = AVAssetReaderVideoCompositionOutput(
         videoTracks: [track],
@@ -81,6 +83,11 @@ enum OfflineAnalyzer {
         frames: frames.count, elapsed: CACurrentMediaTime() - started,
         averageInferenceMs: frames.isEmpty ? 0 : inferenceTotal / Double(frames.count))
       return (frames, summary)
-    }.value
+    }
+    return try await withTaskCancellationHandler {
+      try await work.value
+    } onCancel: {
+      work.cancel()
+    }
   }
 }

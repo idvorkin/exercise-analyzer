@@ -51,10 +51,25 @@ check_trim() {  # clip expected-reps wait-seconds: auto-trims after analysis, ex
     echo "ok    trim $1: passthrough, start $start (asked $req), first frame at ${first}s, $reps reps"
   else echo "FAIL  trim $1: passthrough=$pass start=$start asked=$req first_frame=$first reps=$reps (wanted $2)"; fail=1; fi
 }
+check_cancel() {  # clip wait-seconds: cancels one second into the analysis (#37), expects the pass to stop within 3 s
+  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+  SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" SIMCTL_CHILD_SWING_CANCEL_ANALYSIS=1 xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
+  sleep 3
+  wait_for analysis_cancelled "$2" || echo "      (timed out after $2 s waiting for the cancel to land)"
+  local f; f=$(newest_log)
+  local asked landed analyzed
+  asked=$(jq -r 'select(.type=="analysis_cancel") | .t' "$f" | head -1)
+  landed=$(jq -r 'select(.type=="analysis_cancelled") | .t' "$f" | head -1)
+  analyzed=$(jq -r 'select(.type=="analyzed" or .type=="recents_saved") | .type' "$f" | head -1)
+  if [ -n "$asked" ] && [ -n "$landed" ] && [ -z "$analyzed" ] && [ $((landed - asked)) -lt 3000 ]; then
+    echo "ok    cancel $1: stopped $((landed - asked)) ms after Cancel, nothing analyzed or saved"
+  else echo "FAIL  cancel $1: asked=$asked landed=$landed analyzed=$analyzed"; fail=1; fi
+}
 # ONLY=<substring> runs just the matching checks (e.g. ONLY=trim).
 run() { if [ -z "${ONLY:-}" ] || [[ "$*" == *"${ONLY}"* ]]; then "$@"; fi; }
 run check swing-sample-4reps kettlebell-swing 4 90
 run check pistols pistol-squat 6 180
 run check bulgarian bulgarian-split-squat 8 180
 run check_trim igor-1h-swing 9 150
+run check_cancel pistols 60
 exit $fail
