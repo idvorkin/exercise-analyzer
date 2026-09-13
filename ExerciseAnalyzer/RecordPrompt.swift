@@ -14,6 +14,9 @@ enum RecordPrompt {
   /// Ask once while the app is in front: a request made from a background-launched app is deferred by iOS until
   /// the app is foregrounded, and its completion never runs, so the watch's Record would post nothing.
   static func prepare(log: SessionLog) {
+    #if targetEnvironment(simulator)
+      return  // no watch on the simulator, and the permission dialog would sit over every screenshot
+    #endif
     let center = UNUserNotificationCenter.current()
     center.getNotificationSettings { settings in
       log.event("notification_auth", ["status": settings.authorizationStatus.rawValue])

@@ -15,6 +15,9 @@ struct WorkoutGalleryView: View {
   var onEvent: ((String, [String: Any]) -> Void)? = nil
   @Environment(\.dismiss) private var dismiss
   @StateObject private var suggestions = PhotosSuggestions()
+  /// Days folded shut, by start-of-day time; days older than a week start folded, today and this week start open.
+  @State private var collapsed: Set<Date> = []
+  @State private var collapseSeeded = false
 
   private var knownPhotosIDs: Set<String> {
     Set(store.entries.compactMap { entry -> String? in
@@ -50,14 +53,20 @@ struct WorkoutGalleryView: View {
               }
               ForEach(WorkoutDay.group(store.entries)) { day in
                 Section {
-                  ForEach(day.exercises) { exercise in
-                    ExerciseSetsRow(group: exercise, store: store) { entry in
-                      dismiss()
-                      onOpen(entry)
+                  if !collapsed.contains(day.date) {
+                    ForEach(day.exercises) { exercise in
+                      ExerciseSetsRow(group: exercise, store: store) { entry in
+                        dismiss()
+                        onOpen(entry)
+                      }
                     }
                   }
                 } header: {
-                  DayHeader(day: day)
+                  DayHeader(day: day, collapsed: collapsed.contains(day.date)) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                      if collapsed.contains(day.date) { collapsed.remove(day.date) } else { collapsed.insert(day.date) }
+                    }
+                  }
                 }
               }
             }
@@ -72,6 +81,11 @@ struct WorkoutGalleryView: View {
         ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
       }
       .onAppear {
+        if !collapseSeeded {
+          collapseSeeded = true
+          let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
+          collapsed = Set(WorkoutDay.group(store.entries).map(\.date).filter { $0 < weekAgo })
+        }
         suggestions.onEvent = onEvent
         suggestions.refresh(excluding: knownPhotosIDs)
         // Test hook: ask for Photos access on open so a simulator run can answer the system dialog.
@@ -184,6 +198,8 @@ extension ExerciseKind {
 
 struct DayHeader: View {
   let day: WorkoutDay
+  var collapsed = false
+  var onToggle: (() -> Void)? = nil
 
   private static let dayFormatter: DateFormatter = {
     let f = DateFormatter()
@@ -198,14 +214,26 @@ struct DayHeader: View {
   }
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline) {
-      Text(title).font(.title3.bold())
-      if title == "Today" || title == "Yesterday" {
-        Text(Self.dayFormatter.string(from: day.date)).font(.subheadline).foregroundStyle(.secondary)
+    Button {
+      onToggle?()
+    } label: {
+      HStack(alignment: .firstTextBaseline) {
+        Image(systemName: "chevron.right")
+          .font(.caption.bold())
+          .rotationEffect(.degrees(collapsed ? 0 : 90))
+          .foregroundStyle(.secondary)
+        Text(title).font(.title3.bold())
+        if title == "Today" || title == "Yesterday" {
+          Text(Self.dayFormatter.string(from: day.date)).font(.subheadline).foregroundStyle(.secondary)
+        }
+        Spacer()
+        Text(summary).font(.subheadline).foregroundStyle(.secondary)
       }
-      Spacer()
-      Text(summary).font(.subheadline).foregroundStyle(.secondary)
+      .contentShape(Rectangle())
     }
+    .buttonStyle(.plain)
+    .foregroundStyle(.primary)
+    .accessibilityLabel("\(title), \(summary), \(collapsed ? "collapsed" : "expanded")")
     .padding(.vertical, 8)
     .background(Color(.systemBackground))
   }
