@@ -125,6 +125,31 @@ Part of the [user stories](README.md); persona and format are described there.
 
 ---
 
+### User Story 039:
+
+- **Summary:** Hold the middle of the picture to get both edges' keys at once, and hold a key to repeat it
+- **Status:** requested (Igor by voice, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds"); not built
+
+#### Use Case:
+- **As a** lifter scrubbing with one thumb
+- **I want to** press and hold anywhere in the middle of the picture and see the left and right edge keys (Rep, Frame, Position, both directions) appear together, slide onto one, and have it fire again every two seconds while I keep holding
+- **so that** stepping through a set is one hold and a slide, in either direction, without hunting for an edge or tapping over and over
+
+#### Acceptance Criteria:
+- **Scenario:** Holding the middle
+- **Given:** a set is open and paused
+- **When:** I press and hold in the middle third of the picture
+- **Then:** both edges' key stacks appear (the left edge's keys step back, the right edge's forward), the one my finger slides onto lights, and letting go fires it once; a quick tap in the middle still plays or pauses
+
+- **Scenario:** Holding a key repeats it
+- **Given:** the keys are up and my finger rests on the right edge's Rep key
+- **When:** I keep holding
+- **Then:** the playhead moves to the next rep immediately and again every two seconds until I lift or slide off, with the key pulsing on each press, and the session log records each press (`ui` action: step, from: hold)
+
+- **Issues:** [#59](https://github.com/idvorkin/exercise-analyzer/issues/59)
+
+---
+
 ### User Story 033:
 
 - **Summary:** See a get-up step by step: floor, elbow, hand, kneel, lunge, stand, and back down to the floor
