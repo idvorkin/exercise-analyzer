@@ -19,6 +19,9 @@ squats and Turkish get-ups. `ExerciseCore/` is the platform-free analysis packag
 - **Bugs live in GitHub issues.** Shake reports → `just pull-logs` → `just file-bugs`; evidence and analysis go on the
   issue as a comment. `just bugs-check` is the quick dirty check (exit 1 when unfiled reports exist); run
   `/loop 5m just bugs-check` while Igor is testing on the phone.
+- **Every feature or behaviour change updates the user stories** (`docs/stories/`) in the same commit or the
+  next: a new capability gets a story in its journey (Cohn + Gherkin, `user-story` skill) and a row in the status
+  table; a changed behaviour edits the story's acceptance criteria. No story, not done.
 - **Every pulled report also updates the user stories** (`docs/stories/`). A feature request becomes a new story in
   the journey it belongs to, in the Cohn + Gherkin form (`user-story` skill), with its issue linked; a bug gets an
   `Issues:` line on the story it violates. Stories are the spec; issues are the trail.

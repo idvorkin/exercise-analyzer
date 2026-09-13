@@ -109,3 +109,23 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** music is playing from another app
 - **When:** I start the camera, tap Done, and play the clip back
 - **Then:** the music plays uninterrupted at the same volume throughout
+
+---
+
+### User Story 029:
+
+- **Summary:** Throw away a false start
+
+#### Use Case:
+- **As a** lifter whose recording caught nothing (camera pointed wrong, set never happened)
+- **I want to** be offered a delete right after the analysis finds no reps
+- **so that** empty recordings don't pile up in Workouts
+
+#### Acceptance Criteria:
+- **Scenario:** A recording with no reps
+- **Given:** I recorded a set with the app and tapped Done
+- **and Given:** the analysis found no reps
+- **When:** the analysis finishes
+- **Then:** the app asks "Delete recording or keep it?", Delete removes the file and its Workouts entry, and a clip from Photos is never deleted
+
+- **Issues:** #31

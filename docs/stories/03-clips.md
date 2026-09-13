@@ -75,3 +75,22 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Then:** a sheet slides up with Workouts, Photos, Files and Report a problem as full-width rows, Workouts first and Files last
 
 - **Issues:** [#25](https://github.com/idvorkin/exercise-analyzer/issues/25)
+
+---
+
+### User Story 028:
+
+- **Summary:** Stop an analysis I didn't mean to start
+
+#### Use Case:
+- **As a** lifter who opened the wrong clip, or a long one
+- **I want to** cancel the analysis while it runs
+- **so that** I am not stuck watching a progress bar for a minute
+
+#### Acceptance Criteria:
+- **Scenario:** Cancelling a long clip
+- **Given:** a two-minute clip is being analyzed and the progress overlay is showing
+- **When:** I tap Cancel on the overlay
+- **Then:** the analysis stops within a second, the clip stays open and paused with no reps, and nothing is added to Workouts
+
+- **Issues:** #30
