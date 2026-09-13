@@ -61,6 +61,8 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I choose Turkish Get-Up from the exercise menu
 - **Then:** the rep count, phases, HUD and gallery update within a second, without the video being re-scanned
 
+- **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) a pass interrupted by the reader ("Operation Interrupted") left a partial track, and the mode switch re-read it instead of re-running the clip: no skeleton past the interruption
+
 ---
 
 ### User Story 004:

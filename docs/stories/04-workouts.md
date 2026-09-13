@@ -144,3 +144,23 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Then:** those sets go through the models again from their clips one at a time in the background (`recents_rerun` and `offline_pass` with `where: refresh` in the log), each replacing its own entry, without my opening them; opening a set while that runs takes priority and the interrupted set waits for the next launch; a set whose clip is out of reach is refreshed from its stored poses as before, and that replay runs today's tracker over the stored sightings (the bell a set was saved with is never kept through a replay)
 
 - **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)
+
+---
+
+### User Story 038:
+
+- **Summary:** See what I did today at a glance when the Workouts sheet is collapsed
+- **Status:** requested ([#58](https://github.com/idvorkin/exercise-analyzer/issues/58), Igor by shake report, 2026-09-13); not built
+
+#### Use Case:
+- **As a** lifter between sets with the Workouts sheet pulled down
+- **I want to** see the day's exercises as short words with a small stick-figure icon each (pistols, swing, TGU, Bulgarian)
+- **so that** I know what I have done today without opening the sheet
+
+#### Acceptance Criteria:
+- **Scenario:** Glancing at the day between sets
+- **Given:** today has a swing set and two pistol sets stored, and the Workouts sheet is collapsed to its handle
+- **When:** I look at the collapsed sheet
+- **Then:** it reads "swing · pistols" with an icon per exercise (a stick figure in the exercise's shape, drawn once as assets), in the order the sets were done, and nothing else; pulling the sheet up shows the full day as before
+
+- **Issues:** [#58](https://github.com/idvorkin/exercise-analyzer/issues/58)
