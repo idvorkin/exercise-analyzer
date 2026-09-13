@@ -1022,7 +1022,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
         : (reps.lastIndex { $0.startTime < currentTime } ?? 0)
     }
     let clamped = max(0, min(reps.count - 1, index))
-    seek(to: reps[clamped].startTime, from: offset > 0 ? "next_rep" : "previous_rep")
+    let target = reps[clamped]
+    // Land in the phase the playhead is in now (#56); when the rep has no such position, its first.
+    let phase = latestFrame?.analysis?.phase
+    seek(
+      to: phase.flatMap { target.positions[$0]?.time } ?? target.startTime,
+      from: offset > 0 ? "next_rep" : "previous_rep")
   }
 
   /// Jumps to `phase` of the rep under the playhead, or of the nearest rep when between reps (#28).
