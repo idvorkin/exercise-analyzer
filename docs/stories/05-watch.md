@@ -199,7 +199,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 043:
 
 - **Summary:** The watch face shows the set
-- **Status:** requested ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; the Muse research of 2026-09-13 sized it)
+- **Status:** implemented in 375e3aa; needs phone + watch (face check by Igor) ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; the Muse research of 2026-09-13 sized it)
 - **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and today's complication is only a launcher.
 
 #### Use Case:
