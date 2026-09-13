@@ -43,7 +43,7 @@ enum StepKey: CaseIterable {
 /// view; each owner stops its engine on lift, gesture cancel, scene change and disappear, so no
 /// timer outlives its touch.
 final class KeyRepeatEngine {
-  static let repeatSeconds = 1.0
+  static let repeatSeconds = 0.5  // Igor, 2026-09-13: "1 s? Make it 0.5 s"
   /// Playhead moves smaller than this between presses count as no movement (same-time seeks republish).
   static let stuckEpsilon = 1e-6
 
@@ -310,13 +310,19 @@ struct MiddleHold: View {
   /// pick the key (the same thirds the stacks use). Leaving the active key past the re-entry margin
   /// lets go; sliding to another key is a new arrival.
   private func track(_ location: CGPoint, in size: CGSize) {
+    // Past either edge is that stack, whichever side is active: a drag across the picture reaches the other
+    // stack (Igor: "let me drag to the other side"). The re-entry margin only keeps the active side sticky.
     let side: StepSide?
-    if activeSide == .previous {
-      side = location.x < Self.reentryMargin ? .previous : nil
-    } else if activeSide == .next {
-      side = location.x > size.width - Self.reentryMargin ? .next : nil
+    if location.x < 0 {
+      side = .previous
+    } else if location.x > size.width {
+      side = .next
+    } else if activeSide == .previous, location.x < Self.reentryMargin {
+      side = .previous
+    } else if activeSide == .next, location.x > size.width - Self.reentryMargin {
+      side = .next
     } else {
-      side = location.x < 0 ? .previous : (location.x > size.width ? .next : nil)
+      side = nil
     }
     guard let side else { deactivate(); return }
     let rowHeight = size.height / CGFloat(StepKey.allCases.count)

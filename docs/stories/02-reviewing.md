@@ -137,7 +137,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 039:
 
 - **Summary:** Hold the middle of the picture to get both edges' keys at once, and hold a key to repeat it
-- **Status:** implemented in [1fcdc3c](https://github.com/idvorkin/exercise-analyzer/commit/1fcdc3c), follow-up in [b96aec3](https://github.com/idvorkin/exercise-analyzer/commit/b96aec3) (stacks stay up, dismiss by tap outside, 1 s repeat); needs the phone (gestures); requested (Igor by voice, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds")
+- **Status:** implemented in [1fcdc3c](https://github.com/idvorkin/exercise-analyzer/commit/1fcdc3c), follow-up in [b96aec3](https://github.com/idvorkin/exercise-analyzer/commit/b96aec3) (stacks stay up, dismiss by tap outside), then a half-second repeat and a drag that reaches the other stack (#63); needs the phone (gestures); requested (Igor by voice, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds")
 
 #### Use Case:
 - **As a** lifter scrubbing with one thumb
@@ -155,10 +155,10 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I slide onto the right edge's Rep key without lifting
 - **Then:** the key lights and pulses and the playhead moves to the next rep before I lift; the log shows one `ui` press from the hold followed by its `seek`
 
-- **Scenario:** Holding a key repeats it every second
+- **Scenario:** Holding a key repeats it every half second
 - **Given:** my finger rests on a key with the stacks up
 - **When:** I keep holding it
-- **Then:** it fires again every second (log `t` spacing about 1000 ms) until I lift or slide off; sliding to another key fires that key at once and restarts its second; a thumb resting on the border between two keys keeps the key it arrived on; lifting fires nothing more and leaves the stacks up
+- **Then:** it fires again every half second (log `t` spacing about 500 ms) until I lift or slide off; sliding to another key, on either stack (a drag straight across the picture reaches the other side), fires that key at once and restarts its half second; a thumb resting on the border between two keys keeps the key it arrived on; lifting fires nothing more and leaves the stacks up
 
 - **Scenario:** Tapping a key while the stacks are up
 - **Given:** both stacks are up from an earlier hold
@@ -168,7 +168,7 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Holding forward on the last rep
 - **Given:** the playhead is paused in the last rep with the stacks up
 - **When:** I hold the forward Rep key
-- **Then:** the playhead stays in the last rep (no wrap to the first) while the key keeps pulsing every second and every press is still logged
+- **Then:** the playhead stays in the last rep (no wrap to the first) while the key keeps pulsing every half second and every press is still logged
 
 - **Scenario:** A quick middle tap still plays or pauses
 - **Given:** a set is open with the stacks down
