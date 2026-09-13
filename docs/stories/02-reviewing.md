@@ -158,7 +158,7 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Holding a key repeats it every half second
 - **Given:** my finger rests on a key with the stacks up
 - **When:** I keep holding it
-- **Then:** it fires again every half second (log `t` spacing about 500 ms) until I lift or slide off; sliding to another key, on either stack (a drag straight across the picture reaches the other side), fires that key at once and restarts its half second; a thumb resting on the border between two keys keeps the key it arrived on; lifting fires nothing more and leaves the stacks up
+- **Then:** it fires again every half second for Rep and Position and every tenth of a second for Frame (log `t` spacing about 500 ms, 100 ms for frames) until I lift or slide off; sliding to another key, on either stack (a drag straight across the picture reaches the other side), fires that key at once and restarts its cadence; a thumb resting on the border between two keys keeps the key it arrived on; lifting fires nothing more and leaves the stacks up
 
 - **Scenario:** Tapping a key while the stacks are up
 - **Given:** both stacks are up from an earlier hold

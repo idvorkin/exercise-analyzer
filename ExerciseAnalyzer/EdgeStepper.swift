@@ -14,6 +14,9 @@ enum StepSide { case previous, next }
 
 enum StepKey: CaseIterable {
   case rep, frame, position
+  /// How often a held key fires: a rep or a position every half second, a frame every tenth (Igor,
+  /// 2026-09-13: "keep 0.5 s on rep and position; for frame movement make it every 0.1 s").
+  var repeatSeconds: TimeInterval { self == .frame ? 0.1 : 0.5 }
   var label: String {
     switch self {
     case .rep: return "Rep"
@@ -43,7 +46,6 @@ enum StepKey: CaseIterable {
 /// view; each owner stops its engine on lift, gesture cancel, scene change and disappear, so no
 /// timer outlives its touch.
 final class KeyRepeatEngine {
-  static let repeatSeconds = 0.5  // Igor, 2026-09-13: "1 s? Make it 0.5 s"
   /// Playhead moves smaller than this between presses count as no movement (same-time seeks republish).
   static let stuckEpsilon = 1e-6
 
@@ -53,11 +55,13 @@ final class KeyRepeatEngine {
   private var timer: Timer?
   private var repeatIndex = 0
   private var lastTime = 0.0
+  private var interval = StepKey.rep.repeatSeconds
 
   var isRunning: Bool { timer != nil }
 
-  /// Arrival: fires at once (repeat 0, never at_end) and starts the cadence.
-  func start() {
+  /// Arrival: fires at once (repeat 0, never at_end) and starts the key's cadence.
+  func start(interval: TimeInterval) {
+    self.interval = interval
     repeatIndex = 0
     fire()
     restart()
@@ -72,7 +76,7 @@ final class KeyRepeatEngine {
     timer?.invalidate()
     // The timer must fire while the finger is down (a tracking-mode runloop), so it goes on
     // the common modes; each arrival owns its timer, invalidated on slide-off, arrival or lift.
-    let next = Timer(timeInterval: Self.repeatSeconds, repeats: true) { [weak self] _ in
+    let next = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
       guard let self else { return }
       self.repeatIndex += 1
       self.fire()
@@ -181,7 +185,7 @@ struct EdgeStepper: View {
     onUpLit(key)
     engine.onFire = { [key] repeatIndex, atEnd in onUpFire(key, repeatIndex, atEnd) }
     engine.clock = upClock
-    engine.start()
+    engine.start(interval: key.repeatSeconds)
   }
 
   private func upEnd() {
@@ -346,7 +350,7 @@ struct MiddleHold: View {
       onFire(side, key, repeatIndex, atEnd)
     }
     engine.clock = clock
-    engine.start()
+    engine.start(interval: key.repeatSeconds)
   }
 
   private func setLit(side: StepSide, key: StepKey) {
