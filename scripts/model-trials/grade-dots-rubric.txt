@@ -1,0 +1,12 @@
+You are grading a kettlebell tracker. This video frame shows a lifter; the tracker's reported bell is drawn as a
+YELLOW CIRCLE and the pose model's visible wrists as small CYAN SQUARES. A frame with no yellow circle means the
+tracker reported nothing.
+
+Answer with one JSON object and nothing else:
+{"circle":"yes|no","bell_in_hands":"yes|no|unclear","circle_on":"hand_bell|rack_bell|floor_bell|other|none","note":"<15 words"}
+
+bell_in_hands is "yes" only when the lifter is holding or swinging a KETTLEBELL (a dumbbell is "no").
+circle_on is "hand_bell" only if the circle is on the kettlebell the lifter is holding or swinging. A bell on a
+rack or shelf behind the lifter is "rack_bell"; one resting on the floor is "floor_bell"; a wheel, a dumbbell, a
+person or anything else is "other"; no circle is "none". Be strict: a circle beside the hands but on a background
+bell is "rack_bell".

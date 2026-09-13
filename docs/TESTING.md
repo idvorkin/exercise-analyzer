@@ -102,6 +102,28 @@ from the nearest wrist; the numbers and the verdict go into `docs/analysis/` (th
 work starts. The phone's Neural Engine timing is a separate measurement (the `offline_pass` event's
 `avg_infer_ms`): the Mac says whether a model works, the phone says what it costs.
 
+**Tracker questions run on fixtures, not video.** `swift test --filter TuningReports/testBellTrackerHeldPerFixture`
+replays the stored sightings through the real tracker in a second and prints, per fixture, how often the detector
+saw a bell at the hands, how often the tracker held one there, the same inside detected reps, and how the lost
+frames class. A fixture for a new detector package comes from `posetrack <clip> --bell-model <pkg> --bell-conf 0.05
+--fixture <out.json>` (a low floor so the replay can sweep floors), with `--poses-from <old fixture>` to keep the
+poses and the rep counts; `BELL_LAB_FIXTURES=<dir>` points the report at a directory of such files.
+
+**The proxy lies; look at frames.** "A bell within 0.2 of a wrist" also scores a rack bell behind the hands and a
+ski-erg wheel, which is how a rule once showed +15 % that was all wheel (docs/analysis/kettlebell-detector.md,
+2026-09-13). Before trusting any tracker gain, cut sampled frames with the tracker's bell drawn in and grade them:
+
+```bash
+cd ExerciseCore && BELL_LAB_DOTS=1 swift test --filter TuningReports/testBellTrackerHeldPerFixture | grep ^DOT > /tmp/dots.txt
+scripts/model-trials/cut-dot-frames.sh /tmp/dots.txt swing-1h-9reps ~/tmp/agent/swing-samples/igor-1h-swing.mp4 25 /tmp/gt
+scripts/model-trials/grade-dots.sh /tmp/gt          # Muse grades every frame headless, six at a time → labels-muse.csv
+```
+
+The grader is Igor's Muse Code contributor model (`muse exec --image`): it can look at images, it is cheap, and it
+grades a frame in about fifteen seconds; the rubric is `grade-dots-rubric.txt`. It prints per clip the frames with a
+bell in the hands, how many had the circle on it (recall) and how many circles sat on something else (false holds).
+A human spot-check of a few frames stays worthwhile; Muse's notes column says what it saw.
+
 ## Rung 2: simulator smoke
 
 [`scripts/sim-smoke.sh`](../scripts/sim-smoke.sh), run by `just test-sim` after `just build-sim`.
