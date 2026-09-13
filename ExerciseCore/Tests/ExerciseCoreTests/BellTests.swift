@@ -81,6 +81,36 @@ final class BellTests: XCTestCase {
     XCTAssertNil(tracker.track([rack], pose: pose(wrist: CGPoint(x: 0.9, y: 0.9))))
   }
 
+  /// A track of frames holding `bells` on the given indices, at 30 fps (H27's timing).
+  private func zoneFrames(count: Int, bells: (Int) -> [BellSighting]) -> [FrameRecord] {
+    (0..<count).map { i in
+      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: nil, box: nil,
+        analysis: nil, bells: bells(i))
+    }
+  }
+
+  func testWindowedZonesCatchABoxThatSitsThroughTheWalkIn() {
+    // H27: a floor bell visible for the first 60 frames of a 200-frame track (2 s) never reaches the whole-clip
+    // share — but it sits through the whole walk-in, so some 3 s window holds it in over 60 % of its frames.
+    let box = bell(0.58, 0.71, conf: 0.9)
+    let frames = zoneFrames(count: 200) { i in i < 60 ? [box] : [] }
+    XCTAssertEqual(BellTracker.staticZones(in: frames).count, 1)
+  }
+
+  func testWindowedZonesIgnoreABoxSpreadEvenlyOverTheClip() {
+    // The same 40 frames spread evenly (every fifth frame) never fill 60 % of any 3 s window.
+    let box = bell(0.58, 0.71, conf: 0.9)
+    let frames = zoneFrames(count: 200) { i in i % 5 == 0 ? [box] : [] }
+    XCTAssertTrue(BellTracker.staticZones(in: frames).isEmpty)
+  }
+
+  func testWindowedZonesIgnoreTheSwingApex() {
+    // The swung bell's apex cell, 5 frames of every 40: about an eighth of any window, never furniture (risk (c)).
+    let box = bell(0.5, 0.2, conf: 0.9)
+    let frames = zoneFrames(count: 200) { i in i % 40 < 5 ? [box] : [] }
+    XCTAssertTrue(BellTracker.staticZones(in: frames).isEmpty)
+  }
+
   func testFollowingRejectsAVividlyDifferentColour() {
     let tracker = BellTracker()
     let red = BellSighting(box: CGRect(x: 0.47, y: 0.57, width: 0.06, height: 0.06), conf: 0.9, color: [0.9, 0.1, 0.1])

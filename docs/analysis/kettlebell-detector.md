@@ -377,6 +377,19 @@ ungraded from a Muse transport error; cap 30 had 14 of 25), misses 9 → 2, fals
 The cap prediction held; the false circles are the walk-in box and the rack bell beside the hinge (H27, H25).
 Repo fixtures unchanged (their stored sightings never reached the cap).
 
+**Furniture from any window a box sits still in (H27, #18, NOT SHIPPED — numbers pending).** A cell is
+furniture if it holds a box in ≥ 60 % of the frames of *some* 3 s window, not only 60 % of the whole clip
+(union of both, `BellTracker.staticZones(..., window: 3.0)`, time-based so any frame rate works): the walk-in
+floor box at (0.58, 0.71) sits still for the whole walk-in but never reaches the whole-clip share. Risks,
+with the answers: (a) the set's own bell in a long walk-in — the pick-up frames zone too, the start lands a
+frame later once it leaves the cell (today's "right bell, not yet in the hands" stretched by a frame, and the
+backward fill stays out of zones); (b) a get-up's bell resting between reps — `stillFrames` already vetoes 3 s
+of stillness, so no new loss expected; (c) the one-hand apex, 24 % of its clip — covered by a host test that 5
+frames of every 40 never zones. Prediction before the replay: 13-rep inZone/zone up by the walk-in frames,
+held and inReps unchanged or up, 4reps/1h/TGU/pistols/Bulgarian within a point; by eye false circles 12 → ~7
+with recall 12 → 12. No `AnalysisVersion` bump in this commit — the rule ships (bump) or is reverted with the
+grade. Numbers: _pending Igor's replay + dots grade below._
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),
