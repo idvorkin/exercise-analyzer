@@ -47,7 +47,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 003:
 
 - **Summary:** Override the detector when it guesses wrong, without re-running the video
-- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f); verified on the phone
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f); verified on the phone; interrupted-pass fix in [4543828](https://github.com/idvorkin/exercise-analyzer/commit/4543828) (simulator rung pending: `ONLY=interrupt just test-sim`)
 
 #### Use Case:
 - **As a** lifter whose set was mislabelled
@@ -60,6 +60,12 @@ Part of the [user stories](README.md); persona and format are described there.
 - **and Given:** it is actually a get-up
 - **When:** I choose Turkish Get-Up from the exercise menu
 - **Then:** the rep count, phases, HUD and gallery update within a second, without the video being re-scanned
+
+- **Scenario:** An interrupted pass
+- **Given:** a clip whose offline pass was interrupted by the reader ("Operation Interrupted")
+- **and Given:** the status line reads "Analysis interrupted" with a retry, and no partial track was kept
+- **When:** I choose an exercise from the exercise menu (or tap the status to retry)
+- **Then:** the clip is re-scanned from the video (an `offline_pass` precedes any `analyzed`), the full skeleton returns, and with a complete extraction a later switch still re-reads instantly without re-scanning
 
 - **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) a pass interrupted by the reader ("Operation Interrupted") left a partial track, and the mode switch re-read it instead of re-running the clip: no skeleton past the interruption
 

@@ -65,6 +65,27 @@ check_cancel() {  # clip wait-seconds: cancels one second into the analysis (#37
     echo "ok    cancel $1: stopped $((landed - asked)) ms after Cancel, nothing analyzed or saved"
   else echo "FAIL  cancel $1: asked=$asked landed=$landed analyzed=$analyzed"; fail=1; fi
 }
+check_interrupt() {  # clip interrupt-frame mode expected-reps wait-seconds: fails the first pass the way a
+  # backgrounded decoder does (#57); the mode switch must then re-run the clip, so an offline_pass comes before
+  # any analyzed and the failed pass alone analyzes nothing.
+  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+  SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" SIMCTL_CHILD_SWING_INTERRUPT_READER="$2" SIMCTL_CHILD_SWING_MODE="$3" \
+    xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
+  sleep 3
+  wait_for offline_interrupted "$5" || echo "      (timed out after $5 s waiting for the interruption)"
+  wait_for analyzed "$5" || echo "      (timed out after $5 s waiting for the re-run analysis)"
+  local f; f=$(newest_log)
+  local interrupted mode pass analyzed reps
+  interrupted=$(jq -r 'select(.type=="offline_interrupted") | .t' "$f" | head -1)
+  mode=$(jq -r 'select(.type=="exercise_mode") | .t' "$f" | head -1)
+  pass=$(jq -r 'select((.type=="offline_pass") and (.where == null)) | .t' "$f" | head -1)
+  analyzed=$(jq -r 'select(.type=="analyzed") | .t' "$f" | head -1)
+  reps=$(jq -r 'select(.type=="analyzed") | .reps' "$f" | tail -1)
+  if [ -n "$interrupted" ] && [ -n "$mode" ] && [ -n "$pass" ] && [ -n "$analyzed" ] && [ "$reps" = "$4" ] \
+    && [ "$interrupted" -lt "$mode" ] && [ "$mode" -lt "$pass" ] && [ "$pass" -lt "$analyzed" ]; then
+    echo "ok    interrupt $1: failed at $interrupted, mode at $mode, pass at $pass, analyzed at $analyzed ($reps reps)"
+  else echo "FAIL  interrupt $1: interrupted=$interrupted mode=$mode pass=$pass analyzed=$analyzed reps=$reps (wanted $4)"; fail=1; fi
+}
 # ONLY=<substring> runs just the matching checks (e.g. ONLY=trim).
 run() { if [ -z "${ONLY:-}" ] || [[ "$*" == *"${ONLY}"* ]]; then "$@"; fi; }
 run check swing-sample-4reps kettlebell-swing 4 90
@@ -72,4 +93,5 @@ run check pistols pistol-squat 6 180
 run check bulgarian bulgarian-split-squat 8 180
 run check_trim igor-1h-swing 9 150
 run check_cancel pistols 60
+run check_interrupt pistols 60 pistol-squat 6 180
 exit $fail
