@@ -47,7 +47,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 014:
 
 - **Summary:** Surface the gym videos I haven't analyzed yet, and mark the ones I have
-- **Status:** implemented in [f4da4a2](https://github.com/idvorkin/exercise-analyzer/commit/f4da4a2); needs the phone (the simulator cannot grant Photos)
+- **Status:** implemented in [f4da4a2](https://github.com/idvorkin/exercise-analyzer/commit/f4da4a2), [17f2398](https://github.com/idvorkin/exercise-analyzer/commit/17f2398); needs the phone (the simulator cannot grant Photos)
 
 #### Use Case:
 - **As a** lifter who records first and reviews later
