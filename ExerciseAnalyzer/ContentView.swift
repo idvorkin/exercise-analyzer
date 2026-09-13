@@ -19,6 +19,11 @@ struct ContentView: View {
   @State private var showRecents = false
   /// Workouts sheet height (#58): collapsed is the handle plus today's summary row; pull up for the full gallery.
   @State private var workoutsDetent: PresentationDetent = .large
+  /// Middle-hold key stacks (story 039): display state driven by MiddleHold.
+  @State private var middleHolding = false
+  @State private var middleLeftLit: StepKey? = nil
+  @State private var middleRightLit: StepKey? = nil
+  @State private var middlePulse = 0
   @State private var showOpenDialog = false
   @Environment(\.openURL) private var openURL
   @State private var lastClockLog = Date.distantPast
@@ -435,38 +440,64 @@ struct ContentView: View {
 
   /// Left and right edges of the picture: tap steps a frame, hold shows Rep / Frame / Position keys (story 030).
   /// They sit between the HUD's top and bottom rows so those buttons keep working.
+  /// The middle holds for both stacks at once, firing on arrival and repeating while held (story 039).
   private var edgeControls: some View {
     GeometryReader { geo in
       let width = geo.size.width * 0.24
       let inset = geo.size.height * 0.16
-      HStack {
-        EdgeStepper(
-          side: .previous, onTap: { chromeAction { session.stepFrame(-1) } },
-          onKey: { key in
-            chromeAction {
-              switch key {
-              case .rep: session.seekToRep(offset: -1)
-              case .frame: session.stepFrame(-1)
-              case .position: session.seekToCheckpoint(offset: -1)
+      ZStack {
+        HStack {
+          EdgeStepper(
+            side: .previous, onTap: { chromeAction { session.stepFrame(-1) } },
+            onKey: { key in
+              chromeAction {
+                switch key {
+                case .rep: session.seekToRep(offset: -1)
+                case .frame: session.stepFrame(-1)
+                case .position: session.seekToCheckpoint(offset: -1)
+                }
               }
             }
-          }
-        )
-        .frame(width: width)
-        Spacer()
-        EdgeStepper(
-          side: .next, onTap: { chromeAction { session.stepFrame(1) } },
-          onKey: { key in
-            chromeAction {
-              switch key {
-              case .rep: session.seekToRep(offset: 1)
-              case .frame: session.stepFrame(1)
-              case .position: session.seekToCheckpoint(offset: 1)
+          )
+          .frame(width: width)
+          MiddleHold(
+            onFire: { side, key, repeatIndex, atEnd in
+              chromeAction {
+                let delta = side == .next ? 1 : -1
+                switch key {
+                case .rep: session.seekToRep(offset: delta)
+                case .frame: session.stepFrame(delta)
+                case .position: session.seekToCheckpoint(offset: delta)
+                }
+              }
+              session.log.event(
+                "ui",
+                ["action": key.logAction, "delta": side == .next ? 1 : -1, "from": "hold", "repeat": repeatIndex, "atEnd": atEnd])
+            },
+            onTap: { if session.source == .file { session.togglePlayback() } },
+            clock: { session.currentTime },
+            holding: $middleHolding, leftLit: $middleLeftLit, rightLit: $middleRightLit, pulse: $middlePulse
+          )
+          EdgeStepper(
+            side: .next, onTap: { chromeAction { session.stepFrame(1) } },
+            onKey: { key in
+              chromeAction {
+                switch key {
+                case .rep: session.seekToRep(offset: 1)
+                case .frame: session.stepFrame(1)
+                case .position: session.seekToCheckpoint(offset: 1)
+                }
               }
             }
-          }
-        )
-        .frame(width: width)
+          )
+          .frame(width: width)
+        }
+        if middleHolding {
+          MiddleStacks(leftLit: $middleLeftLit, rightLit: $middleRightLit, pulse: middlePulse)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .transition(.opacity)
+        }
       }
       .padding(.vertical, inset)
     }
