@@ -4,10 +4,19 @@
 # hands. Input: a DOT dump from `BELL_LAB_DOTS=1 swift test --filter TuningReports/testBellTrackerHeldPerFixture`
 #   DOT <fixture> <frame> <time> <cx> <cy> <w> <h> <conf> <wrists: x,y/x,y or ->
 # Usage: cut-dot-frames.sh <dots file> <fixture name> <clip path> <n frames> <out dir>
+#   A seeded random sample of n frames, so a rerun after a tracker change cuts the same frames; or, with
+#   FRAMES="225 533 ..." in the environment, exactly those frame indices.
 set -uo pipefail
 dots=$1 name=$2 clip=$3 n=$4 out=$5
 mkdir -p "$out"
-grep "^DOT $name " "$dots" | awk 'BEGIN{srand(7)} {print rand() "\t" $0}' | sort -n | head -n "$n" | cut -f2- | sort -k3,3n |
+pick() {
+  if [ -n "${FRAMES:-}" ]; then
+    for f in $FRAMES; do grep "^DOT $name $f " "$dots"; done | sed 's/^/0\t/'
+  else
+    grep "^DOT $name " "$dots" | awk 'BEGIN{srand(7)} {print rand() "\t" $0}' | sort -n | head -n "$n" | cut -f2- | sed 's/^/0\t/'
+  fi
+}
+pick | cut -f2- | sort -k3,3n |
 while read -r _ fx frame time cx cy w h conf wrists; do
   png="$out/$name-$frame.png"
   ffmpeg -loglevel error -y -ss "$time" -i "$clip" -frames:v 1 "$png.raw.png" || { echo "no frame $frame"; continue; }
