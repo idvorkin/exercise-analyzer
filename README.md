@@ -35,19 +35,9 @@ Captured from the simulator by `scripts/screenshots.sh` (sample clips, CPU infer
 
 ## Session log
 
-Every session writes JSON Lines to the app's `Documents/logs/swing-<timestamp>.jsonl` (visible in Finder and the
-Files app). Events: `session_start`, `model_loaded`, `load`, `install_item`, `play`, `display_frame` (first few per
-item), `frame` (per analyzed frame: time, src live/file/offline, infer_ms, fps, conf, phase, rep, angles), `phase`
-(transitions during playback), `rep` (positions, score, feedback), `camera_start`/`camera_done`/`camera_cancel`,
-`trim_start`/`trim`/`trim_done`/`trim_skipped`, `offline_pass` (frames, elapsed, fps), `detection`, `analyzed`,
-`crop`, `seek` (which control asked, player time before/after), `pause`, `ui` (frame steps), `recents_saved`,
-`bug_report`, `error`.
-
-```bash
-just pull-logs                 # iPhone → ~/tmp/agent/swing-logs/logs
-just pull-logs-sim             # simulator → ~/tmp/agent/swing-logs/sim
-just log-summary <file.jsonl>  # everything except per-frame events, plus frame count
-```
+Every launch writes JSON Lines to the app's `Documents/logs/swing-<timestamp>.jsonl`: per-frame metrics, every
+phase transition, reps, detection reasons, seeks, trims, camera and watch events, and bug reports. The event
+catalogue, the pull commands and the reading recipes are in [docs/DEBUGGING.md](docs/DEBUGGING.md).
 
 ## Test ladder
 
@@ -58,15 +48,9 @@ screenshot script are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Bug reports
 
-Shake the phone to file a report: it writes a `bug_report` event into the session log plus a line in
-`Documents/bugs.jsonl` (note, clip, exercise, playhead, log file). Then:
-
-```bash
-just pull-logs   # copies logs and bugs.jsonl to ~/tmp/agent/swing-logs and prints the reports
-just file-bugs   # files each new report as a GitHub issue (once; marker <!-- bug:<time> --> in the body)
-```
-
-Analysis of each report goes on its issue as a comment, with the log evidence, so regressions stay findable.
+Shake the phone to file a report: the note, the context (clip, exercise, playhead, log file), a screenshot and the
+playhead frame. `just pull-logs` brings them to the Mac and `just file-bugs` files each new one as a GitHub issue
+with the images attached. The monitor loop and the whole flow: [docs/DEBUGGING.md](docs/DEBUGGING.md).
 
 ## Keypoints
 
