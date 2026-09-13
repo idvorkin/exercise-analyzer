@@ -2,7 +2,8 @@
 
 //  Watch mode: the phone sits on a tripod and is driven from the wrist, so its screen shows what is readable
 //  from across the room: the rep count in huge digits, the in-frame hint in red when the lifter is out, the
-//  elapsed time and the exercise. Nothing else. Long-press anywhere to leave (a stray tap must not).
+//  elapsed time and the exercise. Nothing else. Only while recording (the session refuses it otherwise and
+//  leaves it with the set, #36). Long-press anywhere to leave (a stray tap must not).
 
 import ExerciseCore
 import SwiftUI
@@ -10,37 +11,28 @@ import SwiftUI
 struct WatchModeView: View {
   @ObservedObject var session: VideoPoseSession
 
-  private var recording: Bool { session.source == .camera }
-
   var body: some View {
     ZStack {
       Color.black.ignoresSafeArea()
       VStack(spacing: 12) {
         Spacer()
-        if recording {
-          Text("\(session.reps.count)")
-            .font(.system(size: 220, weight: .bold, design: .rounded).monospacedDigit())
-            .minimumScaleFactor(0.4).lineLimit(1)
+        Text("\(session.reps.count)")
+          .font(.system(size: 220, weight: .bold, design: .rounded).monospacedDigit())
+          .minimumScaleFactor(0.4).lineLimit(1)
+          .foregroundStyle(.white)
+        Text(session.reps.count == 1 ? "rep" : "reps").font(.title).foregroundStyle(.gray)
+        if !session.frameStatus.inFrame {
+          Text(session.frameStatus.hint.uppercased())
+            .font(.system(size: 40, weight: .heavy))
             .foregroundStyle(.white)
-          Text(session.reps.count == 1 ? "rep" : "reps").font(.title).foregroundStyle(.gray)
-          if !session.frameStatus.inFrame {
-            Text(session.frameStatus.hint.uppercased())
-              .font(.system(size: 40, weight: .heavy))
-              .foregroundStyle(.white)
-              .padding(.horizontal, 24).padding(.vertical, 10)
-              .background(Color.red, in: RoundedRectangle(cornerRadius: 16))
-              .minimumScaleFactor(0.5).lineLimit(1)
-          } else {
-            Text("IN FRAME").font(.title2.bold()).foregroundStyle(.green)
-          }
-          Text(elapsed).font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit()).foregroundStyle(.white)
-          Text(session.exercise.definition.name).font(.title3).foregroundStyle(.gray)
+            .padding(.horizontal, 24).padding(.vertical, 10)
+            .background(Color.red, in: RoundedRectangle(cornerRadius: 16))
+            .minimumScaleFactor(0.5).lineLimit(1)
         } else {
-          Image(systemName: "applewatch").font(.system(size: 120)).foregroundStyle(.gray)
-          Text("Watch mode").font(.largeTitle.bold()).foregroundStyle(.white)
-          Text(session.watch.reachable ? "Tap Record on the watch to start a set" : "Watch not connected")
-            .font(.title3).foregroundStyle(.gray)
+          Text("IN FRAME").font(.title2.bold()).foregroundStyle(.green)
         }
+        Text(elapsed).font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit()).foregroundStyle(.white)
+        Text(session.exercise.definition.name).font(.title3).foregroundStyle(.gray)
         Spacer()
         Button {
           session.setWatchMode(false, from: "phone_button")

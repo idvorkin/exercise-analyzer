@@ -56,8 +56,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var cameraPreviewLayer: AVCaptureVideoPreviewLayer?
   @Published private(set) var cameraPosition: AVCaptureDevice.Position = .back
   @Published private(set) var cameraZoom: Double = 1
-  /// Watch mode: the phone shows big digits readable from across the room and is driven from the wrist.
-  @Published private(set) var watchMode = UserDefaults.standard.bool(forKey: "watchMode")
+  /// Watch mode: the phone shows big digits readable from across the room and is driven from the wrist. It only
+  /// exists while a set is being recorded and ends with the set (#36).
+  @Published private(set) var watchMode = false
   /// Whether the athlete is inside the picture (live camera only); mirrored to the watch.
   @Published private(set) var frameStatus = FrameStatus(box: nil, pose: nil)
   let watch = WatchBridge()
@@ -1056,8 +1057,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   func setWatchMode(_ on: Bool, from origin: String) {
     guard on != watchMode else { return }
+    if on, source != .camera {
+      log.event("watch_mode_refused", ["from": origin, "source": "\(source)"])
+      return
+    }
     watchMode = on
-    UserDefaults.standard.set(on, forKey: "watchMode")
     log.event("watch_mode", ["on": on, "from": origin])
     updateKeepAwake()
     pushWatchStatus(force: true)
@@ -1122,7 +1126,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     camera?.stop()
     camera = nil
     cameraPreviewLayer = nil
-    if source == .camera { source = .none }
+    if source == .camera {
+      source = .none
+      setWatchMode(false, from: "set_ended")
+    }
     updateKeepAwake()
     pushWatchStatus(force: true)
   }

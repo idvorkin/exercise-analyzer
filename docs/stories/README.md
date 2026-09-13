@@ -45,7 +45,7 @@ Built and where each story was verified (host tests, simulator, or phone).
 | 024 Phase pills and tap to play | yes | needs phone check |
 | 025 Open sheet | yes | needs phone check |
 | 026 Screenshot in reports | no | not built |
-| 027 Watch mode | yes | simulator screenshot (idle); recording view needs the phone |
+| 027 Watch mode | yes | needs phone + watch (recording only since #36) |
 | 028 Cancel an analysis | yes | simulator (cancel hook) |
 | 029 Throw away a false start | yes | needs phone (recording) |
 | 030 Edge controls | yes | needs phone (gestures) |

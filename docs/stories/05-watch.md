@@ -106,10 +106,10 @@ Part of the [user stories](README.md); persona and format are described there.
 
 #### Acceptance Criteria:
 - **Scenario:** A set in watch mode
-- **Given:** the phone is in watch mode (toggled from the phone or the watch)
-- **and Given:** a set is being recorded
+- **Given:** a set is being recorded
+- **and Given:** I turned watch mode on from the phone's recording HUD or the watch's recording screen (neither offers it in playback or when idle, and the phone refuses it then)
 - **When:** I glance at the phone from across the room
-- **Then:** it shows the rep count in digits that fill the screen, a red "feet cut off" style banner when I am out of frame, the elapsed time and the exercise, and only a long press leaves the mode
+- **Then:** it shows the rep count in digits that fill the screen, a red "feet cut off" style banner when I am out of frame, the elapsed time and the exercise; only a long press, a double tap or the end of the set leaves the mode
 
-- **Issues:** [#29](https://github.com/idvorkin/exercise-analyzer/issues/29)
+- **Issues:** [#29](https://github.com/idvorkin/exercise-analyzer/issues/29), [#36](https://github.com/idvorkin/exercise-analyzer/issues/36)
 
