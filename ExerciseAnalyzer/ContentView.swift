@@ -53,6 +53,11 @@ struct ContentView: View {
                 .clipped()  // clip the vector overlay only; a clip on the video's ancestors can drop HDR
             }
           }
+          .contentShape(Rectangle())
+          .onTapGesture {
+            // A tap on the picture plays or pauses (#28); the HUD's own buttons sit above and win.
+            if session.source == .file { session.togglePlayback() }
+          }
         }
         if case .working(let label, let progress) = session.activity, session.source != .camera {
           VStack(spacing: 8) {
@@ -185,13 +190,20 @@ struct ContentView: View {
       HStack(spacing: 5) {
         ForEach(definition.phases, id: \.id) { phase in
           let active = analysis?.phase == phase.id
-          Text(phase.label.uppercased())
-            .font(.caption2.weight(.semibold))
-            .fixedSize()
-            .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(active ? Color.accentColor : Color.white.opacity(0.18))
-            .foregroundStyle(active ? .white : Color.white.opacity(0.85))
-            .clipShape(Capsule())
+          Button {
+            session.seekToPhase(phase.id)
+          } label: {
+            Text(phase.label.uppercased())
+              .font(.caption2.weight(.semibold))
+              .fixedSize()
+              .padding(.horizontal, 7).padding(.vertical, 5)
+              .background(active ? Color.accentColor : Color.white.opacity(0.18))
+              .foregroundStyle(active ? .white : Color.white.opacity(0.85))
+              .clipShape(Capsule())
+          }
+          .buttonStyle(.plain)
+          .disabled(session.source == .camera)
+          .accessibilityLabel("Jump to \(phase.label) of this rep")
         }
         Spacer()
       }

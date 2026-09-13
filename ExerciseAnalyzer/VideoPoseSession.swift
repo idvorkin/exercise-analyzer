@@ -638,6 +638,14 @@ final class VideoPoseSession: NSObject, ObservableObject {
     seek(to: reps[clamped].startTime, from: offset > 0 ? "next_rep" : "previous_rep")
   }
 
+  /// Jumps to `phase` of the rep under the playhead, or of the nearest rep when between reps (#28).
+  func seekToPhase(_ phase: String) {
+    guard !reps.isEmpty else { return }
+    let rep = currentRep ?? reps.min { abs($0.startTime - currentTime) < abs($1.startTime - currentTime) }
+    guard let position = rep?.positions[phase] else { return }
+    seek(to: position.time, from: "phase_pill")
+  }
+
   func seekToCheckpoint(offset: Int) {
     let times = reps.flatMap { $0.checkpoints.map(\.time) }.sorted()
     let target =
