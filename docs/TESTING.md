@@ -128,6 +128,10 @@ A human spot-check of a few frames stays worthwhile; Muse's notes column says wh
 
 [`scripts/sim-smoke.sh`](../scripts/sim-smoke.sh), run by `just test-sim` after `just build-sim`.
 
+A fresh checkout or worktree needs `just model` before any app build: the `.mlpackage` binaries are gitignored
+downloads, and a build without them launches with no predictor — one `model_missing` event, then silence until
+every check times out (2026-09-13).
+
 The simulator cannot be tapped from a script, so the app has **launch hooks** read from the environment
 (pass them through `simctl` as `SIMCTL_CHILD_<name>`):
 

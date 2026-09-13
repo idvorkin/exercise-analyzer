@@ -398,6 +398,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func loadModel() {
     guard let url = Bundle.main.url(forResource: "yolo26n-pose", withExtension: "mlmodelc") else {
       modelStatus = "yolo26n-pose.mlpackage missing from bundle"
+      // A build without the gitignored model packages launches with no predictor and nothing after the launch
+      // refresh but silence; say so in the log (2026-09-13: a fresh worktree's test-sim failed all five checks).
+      log.event("model_missing", ["model": "yolo26n-pose"])
       return
     }
     BasePredictor.create(for: .pose, modelURL: url, isRealTime: true) { [weak self] result in
