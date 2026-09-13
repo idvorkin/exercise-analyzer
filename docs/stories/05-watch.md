@@ -194,6 +194,13 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I raise my wrist
 - **Then:** the picture fills the screen edge to edge, the rep count and the elapsed time sit on translucent chips over its top corners, the in-frame hint is a bar over its bottom edge (green in frame, red when cut off), three round buttons overlay the bottom, Pause/Resume, Camera and Done, and Cancel, the watch-mode toggle and the exercise are on the page below (vertical page swipe) so a stray touch cannot end a set; the picture refreshes about once a second at twice today's resolution (long side 320 px instead of 176, about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
 
+- **Scenario:** Framing the shot before I press Record
+- **Given:** the phone's camera is up (Live) but nothing is recording yet, and the watch app is in front
+- **When:** I raise my wrist
+- **Then:** the same full-screen picture shows, with the in-frame bar and two round buttons over its bottom, Record and Camera (switch front/back), so I can set the phone on the rack, check the framing from where I lift, switch cameras and start the set from the wrist; once recording, the buttons become Pause/Resume, Camera and Done as above (Igor, 2026-09-13: "I need to see the preview before I'm recording, so when I have a full-screen record I still need to be able to switch cameras and pause and stop")
+
+- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73) the picture only fills the watch once recording has started; before Record the watch shows the idle pages
+
 ---
 
 ### User Story 043:
