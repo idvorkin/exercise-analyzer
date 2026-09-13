@@ -10,7 +10,8 @@ import CoreVideo
 
 public enum BellColorSampler {
   /// sRGB mean (0–1) of the central half of `box` (normalized, origin top-left) in a 32BGRA `pixelBuffer`; nil for
-  /// another pixel format or an empty region. Samples on a grid of at most 32 × 32 points, so the cost is fixed.
+  /// another pixel format or an empty region. Samples on a grid with a step of a 32nd of the region (floored, so
+  /// a region under 64 px is read at every pixel: at most 63 × 63 points), a bounded cost per box.
   public static func averageColor(in pixelBuffer: CVPixelBuffer, box: CGRect) -> [Float]? {
     guard CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_32BGRA else { return nil }
     let width = CVPixelBufferGetWidth(pixelBuffer), height = CVPixelBufferGetHeight(pixelBuffer)
