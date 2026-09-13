@@ -275,7 +275,15 @@ struct ContentView: View {
         }
         Spacer()
       }
-      if let message = session.statusMessage {
+      if session.analysisInterrupted, let message = session.statusMessage {
+        // An interrupted pass offers its re-run right on the status line, big enough for the gym (#57).
+        Button(action: { session.retryAnalysis() }) {
+          Text(message).font(.headline).lineLimit(2)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Analysis interrupted. Retry analysis.")
+      } else if let message = session.statusMessage {
         Text(message).font(.caption).lineLimit(1).opacity(0.85)
           .frame(maxWidth: .infinity, alignment: .leading)
       } else if let quality = session.lastQuality {

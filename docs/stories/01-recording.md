@@ -61,6 +61,12 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I choose Turkish Get-Up from the exercise menu
 - **Then:** the rep count, phases, HUD and gallery update within a second, without the video being re-scanned
 
+- **Scenario:** An interrupted pass
+- **Given:** a clip whose offline pass was interrupted by the reader ("Operation Interrupted")
+- **and Given:** the status line reads "Analysis interrupted" with a retry, and no partial track was kept
+- **When:** I choose an exercise from the exercise menu (or tap the status to retry)
+- **Then:** the clip is re-scanned from the video (an `offline_pass` precedes any `analyzed`), the full skeleton returns, and with a complete extraction a later switch still re-reads instantly without re-scanning
+
 - **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) a pass interrupted by the reader ("Operation Interrupted") left a partial track, and the mode switch re-read it instead of re-running the clip: no skeleton past the interruption
 
 ---

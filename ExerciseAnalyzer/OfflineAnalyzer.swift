@@ -17,6 +17,9 @@ enum OfflineAnalyzer {
     case cancelled
   }
 
+  /// Test hook state: SWING_INTERRUPT_READER fails only the first pass, so a re-run proves recovery (#57).
+  private static var interruptFired = false
+
   struct Summary {
     let frames: Int
     let elapsed: Double
@@ -92,6 +95,9 @@ enum OfflineAnalyzer {
       // Rolling window for the heartbeat: sums over the last 60 frames, and when that window started.
       var windowPose = 0.0, windowBell = 0.0, windowDecode = 0.0, windowStart = CACurrentMediaTime()
       var frameStart = CACurrentMediaTime()
+      // Test hook: SWING_INTERRUPT_READER=<frame> fails the first pass at that frame with the same error a
+      // backgrounded app's decoder produces (simulator runs can't leave the foreground, #57).
+      let interruptAt = Int(ProcessInfo.processInfo.environment["SWING_INTERRUPT_READER"] ?? "")
 
       while let sampleBuffer = output.copyNextSampleBuffer() {
         if Task.isCancelled {
@@ -146,6 +152,10 @@ enum OfflineAnalyzer {
           windowBell = 0
           windowDecode = 0
           windowStart = CACurrentMediaTime()
+        }
+        if !Self.interruptFired, let interruptAt, frames.count >= interruptAt {
+          Self.interruptFired = true
+          throw OfflineError.readerFailed("Operation Interrupted")
         }
         inferenceTotal += result.inferenceMs
         if duration > 0, time - lastProgress > 0.5 {

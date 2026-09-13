@@ -137,6 +137,8 @@ The simulator cannot be tapped from a script, so the app has **launch hooks** re
 | `SWING_AUTO_TRIM=1` | trim to the rep span right after the first analysis |
 | `SWING_UNDO_TRIM=1` | undo that trim 3 s later (with `SWING_AUTO_TRIM`) |
 | `SWING_CANCEL_ANALYSIS=1` | cancel the offline pass one second in |
+| `SWING_INTERRUPT_READER=<frame>` | fail the first pass at that frame with `readerFailed("Operation Interrupted")`, like a backgrounded decoder (#57) |
+| `SWING_MODE=<exercise\|auto>` | switch exercise 2 s after an interrupted pass, proving a mode switch re-runs the clip (#57) |
 | `SWING_OPEN_RECENT=1` | reopen the newest Recents entry |
 | `SWING_BUG=text` | file a bug report on launch |
 | `SWING_SHOW_WORKOUTS=1` | open the workout gallery on launch (screenshots) |
