@@ -261,8 +261,17 @@ was the wheel); restored: furniture cells veto follows as well as starts, and wi
 and the backward fill in place the honest numbers are 4reps 98, 1h 98, TGU 82, pistols 4, Bulgarian 0 with
 inZone 5 / 0 / 0 / 0 / 0. The second Fable instance reached the same warning independently: a box placed near
 the wrist by a rule is scored by the rule that placed it; against a crop-detector reference its carried boxes
-were off by 0.13 of the frame at the median. Muse (which can view images) is grading 95 sampled frames as
-labelled ground truth; the grades go here when they land.
+were off by 0.13 of the frame at the median.
+
+**By eye (Muse, 95 sampled frames, the same frames before and after the fix; recall = frames with the bell in
+the hands where the circle sits on it):** 4-rep swing 0.40→0.60 (false holds 6→4: the flywheel gone, the rest
+circles shifted off the bell), one-hand swing 0.60→0.72 (8→4: the rack grabs gone; one coasted box on a knee,
+two on the floor bell at setup), get-up 0.76→0.76 (7 unchanged: the floor bell at setup twice, the lifter's
+head twice, the chest while the bell is clutched to it three times), pistols and Bulgarian 0 false holds in 20
+frames. So the proxy's 98 % on the swings is a 0.6–0.7 by eye; what remains between them is mostly carried
+boxes drifting off the bell during a blink and strict grading of near-misses. Next branch of the tree: coasting
+itself (fewer carried frames, drawn only where the bell can be), then the get-up's head and chest classes.
+Tooling: `scripts/model-trials/cut-dot-frames.sh` and `grade-dots.sh` (docs/TESTING.md).
 
 Rejected by its own numbers: classifying box shape in source pixels instead of normalized units (Bulgarian
 0→19, the gate is a camera-calibrated classifier, not geometry), and seeding a start from a sustained overhead
