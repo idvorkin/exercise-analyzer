@@ -19,8 +19,9 @@ struct ContentView: View {
   @State private var showRecents = false
   /// Workouts sheet height (#58): collapsed is the handle plus today's summary row; pull up for the full gallery.
   @State private var workoutsDetent: PresentationDetent = .large
-  /// Middle-hold key stacks (story 039): display state driven by MiddleHold.
-  @State private var middleHolding = false
+  /// Middle-hold key stacks (stories 039, #60): up after a middle hold, staying up until a
+  /// dismissing tap, a new clip, the clip's end, disappear or an inactive scene.
+  @State private var stacksUp = false
   @State private var middleLeftLit: StepKey? = nil
   @State private var middleRightLit: StepKey? = nil
   @State private var middlePulse = 0
@@ -440,7 +441,8 @@ struct ContentView: View {
 
   /// Left and right edges of the picture: tap steps a frame, hold shows Rep / Frame / Position keys (story 030).
   /// They sit between the HUD's top and bottom rows so those buttons keep working.
-  /// The middle holds for both stacks at once, firing on arrival and repeating while held (story 039).
+  /// The middle holds for both stacks at once, which stay up until dismissed; a key fires on
+  /// arrival and repeats while held (stories 039, #60).
   private var edgeControls: some View {
     GeometryReader { geo in
       let width = geo.size.width * 0.24
@@ -458,27 +460,28 @@ struct ContentView: View {
                 case .position: session.seekToCheckpoint(offset: -1)
                 }
               }
-            }
+            },
+            stacksUp: stacksUp,
+            upClock: { session.currentTime },
+            onUpFire: { key, repeatIndex, atEnd in
+              middlePulse += 1
+              fireHold(side: .previous, key: key, repeatIndex: repeatIndex, atEnd: atEnd)
+            },
+            onUpLit: { middleLeftLit = $0 }
           )
           .frame(width: width)
           MiddleHold(
             onFire: { side, key, repeatIndex, atEnd in
-              chromeAction {
-                let delta = side == .next ? 1 : -1
-                switch key {
-                case .rep: session.seekToRep(offset: delta)
-                case .frame: session.stepFrame(delta)
-                case .position: session.seekToCheckpoint(offset: delta)
-                }
-              }
-              session.log.event(
-                "ui",
-                ["action": "hold", "key": key.logKey, "side": side == .next ? "next" : "previous",
-                 "delta": side == .next ? 1 : -1, "repeat": repeatIndex, "at_end": atEnd])
+              fireHold(side: side, key: key, repeatIndex: repeatIndex, atEnd: atEnd)
             },
             onTap: { if session.source == .file { session.togglePlayback() } },
+            onDismiss: {
+              session.log.event("ui", ["action": "hold", "key": "none"])
+              stacksUp = false
+            },
             clock: { session.currentTime },
-            holding: $middleHolding, leftLit: $middleLeftLit, rightLit: $middleRightLit, pulse: $middlePulse
+            stacksUp: $stacksUp,
+            leftLit: $middleLeftLit, rightLit: $middleRightLit, pulse: $middlePulse
           )
           EdgeStepper(
             side: .next, onTap: { chromeAction { session.stepFrame(1) } },
@@ -490,11 +493,18 @@ struct ContentView: View {
                 case .position: session.seekToCheckpoint(offset: 1)
                 }
               }
-            }
+            },
+            stacksUp: stacksUp,
+            upClock: { session.currentTime },
+            onUpFire: { key, repeatIndex, atEnd in
+              middlePulse += 1
+              fireHold(side: .next, key: key, repeatIndex: repeatIndex, atEnd: atEnd)
+            },
+            onUpLit: { middleRightLit = $0 }
           )
           .frame(width: width)
         }
-        if middleHolding {
+        if stacksUp {
           MiddleStacks(leftLit: $middleLeftLit, rightLit: $middleRightLit, pulse: middlePulse)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
@@ -502,7 +512,28 @@ struct ContentView: View {
         }
       }
       .padding(.vertical, inset)
+      // A new clip (or trim) and the clip's end take the stacks down (#60).
+      .onChange(of: session.duration) { _, _ in stacksUp = false }
+      .onChange(of: session.currentTime) { _, time in
+        if session.duration > 0, time >= session.duration - 0.05 { stacksUp = false }
+      }
     }
+  }
+
+  /// One hold-key press: seek like the matching edge key, then log it (#60).
+  private func fireHold(side: StepSide, key: StepKey, repeatIndex: Int, atEnd: Bool) {
+    let delta = side == .next ? 1 : -1
+    chromeAction {
+      switch key {
+      case .rep: session.seekToRep(offset: delta)
+      case .frame: session.stepFrame(delta)
+      case .position: session.seekToCheckpoint(offset: delta)
+      }
+    }
+    session.log.event(
+      "ui",
+      ["action": "hold", "key": key.logKey, "side": side == .next ? "next" : "previous",
+       "delta": delta, "repeat": repeatIndex, "at_end": atEnd])
   }
 
   /// Nothing loaded: a centred panel with the four ways to start, big enough for the gym.

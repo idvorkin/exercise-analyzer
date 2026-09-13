@@ -137,7 +137,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 039:
 
 - **Summary:** Hold the middle of the picture to get both edges' keys at once, and hold a key to repeat it
-- **Status:** implemented in [1fcdc3c](https://github.com/idvorkin/exercise-analyzer/commit/1fcdc3c); needs the phone (gestures: hold the middle, slide to a key, hold to repeat); requested (Igor by voice, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds")
+- **Status:** implemented in [1fcdc3c](https://github.com/idvorkin/exercise-analyzer/commit/1fcdc3c), follow-up in [b96aec3](https://github.com/idvorkin/exercise-analyzer/commit/b96aec3) (stacks stay up, dismiss by tap outside, 1 s repeat); needs the phone (gestures); requested (Igor by voice, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds")
 
 #### Use Case:
 - **As a** lifter scrubbing with one thumb
@@ -145,37 +145,47 @@ Part of the [user stories](README.md); persona and format are described there.
 - **so that** stepping through a set is one hold and a slide, in either direction, without hunting for an edge or tapping over and over
 
 #### Acceptance Criteria:
-- **Scenario:** Holding the middle brings up both stacks
+- **Scenario:** Holding the middle brings up both stacks, which stay up
 - **Given:** a set is open and paused
-- **When:** I press the middle of the picture (between the edge zones of story 030, clear of the HUD rows) and hold still for 0.3 s
-- **Then:** the left stack (steps back) and the right stack (steps forward) appear at the edges as in story 030 with no key lit, they stay up until I lift, and lifting without sliding onto a key fires nothing (no `ui` press, no `seek` in the log); a hold that starts on an edge still behaves as story 030 (release fires, no repeat)
+- **When:** I press the middle of the picture (between the edge zones of story 030, clear of the HUD rows), hold still for 0.3 s, and lift without sliding onto a key
+- **Then:** the left stack (steps back) and the right stack (steps forward) appear at the edges as in story 030 with no key lit, lifting leaves them on screen, and nothing fires (no `ui` press, no `seek` in the log); a hold that starts on an edge still behaves as story 030 (release fires, no repeat)
 
 - **Scenario:** Sliding onto a key fires it on arrival
 - **Given:** both stacks are up from a middle hold
 - **When:** I slide onto the right edge's Rep key without lifting
 - **Then:** the key lights and pulses and the playhead moves to the next rep before I lift; the log shows one `ui` press from the hold followed by its `seek`
 
-- **Scenario:** Holding a key repeats it every two seconds
+- **Scenario:** Holding a key repeats it every second
 - **Given:** my finger rests on a key with the stacks up
 - **When:** I keep holding it
-- **Then:** it fires again every two seconds (log `t` spacing about 2000 ms) until I lift or slide off; sliding to another key fires that key at once and restarts its two seconds; a thumb resting on the border between two keys keeps the key it arrived on; lifting fires nothing more and takes the stacks down
+- **Then:** it fires again every second (log `t` spacing about 1000 ms) until I lift or slide off; sliding to another key fires that key at once and restarts its second; a thumb resting on the border between two keys keeps the key it arrived on; lifting fires nothing more and leaves the stacks up
+
+- **Scenario:** Tapping a key while the stacks are up
+- **Given:** both stacks are up from an earlier hold
+- **When:** I tap the forward Rep key
+- **Then:** the playhead moves one rep at once (one `ui` press, `repeat: 0`), and the stacks stay up
 
 - **Scenario:** Holding forward on the last rep
 - **Given:** the playhead is paused in the last rep with the stacks up
 - **When:** I hold the forward Rep key
-- **Then:** the playhead stays in the last rep (no wrap to the first) while the key keeps pulsing every two seconds and every press is still logged
+- **Then:** the playhead stays in the last rep (no wrap to the first) while the key keeps pulsing every second and every press is still logged
 
 - **Scenario:** A quick middle tap still plays or pauses
-- **Given:** a set is open
+- **Given:** a set is open with the stacks down
 - **When:** I touch the middle of the picture for under 0.3 s and lift without sliding
 - **Then:** playback toggles as in story 024; a touch held past 0.3 s is a hold, not a tap, and lifting it without reaching a key leaves playback as it was
+
+- **Scenario:** Tapping the picture outside the keys dismisses the stacks
+- **Given:** both stacks are up
+- **When:** I tap the middle of the picture (hitting no key)
+- **Then:** the stacks come down, playback does not toggle, and the log shows the dismissing tap (`ui` hold, `key: none`) with no `seek` after it
 
 - **Scenario:** A hold pauses and stays paused
 - **Given:** a set is playing
 - **When:** I hold the middle, slide onto a key, and lift after it fires
 - **Then:** the set is paused and stays paused
 
-- **Issues:** [#59](https://github.com/idvorkin/exercise-analyzer/issues/59)
+- **Issues:** [#59](https://github.com/idvorkin/exercise-analyzer/issues/59), [#60](https://github.com/idvorkin/exercise-analyzer/issues/60)
 
 ---
 
