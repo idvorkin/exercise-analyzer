@@ -76,6 +76,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var predictor: BasePredictor?
   /// The kettlebell detector (#18), offline pass only; nil when its package is not bundled.
   private var bellDetector: BellDetector?
+  /// Set while a stored set is being run through the models again from its video: its exercise, so a fixed mode
+  /// does not re-read it as something else (#42), and the reason logged with the result.
+  private var rerunExercise: ExerciseKind?
+  /// Names of the models this build runs on a clip: the pose model and, when bundled, the detector. Stored with
+  /// every analysis; a stored set made by a different set is re-run from its video on reopen (story 035).
+  private var loadedModels: [String] { ["yolo26n-pose"] + (bellDetector == nil ? [] : ["yoloe-26n-kettlebell"]) }
   private var pipeline = AnalysisPipeline(exercise: .kettlebellSwing)
   /// Poses of the loaded clip (offline pass or Recents), kept so a different exercise can be analyzed instantly.
   private var extractedFrames: [FrameRecord] = []
@@ -199,7 +205,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
       do {
         try recents.save(
           id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
-          pipeline: analyzed, clipURL: nil, thumbnail: thumbnail, originalName: entry.originalName)
+          pipeline: analyzed, clipURL: nil, thumbnail: thumbnail, originalName: entry.originalName,
+          models: recents.models(for: entry))  // poses replayed, not re-extracted: the model set is the stored one
         log.event(
           "recents_refreshed",
           ["id": entry.id, "was": "\(stored.exercise.rawValue) \(stored.reps.count)", "now": "\(kind.rawValue) \(analyzed.reps.count)"])
@@ -353,6 +360,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
       activity = .idle
       statusMessage = recordedLine(reps: pipeline.reps.count)
       log.event("recents_open", ["id": entry.id, "reps": pipeline.reps.count, "exercise": pipeline.exercise.rawValue])
+      // A stored track made by other models than this build runs (a new detector, a new pose model) is run through
+      // the models again from its video, with the clip at hand. Same entry, so Workouts keeps one set (story 035).
+      let storedModels = recents.models(for: entry)
+      if storedModels != loadedModels {
+        log.event(
+          "recents_rerun",
+          ["id": entry.id, "reason": "models_changed", "stored": storedModels, "current": loadedModels, "exercise": pipeline.exercise.rawValue])
+        rerunExercise = pipeline.exercise
+        await analyzeAndPlay(url: url)
+        return
+      }
       // A stored analysis can predate an exercise the detector now knows (#17) or an analyzer fix (#19): re-analyze
       // over the stored poses when the analyzers moved on or, in Auto, when the detector now says something else.
       // No inference, so this is quick.
@@ -426,7 +444,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       try recents.save(
         id: id, source: source, recordedAt: currentRecordedAt ?? Date(), duration: duration,
         pipeline: pipeline, clipURL: clipURL, thumbnail: thumbnail,
-        originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil)
+        originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil, models: loadedModels)
       currentEntryID = id
       log.event("recents_saved", ["id": id, "reps": pipeline.reps.count, "in_photos": source.isPhotos])
     } catch {
@@ -504,7 +522,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
           "bell_frames": summary.bellFrames, "bell_avg_infer_ms": summary.bellAverageInferenceMs,
           "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
         ])
-      await analyzeExtracted(url: url, reason: "load")
+      let rerun = rerunExercise
+      rerunExercise = nil
+      await analyzeExtracted(url: url, reason: rerun == nil ? "load" : "rerun_models", stored: rerun)
       statusMessage = recordedLine(reps: pipeline.reps.count) + String(
         format: " · %d frames in %.1fs", summary.frames, summary.elapsed)
       rememberCurrent(clipURL: url)

@@ -62,6 +62,9 @@ private struct AnalysisSnapshot: Codable {
   var version: Int = AnalysisSnapshot.currentVersion
   /// Analyzer version the reps were computed with (AnalysisVersion.current); nil in files from before it existed.
   var analysisVersion: String? = AnalysisVersion.current
+  /// The models that produced the stored track (pose model, detector); a set made by a different model set is run
+  /// through the models again from its video when reopened (story 035). Nil in files from before it existed.
+  var models: [String]? = nil
   let exercise: ExerciseKind
   let frames: [FrameRecord]
   let reps: [RepRecord]
@@ -92,7 +95,7 @@ final class RecentsStore: ObservableObject {
   /// Adds or replaces an entry, writing its analysis, rep images, and (for file sources) the clip itself.
   func save(
     id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,
-    clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil
+    clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil, models: [String] = []
   ) throws {
     // Re-analyzing a clip replaces its earlier entry instead of adding a second set to the workout.
     for old in entries where old.id != id && old.isSameClip(source: source, originalName: originalName, duration: duration) {
@@ -109,7 +112,8 @@ final class RecentsStore: ObservableObject {
       }
     }
 
-    let snapshot = AnalysisSnapshot(exercise: pipeline.exercise, frames: pipeline.track.frames, reps: pipeline.reps)
+    var snapshot = AnalysisSnapshot(exercise: pipeline.exercise, frames: pipeline.track.frames, reps: pipeline.reps)
+    snapshot.models = models
     try JSONEncoder().encode(snapshot).write(to: dir.appendingPathComponent("analysis.json"))
     for rep in pipeline.reps {
       for (phase, position) in rep.positions {
@@ -189,6 +193,15 @@ final class RecentsStore: ObservableObject {
 
   /// The stored analysis with rep images re-attached.
   /// True when the stored reps were computed by an older analyzer than the one in this build.
+  /// The models the stored track came from (empty for files from before this was recorded).
+  func models(for entry: RecentEntry) -> [String] {
+    let dir = folder(for: entry.id)
+    guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),
+      let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data)
+    else { return [] }
+    return snapshot.models ?? []
+  }
+
   func isStale(_ entry: RecentEntry) -> Bool {
     let dir = folder(for: entry.id)
     guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),

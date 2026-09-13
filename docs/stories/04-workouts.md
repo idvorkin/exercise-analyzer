@@ -119,3 +119,23 @@ Part of the [user stories](README.md); persona and format are described there.
 
 - **Status:** implemented in [48d4c33](https://github.com/idvorkin/exercise-analyzer/commit/48d4c33); needs the phone (Photos)
 - **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41)
+
+---
+
+### User Story 035:
+
+- **Summary:** A set made by older models is run through the new ones when I reopen it (technical)
+- **Status:** implemented (commit named in the next docs commit); verified by build; needs the phone (reopen a set from before the bell detector: `recents_rerun` then `analyzed` with reason rerun_models, same entry, bell dot on)
+
+#### Use Case:
+- **As a** developer shipping a new model (a detector, a bigger pose model)
+- **I want to** have every stored analysis record the model set that produced its track, and have a set reopened under a different model set go back to its video and run the current models
+- **so that** old sets gain what a new model sees without a manual re-import, while sets whose clip is gone keep what they have
+
+#### Acceptance Criteria:
+- **Scenario:** Reopening a set after the bell detector shipped
+- **Given:** a set in Workouts analyzed by the pose model alone, with its clip still in Photos or in the app
+- **When:** I open it in a build that bundles the pose model and the kettlebell detector
+- **Then:** the app runs the offline pass again from the video as the set's own exercise (a fixed mode does not change it), stores the result on the same entry with the model set, shows the bell, and a second open runs nothing; a set whose clip is missing opens from its stored analysis unchanged
+
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)
