@@ -921,6 +921,19 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     for rep in analyzed.reps { log.rep(rep, source: "offline") }
     log.event("analyzed", ["exercise": chosen.rawValue, "reps": analyzed.reps.count, "reason": reason])
+    // The recording's own pass just settled the final count: land it on the watch idle screen (045). Any other
+    // pass (a file opened, a re-analysis) leaves the last set alone.
+    if currentOrigin == .recording, reason == "load" {
+      let clipSeconds = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? duration
+      lastSet = LastSet(
+        reps: analyzed.reps.count, exercise: chosen.definition.name, seconds: clipSeconds,
+        at: Date().timeIntervalSince1970)
+      analyzingLastSet = false
+      pushWatchStatus(force: true)
+      log.event(
+        "watch_last_set",
+        ["reps": analyzed.reps.count, "exercise": chosen.rawValue, "seconds": clipSeconds])
+    }
   }
 
   /// Lifter picked an exercise (or Auto): persist it and re-analyze whatever is loaded, without re-running inference.
@@ -1366,6 +1379,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   // MARK: - Watch companion
 
   private var lastWatchHeartbeat = Date.distantPast
+  /// The last analyzed recording for the watch idle screen, and whether its offline pass is still running (045).
+  private var lastSet: LastSet?
+  private var analyzingLastSet = false
   private var cancellables = Set<AnyCancellable>()
   private var keepAwake = false
 
@@ -1396,6 +1412,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     status.zoomPresets = camera?.zoomPresets ?? [1]
     status.watchMode = watchMode
     status.paused = paused
+    status.lastSet = lastSet
+    // No new field: phase is free when not recording, and the old watch app never reads it (045).
+    if analyzingLastSet { status.phase = "analyzing" }
     watch.send(status, force: force || heartbeat)
   }
 
@@ -1470,6 +1489,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     liveDetector.reset()
     liveDetectionLocked = false
     detection = nil
+    // A new set owns the idle screen: the old final count and any pass flag go (045).
+    lastSet = nil
+    analyzingLastSet = false
     extractedFrames = []
     extractionComplete = false
     analysisInterrupted = false
@@ -1759,6 +1781,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     var pausedTime = pausedTotal
     if paused, let at = pausedAt, let last = lastCameraPts { pausedTime += last - at }
     stopCamera()
+    // The offline pass runs next: the watch shows "Analyzing…" until `analyzed` lands it the final count (045).
+    analyzingLastSet = true
+    pushWatchStatus(force: true)
     guard let recorder else { return }
     self.recorder = nil
     activity = .working("Finishing recording", progress: nil)
