@@ -239,9 +239,9 @@ struct ContentView: View {
       }
       HStack(spacing: 5) {
         ForEach(definition.phases, id: \.id) { phase in
-          let active = analysis?.phase == phase.id
+          let active = phase.matches(analysis?.phase)
           Button {
-            session.seekToPhase(phase.id)
+            session.seekToPhase(phase)
           } label: {
             Text(phase.label.uppercased())
               .font(.caption2.weight(.semibold))

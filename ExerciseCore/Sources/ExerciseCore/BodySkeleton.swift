@@ -128,6 +128,14 @@ public struct BodySkeleton {
     return Self.angle(hip, vertex: knee, ankle)
   }
 
+  /// Shoulder–elbow–wrist angle for one specific arm: ~180 straight, ~90 bent. 0 when any joint is missing.
+  public func elbowAngle(_ side: BodySide) -> Double {
+    guard let shoulder = point(side.shoulder), let elbow = point(side.elbow), let wrist = point(side.wrist) else {
+      return 0
+    }
+    return Self.angle(shoulder, vertex: elbow, wrist)
+  }
+
   /// Knee–hip–shoulder angle for one specific side. 0 when any joint is missing.
   public func hipAngle(_ side: BodySide) -> Double {
     guard let knee = point(side.knee), let hip = point(side.hip), let shoulder = point(side.shoulder) else {

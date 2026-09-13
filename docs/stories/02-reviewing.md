@@ -118,3 +118,22 @@ Part of the [user stories](README.md); persona and format are described there.
 
 - **Issues:** [#33](https://github.com/idvorkin/exercise-analyzer/issues/33)
 
+---
+
+### User Story 033:
+
+- **Summary:** See a get-up step by step: elbow, hand, kneel, lunge, stand, and back down
+- **Status:** implemented (commit named in the next docs commit); verified on the host (`GetUpStageTests`: four reps under two cameras land in the study's windows); the pills and the nine-column gallery need the phone
+
+#### Use Case:
+- **As a** lifter reviewing a get-up
+- **I want to** see each step of the rep as its own phase, on the pills while it plays and as its own gallery column
+- **so that** I can compare the same step across reps and sides instead of one "up" frame at half height
+
+#### Acceptance Criteria:
+- **Scenario:** Reviewing a two-sided set
+- **Given:** a clip with one get-up per side is analyzed
+- **When:** I open it
+- **Then:** each rep shows Lying, Elbow, Hand, Kneel, Lunge, Standing and the way down's Lunge, Kneel and Elbow in the gallery, the HUD's six pills follow the step as it plays (a way-down step lights the same pill as its way-up step), tapping a pill jumps to that step's nearest occurrence in the current rep, and the rep count is unchanged
+
+- **Issues:** none (Igor: "the get-up is going to need more stages")

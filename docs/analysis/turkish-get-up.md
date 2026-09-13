@@ -3,10 +3,10 @@
 Code: `ExerciseCore/Sources/ExerciseCore/TurkishGetUpAnalyzer.swift`. One rep is lying → standing → lying with the
 bell pressed overhead the whole way.
 
-## Phases today
+## Phases and stages
 
-LYING → RISING → STANDING → LOWERING → LYING (rep complete), on **uprightness** alone (median of the last 15 frames,
-each condition held for `holdFrames` = 8, about a quarter second).
+Counting runs on a coarse machine over **uprightness** (median of the last 15 frames, each condition held for
+`holdFrames` = 8, about a quarter second): LYING → RISING → STANDING → LOWERING → LYING (rep complete).
 
 | Threshold | Value | Meaning |
 |---|---|---|
@@ -17,10 +17,28 @@ each condition held for `holdFrames` = 8, about a quarter second).
 | `minRiseSeconds` / `minLowerSeconds` | 3 s / 2 s | anything faster is a pose glitch, not a get-up (#14) |
 | `armDriftWarn` / `armDriftBad` | 15° / 25° | overhead arm from vertical, 90th percentile over the rep |
 
-Positions stored per rep: the last lying frame, the frame nearest halfway upright on the way up ("Up"), the tallest
-standing frame, the frame nearest halfway upright on the way down ("Down"). Quality: arm drift, a rushed descent
-(down < 0.6 × up), and which arm held the bell (majority of `overheadArmSide` over the rep) so a set reads as one
-rep per side.
+Inside RISING and LOWERING a **stage tracker** names the step (since 2026-09-12, the study below). It only moves
+forward within a direction and never touches the count; the stage is the phase a frame reports and the gallery
+keeps. The support arm is the one opposite the rep's majority overhead arm; an unmeasured elbow reads 0 and never
+drives a stage.
+
+| Stage | Enter when | Position stored | Threshold |
+|---|---|---|---|
+| Elbow | raw uprightness above `lyingMax` with the support elbow bent, even before the coarse machine calls it rising (the step can be over in half a second) | first such frame | `elbowBentMax` 140° |
+| Hand | support elbow straight, held 8 frames | first frame | `handElbowMin` 150° |
+| Kneel | uprightness in [`kneelMin`, `kneelMax`] for `kneelHoldSeconds` | middle of the plateau | 0.25–0.45, 1 s |
+| Lunge | uprightness above `lungeMin` for `lungeHoldSeconds` after the kneel (the bridge pokes above it for under a second) | first frame of the hold | 0.45, 1 s |
+| Standing | `standingMin` (coarse) | tallest frame | |
+| Lunge ↓ | `loweringMax` (coarse) | first frame | |
+| Kneel ↓ | uprightness at or below `kneelMax` for `kneelHoldSeconds` | middle of the plateau | |
+| Elbow ↓ | support elbow bent with uprightness at or below `kneelMax`, held 8 frames | first frame | |
+| Lying | `lyingMax` after ≥ 2 s down (coarse) | last lying frame before the elbow step | |
+
+A stage that was never entered (a fast rep, an unmeasured elbow) gets the frame nearest its typical uprightness
+between the neighbouring stages that were, so every rep carries all nine positions. Gallery order: Lying, Elbow,
+Hand, Kneel, Lunge, Standing, ↓ Lunge, ↓ Kneel, ↓ Elbow; the HUD shows six pills and a down stage lights the
+same pill as its up stage. Quality: arm drift, a rushed descent (down < 0.6 × up), and which arm held the bell
+(majority of `overheadArmSide` over the rep) so a set reads as one rep per side.
 
 ## Fixtures
 
@@ -30,8 +48,9 @@ rep per side.
 | tgu-phone-2sides (IMG_4343) | 2 | yes | #14: a pose glitch at 14 s stood the athlete up and down inside a second and counted as rep 1 |
 | tracks/turkish-get-up-20260912-* | archived | | must still analyze |
 
-Reports: `TuningReports.testTurkishGetUpTrace` (transitions and quality), `testTurkishGetUpSignals` (the half-second
-signal table below).
+Reports: `TuningReports.testTurkishGetUpTrace` (transitions, stages and quality), `testTurkishGetUpSignals` (the
+half-second signal table below). Tests: `GetUpStageTests` pins every stage of the four reps to the landmark windows
+below (±0.5 s) and every rep to all nine positions in order.
 
 ## Experiments
 
@@ -99,26 +118,21 @@ What the numbers say:
   reliable hand-on-floor signal (the wrist-below-hip test is camera dependent), so the way down gets Lunge ↓,
   Kneel ↓, Elbow ↓ only.
 
-### Proposed stages (not built)
+### 2026-09-12: stages built
 
-Lying → **Elbow** → **Hand** → **Kneel** → **Lunge** → Standing → **Lunge ↓** → **Kneel ↓** → **Elbow ↓** → Lying.
+Implemented as above. First run put three of the four reps in the windows; 2sides rep 2 took the one-second bridge
+bump (0.62 / 0.50 at 99.5–100.0 s) as the lunge, so the lunge now has to hold above 0.45 for a second like the
+kneel, after which its kneel midpoint moved to 101.5 s and its lunge to 104.5 s. The same rep's elbow step
+(97.5 s, 86°) fell under the median-filtered lying threshold, so the elbow candidate is judged on the raw
+uprightness. Stored positions after the change (seconds):
 
-| Stage | Enter when (held 8 frames) | Position stored |
-|---|---|---|
-| Elbow | up > 0.15 and support elbow < 140° | first frame |
-| Hand | support elbow ≥ 150° | first frame |
-| Kneel | up in 0.25–0.45 for ≥ 1 s after Hand | midpoint of the plateau |
-| Lunge | up > 0.45 after Kneel | first frame |
-| Standing | up ≥ 0.85 (unchanged) | tallest frame (unchanged) |
-| Lunge ↓ | up < 0.70 (unchanged `loweringMax`) | first frame |
-| Kneel ↓ | up < 0.45 for ≥ 1 s | midpoint |
-| Elbow ↓ | support elbow < 140° with up < 0.45 | first frame |
-| Lying | up ≤ 0.15 after ≥ 2 s down (unchanged) | last lying frame (unchanged) |
+| Rep | Lying | Elbow | Hand | Kneel | Lunge | Standing | ↓ Lunge | ↓ Kneel | ↓ Elbow |
+|---|---|---|---|---|---|---|---|---|---|
+| 2sides 1 (L) | 24.0 | 24.0 | 25.9 | 31.0 | 32.9 | 41.6 | 45.8 | 49.7 | 52.3 |
+| 2sides 2 (R) | 97.5 | 97.5 | 98.3 | 101.5 | 104.5 | 111.2 | 115.5 | 118.9 | 120.2 |
+| 2min 1 (L) | 22.9 | 22.9 | 25.0 | 29.6 | 31.0 | 40.1 | 46.7 | 53.1 | 53.3 |
+| 2min 2 (R) | 90.9 | 91.2 | 92.8 | 96.3 | 97.2 | 106.0 | 110.2 | 113.6 | 114.9 |
 
-Design: the four-state counter (lying / rising / standing / lowering, with the 3 s and 2 s guards) stays exactly as
-it is and keeps owning the rep count; a **stage tracker** runs inside rising and lowering, advances only forward
-within a direction, and reports the fine stage as the frame's `phase`. The support elbow is taken on the side
-opposite the rep's majority overhead arm (the per-frame overhead label flips), and an unmeasured elbow (0°) never
-drives a transition. Gallery order grows from 4 to 10 columns; the HUD keeps six pills (Lying, Elbow, Hand, Kneel,
-Lunge, Standing) with the down stages lighting the same pill. Verified on the host first: both fixtures must still
-count 2, every rep must carry all ten positions at the times in the landmark table (±0.5 s), then the phone.
+Lying and Elbow share a frame when the elbow step starts on the last floor frame. ↓ Kneel of 2min rep 1 never
+held the band (uprightness jittered 0.28–0.56 on the way down, see the table above), so it is a filled frame
+between ↓ Lunge and ↓ Elbow; the count and the other stages are unaffected.

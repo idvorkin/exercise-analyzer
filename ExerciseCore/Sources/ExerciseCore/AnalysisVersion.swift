@@ -5,5 +5,5 @@
 //  sets too instead of leaving stale counts in the gallery.
 
 public enum AnalysisVersion {
-  public static let current = "2026-09-12.6"
+  public static let current = "2026-09-12.7"
 }

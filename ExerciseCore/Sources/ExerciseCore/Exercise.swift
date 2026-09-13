@@ -58,10 +58,18 @@ public enum ExerciseMode: Equatable {
 public struct PhaseInfo: Hashable {
   public let id: String
   public let label: String
+  /// Other phase ids this pill also stands for (a get-up's way-down stages light the same pill as the way up).
+  public let aliases: [String]
 
-  public init(id: String, label: String) {
+  public init(id: String, label: String, aliases: [String] = []) {
     self.id = id
     self.label = label
+    self.aliases = aliases
+  }
+
+  public func matches(_ phase: String?) -> Bool {
+    guard let phase else { return false }
+    return phase == id || aliases.contains(phase)
   }
 }
 
@@ -86,7 +94,7 @@ public struct ExerciseDefinition {
   /// Metrics to show in the HUD strip, in order; keys index `ExerciseFrameResult.metrics`.
   public let hudMetrics: [MetricInfo]
 
-  public func phase(_ id: String) -> PhaseInfo? { phases.first { $0.id == id } }
+  public func phase(_ id: String) -> PhaseInfo? { phases.first { $0.id == id } ?? galleryOrder.first { $0.id == id } }
 }
 
 public struct RepQuality: Codable {

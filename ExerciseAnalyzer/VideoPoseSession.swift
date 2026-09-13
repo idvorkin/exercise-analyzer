@@ -728,10 +728,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Jumps to `phase` of the rep under the playhead, or of the nearest rep when between reps (#28).
-  func seekToPhase(_ phase: String) {
+  /// Jumps to the pill's position in the current rep; a pill that stands for several stages (a get-up's Kneel on
+  /// the way up and down) goes to whichever is nearest the playhead.
+  func seekToPhase(_ phase: PhaseInfo) {
     guard !reps.isEmpty else { return }
     let rep = currentRep ?? reps.min { abs($0.startTime - currentTime) < abs($1.startTime - currentTime) }
-    guard let position = rep?.positions[phase] else { return }
+    let candidates = ([phase.id] + phase.aliases).compactMap { rep?.positions[$0] }
+    guard let position = candidates.min(by: { abs($0.time - currentTime) < abs($1.time - currentTime) }) else { return }
     seek(to: position.time, from: "phase_pill")
   }
 

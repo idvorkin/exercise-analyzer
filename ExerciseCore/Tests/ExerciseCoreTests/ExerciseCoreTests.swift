@@ -30,7 +30,7 @@ final class RepCountTests: XCTestCase {
       XCTAssertEqual(pipeline.reps.count, fixture.expectedReps, "\(fixture.name)")
       for rep in pipeline.reps {
         XCTAssertEqual(
-          Set(rep.positions.keys), Set(fixture.expectedExercise.definition.phases.map(\.id)),
+          Set(rep.positions.keys), Set(fixture.expectedExercise.definition.galleryOrder.map(\.id)),
           "\(fixture.name) rep \(rep.number) is missing a phase position")
         XCTAssert((0...100).contains(rep.quality.score), "\(fixture.name) rep \(rep.number) score out of range")
       }
