@@ -171,8 +171,13 @@ struct EdgeStepper: View {
   /// Hold-up arrival tracking (story 039): the 24 % zone is exactly the cards, so any touch down
   /// here is on a key; rows stick ± the shared margin like the middle hold.
   private func upTrack(_ location: CGPoint, height: CGFloat) {
+    // Off the stack's height is off every key (the same truncate-and-clamp trap as the middle hold).
+    guard location.y >= -MiddleHold.reentryMargin, location.y <= height + MiddleHold.reentryMargin else {
+      if upRow != nil { upCancel() }
+      return
+    }
     let rowHeight = height / CGFloat(StepKey.allCases.count)
-    var row = Int(location.y / rowHeight)
+    var row = Int((location.y / rowHeight).rounded(.down))
     if let current = upRow,
       location.y >= CGFloat(current) * rowHeight - MiddleHold.reentryMargin,
       location.y < CGFloat(current + 1) * rowHeight + MiddleHold.reentryMargin {
@@ -329,8 +334,13 @@ struct MiddleHold: View {
       side = nil
     }
     guard let side else { deactivate(); return }
+    // Above or below the stack is off every key: Int() truncates toward zero and the clamp then read any
+    // height above the top key as the top key, so a thumb sliding up off Rep never let go (Igor, 2026-09-13).
+    guard location.y >= -Self.reentryMargin, location.y <= size.height + Self.reentryMargin else {
+      deactivate(); return
+    }
     let rowHeight = size.height / CGFloat(StepKey.allCases.count)
-    var row = Int(location.y / rowHeight)
+    var row = Int((location.y / rowHeight).rounded(.down))
     if activeSide == side, let active = activeKey, let activeRow = StepKey.allCases.firstIndex(of: active),
       location.y >= CGFloat(activeRow) * rowHeight - Self.reentryMargin,
       location.y < CGFloat(activeRow + 1) * rowHeight + Self.reentryMargin {
