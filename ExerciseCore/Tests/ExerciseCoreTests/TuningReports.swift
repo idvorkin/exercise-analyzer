@@ -200,7 +200,9 @@ extension TuningReports {
     }
     for source in sources {
       let pipeline = AnalysisPipeline.analyze(frames: source.frames, exercise: source.exercise)
-      print(Self.bellHeldLine(label: source.label, frames: pipeline.track.frames, zones: pipeline.bellTracker.staticZones))
+      print(Self.bellHeldLine(
+        label: source.label, frames: pipeline.track.frames, zones: pipeline.bellTracker.staticZones,
+        reps: pipeline.reps.map { ($0.startTime, $0.endTime) }))
       // BELL_LAB_DOTS=1: one line per frame with the reported bell and the wrists, for cutting frames with the
       // dot drawn in so a person (or a vision model) can grade whether it sits on the bell in the hands.
       if ProcessInfo.processInfo.environment["BELL_LAB_DOTS"] == "1" {
@@ -221,9 +223,12 @@ extension TuningReports {
   /// loss classes for seen-but-not-held frames (no near-hand sighting at all; every near-hand sighting in
   /// a static zone; track dead with nothing / something startable; track recently alive with nothing in
   /// reach (= blind gap) or something in reach refused (= follow gate)).
-  private static func bellHeldLine(label: String, frames: [FrameRecord], zones: Set<Int>) -> String {
+  private static func bellHeldLine(label: String, frames: [FrameRecord], zones: Set<Int>, reps: [(Double, Double)]) -> String {
     let startConf = BellTracker.Thresholds().startConf
     var handFrames = 0, seenAtHand = 0, trackedAtHand = 0, heldInZone = 0
+    // Inside detected reps the bell is in the hands by definition; outside them it is on the floor for much of a
+    // get-up clip (setup, rest, walk-off), so the whole-clip number understates (Codex, 2026-09-13).
+    var repHandFrames = 0, repHeld = 0
     var noSight = 0, zone = 0, cold = 0, restartBlocked = 0, dropGap = 0, followRej = 0
     var lastHeld: BellSighting? = nil
     var framesSinceHeld = 9999
@@ -241,6 +246,10 @@ extension TuningReports {
       }
       let near = f.bells.filter(nearHand)
       let held = f.bell.map(nearHand) ?? false
+      if reps.contains(where: { f.time >= $0.0 && f.time <= $0.1 }) {
+        repHandFrames += 1
+        if held { repHeld += 1 }
+      }
       if !near.isEmpty { seenAtHand += 1 }
       if held {
         trackedAtHand += 1
@@ -264,6 +273,6 @@ extension TuningReports {
     }
     func pct(_ n: Int) -> Int { handFrames > 0 ? 100 * n / handFrames : 0 }
     return
-      "bell-held \(label): hands \(handFrames) seen \(pct(seenAtHand))% held \(pct(trackedAtHand))% (inZone \(heldInZone)) | noSight=\(noSight) zone=\(zone) cold=\(cold) restartBlocked=\(restartBlocked) dropGap=\(dropGap) followRej=\(followRej)"
+      "bell-held \(label): hands \(handFrames) seen \(pct(seenAtHand))% held \(pct(trackedAtHand))% (inZone \(heldInZone)) inReps \(repHeld)/\(repHandFrames) (\(repHandFrames > 0 ? 100 * repHeld / repHandFrames : 0)%) | noSight=\(noSight) zone=\(zone) cold=\(cold) restartBlocked=\(restartBlocked) dropGap=\(dropGap) followRej=\(followRej)"
   }
 }
