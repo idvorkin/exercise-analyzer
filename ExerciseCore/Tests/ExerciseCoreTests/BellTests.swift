@@ -156,6 +156,28 @@ final class BellTests: XCTestCase {
     XCTAssertNil(frame.bell)
   }
 
+  func testABoxOnTheHeadIsNeverTheBell() {
+    // Lying in a get-up, the head is a round dark thing at the hands' height; a box containing the nose is the head.
+    var xyn = [PosePoint](repeating: PosePoint(x: 0.5, y: 0.5), count: 17)
+    xyn[CocoKeypoint.nose.rawValue] = PosePoint(x: 0.5, y: 0.6)
+    xyn[CocoKeypoint.leftWrist.rawValue] = PosePoint(x: 0.55, y: 0.62)
+    xyn[CocoKeypoint.rightWrist.rawValue] = PosePoint(x: 0.55, y: 0.62)
+    let pose = Pose(xyn: xyn, conf: [Float](repeating: 0.9, count: 17), imageSize: CGSize(width: 1080, height: 1920))
+    let tracker = BellTracker()
+    XCTAssertNil(tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: pose), "a confident box on the nose does not start")
+    // The same box beside the head, not containing it, starts.
+    XCTAssertNotNil(tracker.track([bell(0.6, 0.62, conf: 0.9)], pose: pose))
+  }
+
+  func testOfSeveralBoxesInReachTheOneNearestAWristWins() {
+    let tracker = BellTracker()
+    _ = tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
+    // Next frame two boxes are in reach: a chest-sized one where the bell just was, and the bell at the wrists.
+    let chest = BellSighting(box: CGRect(x: 0.44, y: 0.53, width: 0.12, height: 0.14), conf: 0.5)
+    let followed = tracker.track([chest, bell(0.56, 0.64, conf: 0.4)], pose: pose(wrist: CGPoint(x: 0.57, y: 0.65)))
+    XCTAssertEqual(followed?.center.x ?? 0, 0.56, accuracy: 0.001)
+  }
+
   func testBackwardPassFillsTheFramesBeforeAConfidentStartWithDetectedBoxesOnly() {
     // Frames 0–1: the bell at the hands reads 0.3 (a blurred pick-up), too faint to start on; frame 2: 0.9.
     // Frame 3: nothing seen at all. Forward, frame 2 holds and frame 3 is carried (conf 0); backward, frames 0–1

@@ -139,19 +139,28 @@ public final class BellTracker {
     // stepped onto the ski-erg wheel behind the hands (2026-09-13 ground truth).
     let still = sightings.filter { resting.contains($0) || staticZones.contains(Self.gridKey($0.center, cell: 0.02)) }
     let wrists = Self.wrists(of: pose)
+    let head = Self.head(of: pose)
     func nearAHand(_ p: CGPoint) -> Bool {
       wrists.isEmpty || wrists.contains { Self.distance(p, $0) <= thresholds.handDistance }
     }
+    func onHead(_ s: BellSighting) -> Bool { head.contains { s.box.contains($0) } }
+    func wristDistance(_ s: BellSighting) -> CGFloat { wrists.map { Self.distance(s.center, $0) }.min() ?? .infinity }
     if let last = current {
       // Follow the nearest moving box in reach that is still at a hand and the same colour; a bell at rest is
       // never followed, so at the bottom of a hinge the track stays with the swung bell and not the floor bell.
       let steps = CGFloat(missed + 1)
+      // Of several boxes in reach, the one nearest a visible wrist wins (a bell clutched to the chest beside a
+      // chest-sized box: the bell is the one at the hands), nearest the last position when no wrist is visible.
       let followed = sightings
         .filter {
-          $0.conf >= thresholds.followConf && !still.contains($0) && nearAHand($0.center)
+          $0.conf >= thresholds.followConf && !still.contains($0) && nearAHand($0.center) && !onHead($0)
             && !Self.colorsDiffer($0, last) && Self.distance($0.center, last.center) <= thresholds.followDistance
         }
-        .min { Self.distance($0.center, last.center) < Self.distance($1.center, last.center) }
+        .min {
+          wrists.isEmpty
+            ? Self.distance($0.center, last.center) < Self.distance($1.center, last.center)
+            : wristDistance($0) < wristDistance($1)
+        }
       if let followed {
         velocity = CGPoint(x: (followed.center.x - last.center.x) / steps, y: (followed.center.y - last.center.y) / steps)
         current = followed
@@ -180,7 +189,7 @@ public final class BellTracker {
     let reference = current ?? lastLost?.bell
     let started = sightings
       .filter { s in
-        s.conf >= thresholds.startConf && !still.contains(s) && !flat(s)
+        s.conf >= thresholds.startConf && !still.contains(s) && !flat(s) && !onHead(s)
           && !(reference.map { Self.colorsDiffer(s, $0) } ?? false)
       }
       .map { s in (s, wrists.map { Self.distance(s.center, $0) }.min() ?? .infinity) }
@@ -211,9 +220,15 @@ public final class BellTracker {
     return still
   }
 
-  private static func wrists(of pose: Pose?) -> [CGPoint] {
+  private static func wrists(of pose: Pose?) -> [CGPoint] { points(of: pose, [.leftWrist, .rightWrist]) }
+
+  /// The visible head keypoints: a round dark thing containing one is the lifter's head, not a bell (a get-up
+  /// clip had the tracker follow the head for whole phases at 0.7 confidence).
+  private static func head(of pose: Pose?) -> [CGPoint] { points(of: pose, [.nose, .leftEye, .rightEye, .leftEar, .rightEar]) }
+
+  private static func points(of pose: Pose?, _ keys: [CocoKeypoint]) -> [CGPoint] {
     guard let pose else { return [] }
-    return [CocoKeypoint.leftWrist, .rightWrist].compactMap { k in
+    return keys.compactMap { k in
       let i = k.rawValue
       guard i < pose.xyn.count, i < pose.conf.count, pose.conf[i] > BodySkeleton.visibleThreshold else { return nil }
       return CGPoint(x: CGFloat(pose.xyn[i].x), y: CGFloat(pose.xyn[i].y))
