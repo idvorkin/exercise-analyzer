@@ -58,7 +58,7 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap the "phase" button on the right
 - **Then:** the playhead lands on rep 3's connect checkpoint and the scrubber moves with it
 
-- **Issues:** [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) scrubber not following a gallery tap; [#23](https://github.com/idvorkin/exercise-analyzer/issues/23) slider not following playback (logging added)
+- **Issues:** [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) scrubber not following a gallery tap; [#23](https://github.com/idvorkin/exercise-analyzer/issues/23) slider not following playback (logging added); [#54](https://github.com/idvorkin/exercise-analyzer/issues/54) the clock shows a stale scrub value past the end of the clip after gallery taps, and the HUD's completed count sits one behind the gallery's rep in progress; [#56](https://github.com/idvorkin/exercise-analyzer/issues/56) request: a rep step should land in the phase the playhead is in
 
 ---
 
@@ -96,7 +96,7 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap the Bottom pill in the HUD
 - **Then:** the playhead lands on rep 4's bottom checkpoint, and a tap on the picture afterwards starts playback
 
-- **Issues:** [#28](https://github.com/idvorkin/exercise-analyzer/issues/28)
+- **Issues:** [#28](https://github.com/idvorkin/exercise-analyzer/issues/28); [#55](https://github.com/idvorkin/exercise-analyzer/issues/55) the Bottom pill has no effect on a Bulgarian set (no seek logged; the other pills seek)
 
 ---
 
