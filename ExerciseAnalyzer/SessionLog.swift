@@ -28,6 +28,8 @@ final class SessionLog: @unchecked Sendable {
       [
         "device": UIDevice.current.model, "system": UIDevice.current.systemVersion,
         "app": Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "",
+        "build": Bundle.main.infoDictionary?["CFBundleVersion"] ?? "",
+        "analysis": AnalysisVersion.current,
         "started": ISO8601DateFormatter().string(from: start),
       ])
   }

@@ -30,7 +30,7 @@ means the phone was busy or locked, so run it again. The current session's file 
 
 | Area | Events (key fields) |
 |---|---|
-| Launch | `session_start` (device, system, app, started), `model_loaded` (model: yolo26n-pose, yoloe-26n-kettlebell), `model_missing` (the detector package is not bundled: no bells), `notification_auth` |
+| Launch | `session_start` (device, system, app, build, analysis: the AnalysisVersion, started), `model_loaded` (model: yolo26n-pose, yoloe-26n-kettlebell), `model_missing` (the detector package is not bundled: no bells), `notification_auth` |
 | Loading a clip | `load` (url, source), `import` (path: photos_suggestion / photos_in_place / picker), `install_item` (track_frames), `video_track` (hdr, transfer, edr_headroom, transform), `player_layer` (video_rect, gravity), `display_frame` (first frames per item: player_time, rate) |
 | Analysis | `offline_pass` (frames, fps, avg_infer_ms, bell_frames, bell_avg_infer_ms, bell_seen), `detection` (exercise, confidence, reason), `analyzed` (exercise, reps, reason: load / analyzer_version / recents_redetect), `crop`, `analysis_cancel` → `analysis_cancelled`, `exercise_mode`, `frame` (per analyzed frame: time, src live/file/offline, infer_ms, phase, rep, the HUD metrics) |
 | Playback | `play`, `pause`, `phase` (transitions while the clock moves), `seek` (from: which control, player_before, player_after, finished), `clock` (every 5 s: current, slider, scrubbing; #23), `ui` (action: step / edge gestures, from: watch) |

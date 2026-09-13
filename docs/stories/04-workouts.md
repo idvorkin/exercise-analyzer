@@ -78,6 +78,8 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I launch the updated app
 - **Then:** those sets are re-analyzed in the background and their counts in Workouts update without me opening them
 
+- **Issues:** [#42](https://github.com/idvorkin/exercise-analyzer/issues/42) a stale get-up reopened under a fixed Swing mode was re-read as swings (0 reps); a stored set now re-reads as its own exercise unless the mode is Auto
+
 ---
 
 ### User Story 031:

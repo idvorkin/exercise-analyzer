@@ -370,7 +370,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       if let reason {
         activity = .working("Re-analyzing", progress: nil)
-        await analyzeExtracted(url: url, reason: reason)
+        await analyzeExtracted(url: url, reason: reason, stored: pipeline.exercise)
         statusMessage = "Re-analyzed as \(exercise.definition.name): \(self.pipeline.reps.count) reps"
         rememberCurrent(clipURL: url)
         activity = .idle
@@ -540,12 +540,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Picks the exercise (detects it in Auto), runs its analyzer over the extracted poses, and pulls rep stills
-  /// from the clip. Cheap: no inference.
-  private func analyzeExtracted(url: URL, reason: String) async {
+  /// from the clip. Cheap: no inference. A stored set passes its own exercise as `stored`: a fixed mode is for
+  /// what the lifter records next, not a reason to read a get-up as swings when its analyzer moved on (#42).
+  private func analyzeExtracted(url: URL, reason: String, stored: ExerciseKind? = nil) async {
     let chosen: ExerciseKind
     switch exerciseMode {
     case .fixed(let kind):
-      chosen = kind
+      chosen = stored ?? kind
       detection = nil
     case .auto:
       let result = ExerciseDetector.detect(frames: extractedFrames)
