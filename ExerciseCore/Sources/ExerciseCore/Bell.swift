@@ -85,11 +85,7 @@ public final class BellTracker {
 
   /// Cells of a `cell`-sized grid that hold a sighting in at least `share` of `frames`: where bells rest for the
   /// clip. Computed over the whole track before an offline analysis; a live pass relies on the running rest count.
-  /// Unioned with the window rule below: a bell on the floor behind the lifter is hidden whenever he is in front
-  /// of it, so it never reaches the whole-clip share — but it sits through the whole walk-in (H27).
-  public static func staticZones(
-    in frames: [FrameRecord], cell: Double = 0.02, share: Double = 0.6, window: Double = 3.0
-  ) -> Set<Int> {
+  public static func staticZones(in frames: [FrameRecord], cell: Double = 0.02, share: Double = 0.6) -> Set<Int> {
     // 0.6, not lower: a swung bell floats at the same apex every rep and reached 0.24 of a 4-rep clip's frames.
     guard !frames.isEmpty else { return [] }
     var counts: [Int: Int] = [:]
@@ -97,26 +93,7 @@ public final class BellTracker {
       for key in Set(frame.bells.map { gridKey($0.center, cell: cell) }) { counts[key, default: 0] += 1 }
     }
     let needed = Int(Double(frames.count) * share)
-    var zones = Set(counts.filter { $0.value >= needed }.keys)
-    // H27: a cell is also furniture if it holds a box in at least `share` of the frames of *some* `window`-second
-    // stretch. A swung bell is in its apex cell a few frames per rep (under 15 % of any window); the floor bell
-    // sits there for the whole walk-in. Time-based, so any frame rate works.
-    for (i, first) in frames.enumerated() {
-      var windowCounts: [Int: Int] = [:]
-      var n = 0
-      var span = 0.0
-      for frame in frames[i...] {
-        guard frame.time - first.time <= window else { break }
-        n += 1
-        span = frame.time - first.time
-        for key in Set(frame.bells.map { gridKey($0.center, cell: cell) }) { windowCounts[key, default: 0] += 1 }
-      }
-      // A truncated tail stretch is not a window: one box in the last frame or two must not zone its cell.
-      guard span + 1e-9 >= window, n > 0 else { continue }
-      let windowNeeded = Int(Double(n) * share)
-      for (key, count) in windowCounts where count >= windowNeeded { zones.insert(key) }
-    }
-    return zones
+    return Set(counts.filter { $0.value >= needed }.keys)
   }
 
   /// The offline pass knows the future. A track starts on a confident box, but the frames before that start often

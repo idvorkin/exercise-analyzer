@@ -377,7 +377,7 @@ ungraded from a Muse transport error; cap 30 had 14 of 25), misses 9 → 2, fals
 The cap prediction held; the false circles are the walk-in box and the rack bell beside the hinge (H27, H25).
 Repo fixtures unchanged (their stored sightings never reached the cap).
 
-**Furniture from any window a box sits still in (H27, #18, NOT SHIPPED — numbers pending).** A cell is
+**Furniture from any window a box sits still in (H27, #18, rejected).** A cell is
 furniture if it holds a box in ≥ 60 % of the frames of *some* 3 s window, not only 60 % of the whole clip
 (union of both, `BellTracker.staticZones(..., window: 3.0)`, time-based so any frame rate works): the walk-in
 floor box at (0.58, 0.71) sits still for the whole walk-in but never reaches the whole-clip share. Risks,
@@ -387,8 +387,12 @@ backward fill stays out of zones); (b) a get-up's bell resting between reps — 
 of stillness, so no new loss expected; (c) the one-hand apex, 24 % of its clip — covered by a host test that 5
 frames of every 40 never zones. Prediction before the replay: 13-rep inZone/zone up by the walk-in frames,
 held and inReps unchanged or up, 4reps/1h/TGU/pistols/Bulgarian within a point; by eye false circles 12 → ~7
-with recall 12 → 12. No `AnalysisVersion` bump in this commit — the rule ships (bump) or is reverted with the
-grade. Numbers: _pending Igor's replay + dots grade below._
+with recall 12 → 12. **Result, rejected.** Replay: 13-rep held 67 → **51** %, inReps 61 → 59, zone
+121 → **254**; TGU held 61 → **57**, inReps 91 → 89, zone 0 → **426** (the resting get-up bell is zoned);
+4reps and 1h unchanged. By eye on the same 30 frames: circles on his bell 12 → 10, misses 2 → 6, false
+circles 12 → 9. The window zones the swung bell's own cells and the get-up's floor rests, so the recall
+loss outweighs the false circles it removes. Reverted (the rule and its tests are gone; this entry stays as
+the record). No version bump — nothing shipped.
 
 ## Plan (offline only; live and the watch unchanged)
 
