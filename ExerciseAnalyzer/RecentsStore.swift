@@ -32,6 +32,9 @@ struct RecentEntry: Codable, Identifiable {
   var exercise: ExerciseKind?
   /// Name of the clip as it was opened (Photos file name or the imported file), used to spot re-analyses.
   var originalName: String?
+  /// File in the entry's folder holding the original clip after a trim replaced it in Photos, so the trim can be
+  /// undone; nil once the undo is gone.
+  var originalBackup: String?
 
   var exerciseKind: ExerciseKind { exercise ?? .kettlebellSwing }
 
@@ -137,6 +140,39 @@ final class RecentsStore: ObservableObject {
     }
     entry.source = .photos(identifier: identifier)
     entries = entries.map { $0.id == id ? entry : $0 }
+    try? persistIndex()
+  }
+
+  /// Copies the clip at `url` into the entry's folder as the original to restore on undo. Returns the file name.
+  func stashOriginal(id: String, from url: URL) throws -> String {
+    let name = "original." + (url.pathExtension.isEmpty ? "mov" : url.pathExtension)
+    let dest = folder(for: id).appendingPathComponent(name)
+    try FileManager.default.createDirectory(at: folder(for: id), withIntermediateDirectories: true)
+    try? FileManager.default.removeItem(at: dest)
+    try FileManager.default.copyItem(at: url, to: dest)
+    update(id: id) { $0.originalBackup = name }
+    return name
+  }
+
+  func backupURL(for entry: RecentEntry) -> URL? {
+    guard let name = entry.originalBackup else { return nil }
+    let url = folder(for: entry.id).appendingPathComponent(name)
+    return FileManager.default.fileExists(atPath: url.path) ? url : nil
+  }
+
+  func dropBackup(id: String) {
+    guard let entry = entry(id: id), let name = entry.originalBackup else { return }
+    try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name))
+    update(id: id) { $0.originalBackup = nil }
+  }
+
+  func update(id: String, _ change: (inout RecentEntry) -> Void) {
+    entries = entries.map { entry in
+      guard entry.id == id else { return entry }
+      var copy = entry
+      change(&copy)
+      return copy
+    }
     try? persistIndex()
   }
 

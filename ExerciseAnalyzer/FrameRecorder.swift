@@ -264,6 +264,15 @@ enum VideoFile {
   }
 
   /// Saves the clip to Photos and returns the new asset's local identifier.
+  /// Deletes an asset from Photos (iOS shows its own confirmation; the asset lands in Recently Deleted).
+  static func deleteFromPhotos(identifier: String) async throws {
+    let assets = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+    guard assets.count > 0 else { return }
+    try await PHPhotoLibrary.shared().performChanges {
+      PHAssetChangeRequest.deleteAssets(assets)
+    }
+  }
+
   static func saveToPhotos(_ url: URL) async throws -> String? {
     let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
     guard status == .authorized || status == .limited else { throw VideoFileError.photosDenied }

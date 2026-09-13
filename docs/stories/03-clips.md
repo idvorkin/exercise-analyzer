@@ -44,7 +44,7 @@ Part of the [user stories](README.md); persona and format are described there.
 
 ### User Story 011:
 
-- **Summary:** Save the trimmed set to Photos, clean
+- **Summary:** Save the trimmed set to Photos, clean, in place of the original
 
 #### Use Case:
 - **As a** lifter who keeps sets to compare over months
@@ -52,10 +52,12 @@ Part of the [user stories](README.md); persona and format are described there.
 - **so that** the saved video is the original footage, reusable anywhere
 
 #### Acceptance Criteria:
-- **Scenario:** Saving a recording
-- **Given:** a recording has been trimmed to its set
-- **When:** I tap Save
-- **Then:** a new video of the trimmed clip appears in Photos with no overlay, and the Workouts entry points at it
+- **Scenario:** Saving a trimmed Photos clip
+- **Given:** a clip from Photos has been trimmed to its set
+- **When:** I tap Save and confirm the deletion iOS asks about
+- **Then:** the trimmed clip (no overlay) is in Photos in place of the original, the Workouts entry points at it, and Undo trim still puts the original back into Photos and reopens it
+
+- **Issues:** [#34](https://github.com/idvorkin/exercise-analyzer/issues/34)
 
 ---
 

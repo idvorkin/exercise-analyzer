@@ -545,9 +545,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func installPlayerItem(url: URL, pipeline: AnalysisPipeline, keepUndo: Bool = false) {
     pause()
     if !keepUndo {
-      // Any other clip coming in ends the trim's undo (#27).
+      // Any other clip coming in ends the trim's undo (#27); a stashed original stays with its set in Workouts.
       untrimmed = nil
       canUndoTrim = false
+      replacedOriginalID = nil
     }
     let asset = AVURLAsset(url: url)
     // No AVPlayerItemVideoOutput here: attaching a BGRA output routes an HDR item through an SDR conversion and
@@ -1201,9 +1202,39 @@ final class VideoPoseSession: NSObject, ObservableObject {
     Task { await trim(url: url, using: current, thenAnalyze: false) }
   }
 
-  /// Puts the untrimmed clip and its analysis back (the trimmed file is dropped).
+  /// Puts the untrimmed clip and its analysis back (the trimmed file is dropped). If the save already replaced
+  /// the original in Photos, the stashed original goes back into Photos and the trimmed asset is deleted.
   func undoTrim() {
     guard let before = untrimmed, source == .file else { return }
+    if replacedOriginalID != nil, let id = currentEntryID, let entry = recents.entry(id: id), let backup = recents.backupURL(for: entry),
+      case .photos(let trimmedID) = entry.source
+    {
+      activity = .working("Restoring the original to Photos", progress: nil)
+      Task {
+        do {
+          guard let restoredID = try await VideoFile.saveToPhotos(backup) else { throw VideoFile.VideoFileError.exportFailed("no asset") }
+          try await VideoFile.deleteFromPhotos(identifier: trimmedID)
+          recents.markSavedToPhotos(id: id, identifier: restoredID)
+          recents.dropBackup(id: id)
+          replacedOriginalID = nil
+          log.event("photos_restored", ["restored": restoredID, "removed": trimmedID])
+          if let url = await RecentsStore.photosClipURL(identifier: restoredID) {
+            finishUndo(before: Untrimmed(url: url, pipeline: before.pipeline, frames: before.frames, origin: .photos(identifier: restoredID)))
+          } else {
+            finishUndo(before: before)
+          }
+        } catch {
+          statusMessage = "Couldn't restore the original: \(error.localizedDescription)"
+          log.event("error", ["where": "photos_restore", "message": "\(error)"])
+        }
+        activity = .idle
+      }
+      return
+    }
+    finishUndo(before: before)
+  }
+
+  private func finishUndo(before: Untrimmed) {
     untrimmed = nil
     canUndoTrim = false
     let dropped = trimmedURL
@@ -1281,13 +1312,31 @@ final class VideoPoseSession: NSObject, ObservableObject {
     activity = .working("Saving", progress: nil)
     Task {
       do {
-        let identifier = try await VideoFile.saveToPhotos(url)
-        statusMessage = "Saved to Photos"
-        log.event("saved", ["clip": url.lastPathComponent])
-        if let identifier, let id = currentEntryID {
-          recents.markSavedToPhotos(id: id, identifier: identifier)
-          currentOrigin = .photos(identifier: identifier)
+        // A trimmed Photos clip replaces its original: the original is stashed in the set's folder so Undo trim
+        // can bring it back, the trimmed clip goes into Photos, then the original asset is deleted (iOS asks).
+        if let before = untrimmed, case .photos(let originalID) = before.origin, trimmedURL != nil, let id = currentEntryID {
+          activity = .working("Keeping a copy of the original", progress: nil)
+          _ = try recents.stashOriginal(id: id, from: before.url)
+          activity = .working("Saving", progress: nil)
+          guard let newID = try await VideoFile.saveToPhotos(url) else { throw VideoFile.VideoFileError.exportFailed("no asset") }
+          try await VideoFile.deleteFromPhotos(identifier: originalID)
+          recents.markSavedToPhotos(id: id, identifier: newID)
+          recents.update(id: id) { $0.originalName = url.lastPathComponent }
+          currentOrigin = .photos(identifier: newID)
+          untrimmed = Untrimmed(url: before.url, pipeline: before.pipeline, frames: before.frames, origin: .photos(identifier: newID))
+          replacedOriginalID = originalID
           canSave = false
+          statusMessage = "Trimmed clip saved; original replaced (Undo trim restores it)"
+          log.event("photos_replaced", ["original": originalID, "trimmed": newID, "clip": url.lastPathComponent])
+        } else {
+          let identifier = try await VideoFile.saveToPhotos(url)
+          statusMessage = "Saved to Photos"
+          log.event("saved", ["clip": url.lastPathComponent])
+          if let identifier, let id = currentEntryID {
+            recents.markSavedToPhotos(id: id, identifier: identifier)
+            currentOrigin = .photos(identifier: identifier)
+            canSave = false
+          }
         }
       } catch {
         statusMessage = "Save failed: \(error.localizedDescription)"
@@ -1296,6 +1345,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
       activity = .idle
     }
   }
+
+  /// Set when a save replaced the original in Photos; Undo trim then re-adds the original and removes the trim.
+  private var replacedOriginalID: String?
 
   // MARK: - Bug reports
 
