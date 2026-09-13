@@ -72,7 +72,7 @@ struct ContentView: View {
         if session.source == .file, session.duration > 0 {
           edgeControls
         }
-        if session.source == .none, session.activity == .idle {
+        if (session.source == .none && session.activity == .idle) || showOpenDialog {
           startPanel
         }
         if case .working(let label, let progress) = session.activity, session.source != .camera {
@@ -209,12 +209,14 @@ struct ContentView: View {
         }
         Spacer()
         Text(String(format: "%.0f fps", session.fps)).font(.caption2).monospacedDigit().opacity(0.7)
-        Button {
-          session.setWatchMode(true, from: "phone")
-        } label: {
-          Image(systemName: "applewatch").font(.title3)
+        if session.source == .camera {
+          Button {
+            session.setWatchMode(true, from: "phone")
+          } label: {
+            Image(systemName: "applewatch").font(.title3)
+          }
+          .accessibilityLabel("Watch mode: big digits on the phone, control from the wrist")
         }
-        .accessibilityLabel("Watch mode: big digits on the phone, control from the wrist")
         Button {
           meView.toggle()
         } label: {
@@ -383,21 +385,33 @@ struct ContentView: View {
 
   /// Nothing loaded: a centred panel with the four ways to start, big enough for the gym.
   private var startPanel: some View {
-    VStack(spacing: 10) {
-      Text("Exercise Analyzer").font(.title2.bold()).foregroundStyle(.white).padding(.bottom, 4)
-      startRow("Live", "camera.fill") { session.startCamera() }
-      startRow("Workouts", "calendar") { showRecents = true }
-      startRow("Photos", "photo.on.rectangle") {
-        PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
-          Task { @MainActor in showPhotosPicker = true }
+    ZStack {
+      if showOpenDialog {
+        // Over a loaded clip: dim the picture and let a tap outside dismiss.
+        Color.black.opacity(0.5).ignoresSafeArea().onTapGesture { showOpenDialog = false }
+      }
+      VStack(spacing: 10) {
+        Text("Exercise Analyzer").font(.title2.bold()).foregroundStyle(.white).padding(.bottom, 4)
+        startRow("Live", "camera.fill") { showOpenDialog = false; session.startCamera() }
+        startRow("Workouts", "calendar") { showOpenDialog = false; showRecents = true }
+        startRow("Photos", "photo.on.rectangle") {
+          showOpenDialog = false
+          PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+            Task { @MainActor in showPhotosPicker = true }
+          }
+        }
+        startRow("Files", "folder") { showOpenDialog = false; showFileImporter = true }
+        startRow("Report a problem", "ladybug") { showOpenDialog = false; showBugReport = true }
+        if showOpenDialog {
+          Button("Cancel") { showOpenDialog = false }
+            .font(.headline).foregroundStyle(.white.opacity(0.8)).padding(.top, 4)
         }
       }
-      startRow("Files", "folder") { showFileImporter = true }
+      .padding(20)
+      .frame(maxWidth: 320)
+      .background(.black.opacity(0.85), in: RoundedRectangle(cornerRadius: 20))
+      .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.15)))
     }
-    .padding(20)
-    .frame(maxWidth: 320)
-    .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 20))
-    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.15)))
   }
 
   private func startRow(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
@@ -529,22 +543,9 @@ struct ContentView: View {
           Label("Camera", systemImage: "camera")
         }
         Button {
-          showOpenDialog = true
+          showOpenDialog = true  // the same centred panel as the first screen (#25)
         } label: {
           Label("Open", systemImage: "folder.badge.plus")
-        }
-        // A full-width action sheet with big rows, gym-friendly (#25): Workouts first, Files last.
-        .confirmationDialog("Open", isPresented: $showOpenDialog, titleVisibility: .visible) {
-          Button("Workouts") { showRecents = true }
-          Button("Photos") {
-            // Read access lets Recents point back at the asset instead of copying it.
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
-              Task { @MainActor in showPhotosPicker = true }
-            }
-          }
-          Button("Files") { showFileImporter = true }
-          Button("Report a problem (or shake)") { showBugReport = true }
-          Button("Cancel", role: .cancel) {}
         }
       }
       .labelStyle(.iconOnly)

@@ -72,7 +72,7 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Launching the app with nothing loaded
 - **Given:** the app has just opened and no clip or camera is active
 - **When:** the main screen appears
-- **Then:** a centred panel offers Live, Workouts, Photos and Files as big rows (and once something is loaded, Open shows the same choices plus Report a problem as a sheet, Workouts first and Files last)
+- **Then:** a centred panel offers Live, Workouts, Photos, Files and Report a problem as big rows; once something is loaded, the Open button brings up the same panel over the dimmed picture, and a tap outside or Cancel dismisses it
 
 - **Issues:** [#25](https://github.com/idvorkin/exercise-analyzer/issues/25)
 
