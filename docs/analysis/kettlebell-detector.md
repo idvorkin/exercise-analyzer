@@ -225,7 +225,11 @@ The Bulgarian phantoms were separated by shape, not place: they start as wide bo
 **Models and input sizes** (seen / held with the new tracker): nano at 960 sees the small get-up bell in 94 %
 of frames (held 81) but only 41 % of the one-hand swing and holds a phantom in 89 % of the Bulgarian; 26s at
 640 holds one in 92 %; 26s at 960 holds the pistols' floor bell in 72 %. Nano at 640 stays. A second package
-at 960 for get-ups only is the one thing left on the table there.
+at 960 for get-ups only was the one thing left on the table, and the blind frames say no: of the TGU clip's
+604 blind hand frames, 429 are the setup, the rest between reps and the walk-off (the bell on the floor, which
+the tracker must refuse anyway), rep 2 is 96 % seen at 640, and with the full gates 960 holds 81 % to 640's
+80 %. The one-hand swing's 47 blind frames are all short mid-transit blurs in the centre of the frame (never
+the apex, never an edge), which coasting already covers.
 
 **Also learned:** the detector floor never changed *held* on its own (every gate sat above it), it only
 relabels the loss; lowering it to 0.15 matters only because `followConf` now sits there. The 1h clip's colour
