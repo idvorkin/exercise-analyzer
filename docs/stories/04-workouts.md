@@ -136,11 +136,11 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Reopening a set after the bell detector shipped
 - **Given:** a set in Workouts analyzed by the pose model alone, with its clip still in Photos or in the app
 - **When:** I open it in a build that bundles the pose model and the kettlebell detector
-- **Then:** the app runs the offline pass again from the video as the set's own exercise (a fixed mode does not change it), stores the result on the same entry with the model set, shows the bell, and a second open runs nothing; a set whose clip is missing opens from its stored analysis unchanged
+- **Then:** the app runs the offline pass again from the video as the set's own exercise (a fixed mode does not change it), stores the result on the same entry with the model set, shows the bell, and a second open runs nothing; a set whose clip is missing says so ("That clip is no longer in Photos") and is left unchanged
 
 - **Scenario:** The gallery catches up on its own after a model or its settings change
 - **Given:** stored sets whose tracks lack a model this build runs, or were made by the detector at other settings (the model set names the detector with its floor and box cap)
 - **When:** I launch the app and leave it on the gallery
-- **Then:** those sets go through the models again from their clips one at a time in the background (`recents_rerun` and `offline_pass` with `where: refresh` in the log), each replacing its own entry, without my opening them; opening a set while that runs takes priority and the interrupted set waits for the next launch; a set whose clip is out of reach is refreshed from its stored poses as before
+- **Then:** those sets go through the models again from their clips one at a time in the background (`recents_rerun` and `offline_pass` with `where: refresh` in the log), each replacing its own entry, without my opening them; opening a set while that runs takes priority and the interrupted set waits for the next launch; a set whose clip is out of reach is refreshed from its stored poses as before, and that replay runs today's tracker over the stored sightings (the bell a set was saved with is never kept through a replay)
 
 - **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)

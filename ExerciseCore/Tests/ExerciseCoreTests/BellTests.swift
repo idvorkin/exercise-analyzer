@@ -197,4 +197,22 @@ final class BellTests: XCTestCase {
     XCTAssertEqual(forward[2].bell?.conf, 0.9, "the forward result is never replaced")
     XCTAssertEqual(forward[3].bell?.conf, 0, "carried by the forward pass, nothing detected to write backward")
   }
+
+  func testReplayingStoredFramesRunsTodaysTrackerOverTheirSightingsNotTheirSavedBell() {
+    // A stored set carries yesterday's choice in `bell` beside the raw `bells`. Replaying it (a version bump, a
+    // mode change, a launch refresh without the clip) must re-track from the sightings, or no tracker change ever
+    // reaches a stored set (#49). Here the saved bell sits on a rack far from the hands; the sighting is at the
+    // wrist and moves a cell each frame (a box in one cell for 60 % of a clip reads as furniture).
+    let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
+    let stale = bell(0.1, 0.9, conf: 0.9)
+    let frames = (0..<6).map { i in
+      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
+        box: CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8), analysis: nil,
+        bells: [bell(0.5, 0.6 + 0.03 * Double(i), conf: 0.9)], bell: stale)
+    }
+    let replayed = AnalysisPipeline.analyze(frames: frames, exercise: .kettlebellSwing).track.frames
+    XCTAssertEqual(replayed.map { $0.bell?.center.x }, Array(repeating: 0.5, count: 6), "the tracker's choice, not the stored one")
+    let restored = AnalysisPipeline.restored(frames: frames, reps: [], exercise: .kettlebellSwing).track.frames
+    XCTAssertEqual(restored.map { $0.bell?.center.x }, Array(repeating: 0.1, count: 6), "a restore keeps the stored analysis as is")
+  }
 }

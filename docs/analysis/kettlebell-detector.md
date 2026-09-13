@@ -321,6 +321,14 @@ learned offset from the wrist rather than by velocity (a hinge can turn mid-gap)
 relative to the forearm as identity. Its inside-reps view of the metric is the better one for the get-up: held
 within detected reps is 89 %, the rest of the loss is the bell on the floor. AnalysisVersion 2026-09-12.10.
 
+**A replay kept the stored bell (#49, 2026-09-13).** Codex's architecture review read `extracted.bell ??
+bellTracker.track(...)` in `AnalysisPipeline.process`: a stored frame's own `bell` won over the tracker, so a
+replay of a stored set (a version bump, a mode change, the launch refresh without the clip) never re-ran the
+tracker; only a model-set change, which is a pass from the clip, did. Every tracker change above reached the
+phone only because the detector's model name changed the same night. Now `analyze(frames:)` always tracks from
+the raw `bells` and only `restored(frames:reps:)` keeps a stored bell (`BellTests`, host). AnalysisVersion
+2026-09-13.1, so every stored set replays once.
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),

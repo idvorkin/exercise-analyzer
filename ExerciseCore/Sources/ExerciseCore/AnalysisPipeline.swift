@@ -40,7 +40,8 @@ public final class AnalysisPipeline: @unchecked Sendable {
     let analysis = extracted.pose.map { analyzer.process(pose: $0, time: extracted.time, image: image) }
     // The tracker sees every frame, including one with no sighting at all: that is how a track ages, and how a
     // blink of the detector is coasted over (Codex's review of 85ed8e5: skipping empty frames froze both).
-    let bell = extracted.bell ?? bellTracker.track(extracted.bells, pose: extracted.pose, personHeight: extracted.box?.height)
+    // A stored frame's own `bell` is ignored: replaying a set is how a tracker change reaches it (#49).
+    let bell = bellTracker.track(extracted.bells, pose: extracted.pose, personHeight: extracted.box?.height)
     let frame = FrameRecord(
       time: extracted.time, imageSize: extracted.imageSize, pose: extracted.pose, box: extracted.box,
       analysis: analysis, bells: extracted.bells, bell: bell)
