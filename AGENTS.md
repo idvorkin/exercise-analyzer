@@ -17,7 +17,11 @@ squats and Turkish get-ups. `ExerciseCore/` is the platform-free analysis packag
 - **Instrument before theorizing.** For any phone-only symptom add a log event, deploy, `just pull-logs`, then fix
   from evidence. Never ship a second guessed fix. Session logs are JSON Lines with a `type` per event.
 - **Bugs live in GitHub issues.** Shake reports → `just pull-logs` → `just file-bugs`; evidence and analysis go on the
-  issue as a comment.
+  issue as a comment. `just bugs-check` is the quick dirty check (exit 1 when unfiled reports exist); run
+  `/loop 5m just bugs-check` while Igor is testing on the phone.
+- **Every pulled report also updates the user stories** (`docs/stories/`). A feature request becomes a new story in
+  the journey it belongs to, in the Cohn + Gherkin form (`user-story` skill), with its issue linked; a bug gets an
+  `Issues:` line on the story it violates. Stories are the spec; issues are the trail.
 - **One commit per issue**, `Fixes #N` only when verified at the right rung, otherwise `#N` plus what remains.
   Never bundle fixes. Never `git add -A` (`.build/`, `Build/`, `.claude/worktrees/` must stay untracked).
 - **Analyzer semantics**: a swing rep is top→top in 1.1–2.1 s (longer is the walk-in or setup, discard); an upswing

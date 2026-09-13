@@ -85,3 +85,7 @@ analyze clip *args:
 # Archive every pose track on the phone as a compact fixture (Fixtures/tracks/), see docs/TESTING.md.
 pull-tracks:
     scripts/pull-tracks.sh {{device}}
+
+# Quick check for unfiled bug reports on the phone (exit 1 when there are any); `/loop 5m just bugs-check` while testing.
+bugs-check:
+    scripts/bugs-check.sh {{device}}
