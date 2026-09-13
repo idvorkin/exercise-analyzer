@@ -11,6 +11,9 @@ default:
 
 # Test ladder, cheapest first. Rung 1: analyzers and detector replayed over stored pose tracks on the Mac.
 test:
+    #!/usr/bin/env bash
+    # pipefail: a failing suite must fail the recipe instead of hiding behind tail's exit 0 (#51).
+    set -uo pipefail
     cd ExerciseCore && swift test 2>&1 | grep -E "Test Suite|passed|failed|error" | tail -20
 
 # Rung 2: simulator smoke run of every sample clip; checks detection and rep counts from the session log.
@@ -113,7 +116,13 @@ screenshots: build-sim
 # Rung 1.5: run the pose model on a clip on the Mac and analyze it like the phone (no simulator).
 # Usage: just analyze path/to/clip.mov [--exercise kettlebell-swing] [--fixture ExerciseCore/Tests/ExerciseCoreTests/Fixtures/name.json]
 analyze clip *args:
-    cd ExerciseCore && swift build -c release --product posetrack 2>&1 | grep -E "error:" || true
+    #!/usr/bin/env bash
+    # A failed build must fail the recipe instead of running a stale posetrack (#51);
+    # same capture-and-require pattern as build-device (ab4f1a5).
+    set -uo pipefail
+    out=$(cd ExerciseCore && swift build -c release --product posetrack 2>&1)
+    echo "$out" | grep -E "error:|Build complete" || true
+    echo "$out" | grep -q "Build complete" || exit 1
     ExerciseCore/.build/release/posetrack "{{clip}}" --model ExerciseAnalyzer/yolo26n-pose.mlpackage {{args}}
 
 # Archive every pose track on the phone as a compact fixture (Fixtures/tracks/), see docs/TESTING.md.
