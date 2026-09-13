@@ -45,7 +45,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 007:
 
 - **Summary:** Step by frame and by phase with targets big enough for the gym
-- **Status:** implemented in [564a753](https://github.com/idvorkin/exercise-analyzer/commit/564a753); verified by simulator screenshot; the scrubber follow-up [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) needs the phone
+- **Status:** implemented in [564a753](https://github.com/idvorkin/exercise-analyzer/commit/564a753); verified by simulator screenshot; the scrubber follow-up [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) needs the phone; [#54](https://github.com/idvorkin/exercise-analyzer/issues/54): a seek from the gallery, pills, edge keys or step buttons ends the scrub state and the clock follows the playhead, the HUD shows the gallery's rep in review (the completed count live), and `phase` events log the gallery's rep; [#56](https://github.com/idvorkin/exercise-analyzer/issues/56): a rep step lands in the phase the playhead is in (the rep's first position when it has none)
 
 #### Use Case:
 - **As a** lifter holding a phone with chalky hands
@@ -57,6 +57,11 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** a set is open and paused at the top of rep 3
 - **When:** I tap the "phase" button on the right
 - **Then:** the playhead lands on rep 3's connect checkpoint and the scrubber moves with it
+
+- **Scenario:** Stepping a rep keeps the phase
+- **Given:** a set is open and paused at the bottom of rep 3
+- **When:** I step to the next rep
+- **Then:** the playhead lands on rep 4's bottom checkpoint (its first position when it has no bottom)
 
 - **Issues:** [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) scrubber not following a gallery tap; [#23](https://github.com/idvorkin/exercise-analyzer/issues/23) slider not following playback (logging added); [#54](https://github.com/idvorkin/exercise-analyzer/issues/54) the clock shows a stale scrub value past the end of the clip after gallery taps, and the HUD's completed count sits one behind the gallery's rep in progress; [#56](https://github.com/idvorkin/exercise-analyzer/issues/56) request: a rep step should land in the phase the playhead is in
 
@@ -83,7 +88,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 024:
 
 - **Summary:** Jump to a phase by tapping its name, and play or pause by tapping the picture
-- **Status:** implemented in [3abd301](https://github.com/idvorkin/exercise-analyzer/commit/3abd301); needs a phone check
+- **Status:** implemented in [3abd301](https://github.com/idvorkin/exercise-analyzer/commit/3abd301); needs a phone check; [#55](https://github.com/idvorkin/exercise-analyzer/issues/55): bottom is now a live Bulgarian phase (it was peak-only, so the pill could never light); the pill seeks to the dip's lowest frame as before
 
 #### Use Case:
 - **As a** lifter comparing the same moment across reps
