@@ -139,6 +139,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     log = SessionLog()
     models = ModelSet(log: log)
     super.init()
+    pruneOldLogs()  // after the new session's log is open (#72)
     if case .fixed(let kind) = exerciseMode { exercise = kind }
     pipeline = AnalysisPipeline(exercise: exercise)
     watch.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
@@ -1863,6 +1864,50 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
     }
     statusMessage = "Problem logged. Thanks."
+  }
+
+  /// Deletes session logs older than 30 days, except any named by a report in bugs.jsonl (#72). Runs at launch,
+  /// after the new session's log is open, and logs one `logs_pruned` event even when zero. A file whose age
+  /// cannot be read is never deleted.
+  private func pruneOldLogs() {
+    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    let dir = docs.appendingPathComponent("logs", isDirectory: true)
+    let now = Date()
+    let referenced = Self.referencedLogs(at: docs.appendingPathComponent("bugs.jsonl"))
+    let files = ((try? FileManager.default.contentsOfDirectory(
+      at: dir, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey])) ?? [])
+      .filter { $0.pathExtension == "jsonl" }
+      .compactMap { url -> (name: String, age: Double, size: Int)? in
+        guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+          let modified = values.contentModificationDate
+        else { return nil }
+        return (url.lastPathComponent, now.timeIntervalSince(modified), values.fileSize ?? 0)
+      }
+    let victims = Set(LogRetention.prune(
+      files: files.map { (name: $0.name, age: $0.age) }, referenced: referenced))
+    var count = 0, freed = 0
+    for file in files where victims.contains(file.name) {
+      if (try? FileManager.default.removeItem(at: dir.appendingPathComponent(file.name))) != nil {
+        count += 1
+        freed += file.size
+      }
+    }
+    let kept = files.filter { $0.age > LogRetention.retentionSeconds && referenced.contains($0.name) }.count
+    log.event("logs_pruned", ["count": count, "bytes": freed, "kept_for_reports": kept])
+  }
+
+  /// Log file names referenced by bugs.jsonl (each report names its log); malformed lines are skipped.
+  private static func referencedLogs(at url: URL) -> Set<String> {
+    guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else { return [] }
+    var names = Set<String>()
+    for line in text.split(separator: "\n") {
+      guard let lineData = line.data(using: .utf8),
+        let record = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+        let name = record["log"] as? String
+      else { continue }
+      names.insert(name)
+    }
+    return names
   }
 
   private func currentVideoOrientation() -> AVCaptureVideoOrientation {
