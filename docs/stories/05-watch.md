@@ -121,3 +121,185 @@ Part of the [user stories](README.md); persona and format are described there.
 
 - **Issues:** [#29](https://github.com/idvorkin/exercise-analyzer/issues/29), [#36](https://github.com/idvorkin/exercise-analyzer/issues/36)
 
+---
+
+### User Story 040:
+
+- **Summary:** Pause and resume a set from the wrist
+- **Status:** requested ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "Give me the ability to pause and resume on my watch")
+- **Why:** a set gets interrupted (chalk, someone crossing the frame, a tripod that needs moving) and today the only choices are to keep recording the interruption or to cancel the set.
+
+#### Use Case:
+- **As a** lifter who has to stop in the middle of a set
+- **I want to** pause the set from the watch and resume it when I am back
+- **so that** the interruption is not in the clip and the count carries on where it stopped
+
+#### Acceptance Criteria:
+- **Scenario:** A pause to move the tripod
+- **Given:** a set is being recorded and the watch shows the live status
+- **When:** I tap Pause on the watch, move the tripod, and tap Resume 40 s later
+- **Then:** the watch and the phone show PAUSED with the count and the elapsed time frozen for those 40 s, the picture and the in-frame hint keep refreshing so I can check the new framing, no rep is counted while paused, and Done gives a clip and a count without the 40 s: the two recorded segments are joined without re-encoding (same orientation), the trim and the offline pass run on the joined clip, and the rep gallery shows the halves back to back
+
+- **Notes:** Pause is also a button on the phone's recording HUD and PAUSED shows on the watch-mode screen (the
+  watch may be out of reach or unreachable). Done and Cancel work while paused. A pause is a segment boundary,
+  the same mechanism as rotating the phone mid-set (story 020, #22): rotation across a pause still takes the
+  re-encoding stitch, a plain pause takes a passthrough join (seconds, no quality loss). A rep in progress at the
+  pause is lost: the analyzer sees the frame before and the frame after as neighbours, which is exactly what the
+  offline pass sees in the joined clip, so the live and final counts agree. Wire: `WatchStatus.paused` and
+  `WatchCommand.pause` / `.resume`; an old watch app ignores the new field and never sends the commands.
+
+---
+
+### User Story 041:
+
+- **Summary:** The phone follows the wrist into watch mode
+- **Status:** requested ([#68](https://github.com/idvorkin/exercise-analyzer/issues/68), Igor by voice, 2026-09-13: "If I start my watch, switch the iPhone to watch mode")
+- **Why:** once the watch is in use the phone's full screen is never wanted; today watch mode needs a tap on the phone or a scroll on the watch.
+
+#### Use Case:
+- **As a** lifter who picked up the watch to run the set
+- **I want to** have the phone switch itself to watch mode when I use the watch
+- **so that** I never tap the phone's watch icon after walking away from the tripod
+
+#### Acceptance Criteria:
+- **Scenario:** Record from the wrist
+- **Given:** the phone app is open in front and idle, and the watch app is open
+- **When:** I tap Record on the watch
+- **Then:** the phone starts the camera and shows the watch-mode screen at once, the watch shows "Phone: watch mode on", a set started on the phone switches the same way the moment the watch app comes to the front, and leaving watch mode on the phone (button, double tap or hold) keeps it off for the rest of that set even if the watch app comes to the front again, while the watch's own toggle still works
+
+- **Notes:** What "switch" can and cannot mean. WatchConnectivity delivers a watch message to the phone app even
+  when it is in the background (iOS launches it briefly for that), but it can neither bring the app to the front
+  nor start the camera from there, and watch mode is a recording-only screen ([#36](https://github.com/idvorkin/exercise-analyzer/issues/36)).
+  So: phone app in front, it switches immediately; phone app in the background or the phone locked, nothing changes
+  on the phone until the existing "Ready to record" notification is tapped, and a set started from that tap goes
+  straight to watch mode because the request came from the watch. No wire change: the watch already sends
+  `watchActive` on every scene change and `start` on Record.
+
+---
+
+### User Story 042:
+
+- **Summary:** The picture fills the watch and the controls sit on it
+- **Status:** requested ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot")
+- **Why:** the preview is a 90 pt strip above a column of buttons; from across the room the strip is what matters and the buttons are what Igor already knows.
+
+#### Use Case:
+- **As a** lifter checking the framing from across the room
+- **I want to** see the camera picture fill the watch with the count, the time and the buttons over it
+- **so that** one glance says whether I am in frame, without scrolling past a thumbnail
+
+#### Acceptance Criteria:
+- **Scenario:** The recording screen on a 45 mm watch
+- **Given:** a set is being recorded and the watch app is in front
+- **When:** I raise my wrist
+- **Then:** the picture fills the screen edge to edge, the rep count and the elapsed time sit on translucent chips over its top corners, the in-frame hint is a bar over its bottom edge (green in frame, red when cut off), three round buttons overlay the bottom, Pause/Resume, Camera and Done, and Cancel, the watch-mode toggle and the exercise are on the page below (vertical page swipe) so a stray touch cannot end a set; the picture refreshes about once a second at twice today's resolution (long side 320 px instead of 176, about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
+
+---
+
+### User Story 043:
+
+- **Summary:** The watch face shows the set
+- **Status:** requested ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; the Muse research of 2026-09-13 sized it)
+- **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and today's complication is only a launcher.
+
+#### Use Case:
+- **As a** lifter between reps with the wrist down
+- **I want to** see on the watch face that a set is recording, how long it has run and the count
+- **so that** a glance at the face, not the app, tells me where I am
+
+#### Acceptance Criteria:
+- **Scenario:** The face during a set
+- **Given:** the Exercise Analyzer complication is on my face and a set is recording
+- **When:** I lower my wrist and raise it 20 s later without opening the app
+- **Then:** the face shows "● REC", a timer counting up from the set's start that ticks by itself, and the rep count as of the last time the watch app heard from the phone; tapping it opens the app for the exact count, and after Done the face shows the final count and the exercise until the next set
+
+- **Notes:** The complication cannot talk to the phone: it reads a shared App Group container that the watch app
+  writes on each status and reloads through WidgetKit. WidgetKit throttles reloads, so the count on the face is
+  refreshed on transitions (record, finish, cancel) and while the app is in front, not per rep; the timer is a date,
+  so it ticks without any update. `transferCurrentComplicationUserInfo` (50 a day) is not used. Needs one
+  App Group entitlement on the watch app and the complication, no user permission, no HealthKit. Wrist-down still
+  suspends the app: the face is the answer to that, not a workout session (018 stands).
+
+---
+
+### User Story 044:
+
+- **Summary:** A Live Activity on the phone's lock screen while recording
+- **Status:** requested ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the phone"); not planned: the platform makes the live half impossible, see the notes; Igor decides whether the after-the-set card is worth a widget target
+- **Why:** Igor asked for "a live stream or a lock screen application"; this is what a lock-screen application on the recording phone could and could not be.
+
+#### Use Case:
+- **As a** lifter glancing at the phone from the rack
+- **I want to** see reps, elapsed time and the exercise on the phone's lock screen while it records
+- **so that** the phone reads like a scoreboard without being unlocked
+
+#### Acceptance Criteria:
+- **Scenario:** The set ends and the phone locks
+- **Given:** a set was recorded and finished
+- **When:** the phone locks
+- **Then:** the lock screen shows a card with the set's final count, the exercise and its length until the next set starts or the card is dismissed
+
+- **Notes:** The recording phone is never on its lock screen: locking backgrounds the app and iOS stops the camera
+  (story 019 keeps the phone awake for exactly this reason). A Live Activity can therefore only show the set after
+  it ended, which is why the scenario above is the after-the-set card and not the live one. A live video stream on
+  the lock screen is not possible at all. If the card is wanted, ActivityKit allows: iOS 16.1+ (the target is 17),
+  `NSSupportsLiveActivities` in Info.plist, a new iOS widget extension target (the only extension today is the
+  watchOS complication), an `ActivityAttributes` with a `ContentState` of at most 4 KB, so the 1 fps preview JPEG
+  (8–12 KB at 176 px, more after 042) cannot ride in the state; a small still can be read by the extension's view
+  from an App Group file and is re-rendered on each `Activity.update`, which has no published budget for a running
+  app but is throttled in bursts; elapsed time costs no updates (`Text(timerInterval:)`). The watch face (043) and
+  watch mode on the phone (027, 041) are the readings of #70 that show a live set.
+
+---
+
+### User Story 045:
+
+- **Summary:** The final count reaches the wrist
+- **Status:** requested (design lead, 2026-09-13, for Igor's "think through other good watch user stories" in #67)
+- **Why:** the watch drops to "Phone ready" the moment the camera stops, and the live count it showed is not the one the offline pass settles on a few seconds later; Igor walks to the phone to learn the set.
+
+#### Use Case:
+- **As a** lifter who tapped Done on the watch
+- **I want to** see the set's final count on the watch once the phone has finished analyzing
+- **so that** I never walk to the phone to learn what the set was
+
+#### Acceptance Criteria:
+- **Scenario:** Done from the wrist
+- **Given:** a set was recorded and finished from the watch
+- **When:** the phone's offline pass completes, a few seconds after Done
+- **Then:** the watch shows "Analyzing…" while the pass runs and then "Last set: 12 reps · Kettlebell Swing · 1:02" above the Record button until the next set starts
+
+- **Notes:** Wire: `WatchStatus.lastSet` (reps, exercise, seconds, when), optional, ignored by an old watch app.
+
+---
+
+### User Story 046:
+
+- **Summary:** Rest timer on the wrist
+- **Status:** requested (design lead, 2026-09-13, for Igor's "think through other good watch user stories" in #67)
+- **Why:** rest length is the one number between sets, and the watch is the only screen on the lifter; today it shows nothing between Done and the next Record.
+
+#### Use Case:
+- **As a** lifter resting between sets
+- **I want to** see on the watch how long I have rested since Done and be tapped at my rest length
+- **so that** rest is a number I read, not a guess
+
+#### Acceptance Criteria:
+- **Scenario:** A 90 s rest
+- **Given:** a set just ended from the watch and the rest length is set to 90 s
+- **When:** 90 s pass
+- **Then:** the watch has been counting the rest up under the Record button since Done, taps twice at 90 s (once, no repeat), and Record clears the count
+
+- **Notes:** Watch only, no phone change; the rest length is a watch setting (60, 90, 120, 180 s). With the wrist
+  down the app is suspended, so the tap at 90 s is a scheduled local notification on the watch (one permission
+  prompt, on the watch, the first time); without that permission the count still shows, the tap does not come.
+
+---
+
+### Not stories (while 018 stands)
+
+Heart rate during a set, surviving wrist-down (#32) and launching the watch app from the phone all need an
+`HKWorkoutSession`, which ends whatever other workout the watch is running (watchOS runs one at a time); Igor
+declined that in #32. They come back together as one decision, "a workout session only while recording", with the
+trade-off table in `~/tmp/agent/notes/2026-09-13-watch-research-muse.md` §2.
+
