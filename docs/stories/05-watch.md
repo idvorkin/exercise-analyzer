@@ -180,7 +180,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 042:
 
 - **Summary:** The picture fills the watch and the controls sit on it
-- **Status:** requested ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot")
+- **Status:** implemented in 08c563c; needs phone + watch ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot")
 - **Why:** the preview is a 90 pt strip above a column of buttons; from across the room the strip is what matters and the buttons are what Igor already knows.
 
 #### Use Case:

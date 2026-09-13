@@ -13,6 +13,20 @@ struct WatchContentView: View {
   private var status: WatchStatus { phone.status }
 
   var body: some View {
+    Group {
+      if phone.isLive && status.phoneActive && status.recording {
+        recordingPages
+      } else {
+        idlePages
+      }
+    }
+    .onReceive(clock) { now = $0; if !phone.isLive { phone.ping() } }
+    .onAppear { phone.sceneActive(true) }  // also pings; the phone learns the app is in front even without a scene change
+    .onChange(of: scenePhase) { _, phase in phone.sceneActive(phase == .active) }
+  }
+
+  /// Everything that is not a recording: the not-connected, backgrounded-phone and idle screens, unchanged.
+  private var idlePages: some View {
     ScrollView {
       VStack(spacing: 8) {
         if !phone.isLive {
@@ -34,46 +48,6 @@ struct WatchContentView: View {
           Button { phone.send(.start) } label: {
             Label("Send a reminder to the phone", systemImage: "bell").frame(maxWidth: .infinity)
           }
-        } else if status.recording {
-          if let preview = phone.preview {
-            Image(uiImage: preview).resizable().scaledToFit()
-              .frame(maxWidth: .infinity, maxHeight: 90)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
-          }
-          Text(status.paused ? "PAUSED · \(status.frame.hint.uppercased())" : status.frame.hint.uppercased())
-            .font(.headline).multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(status.frame.inFrame ? Color.green.opacity(0.35) : Color.red.opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
-          HStack {
-            VStack {
-              Text("\(status.reps)").font(.system(size: 34, weight: .bold, design: .rounded))
-              Text("reps").font(.caption2).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            VStack {
-              Text(elapsed).font(.system(size: 26, weight: .semibold, design: .rounded)).monospacedDigit()
-              Text(cameraLevel).font(.caption2).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-          }
-          if !status.exercise.isEmpty {
-            Text(status.exercise).font(.caption2).foregroundStyle(.secondary)
-          }
-          Button { phone.send(.switchCamera) } label: {
-            Label("Camera: \(cameraLevel)", systemImage: "arrow.triangle.2.circlepath.camera").frame(maxWidth: .infinity)
-          }
-          Button { phone.send(status.paused ? .resume : .pause) } label: {
-            Label(status.paused ? "Resume" : "Pause", systemImage: status.paused ? "play.fill" : "pause.fill").frame(maxWidth: .infinity)
-          }
-          .tint(status.paused ? .orange : nil)
-          Button { phone.send(.finish) } label: {
-            Label("Done", systemImage: "checkmark.circle.fill").frame(maxWidth: .infinity)
-          }
-          .tint(.green)
-          Button(role: .destructive) { phone.send(.cancel) } label: {
-            Label("Cancel", systemImage: "xmark.circle").frame(maxWidth: .infinity)
-          }
-          watchModeToggle
         } else {
           Image(systemName: "figure.strengthtraining.traditional").font(.largeTitle).foregroundStyle(.secondary)
           Text(phone.reachable ? "Phone ready" : "Open Exercise Analyzer on the phone")
@@ -91,9 +65,107 @@ struct WatchContentView: View {
       }
       .padding(.horizontal, 4)
     }
-    .onReceive(clock) { now = $0; if !phone.isLive { phone.ping() } }
-    .onAppear { phone.sceneActive(true) }  // also pings; the phone learns the app is in front even without a scene change
-    .onChange(of: scenePhase) { _, phase in phone.sceneActive(phase == .active) }
+  }
+
+  /// A set fills the watch: the picture edge to edge with the count, the time and the controls over it, and a
+  /// second page for everything a stray touch must not reach (story 042). Taps still go through `phone.send`.
+  private var recordingPages: some View {
+    TabView {
+      recordingPicturePage
+      recordingControlsPage
+    }
+    .tabViewStyle(.verticalPage)
+  }
+
+  /// Page one: the preview filling the screen, chips over its top corners, the hint bar and three round buttons
+  /// over its bottom edge. No picture yet: the same overlays on black.
+  private var recordingPicturePage: some View {
+    ZStack {
+      if let preview = phone.preview {
+        Image(uiImage: preview).resizable().scaledToFill()
+          .ignoresSafeArea()
+      } else {
+        Color.black.ignoresSafeArea()
+      }
+      VStack(spacing: 6) {
+        HStack {
+          Text("\(status.reps)")
+            .font(.system(size: 30, weight: .bold, design: .rounded))
+            .padding(.horizontal, 10).padding(.vertical, 2)
+            .background(.ultraThinMaterial, in: Capsule())
+          Spacer()
+          Text(elapsed).monospacedDigit()
+            .font(.system(size: 20, weight: .semibold, design: .rounded))
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(.ultraThinMaterial, in: Capsule())
+        }
+        .padding(.horizontal, 8)
+        Spacer()
+        Text(hintText)
+          .font(.caption).multilineTextAlignment(.center)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 6)
+          .background(status.frame.inFrame ? Color.green.opacity(0.5) : Color.red.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+          .padding(.horizontal, 8)
+        HStack(spacing: 16) {
+          Button { phone.send(status.paused ? .resume : .pause) } label: {
+            Image(systemName: status.paused ? "play.fill" : "pause.fill")
+              .font(.body)
+              .frame(width: 44, height: 44)
+              .background(status.paused ? Color.orange : Color.gray.opacity(0.5), in: Circle())
+              .foregroundStyle(.white)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(status.paused ? "Resume" : "Pause")
+          Button { phone.send(.switchCamera) } label: {
+            Text(cameraLevel)
+              .font(.caption.bold())
+              .minimumScaleFactor(0.5).lineLimit(1)
+              .frame(width: 44, height: 44)
+              .background(Color.gray.opacity(0.5), in: Circle())
+              .foregroundStyle(.white)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Camera: \(cameraLevel)")
+          Button { phone.send(.finish) } label: {
+            Image(systemName: "checkmark")
+              .font(.body.bold())
+              .frame(width: 44, height: 44)
+              .background(Color.green, in: Circle())
+              .foregroundStyle(.white)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Done")
+        }
+        .padding(.bottom, 2)
+      }
+    }
+  }
+
+  /// Page two (swipe up): the exercise, Cancel, the watch-mode toggle and the last error, in the list style.
+  private var recordingControlsPage: some View {
+    ScrollView {
+      VStack(spacing: 8) {
+        if !status.exercise.isEmpty {
+          Text(status.exercise).font(.caption2).foregroundStyle(.secondary)
+        }
+        Button(role: .destructive) { phone.send(.cancel) } label: {
+          Label("Cancel", systemImage: "xmark.circle").frame(maxWidth: .infinity)
+        }
+        watchModeToggle
+        if let error = phone.lastError {
+          Text(error).font(.caption2).foregroundStyle(.red).multilineTextAlignment(.center)
+        }
+      }
+      .padding(.horizontal, 4)
+    }
+  }
+
+  /// "PAUSED · FEET CUT OFF" when paused, "waiting for the picture" before the first preview arrives.
+  private var hintText: String {
+    guard phone.preview != nil else { return "waiting for the picture" }
+    let hint = status.frame.hint.uppercased()
+    return status.paused ? "PAUSED · \(hint)" : hint
   }
 
   /// Watch mode on the phone: big digits on its screen, everything driven from here. Only while recording: the

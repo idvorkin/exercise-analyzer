@@ -1347,7 +1347,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     // whole gate: the scene-active message was missed at launch and starved the preview (#38).
     if watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
       lastPreviewSent = Date()
-      if let small = FrameImage.thumbnail(from: pixelBuffer, longSide: 176),
+      // Long side 320 (about 15–25 KB a frame at quality 0.45): the watch shows the picture full-screen
+      // now, and the first watch_preview event's bytes must stay under 30 000, well under the 65 536
+      // WatchConnectivity message limit (#67, story 042).
+      if let small = FrameImage.thumbnail(from: pixelBuffer, longSide: 320),
         let jpeg = UIImage(cgImage: small).jpegData(compressionQuality: 0.45)
       {
         if !previewSentThisSet {
