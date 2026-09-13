@@ -53,10 +53,25 @@ final class FrameStatusTests: XCTestCase {
   }
 
   func testWatchStatusRoundTripsThroughJSON() throws {
-    let status = WatchStatus(
+    var status = WatchStatus(
       recording: true, frame: FrameStatus(personSeen: true, clippedEdges: [.bottom], coverage: 0.9), reps: 3,
       phase: "bottom", elapsed: 12.5, camera: "front", exercise: "Kettlebell Swing")
+    status.paused = true
     let data = try JSONEncoder().encode(status)
     XCTAssertEqual(try JSONDecoder().decode(WatchStatus.self, from: data), status)
+  }
+
+  func testWatchStatusDecodesWithoutNewKeys() throws {
+    // An old phone app sends only the seven original keys: the new fields fall back to their defaults (#67).
+    let json = """
+      {"recording":true,"frame":{"personSeen":true,"clippedEdges":[],"coverage":0.9},\
+      "reps":3,"phase":"bottom","elapsed":12.5,"camera":"front","exercise":"Kettlebell Swing"}
+      """
+    let status = try JSONDecoder().decode(WatchStatus.self, from: Data(json.utf8))
+    XCTAssertTrue(status.recording)
+    XCTAssertEqual(status.reps, 3)
+    XCTAssertFalse(status.paused)
+    XCTAssertTrue(status.phoneActive)
+    XCTAssertEqual(status.mode, "auto")
   }
 }

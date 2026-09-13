@@ -78,6 +78,8 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   /// False when the phone app is in the background: iOS then allows neither the camera nor coming to the front,
   /// so the watch shows what to do instead of a dead Record button.
   public var phoneActive: Bool
+  /// The set is paused from the phone or the watch: the clip, the count and the elapsed time are frozen (#67).
+  public var paused: Bool = false
 
   public init(
     recording: Bool, frame: FrameStatus, reps: Int, phase: String, elapsed: Double, camera: String, exercise: String,
@@ -94,7 +96,8 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case recording, frame, reps, phase, elapsed, camera, exercise, phoneActive, mode, zoom, zoomPresets, watchMode
+    case recording, frame, reps, phase, elapsed, camera, exercise, phoneActive, mode, zoom, zoomPresets, watchMode,
+      paused
   }
 
   public init(from decoder: Decoder) throws {
@@ -111,6 +114,7 @@ public struct WatchStatus: Codable, Equatable, Sendable {
     zoom = try c.decodeIfPresent(Double.self, forKey: .zoom) ?? 1
     zoomPresets = try c.decodeIfPresent([Double].self, forKey: .zoomPresets) ?? [1]
     watchMode = try c.decodeIfPresent(Bool.self, forKey: .watchMode) ?? false
+    paused = try c.decodeIfPresent(Bool.self, forKey: .paused) ?? false
   }
 
   public static let idle = WatchStatus(
@@ -120,6 +124,8 @@ public struct WatchStatus: Codable, Equatable, Sendable {
 
 public enum WatchCommand: String, Codable, CaseIterable, Sendable {
   case start, switchCamera, finish, cancel
+  /// Freeze the clip, the count and the elapsed time mid-set; resume carries on where the pause began (#67).
+  case pause, resume
   /// The watch asks for a fresh status (it treats anything older than a few seconds as stale).
   case status
   /// Pick the exercise (message carries "exercise": ExerciseKind raw value or "auto").
