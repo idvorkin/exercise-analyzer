@@ -9,6 +9,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 016:
 
 - **Summary:** Know from the wrist whether the camera can see me
+- **Status:** implemented in [96e6e19](https://github.com/idvorkin/exercise-analyzer/commit/96e6e19), [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [fead72e](https://github.com/idvorkin/exercise-analyzer/commit/fead72e); verified on phone + watch ([#21](https://github.com/idvorkin/exercise-analyzer/issues/21) tuned the rule)
 
 #### Use Case:
 - **As a** lifter standing across the room from the tripod
@@ -27,6 +28,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 017:
 
 - **Summary:** Start, switch camera and finish a set from the wrist
+- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe); verified on phone + watch, camera cycle verified from the log
 
 #### Use Case:
 - **As a** lifter who set the phone down across the room
@@ -45,6 +47,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 018:
 
 - **Summary:** The watch never lies about the phone
+- **Status:** implemented in [c5c2d13](https://github.com/idvorkin/exercise-analyzer/commit/c5c2d13), [6199d9d](https://github.com/idvorkin/exercise-analyzer/commit/6199d9d), [b6c5d43](https://github.com/idvorkin/exercise-analyzer/commit/b6c5d43); verified on phone + watch
 
 #### Use Case:
 - **As a** lifter glancing at the watch
@@ -64,6 +67,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 019:
 
 - **Summary:** The phone stays awake while the watch is in charge
+- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); needs a phone check
 
 #### Use Case:
 - **As a** lifter controlling sets from the watch
@@ -81,6 +85,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 023:
 
 - **Summary:** Get to the watch app with one tap on the face
+- **Status:** implemented in [c8762f7](https://github.com/idvorkin/exercise-analyzer/commit/c8762f7); needs a look at the watch face
 
 #### Use Case:
 - **As a** lifter between sets
@@ -98,6 +103,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 027:
 
 - **Summary:** Watch mode: the phone becomes a scoreboard while the wrist drives
+- **Status:** implemented in [78517b6](https://github.com/idvorkin/exercise-analyzer/commit/78517b6), [4eb5026](https://github.com/idvorkin/exercise-analyzer/commit/4eb5026), [934ccef](https://github.com/idvorkin/exercise-analyzer/commit/934ccef); needs phone + watch (recording only since #36)
 
 #### Use Case:
 - **As a** lifter who set the phone down and controls sets from the watch

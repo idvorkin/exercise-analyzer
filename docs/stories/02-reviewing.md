@@ -9,6 +9,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 005:
 
 - **Summary:** See the numbers over the video while it plays
+- **Status:** implemented in [2abe7f2](https://github.com/idvorkin/exercise-analyzer/commit/2abe7f2); verified by simulator screenshot and on the phone
 
 #### Use Case:
 - **As a** lifter reviewing a set
@@ -26,6 +27,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 006:
 
 - **Summary:** Line up the same moment of every rep to compare form
+- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone
 
 #### Use Case:
 - **As a** lifter looking for the rep where form slipped
@@ -43,6 +45,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 007:
 
 - **Summary:** Step by frame and by phase with targets big enough for the gym
+- **Status:** implemented in [564a753](https://github.com/idvorkin/exercise-analyzer/commit/564a753); verified by simulator screenshot; the scrubber follow-up [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) needs the phone
 
 #### Use Case:
 - **As a** lifter holding a phone with chalky hands
@@ -62,6 +65,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 008:
 
 - **Summary:** Fill the screen with me, not the gym
+- **Status:** implemented in [cda8d1e](https://github.com/idvorkin/exercise-analyzer/commit/cda8d1e), [e4c86d9](https://github.com/idvorkin/exercise-analyzer/commit/e4c86d9); verified on the phone (HDR)
 
 #### Use Case:
 - **As a** small figure in a wide tripod shot
@@ -79,6 +83,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 024:
 
 - **Summary:** Jump to a phase by tapping its name, and play or pause by tapping the picture
+- **Status:** implemented in [3abd301](https://github.com/idvorkin/exercise-analyzer/commit/3abd301); needs a phone check
 
 #### Use Case:
 - **As a** lifter comparing the same moment across reps
@@ -98,6 +103,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 030:
 
 - **Summary:** Move through a set from the edges of the picture, no chrome needed
+- **Status:** implemented in [04b1922](https://github.com/idvorkin/exercise-analyzer/commit/04b1922), [53e7a04](https://github.com/idvorkin/exercise-analyzer/commit/53e7a04); needs the phone (gestures)
 
 #### Use Case:
 - **As a** lifter scrubbing a rep with a thumb on each edge of the phone

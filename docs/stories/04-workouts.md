@@ -9,6 +9,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 012:
 
 - **Summary:** See a day's training as sets per exercise, not a list of files
+- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header needs the phone
 
 #### Use Case:
 - **As a** lifter reviewing the week
@@ -28,6 +29,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 013:
 
 - **Summary:** Re-analyzing a clip updates the set instead of duplicating it
+- **Status:** implemented in [ddd1d6f](https://github.com/idvorkin/exercise-analyzer/commit/ddd1d6f); verified on the simulator (same clip twice, one entry)
 
 #### Use Case:
 - **As a** lifter who opens the same clip twice
@@ -45,6 +47,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 014:
 
 - **Summary:** Surface the gym videos I haven't analyzed yet
+- **Status:** implemented in [f4da4a2](https://github.com/idvorkin/exercise-analyzer/commit/f4da4a2); needs the phone (the simulator cannot grant Photos)
 
 #### Use Case:
 - **As a** lifter who records first and reviews later
@@ -62,6 +65,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 015:
 
 - **Summary:** Old sets are re-read when the analyzer improves
+- **Status:** implemented in [d269b25](https://github.com/idvorkin/exercise-analyzer/commit/d269b25), [c92e8c6](https://github.com/idvorkin/exercise-analyzer/commit/c92e8c6); verified on the simulator (22 stale entries refreshed)
 
 #### Use Case:
 - **As a** lifter whose old sets were counted by an older analyzer
@@ -79,6 +83,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 031:
 
 - **Summary:** Open an old set whose clip now lives only in iCloud
+- **Status:** implemented in [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); needs the phone (an iCloud-only clip)
 
 #### Use Case:
 - **As a** lifter looking back at a set from months ago

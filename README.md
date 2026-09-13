@@ -4,7 +4,7 @@ Exercise form analysis for iPhone on top of the `UltralyticsYOLO` pose model: ke
 squats and Bulgarian split squats next. A native port of the analysis core and UX from
 [idvorkin/swing-analyzer](https://github.com/idvorkin/swing-analyzer).
 
-User stories with per-feature verification status: [docs/USER_STORIES.md](docs/USER_STORIES.md).
+User stories (Cohn + Gherkin, each with its implementation status and commits): [docs/stories/](docs/stories/README.md).
 
 ## Screenshots
 

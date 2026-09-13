@@ -9,6 +9,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 009:
 
 - **Summary:** Keep only the set, losslessly and fast
+- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (passthrough, first frame at 0); an HDR clip on the phone is pending
 
 #### Use Case:
 - **As a** lifter who leaves the camera running while setting up
@@ -28,6 +29,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 010:
 
 - **Summary:** Open old clips from Photos with nothing copied
+- **Status:** implemented in [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a); verified on the phone
 
 #### Use Case:
 - **As a** lifter with months of sets in Photos
@@ -45,6 +47,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 011:
 
 - **Summary:** Save the trimmed set to Photos, clean, in place of the original
+- **Status:** implemented in [2376b1b](https://github.com/idvorkin/exercise-analyzer/commit/2376b1b); verified on the phone
 
 #### Use Case:
 - **As a** lifter who keeps sets to compare over months
@@ -64,6 +67,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 025:
 
 - **Summary:** Start from a centred panel; Open as a sheet with big rows, most-used first
+- **Status:** implemented in [5fead59](https://github.com/idvorkin/exercise-analyzer/commit/5fead59), [387e252](https://github.com/idvorkin/exercise-analyzer/commit/387e252), [4059301](https://github.com/idvorkin/exercise-analyzer/commit/4059301); needs a phone check
 
 #### Use Case:
 - **As a** lifter opening a clip with sweaty hands
@@ -83,6 +87,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 028:
 
 - **Summary:** Stop an analysis I didn't mean to start
+- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb); verified on the simulator (cancel hook)
 
 #### Use Case:
 - **As a** lifter who opened the wrong clip, or a long one

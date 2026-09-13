@@ -9,6 +9,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 001:
 
 - **Summary:** Record a set and get a trusted rep count without touching the phone afterwards
+- **Status:** implemented in [0517562](https://github.com/idvorkin/exercise-analyzer/commit/0517562), [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529); verified on the phone (daily use)
 
 #### Use Case:
 - **As a** solo lifter with the phone on a tripod
@@ -27,6 +28,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 002:
 
 - **Summary:** Auto-detect the exercise so a mixed session needs no menu taps
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [8bc27b5](https://github.com/idvorkin/exercise-analyzer/commit/8bc27b5); verified by host fixtures for all four exercises and on the phone
 
 #### Use Case:
 - **As a** lifter who moves between swings, pistols, split squats and get-ups in one session
@@ -45,6 +47,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 003:
 
 - **Summary:** Override the detector when it guesses wrong, without re-running the video
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f); verified on the phone
 
 #### Use Case:
 - **As a** lifter whose set was mislabelled
@@ -63,6 +66,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 004:
 
 - **Summary:** Count the swings that are swings, not the walk-in, the setup or the bell park
+- **Status:** implemented in [6b74a93](https://github.com/idvorkin/exercise-analyzer/commit/6b74a93), [4344155](https://github.com/idvorkin/exercise-analyzer/commit/4344155), [f3e7955](https://github.com/idvorkin/exercise-analyzer/commit/f3e7955); verified by host fixtures (walk-in, pick-up, low camera)
 
 #### Use Case:
 - **As a** lifter who picks the bell up on camera and puts it down on camera
@@ -81,6 +85,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 020:
 
 - **Summary:** Turning the phone turns the picture, even mid-set
+- **Status:** implemented in [99a8525](https://github.com/idvorkin/exercise-analyzer/commit/99a8525); needs a phone check ([#22](https://github.com/idvorkin/exercise-analyzer/issues/22))
 
 #### Use Case:
 - **As a** lifter who reframes from portrait to landscape after starting
@@ -98,6 +103,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 021:
 
 - **Summary:** Music keeps playing, whatever the app does
+- **Status:** implemented in [4807cb2](https://github.com/idvorkin/exercise-analyzer/commit/4807cb2); verified on the phone
 
 #### Use Case:
 - **As a** lifter training to a playlist
@@ -115,6 +121,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 029:
 
 - **Summary:** Throw away a false start
+- **Status:** implemented in [2eaa003](https://github.com/idvorkin/exercise-analyzer/commit/2eaa003); needs the phone (recording)
 
 #### Use Case:
 - **As a** lifter whose recording caught nothing (camera pointed wrong, set never happened)

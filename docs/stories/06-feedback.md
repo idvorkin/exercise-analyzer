@@ -9,6 +9,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 022:
 
 - **Summary:** Report a problem in five seconds with the evidence attached
+- **Status:** implemented in [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [d92c62f](https://github.com/idvorkin/exercise-analyzer/commit/d92c62f); verified on the phone (every issue from #25 on came through it)
 
 #### Use Case:
 - **As a** lifter who just saw a wrong count
@@ -26,6 +27,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 026:
 
 - **Summary:** Attach what I was looking at to a bug report
+- **Status:** not implemented ([#24](https://github.com/idvorkin/exercise-analyzer/issues/24))
 
 #### Use Case:
 - **As a** lifter reporting a wrong count or a display glitch
