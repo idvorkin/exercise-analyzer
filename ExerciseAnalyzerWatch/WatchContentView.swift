@@ -65,6 +65,7 @@ struct WatchContentView: View {
           Button(role: .destructive) { phone.send(.cancel) } label: {
             Label("Cancel", systemImage: "xmark.circle").frame(maxWidth: .infinity)
           }
+          watchModeToggle
         } else {
           Image(systemName: "figure.strengthtraining.traditional").font(.largeTitle).foregroundStyle(.secondary)
           Text(phone.reachable ? "Phone ready" : "Open Exercise Analyzer on the phone")
@@ -75,6 +76,7 @@ struct WatchContentView: View {
           .tint(.red)
           .disabled(!phone.reachable)
           exercisePicker
+          watchModeToggle
         }
         if let error = phone.lastError {
           Text(error).font(.caption2).foregroundStyle(.red).multilineTextAlignment(.center)
@@ -84,6 +86,15 @@ struct WatchContentView: View {
     }
     .onReceive(clock) { now = $0; if !phone.isLive { phone.ping() } }
     .onAppear { phone.ping() }
+  }
+
+  /// Watch mode on the phone: big digits on its screen, everything driven from here.
+  private var watchModeToggle: some View {
+    Button { phone.send(.watchMode) } label: {
+      Label(status.watchMode ? "Phone: watch mode on" : "Phone: watch mode", systemImage: status.watchMode ? "iphone.gen3.radiowaves.left.and.right" : "iphone.gen3")
+        .frame(maxWidth: .infinity)
+    }
+    .tint(status.watchMode ? .blue : nil)
   }
 
   /// Auto or a specific exercise; the phone re-analyzes and reports back through `mode`.

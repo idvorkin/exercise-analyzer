@@ -35,6 +35,14 @@ struct ContentView: View {
   private var busy: Bool { session.activity != .idle && session.source != .camera }
 
   var body: some View {
+    if session.watchMode {
+      WatchModeView(session: session)
+    } else {
+      mainBody
+    }
+  }
+
+  private var mainBody: some View {
     VStack(spacing: 0) {
       ZStack {
         Color.black
@@ -183,6 +191,12 @@ struct ContentView: View {
         }
         Spacer()
         Text(String(format: "%.0f fps", session.fps)).font(.caption2).monospacedDigit().opacity(0.7)
+        Button {
+          session.setWatchMode(true, from: "phone")
+        } label: {
+          Image(systemName: "applewatch").font(.title3)
+        }
+        .accessibilityLabel("Watch mode: big digits on the phone, control from the wrist")
         Button {
           meView.toggle()
         } label: {

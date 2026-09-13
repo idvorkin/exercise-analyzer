@@ -73,6 +73,8 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   /// Current camera zoom (0.5, 1, 2) and the presets the camera offers.
   public var zoom: Double = 1
   public var zoomPresets: [Double] = [1]
+  /// The phone is in watch mode (big-digits screen, controlled from the wrist).
+  public var watchMode: Bool = false
   /// False when the phone app is in the background: iOS then allows neither the camera nor coming to the front,
   /// so the watch shows what to do instead of a dead Record button.
   public var phoneActive: Bool
@@ -92,7 +94,7 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case recording, frame, reps, phase, elapsed, camera, exercise, phoneActive, mode, zoom, zoomPresets
+    case recording, frame, reps, phase, elapsed, camera, exercise, phoneActive, mode, zoom, zoomPresets, watchMode
   }
 
   public init(from decoder: Decoder) throws {
@@ -108,6 +110,7 @@ public struct WatchStatus: Codable, Equatable, Sendable {
     mode = try c.decodeIfPresent(String.self, forKey: .mode) ?? "auto"
     zoom = try c.decodeIfPresent(Double.self, forKey: .zoom) ?? 1
     zoomPresets = try c.decodeIfPresent([Double].self, forKey: .zoomPresets) ?? [1]
+    watchMode = try c.decodeIfPresent(Bool.self, forKey: .watchMode) ?? false
   }
 
   public static let idle = WatchStatus(
@@ -123,4 +126,6 @@ public enum WatchCommand: String, Codable, CaseIterable, Sendable {
   case exercise
   /// Step to the next zoom preset on the current camera.
   case zoom
+  /// Toggle watch mode: the phone shows a big-digits screen meant to be read from across the room.
+  case watchMode
 }

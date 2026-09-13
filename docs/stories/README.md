@@ -11,7 +11,7 @@ question per story is [../USER_STORIES.md](../USER_STORIES.md).
 | [Reviewing a set](02-reviewing.md) | 005, 006, 007, 008, 024 | Seeing what the camera measured and finding the rep where form slipped. |
 | [Clips and Photos](03-clips.md) | 009, 010, 011, 025 | Trimming, opening and saving video without copies or quality loss. |
 | [Workouts](04-workouts.md) | 012, 013, 014, 015 | Training as sets per day and exercise, kept honest over time. |
-| [From the wrist](05-watch.md) | 016, 017, 018, 019, 023 | Running a session from the Apple Watch with the phone on a tripod. |
+| [From the wrist](05-watch.md) | 016, 017, 018, 019, 023, 027 | Running a session from the Apple Watch with the phone on a tripod. |
 | [Reporting problems](06-feedback.md) | 022, 026 | Getting a wrong count in front of the developer with the evidence attached. |
 
 ## Status
@@ -45,3 +45,4 @@ Built and where each story was verified (host tests, simulator, or phone).
 | 024 Phase pills and tap to play | yes | needs phone check |
 | 025 Open sheet | yes | needs phone check |
 | 026 Screenshot in reports | no | not built |
+| 027 Watch mode | yes | simulator screenshot (idle); recording view needs the phone |

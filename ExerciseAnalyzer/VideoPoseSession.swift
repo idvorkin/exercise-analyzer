@@ -56,6 +56,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var cameraPreviewLayer: AVCaptureVideoPreviewLayer?
   @Published private(set) var cameraPosition: AVCaptureDevice.Position = .back
   @Published private(set) var cameraZoom: Double = 1
+  /// Watch mode: the phone shows big digits readable from across the room and is driven from the wrist.
+  @Published private(set) var watchMode = UserDefaults.standard.bool(forKey: "watchMode")
   /// Whether the athlete is inside the picture (live camera only); mirrored to the watch.
   @Published private(set) var frameStatus = FrameStatus(box: nil, pose: nil)
   let watch = WatchBridge()
@@ -797,7 +799,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// a backgrounded app), so while the app is open and a watch is connected the phone does not auto-lock.
   private func updateKeepAwake() {
     let active = UIApplication.shared.applicationState == .active
-    let wanted = active && (source == .camera || watch.reachable)
+    let wanted = active && (source == .camera || watch.reachable || watchMode)
     guard wanted != keepAwake else { return }
     keepAwake = wanted
     UIApplication.shared.isIdleTimerDisabled = wanted
@@ -816,6 +818,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     status.mode = exerciseMode.storageValue
     status.zoom = camera?.zoom ?? 1
     status.zoomPresets = camera?.zoomPresets ?? [1]
+    status.watchMode = watchMode
     watch.send(status, force: force || heartbeat)
   }
 
@@ -838,6 +841,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     case .cancel: if source == .camera { cancelCamera() }
     case .status: pushWatchStatus(force: true)
     case .zoom: cycleCameraLevel()
+    case .watchMode: setWatchMode(!watchMode, from: "watch")
     case .exercise: break  // carries a payload; handled by onExercise
     }
   }
@@ -984,6 +988,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
         recordedSegments.append(url)
       }
     }
+  }
+
+  func setWatchMode(_ on: Bool, from origin: String) {
+    guard on != watchMode else { return }
+    watchMode = on
+    UserDefaults.standard.set(on, forKey: "watchMode")
+    log.event("watch_mode", ["on": on, "from": origin])
+    updateKeepAwake()
+    pushWatchStatus(force: true)
   }
 
   /// One control for the three views that matter at the gym: front → back 0.5× → back 1× → front.

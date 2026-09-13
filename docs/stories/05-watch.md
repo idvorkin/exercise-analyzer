@@ -90,3 +90,24 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** the Exercise Analyzer complication is on my watch face
 - **When:** I tap it
 - **Then:** the watch app opens showing the live status or the Record button
+
+---
+
+### User Story 027:
+
+- **Summary:** Watch mode: the phone becomes a scoreboard while the wrist drives
+
+#### Use Case:
+- **As a** lifter who set the phone down and controls sets from the watch
+- **I want to** put the phone into watch mode, where its screen shows only what I can read from across the room
+- **so that** I see my rep count and whether I am in frame at a glance, without the full app in the way
+
+#### Acceptance Criteria:
+- **Scenario:** A set in watch mode
+- **Given:** the phone is in watch mode (toggled from the phone or the watch)
+- **and Given:** a set is being recorded
+- **When:** I glance at the phone from across the room
+- **Then:** it shows the rep count in digits that fill the screen, a red "feet cut off" style banner when I am out of frame, the elapsed time and the exercise, and only a long press leaves the mode
+
+- **Issues:** [#29](https://github.com/idvorkin/exercise-analyzer/issues/29)
+
