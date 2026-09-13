@@ -77,7 +77,7 @@ public struct GenericRepCounter {
     }
     let intervals = cycles(times: winner.times, values: winner.values, period: winner.period, thresholds: thresholds)
     let span = (winner.times.last ?? 0) - (winner.times.first ?? 0)
-    let coverage = span > 0 ? min(1, intervals.reduce(0) { $0 + ($1.end - $1.start) } / span) : 0
+    let coverage = span > 0 ? min(1, intervals.reduce(0.0) { $0 + ($1.end - $1.start) } / span) : 0
     let confidence = Int((100 * winner.strength * (0.4 + 0.6 * coverage)).rounded())
     return Result(
       count: intervals.count, intervals: intervals, signal: winner.signal, confidence: confidence,
