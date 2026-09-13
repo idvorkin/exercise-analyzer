@@ -15,6 +15,8 @@ final class PhoneLink: NSObject, ObservableObject {
   @Published private(set) var receivedAt: Date?
   /// Latest preview frame from the phone (about 1 fps while recording).
   @Published private(set) var preview: UIImage?
+  /// Rest since the last set ended; driven by recording transitions below, cleared on Record.
+  let rest: RestTimer
 
   /// Status older than this is stale: the phone app may be gone without having sent an idle status.
   static let maxStatusAge: TimeInterval = 8
@@ -34,6 +36,7 @@ final class PhoneLink: NSObject, ObservableObject {
 
   override init() {
     super.init()
+    rest = RestTimer { [weak self] type, fields in self?.logEvent(type, fields) }
     guard WCSession.isSupported() else { return }
     WCSession.default.delegate = self
     WCSession.default.activate()
@@ -60,6 +63,7 @@ final class PhoneLink: NSObject, ObservableObject {
     let session = WCSession.default
     logEvent("command", ["command": command.rawValue, "reachable": session.isReachable, "activation": session.activationState.rawValue, "live": isLive])
     guard session.activationState == .activated else { return }
+    if command == .start { rest.clear() }  // Record clears the count (story 046)
     if command != .status { WKInterfaceDevice.current().play(.click) }
     session.sendMessage(["command": command.rawValue], replyHandler: { [weak self] reply in
       Task { @MainActor in self?.logEvent("command_reply", ["command": command.rawValue, "reply": "\(reply)"]) }
@@ -87,6 +91,11 @@ final class PhoneLink: NSObject, ObservableObject {
     if next.recording {
       if previous.frame.inFrame && !next.frame.inFrame { WKInterfaceDevice.current().play(.notification) }
       if next.reps > previous.reps { WKInterfaceDevice.current().play(.success) }
+    }
+    if previous.recording, !next.recording, isLive {
+      rest.setEnded()
+    } else if next.recording, !previous.recording {
+      rest.clear()
     }
   }
 }
