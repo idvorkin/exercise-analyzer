@@ -50,6 +50,8 @@ public final class AnalysisPipeline: @unchecked Sendable {
   /// Analyzes a whole extracted track (offline pass output or a Recents track) as `exercise`.
   public static func analyze(frames: [FrameRecord], exercise: ExerciseKind) -> AnalysisPipeline {
     let pipeline = AnalysisPipeline(exercise: exercise)
+    // The whole track is known: bells that sit in one place for much of it are furniture, never the one in play.
+    pipeline.bellTracker.staticZones = BellTracker.staticZones(in: frames)
     for frame in frames { pipeline.process(extracted: frame) { nil } }
     return pipeline
   }

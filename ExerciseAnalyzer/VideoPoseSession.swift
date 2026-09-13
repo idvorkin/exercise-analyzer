@@ -494,8 +494,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   private func analyzeAndPlay(url: URL) async {
+    // A set opened in the first second after launch (a Recents tap, the reopen hook) arrives before the model has
+    // loaded; wait for it rather than abandoning the pass with "Model not ready" (#45).
+    var waited = 0
+    while predictor == nil, waited < 100 {
+      try? await Task.sleep(for: .milliseconds(100))
+      waited += 1
+    }
     guard let predictor else {
       statusMessage = "Model not ready"
+      log.event("error", ["where": "offline_pass", "message": "model not loaded after 10 s"])
       return
     }
     installPlayerItem(url: url, pipeline: AnalysisPipeline(exercise: exercise))
@@ -503,7 +511,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
     activity = .working("Analyzing", progress: 0)
     await waitForPlans()
     canCancelAnalysis = true
-    defer { canCancelAnalysis = false; analysisTask = nil }
+    defer {
+      canCancelAnalysis = false
+      analysisTask = nil
+      updateKeepAwake()
+    }
     let task = Task { [weak self] in
       guard let self else { return }
       do {
@@ -512,9 +524,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
           progress: { [weak self] fraction in
             Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
           },
-          heartbeat: { [weak self] frames, footprint, available in
-            // Memory every two seconds of clip: a pass that dies without a signal was killed for memory (#43).
-            self?.log.event("offline_progress", ["frames": frames, "footprint_mb": footprint, "available_mb": available])
+          heartbeat: { [weak self] h in
+            // Every 60 frames: memory (a pass that dies without a signal was killed for memory, #43) and the last
+            // window's per-frame cost of each model, decoding, and the frame rate.
+            self?.log.event(
+              "offline_progress",
+              [
+                "frames": h.frames, "footprint_mb": h.footprintMB, "available_mb": h.availableMB,
+                "pose_ms": h.poseMs, "bell_ms": h.bellMs, "decode_ms": h.decodeMs, "fps": h.fps,
+              ])
           })
         try Task.checkCancellation()
         await self.finishAnalysis(url: url, frames: frames, summary: summary)
@@ -530,6 +548,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
     }
     analysisTask = task
+    updateKeepAwake()
     // Test hook: SWING_CANCEL_ANALYSIS=1 cancels one second in (simulator runs can't tap the UI).
     if ProcessInfo.processInfo.environment["SWING_CANCEL_ANALYSIS"] == "1" {
       Task { try? await Task.sleep(for: .seconds(1)); self.cancelAnalysis() }
@@ -979,7 +998,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// a backgrounded app), so while the app is open and a watch is connected the phone does not auto-lock.
   private func updateKeepAwake() {
     let active = UIApplication.shared.applicationState == .active
-    let wanted = active && (source == .camera || watch.reachable || watchMode)
+    // An offline pass on a two-minute clip outlasts auto-lock; a locked phone backgrounds the app and AVFoundation
+    // interrupts the reader ("Operation Interrupted" at 43 s, #46), so the pass keeps the screen on too.
+    let wanted = active && (source == .camera || watch.reachable || watchMode || analysisTask != nil)
     guard wanted != keepAwake else { return }
     keepAwake = wanted
     UIApplication.shared.isIdleTimerDisabled = wanted

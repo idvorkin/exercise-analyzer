@@ -62,6 +62,32 @@ final class BellTests: XCTestCase {
     XCTAssertEqual(started?.center.x ?? 0, 0.46, accuracy: 0.001)
   }
 
+  func testStaticZonesFromTheWholeClipAreFurnitureFromFrameOne() {
+    // A rack bell sits at (0.9, 0.9) in 70 % of the clip's frames; the bell in play is elsewhere. (A swung bell's
+    // apex reaches about a quarter of the frames, which is why the share is 60 %.)
+    let rack = bell(0.9, 0.9, conf: 0.95)
+    let frames = (0..<100).map { i in
+      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: nil, box: nil, analysis: nil,
+        bells: i % 10 < 7 ? [rack] : [])
+    }
+    let zones = BellTracker.staticZones(in: frames)
+    XCTAssertEqual(zones.count, 1)
+    let tracker = BellTracker()
+    tracker.staticZones = zones
+    // First frame of the analysis, hands right at the rack bell: still not the one in play.
+    XCTAssertNil(tracker.track([rack], pose: pose(wrist: CGPoint(x: 0.9, y: 0.9))))
+  }
+
+  func testFollowingRejectsAVividlyDifferentColour() {
+    let tracker = BellTracker()
+    let red = BellSighting(box: CGRect(x: 0.47, y: 0.57, width: 0.06, height: 0.06), conf: 0.9, color: [0.9, 0.1, 0.1])
+    _ = tracker.track([red], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
+    let blue = BellSighting(box: CGRect(x: 0.49, y: 0.55, width: 0.06, height: 0.06), conf: 0.9, color: [0.1, 0.2, 0.9])
+    XCTAssertNil(tracker.track([blue], pose: pose(wrist: CGPoint(x: 0.52, y: 0.58))), "a blue bell is not the red one")
+    let darkRed = BellSighting(box: CGRect(x: 0.49, y: 0.55, width: 0.06, height: 0.06), conf: 0.5, color: [0.5, 0.1, 0.1])
+    XCTAssertNotNil(tracker.track([darkRed], pose: pose(wrist: CGPoint(x: 0.52, y: 0.58))), "the same red, darker")
+  }
+
   func testDropsTheTrackAfterEnoughUnseenFrames() {
     var thresholds = BellTracker.Thresholds()
     thresholds.lostAfter = 2

@@ -33,6 +33,19 @@ enum OfflineAnalyzer {
     func on(inferenceTime: Double, fpsRate: Double) {}
   }
 
+  /// What the pass reports every 60 frames: memory, and the last 60 frames' timing (Igor: how long each model
+  /// takes per frame, and the frame rate, while it runs).
+  struct Heartbeat {
+    let frames: Int
+    let footprintMB: Double
+    let availableMB: Double
+    /// Mean per frame over the last window, ms.
+    let poseMs: Double
+    let bellMs: Double
+    let decodeMs: Double
+    let fps: Double
+  }
+
   /// Resident memory of the process in MB (phys_footprint, what Jetsam judges) and what iOS still allows.
   static func memoryMB() -> (footprint: Double, available: Double) {
     var info = task_vm_info_data_t()
@@ -46,7 +59,7 @@ enum OfflineAnalyzer {
 
   static func extract(
     url: URL, predictor: BasePredictor, bellDetector: BellDetector? = nil, progress: @escaping @Sendable (Double) -> Void,
-    heartbeat: (@Sendable (Int, Double, Double) -> Void)? = nil
+    heartbeat: (@Sendable (Heartbeat) -> Void)? = nil
   ) async throws -> ([FrameRecord], Summary) {
     let asset = AVURLAsset(url: url)
     guard let track = try await asset.loadTracks(withMediaType: .video).first else {
@@ -76,6 +89,9 @@ enum OfflineAnalyzer {
       var bellTotal = 0.0
       var bellFrames = 0
       var lastProgress = 0.0
+      // Rolling window for the heartbeat: sums over the last 60 frames, and when that window started.
+      var windowPose = 0.0, windowBell = 0.0, windowDecode = 0.0, windowStart = CACurrentMediaTime()
+      var frameStart = CACurrentMediaTime()
 
       while let sampleBuffer = output.copyNextSampleBuffer() {
         if Task.isCancelled {
@@ -83,20 +99,40 @@ enum OfflineAnalyzer {
           throw OfflineError.cancelled
         }
         let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
-        catcher.result = nil
-        predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: catcher)
-        guard let result = catcher.result else { continue }
-        var frame = FrameRecord(result: result, time: time)
-        if let bellDetector, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
-          let bells = bellDetector.detect(in: pixelBuffer)
-          bellTotal += bellDetector.lastInferenceMs
-          bellFrames += 1
-          frame = FrameRecord(time: frame.time, imageSize: frame.imageSize, pose: frame.pose, box: frame.box, analysis: nil, bells: bells)
+        // Both models' per-frame results are autoreleased; this loop runs for thousands of frames on a background
+        // thread, so drain the pool every frame or the footprint grows until iOS kills the pass (#43).
+        let decoded = CACurrentMediaTime()
+        windowDecode += (decoded - frameStart) * 1000
+        let (result, frame): (YOLOResult?, FrameRecord?) = autoreleasepool {
+          catcher.result = nil
+          predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: catcher)
+          guard let result = catcher.result else { return (nil, nil) }
+          var frame = FrameRecord(result: result, time: time)
+          if let bellDetector, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            let bells = bellDetector.detect(in: pixelBuffer)
+            bellTotal += bellDetector.lastInferenceMs
+            windowBell += bellDetector.lastInferenceMs
+            bellFrames += 1
+            frame = FrameRecord(time: frame.time, imageSize: frame.imageSize, pose: frame.pose, box: frame.box, analysis: nil, bells: bells)
+          }
+          return (result, frame)
         }
+        frameStart = CACurrentMediaTime()
+        guard let result, let frame else { continue }
         frames.append(frame)
-        if frames.count % 60 == 1, let heartbeat {
+        windowPose += result.inferenceMs
+        if frames.count % 60 == 0, let heartbeat {
           let memory = memoryMB()
-          heartbeat(frames.count, memory.footprint, memory.available)
+          let seconds = CACurrentMediaTime() - windowStart
+          heartbeat(
+            Heartbeat(
+              frames: frames.count, footprintMB: memory.footprint, availableMB: memory.available,
+              poseMs: windowPose / 60, bellMs: windowBell / 60, decodeMs: windowDecode / 60,
+              fps: seconds > 0 ? 60 / seconds : 0))
+          windowPose = 0
+          windowBell = 0
+          windowDecode = 0
+          windowStart = CACurrentMediaTime()
         }
         inferenceTotal += result.inferenceMs
         if duration > 0, time - lastProgress > 0.5 {

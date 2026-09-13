@@ -598,9 +598,13 @@ struct ContentView: View {
       }
     }
     if env["SWING_SHOW_WORKOUTS"] == "1" { showRecents = true }
-    if env["SWING_OPEN_RECENT"] == "1", let newest = session.recents.entries.first {
-      session.open(recent: newest)  // test hook: reopen the newest Recents entry
-      return
+    if let wanted = env["SWING_OPEN_RECENT"], !wanted.isEmpty {
+      // Test hook: reopen a Recents entry, the newest for "1" or the one with this id (a long clip for a memory run).
+      let entry = wanted == "1" ? session.recents.entries.first : session.recents.entries.first { $0.id == wanted }
+      if let entry {
+        session.open(recent: entry)
+        return
+      }
     }
     guard let path = env["SWING_VIDEO"], !path.isEmpty else { return }
     session.load(url: URL(fileURLWithPath: path))

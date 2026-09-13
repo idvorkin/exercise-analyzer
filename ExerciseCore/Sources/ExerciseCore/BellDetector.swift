@@ -68,22 +68,27 @@
     public func detect(in pixelBuffer: CVPixelBuffer) -> [BellSighting] {
       let started = Date()
       defer { lastInferenceMs = Date().timeIntervalSince(started) * 1000 }
-      let request = VNCoreMLRequest(model: model)
-      request.imageCropAndScaleOption = .scaleFit
-      guard (try? VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:]).perform([request])) != nil else { return [] }
-      let size = CGSize(width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
-      guard let letterbox = Letterbox(inputSize: size, model: inputSize) else { return [] }
-      let tensors = (request.results ?? []).compactMap { ($0 as? VNCoreMLFeatureValueObservation)?.featureValue.multiArrayValue }
-      // Row-major end-to-end output [1, max_det, 6+] or the dense one-to-many head [1, channels, anchors]; the
-      // mask prototype tensor [1, 32, 160, 160] is neither.
-      guard let tensor = tensors.first(where: { $0.shape.count == 3 }) else { return [] }
-      let shape = tensor.shape.map { $0.intValue }
-      let parsed = shape[2] > shape[1] * 4
-        ? Self.parseDense(tensor, letterbox: letterbox, minConfidence: minConfidence)
-        : Self.parse(tensor, letterbox: letterbox, minConfidence: minConfidence)
-      let boxes = Self.suppressOverlaps(parsed)
-      return boxes.prefix(maxSightings).map { conf, box in
-        BellSighting(box: box, conf: conf, color: samplesColor ? BellColorSampler.averageColor(in: pixelBuffer, box: box) : nil)
+      // Vision's observations and the output tensors (a 37 × 8400 and a 32 × 160 × 160 per frame) are autoreleased;
+      // a background loop over thousands of frames never drains its pool on its own, and the footprint grew
+      // ~1.4 MB a frame on the phone until the memory limit (#43). Drain per call.
+      return autoreleasepool {
+        let request = VNCoreMLRequest(model: model)
+        request.imageCropAndScaleOption = .scaleFit
+        guard (try? VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:]).perform([request])) != nil else { return [] }
+        let size = CGSize(width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
+        guard let letterbox = Letterbox(inputSize: size, model: inputSize) else { return [] }
+        let tensors = (request.results ?? []).compactMap { ($0 as? VNCoreMLFeatureValueObservation)?.featureValue.multiArrayValue }
+        // Row-major end-to-end output [1, max_det, 6+] or the dense one-to-many head [1, channels, anchors]; the
+        // mask prototype tensor [1, 32, 160, 160] is neither.
+        guard let tensor = tensors.first(where: { $0.shape.count == 3 }) else { return [] }
+        let shape = tensor.shape.map { $0.intValue }
+        let parsed = shape[2] > shape[1] * 4
+          ? Self.parseDense(tensor, letterbox: letterbox, minConfidence: minConfidence)
+          : Self.parse(tensor, letterbox: letterbox, minConfidence: minConfidence)
+        let boxes = Self.suppressOverlaps(parsed)
+        return boxes.prefix(maxSightings).map { conf, box in
+          BellSighting(box: box, conf: conf, color: samplesColor ? BellColorSampler.averageColor(in: pixelBuffer, box: box) : nil)
+        }
       }
     }
 

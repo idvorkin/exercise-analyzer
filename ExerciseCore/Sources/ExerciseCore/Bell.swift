@@ -49,8 +49,13 @@ public final class BellTracker {
   private let thresholds: Thresholds
   private var current: BellSighting?
   private var missed = 0
+  /// The bell just lost and how many frames ago, so a restart within a second keeps its colour.
+  private var lastLost: (bell: BellSighting, frames: Int)?
   /// Where bells have been sitting still, and for how many consecutive frames.
   private var resting: [(center: CGPoint, frames: Int)] = []
+  /// Grid cells where a bell sits for much of the clip (rack, floor), known ahead of an offline analysis; a
+  /// sighting there is furniture, never the bell in play (Igor: only a bell that moves is interesting).
+  public var staticZones: Set<Int> = []
 
   public init(thresholds: Thresholds = Thresholds()) {
     self.thresholds = thresholds
@@ -59,22 +64,51 @@ public final class BellTracker {
   public func reset() {
     current = nil
     missed = 0
+    lastLost = nil
     resting = []
+  }
+
+  /// Cells of a `cell`-sized grid that hold a sighting in at least `share` of `frames`: where bells rest for the
+  /// clip. Computed over the whole track before an offline analysis; a live pass relies on the running rest count.
+  public static func staticZones(in frames: [FrameRecord], cell: Double = 0.02, share: Double = 0.6) -> Set<Int> {
+    // 0.6, not lower: a swung bell floats at the same apex every rep and reached 0.24 of a 4-rep clip's frames.
+    guard !frames.isEmpty else { return [] }
+    var counts: [Int: Int] = [:]
+    for frame in frames {
+      for key in Set(frame.bells.map { gridKey($0.center, cell: cell) }) { counts[key, default: 0] += 1 }
+    }
+    let needed = Int(Double(frames.count) * share)
+    return Set(counts.filter { $0.value >= needed }.keys)
+  }
+
+  static func gridKey(_ p: CGPoint, cell: Double) -> Int {
+    Int(Double(p.x) / cell) * 4096 + Int(Double(p.y) / cell)
+  }
+
+  /// True when both colours are known and vivid and their hues differ by more than a quarter turn: not the same
+  /// bell (a rack of coloured competition bells beside one in play).
+  static func colorsDiffer(_ a: BellSighting, _ b: BellSighting) -> Bool {
+    guard let ca = a.color, let cb = b.color, let ha = BellColor.hsv(ca), let hb = BellColor.hsv(cb),
+      ha.s >= 0.35, hb.s >= 0.35, ha.v >= 0.2, hb.v >= 0.2
+    else { return false }
+    let d = abs(ha.h - hb.h).truncatingRemainder(dividingBy: 360)
+    return min(d, 360 - d) > 60  // gym light swings a dark red bell between orange and yellow readings
   }
 
   /// The bell in play this frame, or nil when none is (or the tracked one is briefly unseen).
   public func track(_ sightings: [BellSighting], pose: Pose?) -> BellSighting? {
-    let still = updateResting(with: sightings)
+    let resting = updateResting(with: sightings)
+    let still = sightings.filter { resting.contains($0) || staticZones.contains(Self.gridKey($0.center, cell: 0.02)) }
     let wrists = Self.wrists(of: pose)
     func nearAHand(_ s: BellSighting) -> Bool {
       wrists.isEmpty || wrists.contains { Self.distance(s.center, $0) <= thresholds.handDistance }
     }
     if let last = current {
-      // Follow the nearest moving box in reach that is still at a hand; a bell at rest is never followed, so at the
-      // bottom of a hinge the track stays with the swung bell and not the floor bell beside it.
+      // Follow the nearest moving box in reach that is still at a hand and the same colour; a bell at rest is
+      // never followed, so at the bottom of a hinge the track stays with the swung bell and not the floor bell.
       let followed = sightings
         .filter {
-          $0.conf >= thresholds.followConf && !still.contains($0) && nearAHand($0)
+          $0.conf >= thresholds.followConf && !still.contains($0) && nearAHand($0) && !Self.colorsDiffer($0, last)
             && Self.distance($0.center, last.center) <= thresholds.followDistance
         }
         .min { Self.distance($0.center, last.center) < Self.distance($1.center, last.center) }
@@ -84,17 +118,27 @@ public final class BellTracker {
         return followed
       }
       missed += 1
-      if missed > thresholds.lostAfter { current = nil }
+      if missed > thresholds.lostAfter {
+        lastLost = (last, 0)
+        current = nil
+      }
     }
+    if let lost = lastLost { lastLost = lost.frames < 30 ? (lost.bell, lost.frames + 1) : nil }
     guard !wrists.isEmpty else { return nil }
+    // A new track while one is briefly unseen, or within a second of losing it, must be the same bell by colour (a
+    // rack of coloured bells beside the one in play); later, any bell may start, since the set may have changed bells.
+    let reference = current ?? lastLost?.bell
     let started = sightings
-      .filter { $0.conf >= thresholds.startConf && !still.contains($0) }
+      .filter { s in
+        s.conf >= thresholds.startConf && !still.contains(s) && !(reference.map { Self.colorsDiffer(s, $0) } ?? false)
+      }
       .map { s in (s, wrists.map { Self.distance(s.center, $0) }.min() ?? .infinity) }
       .filter { $0.1 <= thresholds.startDistance }
       .min { $0.1 < $1.1 }?.0
     if let started {
       current = started
       missed = 0
+      lastLost = nil
     }
     return started
   }
