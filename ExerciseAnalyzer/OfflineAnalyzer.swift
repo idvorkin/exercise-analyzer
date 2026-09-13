@@ -98,6 +98,7 @@ enum OfflineAnalyzer {
       // Test hook: SWING_INTERRUPT_READER=<frame> fails the first pass at that frame with the same error a
       // backgrounded app's decoder produces (simulator runs can't leave the foreground, #57).
       let interruptAt = Int(ProcessInfo.processInfo.environment["SWING_INTERRUPT_READER"] ?? "")
+      var lastWrists: [CGPoint] = []  // previous frame's wrists, for the overlapped bell path below
 
       while let sampleBuffer = output.copyNextSampleBuffer() {
         if Task.isCancelled {
@@ -111,13 +112,27 @@ enum OfflineAnalyzer {
         windowDecode += (decoded - frameStart) * 1000
         let (result, frame): (YOLOResult?, FrameRecord?) = autoreleasepool {
           catcher.result = nil
+          // The detector runs on a second thread while the pose model runs: both only read the frame, and the
+          // two passes overlap instead of adding up (3ba7902 doubled the phone's pass, 38.6 → 77.1 fps, and
+          // that stays). It sees the previous frame's wrists — one frame of lag at 30+ fps is far under the
+          // 0.2 reach (H26); the first frame has none.
+          var bells: [BellSighting] = []
+          let pixelBuffer = bellDetector == nil ? nil : CMSampleBufferGetImageBuffer(sampleBuffer)
+          let group = DispatchGroup()
+          if let bellDetector, let pixelBuffer {
+            group.enter()
+            let wrists = lastWrists
+            DispatchQueue.global(qos: .userInitiated).async {
+              bells = bellDetector.detect(in: pixelBuffer, wrists: wrists)
+              group.leave()
+            }
+          }
           predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: catcher)
+          group.wait()
           guard let result = catcher.result else { return (nil, nil) }
           var frame = FrameRecord(result: result, time: time)
-          if let bellDetector, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
-            // Same-frame wrists first: the cap's wrist reserve needs the pose, so the bell runs after it
-            // here instead of overlapped (H26; the phone's fps cost lands in the instrumented run).
-            let bells = bellDetector.detect(in: pixelBuffer, wrists: BellDetector.wrists(of: frame.pose))
+          lastWrists = BellDetector.wrists(of: frame.pose)
+          if let bellDetector, pixelBuffer != nil {
             bellTotal += bellDetector.lastInferenceMs
             windowBell += bellDetector.lastInferenceMs
             bellFrames += 1

@@ -363,9 +363,10 @@ confidence, then adds any remaining box above the floor whose centre is within 0
 taking the frame's wrists, `maxSightings` 12, `handExtra` 4, `handReach` 0.2. The detector's model name
 is now `yoloe-26n-kettlebell@0.15x12+4`, so every stored set re-runs through the models once; the same
 rule runs in posetrack (sequential: same-frame wrists; `POSETRACK_PARALLEL=1`: previous frame's, the
-overlap stays). The app runs the bell after the pose now — the overlap needed the pose it did not have —
-so the detector-on pass backslides toward sequential speed; the phone's number comes from the
-instrumented run. Prediction before the Mac run: blind frames 155 → under 60, by-eye circles on his
+overlap stays). The app keeps the overlap too (3ba7902 stays): the bell runs on its second thread with
+the previous frame's wrists — one frame of lag at 30+ fps is far under the 0.2 reach — so the phone's
+pass should hold its 77 fps; the instrumented run confirms. Prediction before the Mac run: blind frames
+155 → under 60, by-eye circles on his
 bell 7 → ~14, false circles unchanged (they are H27/H25: the walk-in box and the rack bell), repo
 fixtures (4reps, 1h, TGU, pistols, Bulgarian) unchanged within a point — their clips never reach the
 cap. AnalysisVersion 2026-09-13.3. Numbers: _pending Igor's Mac run (posetrack + dots grade below)._
