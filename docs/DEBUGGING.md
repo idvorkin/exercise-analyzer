@@ -30,9 +30,9 @@ means the phone was busy or locked, so run it again. The current session's file 
 
 | Area | Events (key fields) |
 |---|---|
-| Launch | `session_start` (device, system, app, started), `model_loaded` (model), `notification_auth` |
+| Launch | `session_start` (device, system, app, started), `model_loaded` (model: yolo26n-pose, yoloe-26n-kettlebell), `model_missing` (the detector package is not bundled: no bells), `notification_auth` |
 | Loading a clip | `load` (url, source), `import` (path: photos_suggestion / photos_in_place / picker), `install_item` (track_frames), `video_track` (hdr, transfer, edr_headroom, transform), `player_layer` (video_rect, gravity), `display_frame` (first frames per item: player_time, rate) |
-| Analysis | `offline_pass` (frames, fps, avg_infer_ms), `detection` (exercise, confidence, reason), `analyzed` (exercise, reps, reason: load / analyzer_version / recents_redetect), `crop`, `analysis_cancel` → `analysis_cancelled`, `exercise_mode`, `frame` (per analyzed frame: time, src live/file/offline, infer_ms, phase, rep, the HUD metrics) |
+| Analysis | `offline_pass` (frames, fps, avg_infer_ms, bell_frames, bell_avg_infer_ms, bell_seen), `detection` (exercise, confidence, reason), `analyzed` (exercise, reps, reason: load / analyzer_version / recents_redetect), `crop`, `analysis_cancel` → `analysis_cancelled`, `exercise_mode`, `frame` (per analyzed frame: time, src live/file/offline, infer_ms, phase, rep, the HUD metrics) |
 | Playback | `play`, `pause`, `phase` (transitions while the clock moves), `seek` (from: which control, player_before, player_after, finished), `clock` (every 5 s: current, slider, scrubbing; #23), `ui` (action: step / edge gestures, from: watch) |
 | Recording | `camera_start`, `camera_switch`, `camera_level`, `camera_done` (duration_s, frames_delivered/analyzed, live_reps), `camera_cancel`, `recording_partial`, `stitch` (rotation segments), `empty_recording`, `recording_deleted`, `keep_awake` |
 | Trim, save, Photos | `trim_start`, `trim` (requested_start_s, start_s, reps), `trim_done` (passthrough), `trim_skipped`, `trim_undo`, `saved`, `photos_replaced`, `photos_restored`, `photos_suggestions` (matched, already_analyzed, shown), `photos_suggestion_open`, `photos_fetch` (seconds, in_cloud, found, error) |

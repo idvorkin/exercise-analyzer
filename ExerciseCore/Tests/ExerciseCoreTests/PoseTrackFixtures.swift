@@ -57,7 +57,10 @@ struct Fixture {
         time: f.time, imageSize: size,
         pose: f.pose.map { Pose(xyn: $0.xyn, conf: $0.conf, imageSize: size) },
         box: f.box.map { CGRect(x: $0[0][0], y: $0[0][1], width: $0[1][0], height: $0[1][1]) },
-        analysis: nil)
+        analysis: nil,
+        bells: (f.bells ?? []).map {
+          BellSighting(box: CGRect(x: $0.box[0][0], y: $0.box[0][1], width: $0.box[1][0], height: $0.box[1][1]), conf: $0.conf, color: $0.color)
+        })
     }
   }
 
@@ -66,11 +69,17 @@ struct Fixture {
       let xyn: [PosePoint]
       let conf: [Float]
     }
+    struct StoredBell: Decodable {
+      let box: [[Double]]
+      let conf: Float
+      let color: [Float]?
+    }
     struct StoredFrame: Decodable {
       let time: Double
       let imageSize: [Double]
       let box: [[Double]]?
       let pose: StoredPose?
+      let bells: [StoredBell]?
     }
     let frames: [StoredFrame]
   }
@@ -87,7 +96,10 @@ extension Array where Element == FrameRecord {
         return Pose(xyn: xyn, conf: conf, imageSize: frame.imageSize)
       }
       let box = frame.box.map { CGRect(x: 1 - $0.maxX, y: $0.minY, width: $0.width, height: $0.height) }
-      return FrameRecord(time: frame.time, imageSize: frame.imageSize, pose: pose, box: box, analysis: nil)
+      let bells = frame.bells.map {
+        BellSighting(box: CGRect(x: 1 - $0.box.maxX, y: $0.box.minY, width: $0.box.width, height: $0.box.height), conf: $0.conf, color: $0.color)
+      }
+      return FrameRecord(time: frame.time, imageSize: frame.imageSize, pose: pose, box: box, analysis: nil, bells: bells)
     }
   }
 }

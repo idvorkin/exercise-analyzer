@@ -66,6 +66,23 @@ What the numbers say (small model, first trial):
   motion) is the whole disambiguation.
 - Inference on the Mac is 9 ms; the phone's Neural Engine is the real measure and is not yet taken.
 
+## 2026-09-12: plumbing built (step 1)
+
+- `BellDetector` (ExerciseCore, Vision) runs the nano on a frame and parses its end-to-end output itself: the
+  export is a segmentation model, so each row is [x1, y1, x2, y2, conf, class, 32 mask coefficients] in the 640 px
+  letterboxed input plus a mask prototype tensor; the Ultralytics SDK's detector expects six columns and cannot
+  read it. Rows map back with the pose model's letterbox math. The mask outputs are computed and thrown away: a
+  detect-only export would be cheaper and is the first thing to try if the phone's cost is high.
+- `BellSighting` per frame (box, confidence, mean colour of the box's middle via `CIAreaAverage`), stored in the
+  track and in fixtures; `BellTracker` in the pipeline picks the bell in play (starts on a box ≥ 0.5 within 0.12 of
+  a wrist, follows within 0.1 at ≥ 0.25, lost after 10 unseen frames); `BellColor.weightKg` maps a vivid hue to
+  the competition code. `BellTests` cover the tracker and the colours.
+- The app runs it in the offline pass only and logs `bell_frames`, `bell_avg_infer_ms`, `bell_seen` in
+  `offline_pass`; a dot in the bell's colour rides on the tracked bell in playback. `posetrack` runs it on the Mac
+  and `--poses-from` adds bells to a fixture without touching its poses: the four sample fixtures now carry bells.
+- Mac, 4-rep clip: bell in play in 87 % of frames; the pass went from 60 to 40 fps with the detector (release
+  build, Vision on the Mac's GPU/ANE). Phone cost: pending the first `offline_pass` with the detector bundled.
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),

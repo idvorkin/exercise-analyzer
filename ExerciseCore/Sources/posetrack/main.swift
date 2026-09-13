@@ -4,7 +4,12 @@
 //  simulator. Prints detection and reps; optionally writes the pose track as a host-test fixture.
 //
 //    swift run -c release posetrack <video> --model ../ExerciseAnalyzer/yolo26n-pose.mlpackage \
-//      [--exercise kettlebell-swing] [--fixture out.json] [--conf 0.25]
+//      [--exercise kettlebell-swing] [--fixture out.json] [--conf 0.25] \
+//      [--bell-model ../ExerciseAnalyzer/yoloe-26n-kettlebell.mlpackage | --no-bells] [--poses-from old.json]
+//
+//  The bell detector (#18) runs on every frame too when its package is present, and the fixture then carries every
+//  bell sighting with its mean colour. `--poses-from` keeps an existing fixture's poses and boxes (frame by frame,
+//  same clip) and only adds the bells, so a human-verified fixture keeps the exact track it was verified on.
 //
 //  Frames are read with the same rotation-applying video composition the app uses, letterboxed by Vision's
 //  scaleFit like the SDK, and the end2end output ([1, 300, 57]: xyxy, conf, class, 17 × (x, y, conf)) is mapped
@@ -22,6 +27,9 @@ struct Options {
   var exercise: ExerciseKind?
   var fixture: String?
   var confidence: Float = 0.25
+  /// Nil for "the package next to the pose model, if it is there"; `--no-bells` sets it to "".
+  var bellModel: String?
+  var posesFrom: String?
 
   init(_ args: [String]) {
     var i = 0
@@ -33,6 +41,9 @@ struct Options {
       case "--exercise": exercise = ExerciseKind(rawValue: value())
       case "--fixture": fixture = value()
       case "--conf": confidence = Float(value()) ?? 0.25
+      case "--bell-model": bellModel = value()
+      case "--no-bells": bellModel = ""
+      case "--poses-from": posesFrom = value()
       default: if video.isEmpty { video = a }
       }
       i += 1
@@ -50,12 +61,10 @@ guard !options.video.isEmpty else { fail("usage: posetrack <video> [--model path
 
 // MARK: - Model
 
-let modelURL = URL(fileURLWithPath: options.model)
-let compiledURL: URL
-if modelURL.pathExtension == "mlmodelc" {
-  compiledURL = modelURL
-} else {
-  // Compile once; the compiled model is cached next to the scratch dir keyed by the package's modification date.
+/// Compiles a package once; the compiled model is cached under the scratch dir keyed by the package's modification
+/// date (an .mlmodelc is used as is).
+func compiled(_ modelURL: URL) throws -> URL {
+  if modelURL.pathExtension == "mlmodelc" { return modelURL }
   let cacheDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("tmp/agent/skill/posetrack")
   try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
   let stamp = (try? FileManager.default.attributesOfItem(atPath: modelURL.appendingPathComponent("Manifest.json").path)[.modificationDate] as? Date)
@@ -65,35 +74,34 @@ if modelURL.pathExtension == "mlmodelc" {
     let tmp = try MLModel.compileModel(at: modelURL)
     try FileManager.default.moveItem(at: tmp, to: cached)
   }
-  compiledURL = cached
+  return cached
 }
+
+let modelURL = URL(fileURLWithPath: options.model)
 let config = MLModelConfiguration()
 config.computeUnits = .all
-let mlModel = try MLModel(contentsOf: compiledURL, configuration: config)
+let mlModel = try MLModel(contentsOf: try compiled(modelURL), configuration: config)
 let visionModel = try VNCoreMLModel(for: mlModel)
+
+/// The bell detector, when its package is there (a missing default is simply "no bells").
+let bellDetector: BellDetector? = try {
+  let path: String
+  if let given = options.bellModel {
+    if given.isEmpty { return nil }
+    path = given
+    guard FileManager.default.fileExists(atPath: path) else { fail("bell model not found: \(path)") }
+  } else {
+    path = modelURL.deletingLastPathComponent().appendingPathComponent("yoloe-26n-kettlebell.mlpackage").path
+    guard FileManager.default.fileExists(atPath: path) else { return nil }
+  }
+  return try BellDetector(compiledModelURL: try compiled(URL(fileURLWithPath: path)))
+}()
 guard let imageInput = mlModel.modelDescription.inputDescriptionsByName.values.first(where: { $0.type == .image }),
   let constraint = imageInput.imageConstraint
 else { fail("model has no image input") }
 let modelSize = (width: constraint.pixelsWide, height: constraint.pixelsHigh)
 
-// MARK: - Letterbox mapping (BasePredictor.letterboxTransform / inputPoint)
-
-struct Letterbox {
-  let gain: CGFloat, padX: CGFloat, padY: CGFloat, inputSize: CGSize
-  init?(inputSize: CGSize, model: (width: Int, height: Int)) {
-    let mw = CGFloat(model.width), mh = CGFloat(model.height)
-    guard inputSize.width > 0, inputSize.height > 0 else { return nil }
-    gain = min(mh / inputSize.height, mw / inputSize.width)
-    let rw = (inputSize.width * gain).rounded(), rh = (inputSize.height * gain).rounded()
-    padX = ((mw - rw) / 2 - 0.1).rounded()
-    padY = ((mh - rh) / 2 - 0.1).rounded()
-    self.inputSize = inputSize
-  }
-  func point(_ p: CGPoint) -> CGPoint {
-    let x = (p.x - padX) / gain, y = (p.y - padY) / gain
-    return CGPoint(x: min(max(x, 0), inputSize.width), y: min(max(y, 0), inputSize.height))
-  }
-}
+// MARK: - Pose output (Letterbox comes from ExerciseCore's BellDetector.swift)
 
 /// The most confident person in one model output, as the app's FrameRecord stores it.
 func parse(_ array: MLMultiArray, letterbox: Letterbox, confidence: Float) -> (pose: Pose, box: CGRect)? {
@@ -159,7 +167,8 @@ Task {
       {
         person = parse(array, letterbox: letterbox, confidence: options.confidence)
       }
-      frames.append(FrameRecord(time: time, imageSize: size, pose: person?.pose, box: person?.box, analysis: nil))
+      let bells = bellDetector?.detect(in: pixelBuffer) ?? []
+      frames.append(FrameRecord(time: time, imageSize: size, pose: person?.pose, box: person?.box, analysis: nil, bells: bells))
       if frames.count % 300 == 0 { FileHandle.standardError.write("  \(frames.count) frames…\n".data(using: .utf8)!) }
     }
     elapsed = Date().timeIntervalSince(started)
@@ -168,13 +177,47 @@ Task {
 }
 semaphore.wait()
 
+// MARK: - Poses from an existing fixture
+
+if let path = options.posesFrom {
+  struct OldPoint: Decodable { let x: Float; let y: Float }
+  struct OldPose: Decodable { let xyn: [OldPoint]; let conf: [Float] }
+  struct OldFrame: Decodable { let time: Double; let imageSize: [Double]; let box: [[Double]]?; let pose: OldPose? }
+  struct Old: Decodable { let frames: [OldFrame] }
+  let old = try JSONDecoder().decode(Old.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+  // A phone-made fixture can differ from the Mac decode by a frame, so bells are matched by time, not index.
+  let duration = frames.last?.time ?? 0
+  guard abs(Double(old.frames.count - frames.count)) <= 2, abs((old.frames.last?.time ?? 0) - duration) < 0.2 else {
+    fail("--poses-from \(path) has \(old.frames.count) frames to \(old.frames.last?.time ?? 0) s, this clip \(frames.count) to \(duration) s: not the same clip")
+  }
+  let byTime = frames
+  frames = old.frames.map { o in
+    let size = CGSize(width: o.imageSize[0], height: o.imageSize[1])
+    let nearest = byTime.min { abs($0.time - o.time) < abs($1.time - o.time) }
+    let bells = (nearest.map { abs($0.time - o.time) <= 0.02 } ?? false) ? nearest!.bells : []
+    return FrameRecord(
+      time: o.time, imageSize: size,
+      pose: o.pose.map { Pose(xyn: $0.xyn.map { PosePoint(x: $0.x, y: $0.y) }, conf: $0.conf, imageSize: size) },
+      box: o.box.map { CGRect(x: $0[0][0], y: $0[0][1], width: $0[1][0], height: $0[1][1]) },
+      analysis: nil, bells: bells)
+  }
+  print("poses and boxes kept from \(path); bells added to \(frames.filter { !$0.bells.isEmpty }.count) frames")
+}
+
 // MARK: - Analysis
 
 let detection = ExerciseDetector.detect(frames: frames)
 let exercise = options.exercise ?? detection.exercise
 let pipeline = AnalysisPipeline.analyze(frames: frames, exercise: exercise)
 let withPerson = frames.filter { $0.pose != nil }.count
+let withBell = pipeline.track.frames.filter { $0.bell != nil }.count
 print(String(format: "%@: %d frames (%d with a person), %.1f s, %.0f fps", options.video, frames.count, withPerson, elapsed, Double(frames.count) / max(elapsed, 0.001)))
+if bellDetector != nil {
+  let colors = pipeline.track.frames.compactMap { $0.bell?.color }
+  let weights = colors.compactMap(BellColor.weightKg(rgb:))
+  let weight = weights.isEmpty ? "no colour code (cast iron?)" : "\(Dictionary(grouping: weights) { $0 }.max { $0.value.count < $1.value.count }!.key) kg by colour"
+  print("bell in play in \(withBell) frames (\(frames.count > 0 ? 100 * withBell / frames.count : 0)%), \(weight)")
+}
 print("detected: \(detection.exercise.rawValue) \(detection.confidence)% (\(detection.reason))")
 print("analyzed as \(exercise.rawValue): \(pipeline.reps.count) reps")
 for rep in pipeline.reps {
@@ -186,13 +229,21 @@ for rep in pipeline.reps {
 if let path = options.fixture {
   struct StoredPoint: Encodable { let x: Float; let y: Float }
   struct StoredPose: Encodable { let xyn: [StoredPoint]; let conf: [Float] }
-  struct StoredFrame: Encodable { let time: Double; let imageSize: [Double]; let box: [[Double]]?; let pose: StoredPose? }
+  struct StoredBell: Encodable { let box: [[Double]]; let conf: Float; let color: [Float]? }
+  struct StoredFrame: Encodable {
+    let time: Double; let imageSize: [Double]; let box: [[Double]]?; let pose: StoredPose?; let bells: [StoredBell]?
+  }
   struct Stored: Encodable { let version = 1; let frames: [StoredFrame] }
   let stored = Stored(frames: frames.map { f in
     StoredFrame(
       time: f.time, imageSize: [Double(f.imageSize.width), Double(f.imageSize.height)],
       box: f.box.map { [[Double($0.minX), Double($0.minY)], [Double($0.width), Double($0.height)]] },
-      pose: f.pose.map { StoredPose(xyn: $0.xyn.map { StoredPoint(x: $0.x, y: $0.y) }, conf: $0.conf) })
+      pose: f.pose.map { StoredPose(xyn: $0.xyn.map { StoredPoint(x: $0.x, y: $0.y) }, conf: $0.conf) },
+      bells: f.bells.isEmpty ? nil : f.bells.map {
+        StoredBell(
+          box: [[Double($0.box.minX), Double($0.box.minY)], [Double($0.box.width), Double($0.box.height)]],
+          conf: $0.conf, color: $0.color.map { $0.map { (($0 * 1000).rounded() / 1000) } })
+      })
   })
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.withoutEscapingSlashes]

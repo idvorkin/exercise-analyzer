@@ -13,6 +13,8 @@ public final class AnalysisPipeline: @unchecked Sendable {
   public let analyzer: ExerciseAnalyzer
   public let track = PoseTrack()
   public private(set) var reps: [RepRecord] = []
+  /// Picks the bell in play from each frame's detector sightings (#18).
+  public let bellTracker = BellTracker()
 
   public init(exercise: ExerciseKind) {
     self.exercise = exercise
@@ -27,6 +29,7 @@ public final class AnalysisPipeline: @unchecked Sendable {
 
   public func reset() {
     analyzer.reset()
+    bellTracker.reset()
     track.removeAll()
     reps = []
   }
@@ -35,9 +38,10 @@ public final class AnalysisPipeline: @unchecked Sendable {
   @discardableResult
   public func process(extracted: FrameRecord, image: () -> CGImage?) -> FrameRecord {
     let analysis = extracted.pose.map { analyzer.process(pose: $0, time: extracted.time, image: image) }
+    let bell = extracted.bell ?? (extracted.bells.isEmpty ? nil : bellTracker.track(extracted.bells, pose: extracted.pose))
     let frame = FrameRecord(
       time: extracted.time, imageSize: extracted.imageSize, pose: extracted.pose, box: extracted.box,
-      analysis: analysis)
+      analysis: analysis, bells: extracted.bells, bell: bell)
     track.append(frame)
     if let rep = analysis?.completedRep { reps.append(rep) }
     return frame

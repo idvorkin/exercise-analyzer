@@ -137,3 +137,23 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Then:** each rep shows Lying, Elbow, Hand, Kneel, Lunge, Standing and the way down's Lunge, Kneel and Elbow in the gallery, the HUD's six pills follow the step as it plays (a way-down step lights the same pill as its way-up step), tapping a pill jumps to that step's nearest occurrence in the current rep, and the rep count is unchanged
 
 - **Issues:** none (Igor: "the get-up is going to need more stages")
+
+---
+
+### User Story 034:
+
+- **Summary:** See the bell on the video, and its weight from its colour
+- **Status:** implemented (commit named in the next docs commit); verified on the host (`BellTests`, four fixtures with bells) and the simulator (the offline pass logs the bell); the dot and the phone's cost need the phone
+
+#### Use Case:
+- **As a** lifter reviewing a swing or a get-up
+- **I want to** see the bell marked on the video as it moves, and the set labelled with the bell's weight when its colour says so
+- **so that** the analysis can follow the bell itself, and a set of 24s is not confused with a set of 16s
+
+#### Acceptance Criteria:
+- **Scenario:** A set with a competition bell
+- **Given:** a clip is analyzed with the bell detector bundled
+- **When:** it plays back
+- **Then:** a dot in the bell's own colour rides on the bell in my hands and not on the ones on the rack, the set's line reads the weight the colour maps to (a black cast-iron bell gets none), the stored track keeps every bell sighting so re-analysis needs no second detector run, and live recording and the watch are unchanged
+
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)

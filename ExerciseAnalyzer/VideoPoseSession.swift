@@ -74,6 +74,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   private var predictor: BasePredictor?
+  /// The kettlebell detector (#18), offline pass only; nil when its package is not bundled.
+  private var bellDetector: BellDetector?
   private var pipeline = AnalysisPipeline(exercise: .kettlebellSwing)
   /// Poses of the loaded clip (offline pass or Recents), kept so a different exercise can be analyzed instantly.
   private var extractedFrames: [FrameRecord] = []
@@ -220,6 +222,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self.predictor = predictor
           self.modelStatus = "yolo26n-pose"
           self.log.event("model_loaded", ["model": "yolo26n-pose"])
+          self.loadBellDetector()
           if let url = self.pendingLoadURL {
             self.pendingLoadURL = nil
             self.load(url: url)
@@ -229,6 +232,20 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self.log.event("error", ["where": "model", "message": "\(error)"])
         }
       }
+    }
+  }
+
+  /// The bell detector is optional: the app counts without it, it just does not see the bell.
+  private func loadBellDetector() {
+    guard let url = Bundle.main.url(forResource: "yoloe-26n-kettlebell", withExtension: "mlmodelc") else {
+      log.event("model_missing", ["model": "yoloe-26n-kettlebell"])
+      return
+    }
+    do {
+      bellDetector = try BellDetector(compiledModelURL: url)
+      log.event("model_loaded", ["model": "yoloe-26n-kettlebell"])
+    } catch {
+      log.event("error", ["where": "bell_model", "message": "\(error)"])
     }
   }
 
@@ -380,7 +397,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   private func recordedLine(reps: Int) -> String {
     let when = currentRecordedAt.map { "Recorded " + Self.recordedFormatter.string(from: $0) } ?? "Clip"
-    return "\(when) · \(reps) reps"
+    let bell = bellWeightKg.map { " · \($0) kg bell" } ?? ""
+    return "\(when) · \(reps) reps\(bell)"
+  }
+
+  /// The weight the tracked bell's colour maps to in most frames (competition colour code, #18); nil for cast iron.
+  var bellWeightKg: Int? {
+    let weights = pipeline.track.frames.compactMap { $0.bell?.color }.compactMap(BellColor.weightKg(rgb:))
+    guard weights.count >= 10 else { return nil }
+    return Dictionary(grouping: weights) { $0 }.max { $0.value.count < $1.value.count }?.key
   }
 
   /// Writes the current clip and analysis into Recents (new entry, or updates the open one after a trim).
@@ -435,7 +460,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let task = Task { [weak self] in
       guard let self else { return }
       do {
-        let (frames, summary) = try await OfflineAnalyzer.extract(url: url, predictor: predictor) {
+        let (frames, summary) = try await OfflineAnalyzer.extract(url: url, predictor: predictor, bellDetector: bellDetector) {
           [weak self] fraction in
           Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
         }
@@ -476,6 +501,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
           "frames": summary.frames, "elapsed_s": summary.elapsed,
           "avg_infer_ms": summary.averageInferenceMs,
           "fps": summary.elapsed > 0 ? Double(summary.frames) / summary.elapsed : 0,
+          "bell_frames": summary.bellFrames, "bell_avg_infer_ms": summary.bellAverageInferenceMs,
+          "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
         ])
       await analyzeExtracted(url: url, reason: "load")
       statusMessage = recordedLine(reps: pipeline.reps.count) + String(

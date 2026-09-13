@@ -39,8 +39,10 @@ Package: [`ExerciseCore`](../ExerciseCore). `cd ExerciseCore && swift test`, or 
 
 **Fixtures** are compact pose tracks in
 [`ExerciseCore/Tests/ExerciseCoreTests/Fixtures/`](../ExerciseCore/Tests/ExerciseCoreTests/Fixtures/):
-`{version: 1, frames: [{time, imageSize: [w, h], box, pose: {xyn, conf}}]}`, COCO-17 keypoints normalized to the
-image. Each is registered in `Fixture.all` with the exercise, the expected rep count, and `humanVerified`
+`{version: 1, frames: [{time, imageSize: [w, h], box, pose: {xyn, conf}, bells}]}`, COCO-17 keypoints normalized to
+the image; `bells` (optional) is every kettlebell the detector saw in the frame, `{box, conf, color: [r, g, b]}`,
+from which the pipeline's tracker picks the one in play (#18). `just analyze <clip> --poses-from old.json
+--fixture old.json` adds bells to an existing fixture without touching its verified poses. Each is registered in `Fixture.all` with the exercise, the expected rep count, and `humanVerified`
 (Igor confirmed the count) versus a regression baseline (the count the analyzer produced when the fixture was cut).
 
 To make a fixture from a set on the phone:

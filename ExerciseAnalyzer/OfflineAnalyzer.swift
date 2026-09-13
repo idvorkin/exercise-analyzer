@@ -21,6 +21,9 @@ enum OfflineAnalyzer {
     let frames: Int
     let elapsed: Double
     let averageInferenceMs: Double
+    /// The bell detector's share (#18): frames it ran on and its mean time per frame; zero without a detector.
+    var bellFrames = 0
+    var bellAverageInferenceMs = 0.0
   }
 
   /// Captures the result `predict` delivers synchronously on the calling thread.
@@ -31,7 +34,7 @@ enum OfflineAnalyzer {
   }
 
   static func extract(
-    url: URL, predictor: BasePredictor, progress: @escaping @Sendable (Double) -> Void
+    url: URL, predictor: BasePredictor, bellDetector: BellDetector? = nil, progress: @escaping @Sendable (Double) -> Void
   ) async throws -> ([FrameRecord], Summary) {
     let asset = AVURLAsset(url: url)
     guard let track = try await asset.loadTracks(withMediaType: .video).first else {
@@ -58,6 +61,8 @@ enum OfflineAnalyzer {
       let started = CACurrentMediaTime()
       var frames: [FrameRecord] = []
       var inferenceTotal = 0.0
+      var bellTotal = 0.0
+      var bellFrames = 0
       var lastProgress = 0.0
 
       while let sampleBuffer = output.copyNextSampleBuffer() {
@@ -69,7 +74,14 @@ enum OfflineAnalyzer {
         catcher.result = nil
         predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: catcher)
         guard let result = catcher.result else { continue }
-        frames.append(FrameRecord(result: result, time: time))
+        var frame = FrameRecord(result: result, time: time)
+        if let bellDetector, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+          let bells = bellDetector.detect(in: pixelBuffer)
+          bellTotal += bellDetector.lastInferenceMs
+          bellFrames += 1
+          frame = FrameRecord(time: frame.time, imageSize: frame.imageSize, pose: frame.pose, box: frame.box, analysis: nil, bells: bells)
+        }
+        frames.append(frame)
         inferenceTotal += result.inferenceMs
         if duration > 0, time - lastProgress > 0.5 {
           lastProgress = time
@@ -81,7 +93,8 @@ enum OfflineAnalyzer {
       }
       let summary = Summary(
         frames: frames.count, elapsed: CACurrentMediaTime() - started,
-        averageInferenceMs: frames.isEmpty ? 0 : inferenceTotal / Double(frames.count))
+        averageInferenceMs: frames.isEmpty ? 0 : inferenceTotal / Double(frames.count),
+        bellFrames: bellFrames, bellAverageInferenceMs: bellFrames == 0 ? 0 : bellTotal / Double(bellFrames))
       return (frames, summary)
     }
     return try await withTaskCancellationHandler {

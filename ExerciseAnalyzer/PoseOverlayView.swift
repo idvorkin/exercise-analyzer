@@ -18,6 +18,16 @@ enum PoseDrawing {
     (.rightEye, .rightEar), (.leftEar, .leftShoulder), (.rightEar, .rightShoulder),
   ]
 
+  /// The bell in play (#18): a dot in the bell's own colour with a white ring, at the box's centre.
+  static func drawBell(_ context: GraphicsContext, bell: BellSighting, in rect: CGRect) {
+    let c = CGPoint(x: rect.minX + bell.box.midX * rect.width, y: rect.minY + bell.box.midY * rect.height)
+    let r = max(4, min(bell.box.width * rect.width, bell.box.height * rect.height) * 0.18)
+    let color = bell.color.map { Color(red: Double($0[0]), green: Double($0[1]), blue: Double($0[2])) } ?? .orange
+    let dot = Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+    context.fill(dot, with: .color(color))
+    context.stroke(dot, with: .color(.white), lineWidth: 2)
+  }
+
   /// Draws `pose` (normalized coordinates) into `rect`, the on-screen rect of the source image.
   static func draw(
     _ context: GraphicsContext, pose: Pose, in rect: CGRect, lineWidth: CGFloat = 1.5
@@ -71,6 +81,7 @@ struct PoseOverlayView: View {
       let rect = AVMakeRect(
         aspectRatio: frame.imageSize, insideRect: CGRect(origin: .zero, size: size))
       PoseDrawing.draw(context, pose: pose, in: rect)
+      if let bell = frame.bell { PoseDrawing.drawBell(context, bell: bell, in: rect) }
     }
     .allowsHitTesting(false)
   }
