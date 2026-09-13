@@ -67,7 +67,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 037:
 
 - **Summary:** An instrumented run of my stored sets, on the phone, with the numbers in the log (technical)
-- **Status:** implemented in (pending); verified in the simulator (`scripts/sim-debug-run.sh`: the run starts from the launch hook, the banner shows, the set goes through the detector, `bell_held` and `debug_run` end land in the log); the phone is next
+- **Status:** implemented in [8fde7b7](https://github.com/idvorkin/exercise-analyzer/commit/8fde7b7); verified in the simulator (`scripts/sim-debug-run.sh`: the run starts from the launch hook, the banner shows, the set goes through the detector, `bell_held` and `debug_run` end land in the log) and on the phone (eight sets, `SWING_DEBUG_RUN=1`, 38.6 fps mean; the same run measured [3ba7902](https://github.com/idvorkin/exercise-analyzer/commit/3ba7902) at 77.1 fps); the banner and the start-panel row need Igor's eye
 
 #### Use Case:
 - **As a** developer measuring the bell detector and the tracker on the phone
