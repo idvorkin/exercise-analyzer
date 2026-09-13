@@ -25,10 +25,13 @@ for snap in sorted(stage.glob("*/analysis.json")):
     day = datetime.datetime(2001, 1, 1) + datetime.timedelta(seconds=stamp) if stamp else None
     name = f"{exercise}-{day.strftime('%Y%m%d') if day else 'nodate'}-{entry_id[:8]}.json"
     target = out / name
-    if target.exists():
+    has_bells = any(f.get("bells") for f in d["frames"])
+    # An archived track is refreshed once when the phone's copy gained the detector's sightings (#50).
+    if target.exists() and not (has_bells and '"bells"' not in target.read_text()):
         continue
     frames = [{"time": f["time"], "imageSize": f["imageSize"], "box": f.get("box"),
-               "pose": ({"xyn": f["pose"]["xyn"], "conf": f["pose"]["conf"]} if f.get("pose") else None)} for f in d["frames"]]
+               "pose": ({"xyn": f["pose"]["xyn"], "conf": f["pose"]["conf"]} if f.get("pose") else None),
+               **({"bells": f["bells"]} if f.get("bells") else {})} for f in d["frames"]]
     json.dump({"version": 1, "source": {"recents_id": entry_id, "exercise": exercise, "reps_when_saved": len(d.get("reps", []))},
                "frames": frames}, open(target, "w"), separators=(",", ":"))
     written += 1
