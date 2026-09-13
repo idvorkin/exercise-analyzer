@@ -39,8 +39,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   let player = AVPlayer()
-  let log = SessionLog()
+  let log: SessionLog
   let recents = RecentsStore()
+  /// Both models and their compute plans behind one readiness gate (#52 step 4); kicks loading on creation.
+  let models: ModelSet
 
   @Published private(set) var source: Source = .none
   @Published private(set) var activity: Activity = .idle
@@ -73,23 +75,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     didSet { if isPlaying { player.rate = rate } }
   }
 
-  private var predictor: BasePredictor?
-  /// The kettlebell detector (#18), offline pass only; nil when its package is not bundled.
-  private var bellDetector: BellDetector?
   /// Set while a stored set is being run through the models again from its video: its exercise, so a fixed mode
   /// does not re-read it as something else (#42), and the reason logged with the result.
   private var rerunExercise: ExerciseKind?
-  /// Names of the models this build runs on a clip: the pose model and, when bundled, the detector. Stored with
-  /// every analysis; a stored set made by a different set is re-run from its video on reopen (story 035).
-  /// The models a track is made with. The detector's name carries its floor, box cap and wrist reserve: a set
-  /// analyzed at other settings holds different sightings (yesterday's six a frame at 0.25 left the new tracker
-  /// little to hold), so a settings change counts as a changed model and the set runs through the detector again.
-  private var loadedModels: [String] {
-    ["yolo26n-pose"]
-      + (bellDetector.map {
-        [String(format: "yoloe-26n-kettlebell@%.2fx%d+%d", $0.minConfidence, $0.maxSightings, $0.handExtra)]
-      } ?? [])
-  }
 
   private func storedModels(_ entry: RecentEntry) -> [String] {
     let models = recents.models(for: entry)
@@ -131,7 +119,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var currentOrigin: Origin = .file
   private var currentEntryID: String?
   private var currentRecordedAt: Date?
-  private var pendingLoadURL: URL?
+  /// A queued load from before the models were ready: the latest tap wins, earlier ones cancel.
+  private var loadRetry: Task<Void, Never>?
   private var debugFramesToLog = 0
   private var lastLoggedPhase: String?
 
@@ -147,6 +136,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   override init() {
     exerciseMode = ExerciseMode(storageValue: UserDefaults.standard.string(forKey: "exerciseMode"))
+    log = SessionLog()
+    models = ModelSet(log: log)
     super.init()
     if case .fixed(let kind) = exerciseMode { exercise = kind }
     pipeline = AnalysisPipeline(exercise: exercise)
@@ -183,7 +174,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     ) { [weak self] _ in
       Task { @MainActor in self?.isPlaying = false }
     }
-    loadModel()
+    models.onStatus = { [weak self] in self?.modelStatus = $0 }
+    modelStatus = models.status
     RecordPrompt.prepare(log: log)
     UIDevice.current.beginGeneratingDeviceOrientationNotifications()
     NotificationCenter.default.addObserver(forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main) {
@@ -216,26 +208,25 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func refreshStaleEntries() async {
     // The models load after init (the detector's model_loaded lands about a second in); judged before that, every
     // set looks made with this build's models and nothing re-runs (the first forced-rerun build did exactly that).
-    var waited = 0
-    while predictor == nil, waited < 100 {
-      try? await Task.sleep(for: .milliseconds(100))
-      waited += 1
-    }
-    log.event("recents_refresh_wait", ["predictor": predictor != nil, "waited_ms": waited * 100, "plans": planTasks.count])
-    await waitForPlans()
-    log.event("recents_refresh_wait", ["plans": "done", "models": loadedModels])
-    let stale = recents.entries.filter { recents.isStale($0) || !Set(loadedModels).isSubset(of: storedModels($0)) }
+    let plans = models.outstandingPlans
+    let waitStarted = Date()
+    let predictor = await models.ready()
+    log.event(
+      "recents_refresh_wait",
+      ["predictor": predictor != nil, "waited_ms": Int(Date().timeIntervalSince(waitStarted) * 1000), "plans": plans])
+    log.event("recents_refresh_wait", ["plans": "done", "models": models.names])
+    let stale = recents.entries.filter { recents.isStale($0) || !Set(models.names).isSubset(of: storedModels($0)) }
     guard !stale.isEmpty else {
-      log.event("recents_refresh_start", ["count": 0, "version": AnalysisVersion.current, "models": loadedModels])
+      log.event("recents_refresh_start", ["count": 0, "version": AnalysisVersion.current, "models": models.names])
       return
     }
-    log.event("recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current, "models": loadedModels])
+    log.event("recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current, "models": models.names])
     for entry in stale {
       guard let stored = recents.loadPipeline(for: entry) else { continue }
       let frames = stored.track.frames
       let plan = StoredSetPlan.decide(
         storedVersion: entry.analysisVersion, storedModels: storedModels(entry),
-        currentVersion: AnalysisVersion.current, currentModels: loadedModels,
+        currentVersion: AnalysisVersion.current, currentModels: models.names,
         mode: exerciseMode, storedExercise: stored.exercise, detection: nil)
       if case .rerunFromClip = plan, await rerunFromClip(entry, stored: stored, where: "refresh") {
         continue
@@ -284,16 +275,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
   func startInstrumentedRun() async {
     guard instrumentedRun == nil, analysisTask == nil else { return }
     instrumentedRunCancelled = false
-    var waited = 0
-    while predictor == nil, waited < 100 {
-      try? await Task.sleep(for: .milliseconds(100))
-      waited += 1
-    }
-    if bellDetector == nil { loadBellDetector(force: true) }
-    await waitForPlans()
+    await models.ready()
+    models.ensureBellDetector()
+    await models.waitForPlans()
     UIDevice.current.isBatteryMonitoringEnabled = true  // batteryLevel reads -1 until this is on
     let entries = recents.entries
-    log.event("debug_run", ["phase": "start", "sets": entries.count, "models": loadedModels])
+    log.event("debug_run", ["phase": "start", "sets": entries.count, "models": models.names])
     instrumentedRun = InstrumentedRun(index: 0, total: entries.count, name: "", line: "loading")
     var done = 0, passes: [Double] = []
     for (i, entry) in entries.enumerated() {
@@ -325,15 +312,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// instead) while a pass the user started is running, when the clip is out of reach, or before the models have
   /// loaded. Opening a set cancels it; the set it was on falls back to its stored poses until the next launch.
   private func rerunFromClip(_ entry: RecentEntry, stored: AnalysisPipeline, where: String) async -> Bool {
-    guard analysisTask == nil, let predictor, let url = await recents.clipURL(for: entry) else { return false }
+    guard analysisTask == nil, let predictor = models.predictor, let url = await recents.clipURL(for: entry) else { return false }
     log.event(
       "recents_rerun",
       ["id": entry.id, "reason": `where` == "debug" ? "instrumented" : "models_changed", "where": `where`,
-       "stored": storedModels(entry), "current": loadedModels, "exercise": stored.exercise.rawValue])
+       "stored": storedModels(entry), "current": models.names, "exercise": stored.exercise.rawValue])
     let task = Task { [weak self] () -> ([FrameRecord], OfflineAnalyzer.Summary)? in
       guard let self else { return nil }
       return try? await OfflineAnalyzer.extract(
-        url: url, predictor: predictor, bellDetector: bellDetector,
+        url: url, predictor: predictor, bellDetector: self.models.bellDetector,
         progress: { [weak self] fraction in
           if `where` == "debug" { Task { @MainActor in self?.instrumentedRun?.progress = fraction } }
         },
@@ -373,7 +360,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
         // The instrumentation a lab run wants beside the timings: what the detector was set to, and what the
         // phone was doing to itself (a throttled or low-power phone runs the same models slower).
-        "bell_floor": bellDetector?.minConfidence ?? 0, "bell_cap": bellDetector?.maxSightings ?? 0,
+        "bell_floor": models.bellDetector?.minConfidence ?? 0, "bell_cap": models.bellDetector?.maxSightings ?? 0,
         "thermal": ProcessInfo.processInfo.thermalState.rawValue, "low_power": ProcessInfo.processInfo.isLowPowerModeEnabled,
         "battery": UIDevice.current.batteryLevel, "footprint_mb": memory.footprint, "available_mb": memory.available,
       ])
@@ -392,95 +379,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
       try recents.save(
         id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
         pipeline: analyzed, clipURL: nil, thumbnail: galleryThumbnail(analyzed, kind: kind, entry: entry),
-        originalName: entry.originalName, models: loadedModels)
+        originalName: entry.originalName, models: models.names)
       log.event(
         "recents_refreshed",
         ["id": entry.id, "where": `where`, "was": "\(stored.exercise.rawValue) \(stored.reps.count)",
-         "now": "\(kind.rawValue) \(analyzed.reps.count)", "models": loadedModels])
+         "now": "\(kind.rawValue) \(analyzed.reps.count)", "models": models.names])
       return true
     } catch {
       log.event("error", ["where": "recents_rerun_\(`where`)", "id": entry.id, "message": "\(error)"])
       return false
-    }
-  }
-
-  private func loadModel() {
-    guard let url = Bundle.main.url(forResource: "yolo26n-pose", withExtension: "mlmodelc") else {
-      modelStatus = "yolo26n-pose.mlpackage missing from bundle"
-      // A build without the gitignored model packages launches with no predictor and nothing after the launch
-      // refresh but silence; say so in the log (2026-09-13: a fresh worktree's test-sim failed all five checks).
-      log.event("model_missing", ["model": "yolo26n-pose"])
-      return
-    }
-    BasePredictor.create(for: .pose, modelURL: url, isRealTime: true) { [weak self] result in
-      Task { @MainActor in
-        guard let self else { return }
-        switch result {
-        case .success(let predictor):
-          self.predictor = predictor
-          self.modelStatus = "yolo26n-pose"
-          self.log.event("model_loaded", ["model": "yolo26n-pose", "compute_units": "all"])
-          self.logPlan(model: "yolo26n-pose", url: url)
-          self.loadBellDetector()
-          if let url = self.pendingLoadURL {
-            self.pendingLoadURL = nil
-            self.load(url: url)
-          }
-        case .failure(let error):
-          self.modelStatus = "Model failed: \(error.localizedDescription)"
-          self.log.event("error", ["where": "model", "message": "\(error)"])
-        }
-      }
-    }
-  }
-
-  /// Where Core ML schedules the model's ops (CPU / GPU / Neural Engine), the same assignment Xcode's performance
-  /// report shows (#44). Logged as model_plan with per-device op counts.
-  /// Loading a plan compiles the model for analysis; it must not overlap inference on the same model, so the
-  /// offline pass waits for these before it starts (#43: the second phone crash landed as the pose plan finished).
-  private var planTasks: [Task<Void, Never>] = []
-
-  private func logPlan(model: String, url: URL) {
-    planTasks.append(
-      Task { [weak self] in
-        let counts = await ModelPlan.summary(compiledModelURL: url)
-        guard let self, !counts.isEmpty else { return }
-        var fields: [String: Any] = ["model": model]
-        for (k, v) in counts { fields[k] = v }
-        self.log.event("model_plan", fields)
-      })
-  }
-
-  private func waitForPlans() async {
-    for task in planTasks { await task.value }
-    planTasks = []
-  }
-
-  /// Igor, 2026-09-12: the detector was fun but made nothing better yet, and it halves the offline pass (94 → 44
-  /// fps). Off by default; `SWING_BELLS=1` in the environment or the `bellDetector` default turns it on for a trial.
-  static var bellDetectorEnabled: Bool {
-    ProcessInfo.processInfo.environment["SWING_BELLS"] == "1" || UserDefaults.standard.bool(forKey: "bellDetector")
-  }
-
-  /// The bell detector is optional: the app counts without it, it just does not see the bell. `force` loads it
-  /// regardless of the switch (an instrumented run always measures with it).
-  private func loadBellDetector(force: Bool = false) {
-    guard Self.bellDetectorEnabled || force else {
-      log.event("model_skipped", ["model": "yoloe-26n-kettlebell", "reason": "disabled"])
-      return
-    }
-    guard let url = Bundle.main.url(forResource: "yoloe-26n-kettlebell", withExtension: "mlmodelc") else {
-      log.event("model_missing", ["model": "yoloe-26n-kettlebell"])
-      return
-    }
-    do {
-      bellDetector = try BellDetector(compiledModelURL: url)
-      // Core ML picks the unit per layer within the configured set and never reports which; "all" means CPU,
-      // GPU and the Neural Engine. bell_avg_infer_ms in offline_pass is the only placement evidence.
-      log.event("model_loaded", ["model": "yoloe-26n-kettlebell", "compute_units": "all"])
-      logPlan(model: "yoloe-26n-kettlebell", url: url)
-    } catch {
-      log.event("error", ["where": "bell_model", "message": "\(error)"])
     }
   }
 
@@ -491,11 +398,22 @@ final class VideoPoseSession: NSObject, ObservableObject {
     stopCamera()
     untrimmed = nil
     canUndoTrim = false
-    guard predictor != nil else {
-      pendingLoadURL = url  // model still loading; retried from loadModel's completion
+    guard models.predictor != nil else {
+      // Model still loading: retry when ready, latest tap wins (replaces pendingLoadURL).
       statusMessage = "Waiting for model…"
+      loadRetry?.cancel()
+      loadRetry = Task { [weak self, url, origin, recordedAt] in
+        guard let self else { return }
+        guard await self.models.ready() != nil else {
+          self.statusMessage = "Model not ready"
+          return
+        }
+        guard !Task.isCancelled else { return }
+        self.load(url: url, origin: origin, recordedAt: recordedAt)
+      }
       return
     }
+    loadRetry?.cancel()
     currentFileURL = url
     trimmedURL = nil
     currentOrigin = origin
@@ -603,13 +521,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       switch StoredSetPlan.decide(
         storedVersion: entry.analysisVersion, storedModels: storedModels,
-        currentVersion: AnalysisVersion.current, currentModels: loadedModels,
+        currentVersion: AnalysisVersion.current, currentModels: models.names,
         mode: exerciseMode, storedExercise: pipeline.exercise, detection: fresh)
       {
       case .rerunFromClip(let exercise, _):
         log.event(
           "recents_rerun",
-          ["id": entry.id, "reason": "models_changed", "stored": storedModels, "current": loadedModels, "exercise": exercise.rawValue])
+          ["id": entry.id, "reason": "models_changed", "stored": storedModels, "current": models.names, "exercise": exercise.rawValue])
         rerunExercise = exercise
         await analyzeAndPlay(url: url)
         return
@@ -680,7 +598,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       try recents.save(
         id: id, source: source, recordedAt: currentRecordedAt ?? Date(), duration: duration,
         pipeline: pipeline, clipURL: clipURL, thumbnail: thumbnail,
-        originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil, models: loadedModels)
+        originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil, models: models.names)
       currentEntryID = id
       log.event("recents_saved", ["id": id, "reps": pipeline.reps.count, "in_photos": source.isPhotos])
     } catch {
@@ -731,12 +649,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     refreshTask?.cancel()
     // A set opened in the first second after launch (a Recents tap, the reopen hook) arrives before the model has
     // loaded; wait for it rather than abandoning the pass with "Model not ready" (#45).
-    var waited = 0
-    while predictor == nil, waited < 100 {
-      try? await Task.sleep(for: .milliseconds(100))
-      waited += 1
-    }
-    guard let predictor else {
+    guard let predictor = await models.ready() else {
       statusMessage = "Model not ready"
       log.event("error", ["where": "offline_pass", "message": "model not loaded after 10 s"])
       return
@@ -749,7 +662,6 @@ final class VideoPoseSession: NSObject, ObservableObject {
     passFramesSeen = 0
     liveInferenceEnabled = false
     activity = .working("Analyzing", progress: 0)
-    await waitForPlans()
     canCancelAnalysis = true
     defer {
       canCancelAnalysis = false
@@ -760,7 +672,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       guard let self else { return }
       do {
         let (frames, summary) = try await OfflineAnalyzer.extract(
-          url: url, predictor: predictor, bellDetector: bellDetector,
+          url: url, predictor: predictor, bellDetector: self.models.bellDetector,
           progress: { [weak self] fraction in
             Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
           },
@@ -1150,7 +1062,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   // MARK: - Shared frame ingest
 
   private func ingest(pixelBuffer: CVPixelBuffer, time: Double) {
-    guard liveInferenceEnabled, let predictor, !inferenceBusy,
+    guard liveInferenceEnabled, let predictor = models.predictor, !inferenceBusy,
       let sampleBuffer = Self.makeSampleBuffer(pixelBuffer, time: time)
     else { return }
     inferenceBusy = true
