@@ -13,6 +13,7 @@ struct ExerciseAnalyzerApp: App {
     // Never stop the lifter's music: mix with other audio and don't take over the session on playback.
     try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
     NotificationRouter.shared.install()
+    CrashReports.shared.install()  // last launch's crash arrives here and lands in the session log
   }
 
   var body: some Scene {

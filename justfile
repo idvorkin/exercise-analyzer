@@ -55,9 +55,22 @@ pull-logs:
       --domain-identifier {{bundle}} --source Documents/bugs.jsonl --destination ~/tmp/agent/swing-logs/bugs.jsonl || true
     xcrun devicectl device copy from --device {{device}} --domain-type appDataContainer \
       --domain-identifier {{bundle}} --source Documents/bugs --destination ~/tmp/agent/swing-logs/bugs || true
+    xcrun devicectl device copy from --device {{device}} --domain-type appDataContainer \
+      --domain-identifier {{bundle}} --source Documents/crashes --destination ~/tmp/agent/swing-logs/crashes || true
     ls -t ~/tmp/agent/swing-logs/logs | head -5
+    @ls -t ~/tmp/agent/swing-logs/crashes 2>/dev/null | head -3 | sed 's/^/crash report: /' || true
     @echo "--- bug reports (newest last); each names its log file:"
     @tail -5 ~/tmp/agent/swing-logs/bugs.jsonl 2>/dev/null | jq -c '{reported_at, note, log, clip, exercise, playhead}' || true
+
+# The phone's own crash reports (.ips) via libimobiledevice; needs the phone on USB and paired (`idevicepair pair`).
+# MetricKit reports (Documents/crashes, pulled by pull-logs) do not need this.
+pull-crashes:
+    mkdir -p ~/tmp/agent/swing-logs/ips
+    cd ~/tmp/agent/swing-logs/ips && idevicecrashreport -k . && ls -t | grep -i exercise | head -5
+
+# Resolve a MetricKit crash JSON's addresses with the last device build's dSYM (frames print as symbol +offset).
+symbolicate file:
+    scripts/symbolicate.sh {{file}}
 
 # Copy session logs from the simulator instead.
 pull-logs-sim:

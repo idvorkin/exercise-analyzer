@@ -43,3 +43,23 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Then:** the report carries a screenshot taken at the moment of the shake and, in playback, the clip's frame at the playhead; `just pull-logs` brings both to the Mac and the issue filed from the report shows them under the note
 
 - **Issues:** [#24](https://github.com/idvorkin/exercise-analyzer/issues/24)
+
+---
+
+### User Story 036:
+
+- **Summary:** A crash comes back with the logs (technical)
+- **Status:** implemented (commit named in the next docs commit); verified by build; needs the phone (the next crash, or none: the first one caught was the Float16 tensor read, fixed in the same commit)
+
+#### Use Case:
+- **As a** developer reading a session log that stops mid-work
+- **I want to** get the crash's stack and reason from the phone with the same pull as the logs, and resolve the app's frames against the build
+- **so that** a crash is diagnosed from evidence like any other report instead of from the last log line
+
+#### Acceptance Criteria:
+- **Scenario:** The app crashes during an offline pass
+- **Given:** the app crashed on the phone
+- **When:** it is launched again and I run `just pull-logs`
+- **Then:** the new session's log has a `crash_report` event naming a JSON file under `crashes/` with the exception, signal and reason, the file is pulled with the logs, and `just symbolicate <file>` prints the app's frames as symbols
+
+- **Issues:** none (Igor: "let's get a crash log library")

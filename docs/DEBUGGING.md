@@ -39,7 +39,7 @@ means the phone was busy or locked, so run it again. The current session's file 
 | Workouts | `recents_tap`, `recents_open`, `recents_rerun` (a stored set goes back to its video because its stored model set differs from this build's: stored, current; the `analyzed` that follows has reason rerun_models), `recents_missing`, `recents_saved` (id, in_photos), `recents_refresh_start`, `recents_redetect`, `workouts_day` (day, opened) |
 | Watch | `watch_session` (state, paired, app_installed), `watch_reachable`, `watch_scene` (active), `watch_status` / `watch_command` / `watch_command_reply` (from the watch), `watch_send_failed` (once per unreachable spell), `watch_preview` (first preview of a set), `watch_preview_failed`, `watch_mode`, `watch_mode_refused`, `record_prompt` |
 | Reports | `bug_report` (note, log, clip, exercise, playhead, phase, reps, recents_id, screenshot, frame) |
-| Failures | `error` (where: recorder / offline_pass / recents / save / bug_images / …, message) |
+| Failures | `error` (where: recorder / offline_pass / recents / save / bug_images / bell_model / …, message), `crash_report` (last launch's crash or hang from MetricKit: kind, exception, signal, reason, file) |
 
 Adding one: `log.event("snake_case_type", ["field": value])` from the session, or the component's `onEvent` hook
 (the watch bridge, Photos suggestions and the workout gallery use it). Log a failure once per spell, not once per
@@ -81,6 +81,18 @@ the numbers, then fix. Never ship a second guessed fix. Examples that paid off: 
    with a comment saying what was verified where and what Igor should feel. Igor reopens if it is not fixed.
 6. **Reports that arrive by voice** (Igor says it in the session rather than shaking) still get an issue, filed by
    hand with the same evidence, so the trail is complete.
+
+## Crash reports
+
+The app has no crash service; it uses MetricKit, which hands an app its own crash and hang diagnostics on the
+next launch (`CrashReports.swift`). Each payload is written to `Documents/crashes/<stamp>.json` and announced in
+the new session's log as `crash_report` (kind crash or hang, exception type, signal, termination reason, the file).
+`just pull-logs` copies the folder; `just symbolicate ~/tmp/agent/swing-logs/crashes/<stamp>.json` resolves the
+app's frames against the dSYM of the last `just build-device` (system frames print as offsets). The phone's own
+`.ips` reports are a second source: `just pull-crashes` uses libimobiledevice and needs the phone paired over USB.
+
+A session log that simply stops mid-work is the other crash signature: the last events say what was running.
+First crash caught this way: the detector's output tensor is Float16 on the phone and was read as Float32.
 
 ## Device tooling
 

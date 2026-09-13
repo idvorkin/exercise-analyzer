@@ -131,6 +131,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     if case .fixed(let kind) = exerciseMode { exercise = kind }
     pipeline = AnalysisPipeline(exercise: exercise)
     watch.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
+    CrashReports.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
     watch.onExercise = { [weak self] mode in
       guard let self else { return }

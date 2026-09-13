@@ -78,20 +78,36 @@
       }
     }
 
-    /// Rows of [x1, y1, x2, y2, conf, class, …] in model-input pixels → normalized image boxes.
-    static func parse(_ array: MLMultiArray, letterbox: Letterbox, minConfidence: Float) -> [(conf: Float, box: CGRect)] {
+    /// Rows of [x1, y1, x2, y2, conf, class, …] in model-input pixels → normalized image boxes. The tensor is
+    /// Float16 on the phone (the export is half precision and the Neural Engine keeps it so) and Float32 on the
+    /// Mac; reading it with the wrong width walks off the buffer, which is how the first phone run crashed.
+    public static func parse(_ array: MLMultiArray, letterbox: Letterbox, minConfidence: Float) -> [(conf: Float, box: CGRect)] {
       let shape = array.shape.map { $0.intValue }
       let strides = array.strides.map { $0.intValue }
+      guard shape.count == 3, strides.count == 3 else { return [] }
       let count = shape[1], width = shape[2]
       guard width >= 6 else { return [] }
-      let p = UnsafeMutablePointer<Float>(OpaquePointer(array.dataPointer))
+      let read: (Int) -> Float
+      switch array.dataType {
+      case .float16:
+        let p = UnsafeMutablePointer<Float16>(OpaquePointer(array.dataPointer))
+        read = { Float(p[$0]) }
+      case .float32:
+        let p = UnsafeMutablePointer<Float>(OpaquePointer(array.dataPointer))
+        read = { p[$0] }
+      case .double:
+        let p = UnsafeMutablePointer<Double>(OpaquePointer(array.dataPointer))
+        read = { Float(p[$0]) }
+      default:
+        read = { array[$0].floatValue }
+      }
       var out: [(Float, CGRect)] = []
       for i in 0..<count {
         let base = i * strides[1]
-        let conf = p[base + 4 * strides[2]]
+        let conf = read(base + 4 * strides[2])
         guard conf >= minConfidence else { continue }
-        let a = letterbox.point(CGPoint(x: CGFloat(p[base]), y: CGFloat(p[base + strides[2]])))
-        let b = letterbox.point(CGPoint(x: CGFloat(p[base + 2 * strides[2]]), y: CGFloat(p[base + 3 * strides[2]])))
+        let a = letterbox.point(CGPoint(x: CGFloat(read(base)), y: CGFloat(read(base + strides[2]))))
+        let b = letterbox.point(CGPoint(x: CGFloat(read(base + 2 * strides[2])), y: CGFloat(read(base + 3 * strides[2]))))
         let box = CGRect(
           x: a.x / letterbox.inputSize.width, y: a.y / letterbox.inputSize.height,
           width: (b.x - a.x) / letterbox.inputSize.width, height: (b.y - a.y) / letterbox.inputSize.height)
