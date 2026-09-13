@@ -282,7 +282,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 046:
 
 - **Summary:** Rest timer on the wrist
-- **Status:** implemented, needs the watch (design lead, 2026-09-13, for Igor's "think through other good watch user stories" in #67)
+- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); needs phone + watch (design lead, 2026-09-13, for Igor's "think through other good watch user stories" in #67)
 - **Why:** rest length is the one number between sets, and the watch is the only screen on the lifter; today it shows nothing between Done and the next Record.
 
 #### Use Case:
