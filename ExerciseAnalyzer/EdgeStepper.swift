@@ -26,11 +26,12 @@ enum StepKey: CaseIterable {
     case .position: return "flag"
     }
   }
-  /// The `ui` log action per key (story 039).
-  var logAction: String {
+  /// The `ui` log key per key (story 039): the hold logs one `action: "hold"` event per press,
+  /// never a second step event.
+  var logKey: String {
     switch self {
     case .rep: return "rep"
-    case .frame: return "step"
+    case .frame: return "frame"
     case .position: return "position"
     }
   }
@@ -144,6 +145,9 @@ struct MiddleHold: View {
   @Binding var rightLit: StepKey?
   @Binding var pulse: Int
 
+  @Environment(\.scenePhase) private var scenePhase
+  @GestureState private var touching = false
+
   @State private var touchStart: Date?
   @State private var killed = false
   @State private var activeSide: StepSide?
@@ -156,7 +160,7 @@ struct MiddleHold: View {
     GeometryReader { geo in
       Color.clear.contentShape(Rectangle())
         .gesture(
-          LongPressGesture(minimumDuration: Self.holdSeconds)
+          LongPressGesture(minimumDuration: Self.holdSeconds, maximumDistance: Self.tapSlop)
             .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
             .onChanged { value in
               guard case .second(true, let drag) = value else { return }
@@ -171,8 +175,9 @@ struct MiddleHold: View {
         )
         .simultaneousGesture(
           DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .updating($touching) { _, state, _ in state = true }
             .onChanged { value in
-              if touchStart == nil { touchStart = Date() }
+              if touchStart == nil { touchStart = Date(); killed = false }
               if !holding, abs(value.translation.width) > Self.tapSlop || abs(value.translation.height) > Self.tapSlop {
                 killed = true
               }
@@ -189,6 +194,11 @@ struct MiddleHold: View {
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Middle: hold for back and forward keys")
+    // Watchdog: SwiftUI resets the gesture state (but calls no gesture callback) when the system
+    // takes the touch away, so end the touch there — otherwise the repeat timer keeps stepping.
+    .onChange(of: touching) { _, down in if !down, holding || repeatTimer != nil { endTouch() } }
+    .onChange(of: scenePhase) { _, phase in if phase != .active { endTouch() } }
+    .onDisappear { endTouch() }
   }
 
   /// Follows the finger in middle-local coordinates: past the middle's edge is a stack, y thirds
@@ -204,8 +214,14 @@ struct MiddleHold: View {
       side = location.x < 0 ? .previous : (location.x > size.width ? .next : nil)
     }
     guard let side else { deactivate(); return }
-    let row = min(StepKey.allCases.count - 1, max(0, Int(location.y / (size.height / CGFloat(StepKey.allCases.count)))))
-    let key = StepKey.allCases[row]
+    let rowHeight = size.height / CGFloat(StepKey.allCases.count)
+    var row = Int(location.y / rowHeight)
+    if activeSide == side, let active = activeKey, let activeRow = StepKey.allCases.firstIndex(of: active),
+      location.y >= CGFloat(activeRow) * rowHeight - Self.reentryMargin,
+      location.y < CGFloat(activeRow + 1) * rowHeight + Self.reentryMargin {
+      row = activeRow
+    }
+    let key = StepKey.allCases[min(StepKey.allCases.count - 1, max(0, row))]
     if activeSide == side, activeKey == key { return }
     arrive(side: side, key: key)
   }
@@ -266,7 +282,8 @@ struct MiddleStacks: View {
 
   var body: some View {
     GeometryReader { geo in
-      let width = min(geo.size.width * 0.32, 210)
+      // Same 24 % as the edge zones and 030's cards: the cards end where the fire region ends.
+      let width = geo.size.width * 0.24
       HStack {
         KeyStackView(side: .previous, lit: leftLit, litScale: scale(leftLit))
           .frame(width: width)

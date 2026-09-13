@@ -446,7 +446,8 @@ struct ContentView: View {
       let width = geo.size.width * 0.24
       let inset = geo.size.height * 0.16
       ZStack {
-        HStack {
+        // No spacing: the middle hold's fire region starts exactly where the 24 % edge zones end.
+        HStack(spacing: 0) {
           EdgeStepper(
             side: .previous, onTap: { chromeAction { session.stepFrame(-1) } },
             onKey: { key in
@@ -472,7 +473,8 @@ struct ContentView: View {
               }
               session.log.event(
                 "ui",
-                ["action": key.logAction, "delta": side == .next ? 1 : -1, "from": "hold", "repeat": repeatIndex, "atEnd": atEnd])
+                ["action": "hold", "key": key.logKey, "side": side == .next ? "next" : "previous",
+                 "delta": side == .next ? 1 : -1, "repeat": repeatIndex, "at_end": atEnd])
             },
             onTap: { if session.source == .file { session.togglePlayback() } },
             clock: { session.currentTime },
