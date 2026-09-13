@@ -12,6 +12,7 @@ evidence, so a threshold is never re-derived from scratch. One file per exercise
 | [turkish-get-up.md](turkish-get-up.md) | lying / rising / standing / lowering on uprightness; the 2026-09-12 staging study and the proposed stages |
 | [detector.md](detector.md) | which exercise a set is, from floor time, arm cycles, knee asymmetry and foot elevation |
 | [kettlebell-detector.md](kettlebell-detector.md) | seeing the bell with a second model: the YOLO-World Core ML trial on the sample clips (#18) |
+| [optimization.md](optimization.md) | index of every precision and speed hypothesis, with its numbers (#18) |
 
 ## The pipeline
 
