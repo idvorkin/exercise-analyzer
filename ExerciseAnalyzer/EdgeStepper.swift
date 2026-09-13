@@ -32,6 +32,7 @@ struct EdgeStepper: View {
 
   @State private var holding = false
   @State private var highlighted: Key?
+  @State private var touchStart: Date?
 
   var body: some View {
     GeometryReader { geo in
@@ -73,7 +74,19 @@ struct EdgeStepper: View {
             highlighted = nil
           }
       )
-      .onTapGesture { onTap() }
+      // Every quick touch-up is one step, with no double-tap disambiguation delay: a double tap steps twice, a
+      // triple tap three times. A hold (0.3 s) is the key overlay instead.
+      .simultaneousGesture(
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+          .onChanged { _ in if touchStart == nil { touchStart = Date() } }
+          .onEnded { value in
+            defer { touchStart = nil }
+            guard let start = touchStart, !holding, Date().timeIntervalSince(start) < 0.3,
+              abs(value.translation.width) < 20, abs(value.translation.height) < 20
+            else { return }
+            onTap()
+          }
+      )
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(side == .next ? "Next: tap for a frame, hold for rep, frame or position" : "Previous: tap for a frame, hold for rep, frame or position")
