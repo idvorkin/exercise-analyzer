@@ -417,33 +417,23 @@ struct ContentView: View {
         } label: {
           Label("Camera", systemImage: "camera")
         }
-        Menu {
-          Button {
-            showRecents = true
-          } label: {
-            Label("Workouts", systemImage: "calendar")
-          }
-          Button {
+        Button {
+          showOpenDialog = true
+        } label: {
+          Label("Open", systemImage: "folder.badge.plus")
+        }
+        // A full-width action sheet with big rows, gym-friendly (#25): Workouts first, Files last.
+        .confirmationDialog("Open", isPresented: $showOpenDialog, titleVisibility: .visible) {
+          Button("Workouts") { showRecents = true }
+          Button("Photos") {
             // Read access lets Recents point back at the asset instead of copying it.
             PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
               Task { @MainActor in showPhotosPicker = true }
             }
-          } label: {
-            Label("Photos", systemImage: "photo.on.rectangle")
           }
-          Button {
-            showFileImporter = true
-          } label: {
-            Label("Files", systemImage: "folder")
-          }
-          Divider()
-          Button {
-            showBugReport = true
-          } label: {
-            Label("Report a problem (or shake)", systemImage: "ladybug")
-          }
-        } label: {
-          Label("Open", systemImage: "folder.badge.plus")
+          Button("Files") { showFileImporter = true }
+          Button("Report a problem (or shake)") { showBugReport = true }
+          Button("Cancel", role: .cancel) {}
         }
       }
       .labelStyle(.iconOnly)
