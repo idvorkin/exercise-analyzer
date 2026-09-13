@@ -3,6 +3,7 @@
 //  Not assertions: these print how an analyzer behaves on a fixture under different thresholds, for tuning on
 //  the Mac against real sets. Run with `swift test --filter TuningReports`.
 
+import CoreGraphics
 import XCTest
 
 @testable import ExerciseCore
@@ -120,5 +121,49 @@ extension TuningReports {
     report(fixture.name, pipeline)
     for rep in pipeline.reps { print("    rep \(rep.number) quality \(rep.quality.metrics) \(rep.quality.feedback)") }
     print("    detection:", ExerciseDetector.detect(frames: frames).reason)
+  }
+
+  /// Get-up signals every half second: uprightness, spine lean, hip and knee angles per side, the overhead side,
+  /// the support arm's elbow angle, and the torso's angle from the screen's horizontal. This is the table the
+  /// staging in docs/analysis/turkish-get-up.md was read from; rerun it when the stages or the camera change.
+  func testTurkishGetUpSignals() throws {
+    for fixture in Fixture.all where fixture.expectedExercise == .turkishGetUp {
+      let frames = try fixture.frames()
+      let pipeline = AnalysisPipeline(exercise: .turkishGetUp, analyzer: TurkishGetUpAnalyzer())
+      print("=== \(fixture.name)")
+      print("    t  phase      up  spine  hipL  hipR kneeL kneeR ovh supElb torso")
+      var nextPrint = 0.0
+      for frame in frames {
+        let result = pipeline.process(extracted: frame) { nil }
+        guard frame.time >= nextPrint, let pose = frame.pose else { continue }
+        nextPrint += 0.5
+        let s = BodySkeleton(pose: pose)
+        let overhead = s.overheadArmSide
+        var supportElbow = 0.0
+        if let support = overhead?.other, let sh = s.point(support.shoulder), let el = s.point(support.elbow),
+          let wr = s.point(support.wrist)
+        {
+          supportElbow = Self.angle(sh, vertex: el, wr)
+        }
+        var torso = 0.0
+        if let sh = s.point(.leftShoulder) ?? s.point(.rightShoulder), let hip = s.point(.leftHip) ?? s.point(.rightHip) {
+          torso = atan2(Double(hip.y - sh.y), Double(abs(hip.x - sh.x))) * 180 / .pi
+        }
+        print(
+          String(
+            format: "%6.1f  %-9@ %5.2f %5.0f %5.0f %5.0f %5.0f %5.0f  %@  %5.0f %5.0f",
+            frame.time, (result.analysis?.phase ?? "-") as NSString, s.uprightness ?? -9, s.spineAngle,
+            s.hipAngle(.left), s.hipAngle(.right), s.kneeAngle(.left), s.kneeAngle(.right),
+            (overhead == .left ? "L" : overhead == .right ? "R" : "-") as NSString, supportElbow, torso))
+      }
+    }
+  }
+
+  private static func angle(_ a: CGPoint, vertex v: CGPoint, _ b: CGPoint) -> Double {
+    let v1 = CGVector(dx: a.x - v.x, dy: a.y - v.y), v2 = CGVector(dx: b.x - v.x, dy: b.y - v.y)
+    let dot = Double(v1.dx * v2.dx + v1.dy * v2.dy)
+    let mag = Double(hypot(v1.dx, v1.dy) * hypot(v2.dx, v2.dy))
+    guard mag > 0 else { return 0 }
+    return acos(max(-1, min(1, dot / mag))) * 180 / .pi
   }
 }

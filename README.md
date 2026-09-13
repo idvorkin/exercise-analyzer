@@ -5,6 +5,7 @@ squats and Bulgarian split squats next. A native port of the analysis core and U
 [idvorkin/swing-analyzer](https://github.com/idvorkin/swing-analyzer).
 
 User stories (Cohn + Gherkin, each with its implementation status and commits): [docs/stories/](docs/stories/README.md).
+How poses become phases, reps and scores, with the evidence behind every rule: [docs/analysis/](docs/analysis/README.md).
 
 ## Screenshots
 
