@@ -58,6 +58,9 @@ squats and Turkish get-ups. `ExerciseCore/` is the platform-free analysis packag
 - **Device tooling**: builds need the sandbox off and `-allowProvisioningUpdates -allowProvisioningDeviceRegistration`,
   never `-sdk` (breaks the watch target). "No provider was found" is noise. A locked phone fails launch, not install.
   Install the watch app separately when the watch target changed ([DEBUGGING.md](docs/DEBUGGING.md)).
+- **Edit files with the Read, Edit and Write tools.** Not with Python or sed scripts wrapped in a shell command:
+  Igor reads the diffs, and a tool edit shows exactly what changed. Shell is for building, testing, git and
+  device commands.
 - **Background agents** that investigate are read-only, in a worktree, notes under `~/tmp/agent/notes/`; confirm scope
   before an agent that writes to the repo. Reap background commands when done.
 - **Gym-first UI**: few large targets, HUD on the video, Recents point at Photos. Propose with a numeric plan or a
