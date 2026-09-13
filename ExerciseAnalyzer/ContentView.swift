@@ -74,6 +74,10 @@ struct ContentView: View {
             ProgressView(value: progress).frame(width: 160)
             Text(progress.map { "\(label) \(Int($0 * 100))%" } ?? "\(label)…")
               .font(.footnote).foregroundStyle(.white)
+            if session.canCancelAnalysis {
+              Button("Cancel") { session.cancelAnalysis() }
+                .buttonStyle(.bordered).tint(.white).font(.footnote)
+            }
           }
           .padding(16)
           .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))

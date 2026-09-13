@@ -396,11 +396,43 @@ final class VideoPoseSession: NSObject, ObservableObject {
     installPlayerItem(url: url, pipeline: AnalysisPipeline(exercise: exercise))
     liveInferenceEnabled = false
     activity = .working("Analyzing", progress: 0)
-    do {
-      let (frames, summary) = try await OfflineAnalyzer.extract(url: url, predictor: predictor) {
-        [weak self] fraction in
-        Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
+    canCancelAnalysis = true
+    defer { canCancelAnalysis = false; analysisTask = nil }
+    let task = Task { [weak self] in
+      guard let self else { return }
+      do {
+        let (frames, summary) = try await OfflineAnalyzer.extract(url: url, predictor: predictor) {
+          [weak self] fraction in
+          Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
+        }
+        try Task.checkCancellation()
+        await self.finishAnalysis(url: url, frames: frames, summary: summary)
+      } catch is CancellationError {
+        self.statusMessage = "Analysis cancelled"
+      } catch OfflineAnalyzer.OfflineError.cancelled {
+        self.statusMessage = "Analysis cancelled"
+      } catch {
+        self.statusMessage = "Analysis failed: \(error.localizedDescription)"
+        self.log.event("error", ["where": "offline_pass", "message": "\(error)"])
       }
+    }
+    analysisTask = task
+    // Test hook: SWING_CANCEL_ANALYSIS=1 cancels one second in (simulator runs can't tap the UI).
+    if ProcessInfo.processInfo.environment["SWING_CANCEL_ANALYSIS"] == "1" {
+      Task { try? await Task.sleep(for: .seconds(1)); self.cancelAnalysis() }
+    }
+    await task.value
+    activity = .idle
+    liveInferenceEnabled = true
+    play()
+    // Test hook: SWING_AUTO_TRIM=1 trims right after the first analysis (simulator runs can't tap the UI).
+    if trimmedURL == nil, ProcessInfo.processInfo.environment["SWING_AUTO_TRIM"] == "1" {
+      trimToReps()
+    }
+  }
+
+  private func finishAnalysis(url: URL, frames: [FrameRecord], summary: OfflineAnalyzer.Summary) async {
+    do {
       extractedFrames = frames
       log.event(
         "offline_pass",

@@ -14,6 +14,7 @@ enum OfflineAnalyzer {
   enum OfflineError: Error {
     case noVideoTrack
     case readerFailed(String)
+    case cancelled
   }
 
   struct Summary {
@@ -58,6 +59,10 @@ enum OfflineAnalyzer {
       var lastProgress = 0.0
 
       while let sampleBuffer = output.copyNextSampleBuffer() {
+        if Task.isCancelled {
+          reader.cancelReading()
+          throw OfflineError.cancelled
+        }
         let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         catcher.result = nil
         predictor.predict(sampleBuffer: sampleBuffer, onResultsListener: catcher, onInferenceTime: catcher)
