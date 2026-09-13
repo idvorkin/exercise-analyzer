@@ -15,8 +15,7 @@ final class PhoneLink: NSObject, ObservableObject {
   @Published private(set) var receivedAt: Date?
   /// Latest preview frame from the phone (about 1 fps while recording).
   @Published private(set) var preview: UIImage?
-  /// Workout session that keeps this app, and so the connection, alive with the wrist down.
-  let workout = WorkoutKeeper()
+
   /// Status older than this is stale: the phone app may be gone without having sent an idle status.
   static let maxStatusAge: TimeInterval = 8
 
@@ -35,11 +34,9 @@ final class PhoneLink: NSObject, ObservableObject {
 
   override init() {
     super.init()
-    workout.onEvent = { [weak self] type, fields in self?.logEvent(type, fields) }
     guard WCSession.isSupported() else { return }
     WCSession.default.delegate = self
     WCSession.default.activate()
-    workout.prepare()
   }
 
   /// Called from the view's scene phase: tells the phone whether to stream previews, and pings on wake.
@@ -60,8 +57,6 @@ final class PhoneLink: NSObject, ObservableObject {
   }
 
   func send(_ command: WatchCommand) {
-    if command == .cancel, workout.running { workout.stop(keep: false) }
-    if command == .start, !workout.running { workout.start() }  // start early: the phone's first status can lag
     let session = WCSession.default
     logEvent("command", ["command": command.rawValue, "reachable": session.isReachable, "activation": session.activationState.rawValue, "live": isLive])
     guard session.activationState == .activated else { return }
@@ -90,9 +85,6 @@ final class PhoneLink: NSObject, ObservableObject {
       if previous.frame.inFrame && !next.frame.inFrame { WKInterfaceDevice.current().play(.notification) }
       if next.reps > previous.reps { WKInterfaceDevice.current().play(.success) }
     }
-    // The set is the workout: keep the app alive for exactly as long as the phone records.
-    if next.recording && !workout.running { workout.start() }
-    if !next.recording && workout.running { workout.stop(keep: true) }
   }
 }
 

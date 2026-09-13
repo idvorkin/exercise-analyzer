@@ -6,13 +6,6 @@
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>com.idvorkin.exerciseanalyzer</string>
-	<key>WKBackgroundModes</key>
-	<array>
-		<string>workout-processing</string>
-	</array>
-	<key>NSHealthShareUsageDescription</key>
-	<string>Exercise Analyzer runs a workout session so the watch stays connected to the phone while your wrist is down.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>Exercise Analyzer records each set as a strength-training workout.</string>
+
 </dict>
 </plist>

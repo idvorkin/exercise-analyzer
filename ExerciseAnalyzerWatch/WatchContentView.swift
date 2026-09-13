@@ -81,6 +81,7 @@ struct WatchContentView: View {
           .disabled(!phone.reachable)
           exercisePicker
           watchModeToggle
+
         }
         if let error = phone.lastError {
           Text(error).font(.caption2).foregroundStyle(.red).multilineTextAlignment(.center)
