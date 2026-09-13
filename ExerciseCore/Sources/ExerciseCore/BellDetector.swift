@@ -47,6 +47,12 @@
     /// Sightings kept per frame, most confident first. A gym rack holds a dozen confident bells and a blurred
     /// swung bell can rank behind all of them: six truncated it in a fifth of a one-hand swing's frames.
     public var maxSightings = 12
+    /// Extra sightings past the cap, reserved for boxes within reach of a visible wrist (H26: Igor's gym crowds
+    /// the swung bell out of the twelve; 30 everywhere costs memory and a colour sample per box per frame).
+    public var handExtra = 4
+    /// How near a box centre must be to a visible wrist to earn the reserve, in normalized units: the tracker's
+    /// `handDistance`, the distance that defines "at the hands".
+    public var handReach: CGFloat = 0.2
     /// Milliseconds spent in the last `detect` call, for the session log.
     public private(set) var lastInferenceMs = 0.0
     /// Whether each box's mean colour is sampled from the pixels (off for experiments).
@@ -66,7 +72,10 @@
     }
 
     /// Every bell in the frame, boxes normalized to the image (origin top-left), colours sampled from the pixels.
-    public func detect(in pixelBuffer: CVPixelBuffer) -> [BellSighting] {
+    /// `wrists` are the frame's visible wrists in normalized coords: past the cap, boxes within reach of one are
+    /// kept too (up to `handExtra`), so a crowded rack cannot crowd the swung bell out. Empty means the cap is
+    /// as before.
+    public func detect(in pixelBuffer: CVPixelBuffer, wrists: [CGPoint] = []) -> [BellSighting] {
       let started = Date()
       defer { lastInferenceMs = Date().timeIntervalSince(started) * 1000 }
       // Vision's observations and the output tensors (a 37 × 8400 and a 32 × 160 × 160 per frame) are autoreleased;
@@ -87,7 +96,9 @@
           ? Self.parseDense(tensor, letterbox: letterbox, minConfidence: minConfidence)
           : Self.parse(tensor, letterbox: letterbox, minConfidence: minConfidence)
         let boxes = Self.suppressOverlaps(parsed)
-        return boxes.prefix(maxSightings).map { conf, box in
+        return Self.select(
+          candidates: boxes, wrists: wrists, cap: maxSightings, extra: handExtra, reach: handReach
+        ).map { conf, box in
           BellSighting(box: box, conf: conf, color: samplesColor ? BellColorSampler.averageColor(in: pixelBuffer, box: box) : nil)
         }
       }
@@ -108,6 +119,35 @@
         if !duplicate { kept.append(candidate) }
       }
       return kept
+    }
+
+    /// Picks the sightings to keep from post-NMS candidates: the top `cap` by confidence, then up to `extra`
+    /// more (in confidence order) whose centre is within `reach` of a wrist. With no wrists in view the cap is
+    /// as before, and the total never grows past `cap + extra`. Pure, so the host covers it (H26).
+    public static func select(
+      candidates: [(conf: Float, box: CGRect)], wrists: [CGPoint], cap: Int, extra: Int, reach: CGFloat
+    ) -> [(conf: Float, box: CGRect)] {
+      let ordered = candidates.sorted { $0.conf > $1.conf }
+      var kept = Array(ordered.prefix(cap))
+      guard extra > 0, ordered.count > cap else { return kept }
+      for candidate in ordered.dropFirst(cap) {
+        if kept.count >= cap + extra { break }
+        let center = CGPoint(x: candidate.box.midX, y: candidate.box.midY)
+        let nearHand = wrists.contains { Double(hypot($0.x - center.x, $0.y - center.y)) <= Double(reach) }
+        if nearHand { kept.append(candidate) }
+      }
+      return kept
+    }
+
+    /// Visible wrists in normalized image coords, by the tracker's rule (confidence above
+    /// `BodySkeleton.visibleThreshold`).
+    public static func wrists(of pose: Pose?) -> [CGPoint] {
+      guard let pose else { return [] }
+      return [CocoKeypoint.leftWrist, .rightWrist].compactMap { k in
+        let i = k.rawValue
+        guard i < pose.xyn.count, i < pose.conf.count, pose.conf[i] > BodySkeleton.visibleThreshold else { return nil }
+        return CGPoint(x: CGFloat(pose.xyn[i].x), y: CGFloat(pose.xyn[i].y))
+      }
     }
 
     /// The dense head: [1, channels, anchors] with channels = 4 box (centre x, y, width, height in model-input

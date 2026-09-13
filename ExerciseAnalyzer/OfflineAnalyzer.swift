@@ -98,6 +98,7 @@ enum OfflineAnalyzer {
       // Test hook: SWING_INTERRUPT_READER=<frame> fails the first pass at that frame with the same error a
       // backgrounded app's decoder produces (simulator runs can't leave the foreground, #57).
       let interruptAt = Int(ProcessInfo.processInfo.environment["SWING_INTERRUPT_READER"] ?? "")
+      var lastWrists: [CGPoint] = []  // previous frame's wrists, for the overlapped bell path below
 
       while let sampleBuffer = output.copyNextSampleBuffer() {
         if Task.isCancelled {
@@ -111,16 +112,18 @@ enum OfflineAnalyzer {
         windowDecode += (decoded - frameStart) * 1000
         let (result, frame): (YOLOResult?, FrameRecord?) = autoreleasepool {
           catcher.result = nil
-          // The detector runs on a second thread while the pose model runs: both only read the frame, and the two
-          // passes overlap instead of adding up (Igor, 2026-09-13: "could we run both image models at once?";
-          // on the Mac 60 → 85 fps, the same tracker result; the phone's number is offline_pass's fps).
+          // The detector runs on a second thread while the pose model runs: both only read the frame, and the
+          // two passes overlap instead of adding up (3ba7902 doubled the phone's pass, 38.6 → 77.1 fps, and
+          // that stays). It sees the previous frame's wrists — one frame of lag at 30+ fps is far under the
+          // 0.2 reach (H26); the first frame has none.
           var bells: [BellSighting] = []
           let pixelBuffer = bellDetector == nil ? nil : CMSampleBufferGetImageBuffer(sampleBuffer)
           let group = DispatchGroup()
           if let bellDetector, let pixelBuffer {
             group.enter()
+            let wrists = lastWrists
             DispatchQueue.global(qos: .userInitiated).async {
-              bells = bellDetector.detect(in: pixelBuffer)
+              bells = bellDetector.detect(in: pixelBuffer, wrists: wrists)
               group.leave()
             }
           }
@@ -128,6 +131,7 @@ enum OfflineAnalyzer {
           group.wait()
           guard let result = catcher.result else { return (nil, nil) }
           var frame = FrameRecord(result: result, time: time)
+          lastWrists = BellDetector.wrists(of: frame.pose)
           if let bellDetector, pixelBuffer != nil {
             bellTotal += bellDetector.lastInferenceMs
             windowBell += bellDetector.lastInferenceMs

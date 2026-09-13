@@ -127,8 +127,8 @@ Part of the [user stories](README.md); persona and format are described there.
 
 ### User Story 033:
 
-- **Summary:** See a get-up step by step: elbow, hand, kneel, lunge, stand, and back down
-- **Status:** implemented in [1f815f5](https://github.com/idvorkin/exercise-analyzer/commit/1f815f5); verified on the host (`GetUpStageTests`: four reps under two cameras land in the study's windows); the pills and the nine-column gallery need the phone
+- **Summary:** See a get-up step by step: floor, elbow, hand, kneel, lunge, stand, and back down to the floor
+- **Status:** implemented in [1f815f5](https://github.com/idvorkin/exercise-analyzer/commit/1f815f5); verified on the host (`GetUpStageTests`: four reps under two cameras land in the study's windows); the pills and the nine-column gallery need the phone; [#48](https://github.com/idvorkin/exercise-analyzer/issues/48): Floor brackets every rep (flat lying just before the first movement, back flat after the elbow), eleven gallery columns, the Floor pill in place of Lying
 
 #### Use Case:
 - **As a** lifter reviewing a get-up
@@ -139,7 +139,7 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Reviewing a two-sided set
 - **Given:** a clip with one get-up per side is analyzed
 - **When:** I open it
-- **Then:** each rep shows Lying, Elbow, Hand, Kneel, Lunge, Standing and the way down's Lunge, Kneel and Elbow in the gallery, the HUD's six pills follow the step as it plays (a way-down step lights the same pill as its way-up step), tapping a pill jumps to that step's nearest occurrence in the current rep, and the rep count is unchanged
+- **Then:** each rep shows Floor, Lying, Elbow, Hand, Kneel, Lunge, Standing and the way down's Lunge, Kneel, Elbow and Floor in the gallery (eleven columns), the HUD's six pills follow the step as it plays (Floor in place of Lying; a way-down step lights the same pill as its way-up step), tapping a pill jumps to that step's nearest occurrence in the current rep, and the rep count is unchanged
 
 - **Issues:** none (Igor: "the get-up is going to need more stages")
 
@@ -148,7 +148,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 034:
 
 - **Summary:** See the bell on the video, and its weight from its colour
-- **Status:** implemented but **off by default** (Igor, 2026-09-12: fun, made nothing better yet, halves the pass; `SWING_BELLS=1` or the `bellDetector` default turns it on); implemented in [3b997e1](https://github.com/idvorkin/exercise-analyzer/commit/3b997e1), [ab4f1a5](https://github.com/idvorkin/exercise-analyzer/commit/ab4f1a5), [9552f70](https://github.com/idvorkin/exercise-analyzer/commit/9552f70); verified on the host (`BellTests`, five fixtures with bells), the simulator, and the phone (IMG_4342, 3989 frames: 91 s at 43.7 fps, detector 12 ms a frame, memory flat at 73 MB, bell in 2962 frames); the dot on the video needs Igor's eye. "Stays marked through the whole rep" in [85ed8e5](https://github.com/idvorkin/exercise-analyzer/commit/85ed8e5): verified on the host (`TuningReports.testBellTrackerHeldPerFixture`: swings 99 % and 92 %, get-up 77 %, pistols 4 %, Bulgarian 0 %) and on the Mac model rung (posetrack on the five clips); [be9c75d](https://github.com/idvorkin/exercise-analyzer/commit/be9c75d) fills the frames before each start from a backward pass (one-hand swing 98 %, 4-rep 100 %, get-up 82 %); [fd97209](https://github.com/idvorkin/exercise-analyzer/commit/fd97209) and [a6a2cf5](https://github.com/idvorkin/exercise-analyzer/commit/a6a2cf5) after grading frames by eye: no dot on the rack, the ski-erg wheel, the head or the chest (get-up rest-phase false holds 25→7 of 58 frames, inside reps 91 %); the phone with `SWING_BELLS=1` is still to do
+- **Status:** implemented but **off by default** (Igor, 2026-09-12: fun, made nothing better yet, halves the pass; `SWING_BELLS=1` or the `bellDetector` default turns it on); implemented in [3b997e1](https://github.com/idvorkin/exercise-analyzer/commit/3b997e1), [ab4f1a5](https://github.com/idvorkin/exercise-analyzer/commit/ab4f1a5), [9552f70](https://github.com/idvorkin/exercise-analyzer/commit/9552f70); verified on the host (`BellTests`, five fixtures with bells), the simulator, and the phone (IMG_4342, 3989 frames: 91 s at 43.7 fps, detector 12 ms a frame, memory flat at 73 MB, bell in 2962 frames); the dot on the video needs Igor's eye. "Stays marked through the whole rep" in [85ed8e5](https://github.com/idvorkin/exercise-analyzer/commit/85ed8e5): verified on the host (`TuningReports.testBellTrackerHeldPerFixture`: swings 99 % and 92 %, get-up 77 %, pistols 4 %, Bulgarian 0 %) and on the Mac model rung (posetrack on the five clips); [be9c75d](https://github.com/idvorkin/exercise-analyzer/commit/be9c75d) fills the frames before each start from a backward pass (one-hand swing 98 %, 4-rep 100 %, get-up 82 %); [fd97209](https://github.com/idvorkin/exercise-analyzer/commit/fd97209) and [a6a2cf5](https://github.com/idvorkin/exercise-analyzer/commit/a6a2cf5) after grading frames by eye: no dot on the rack, the ski-erg wheel, the head or the chest (get-up rest-phase false holds 25→7 of 58 frames, inside reps 91 %); the phone with `SWING_BELLS=1` is still to do; [a9065a5](https://github.com/idvorkin/exercise-analyzer/commit/a9065a5) keeps room at the cap for a box at the hands (H26: twelve by confidence plus up to 4 within 0.2 of a wrist, model name `yoloe-26n-kettlebell@0.15x12+4`; Mac model rung and phone still to do)
 
 #### Use Case:
 - **As a** lifter reviewing a swing or a get-up
