@@ -38,8 +38,9 @@ public final class AnalysisPipeline: @unchecked Sendable {
   @discardableResult
   public func process(extracted: FrameRecord, image: () -> CGImage?) -> FrameRecord {
     let analysis = extracted.pose.map { analyzer.process(pose: $0, time: extracted.time, image: image) }
-    let bell = extracted.bell
-      ?? (extracted.bells.isEmpty ? nil : bellTracker.track(extracted.bells, pose: extracted.pose, personHeight: extracted.box?.height))
+    // The tracker sees every frame, including one with no sighting at all: that is how a track ages, and how a
+    // blink of the detector is coasted over (Codex's review of 85ed8e5: skipping empty frames froze both).
+    let bell = extracted.bell ?? bellTracker.track(extracted.bells, pose: extracted.pose, personHeight: extracted.box?.height)
     let frame = FrameRecord(
       time: extracted.time, imageSize: extracted.imageSize, pose: extracted.pose, box: extracted.box,
       analysis: analysis, bells: extracted.bells, bell: bell)
@@ -51,9 +52,12 @@ public final class AnalysisPipeline: @unchecked Sendable {
   /// Analyzes a whole extracted track (offline pass output or a Recents track) as `exercise`.
   public static func analyze(frames: [FrameRecord], exercise: ExerciseKind) -> AnalysisPipeline {
     let pipeline = AnalysisPipeline(exercise: exercise)
-    // The whole track is known: bells that sit in one place for much of it are furniture, never the one in play.
-    pipeline.bellTracker.staticZones = BellTracker.staticZones(in: frames)
+    // The whole track is known: bells that sit in one place for much of it are furniture, never the one in play,
+    // and the frames before each track's confident start can be filled from a pass run backward.
+    let zones = BellTracker.staticZones(in: frames)
+    pipeline.bellTracker.staticZones = zones
     for frame in frames { pipeline.process(extracted: frame) { nil } }
+    pipeline.track.replaceAll(with: BellTracker.filledBackward(pipeline.track.frames, staticZones: zones))
     return pipeline
   }
 

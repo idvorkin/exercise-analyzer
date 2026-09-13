@@ -155,4 +155,24 @@ final class BellTests: XCTestCase {
     XCTAssertEqual(frame.bells, [])
     XCTAssertNil(frame.bell)
   }
+
+  func testBackwardPassFillsTheFramesBeforeAConfidentStartWithDetectedBoxesOnly() {
+    // Frames 0–1: the bell at the hands reads 0.3 (a blurred pick-up), too faint to start on; frame 2: 0.9.
+    // Frame 3: nothing seen at all. Forward, frame 2 holds and frame 3 is carried (conf 0); backward, frames 0–1
+    // are the same bell followed from the confident one, written with their detected boxes.
+    let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
+    func frame(_ i: Int, _ bells: [BellSighting]) -> FrameRecord {
+      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
+        box: CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8), analysis: nil, bells: bells)
+    }
+    let frames = [
+      frame(0, [bell(0.5, 0.64, conf: 0.3)]), frame(1, [bell(0.5, 0.62, conf: 0.3)]), frame(2, [bell(0.5, 0.6, conf: 0.9)]),
+      frame(3, []),
+    ]
+    let forward = AnalysisPipeline.analyze(frames: frames, exercise: .kettlebellSwing).track.frames
+    XCTAssertEqual(forward.map { $0.bell != nil }, [true, true, true, true])
+    XCTAssertEqual(forward[0].bell?.conf, 0.3, "the backward pass wrote the detected box, not a carried one")
+    XCTAssertEqual(forward[2].bell?.conf, 0.9, "the forward result is never replaced")
+    XCTAssertEqual(forward[3].bell?.conf, 0, "carried by the forward pass, nothing detected to write backward")
+  }
 }

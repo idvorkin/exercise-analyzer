@@ -240,6 +240,25 @@ flatStartMaxHeight 0.2 (zones veto starts only); `BellDetector` minConfidence 0.
 AnalysisVersion 2026-09-12.9. Verified on the host (`BellTests`, the report) and the Mac model rung (the
 table's last row); the phone is Igor's.
 
+**Second opinions (Igor: "spin up other models and have them come up with different hypotheses").** Codex on
+gpt-6-astra, in its own worktree with the same brief and without the notebook, pre-registered six hypotheses
+and tested three (its notes: `~/tmp/agent/notes/2026-09-13-bell-lab-second-opinion-codex.md`). Two shipped:
+
+- **A backward pass fills the frames before each confident start.** The offline pass knows the future: the
+  same tracker run in reverse over the stored track, writing only frames the forward pass left empty and only
+  boxes the detector produced (never a carried one). One-hand swing held 92→98 (24 of the 34 recovered frames
+  inside reps), 4reps 99→100, TGU 78→82 (all outside reps: the bell picked up and put down), pistols +8 frames
+  (4 %), Bulgarian 0. `BellTracker.filledBackward`, called from `AnalysisPipeline.analyze`.
+- **The tracker sees empty frames.** The pipeline skipped the tracker on frames with no sighting, so a track
+  neither aged nor coasted through them. Fixed; TGU 77→78.
+
+Rejected by its own numbers: classifying box shape in source pixels instead of normalized units (Bulgarian
+0→19, the gate is a camera-calibrated classifier, not geometry), and seeding a start from a sustained overhead
+arm (no recoverable gap has such a box). Its untested ideas, worth a later round: bridge a gap by the bell's
+learned offset from the wrist rather than by velocity (a hinge can turn mid-gap); learn the tracked bell's size
+relative to the forearm as identity. Its inside-reps view of the metric is the better one for the get-up: held
+within detected reps is 89 %, the rest of the loss is the bell on the floor. AnalysisVersion 2026-09-12.10.
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),

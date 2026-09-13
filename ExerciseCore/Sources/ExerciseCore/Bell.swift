@@ -96,6 +96,22 @@ public final class BellTracker {
     return Set(counts.filter { $0.value >= needed }.keys)
   }
 
+  /// The offline pass knows the future. A track starts on a confident box, but the frames before that start often
+  /// hold the same bell at lower confidence (the pick-up, the first blurred hinge). A second tracker run backward
+  /// over the whole track fills only the frames the forward pass left empty, and only with boxes the detector
+  /// produced, never a carried one. (Codex's second opinion, 2026-09-13: one-hand swing 92→98 % held.)
+  public static func filledBackward(_ frames: [FrameRecord], staticZones: Set<Int>) -> [FrameRecord] {
+    let tracker = BellTracker()
+    tracker.staticZones = staticZones
+    var backward: [BellSighting?] = []
+    for f in frames.reversed() { backward.append(tracker.track(f.bells, pose: f.pose, personHeight: f.box?.height)) }
+    return zip(frames, backward.reversed()).map { f, b in
+      guard f.bell == nil, let b, b.conf > 0 else { return f }
+      return FrameRecord(
+        time: f.time, imageSize: f.imageSize, pose: f.pose, box: f.box, analysis: f.analysis, bells: f.bells, bell: b)
+    }
+  }
+
   static func gridKey(_ p: CGPoint, cell: Double) -> Int {
     Int(Double(p.x) / cell) * 4096 + Int(Double(p.y) / cell)
   }
