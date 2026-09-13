@@ -18,6 +18,7 @@ struct ContentView: View {
   @State private var showPhotosPicker = false
   @State private var showRecents = false
   @State private var showOpenDialog = false
+  @Environment(\.openURL) private var openURL
   @State private var lastClockLog = Date.distantPast
   @State private var showBugReport = false
   @State private var showGallery = false
@@ -402,6 +403,10 @@ struct ContentView: View {
         }
         startRow("Files", "folder") { showOpenDialog = false; showFileImporter = true }
         startRow("Report a problem", "ladybug") { showOpenDialog = false; showBugReport = true }
+        startRow("GitHub", "chevron.left.forwardslash.chevron.right") {
+          showOpenDialog = false
+          openURL(URL(string: "https://github.com/idvorkin/exercise-analyzer")!)
+        }
         if showOpenDialog {
           Button("Cancel") { showOpenDialog = false }
             .font(.headline).foregroundStyle(.white.opacity(0.8)).padding(.top, 4)
