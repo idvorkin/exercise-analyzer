@@ -29,8 +29,11 @@ squats and Turkish get-ups. `ExerciseCore/` is the platform-free analysis packag
   Mark fixtures `humanVerified` only when Igor confirmed the count.
 - **Instrument before theorizing.** For any phone-only symptom add a log event, deploy, `just pull-logs`, then fix
   from evidence. Never ship a second guessed fix ([DEBUGGING.md](docs/DEBUGGING.md) lists the events).
-- **Run the bug monitor while Igor is on the phone**: `/loop 5m just bugs-check`. When it exits 1:
-  `just pull-logs && just file-bugs`, then for every report find or write the story in `docs/stories/` that covers
+- **Run the bug monitor while Igor is on the phone**: arm a `Monitor` on `scripts/bugs-monitor.sh` (persistent).
+  It polls the phone every minute and emits one line per new report, so the agent is woken only when there is
+  something to file; a `/loop 5m just bugs-check` wakes the model every five minutes to look and is the fallback
+  when Monitor is unavailable. On an event: `just pull-logs && just file-bugs`, then for every report find or
+  write the story in `docs/stories/` that covers
   it before fixing anything (a request becomes a story, a bug gets an `Issues:` line, no story means the spec has a
   hole). Evidence and analysis go on the issue as a comment. A bug Igor reports by voice gets an issue too. The whole
   flow: [DEBUGGING.md](docs/DEBUGGING.md).

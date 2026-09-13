@@ -59,13 +59,16 @@ the numbers, then fix. Never ship a second guessed fix. Examples that paid off: 
    `Documents/bugs.jsonl` (note, context, `log` file name, `session_t_ms`, `screenshot`, `frame`), and the images
    under `Documents/bugs/<stamp>/`.
 2. **Monitor while Igor tests**: `just bugs-check` copies only `bugs.jsonl` and exits 1 when a report is not yet an
-   issue. Run it as a loop in the agent session for as long as the phone is in use:
+   issue. The agent watches it through `scripts/bugs-monitor.sh`, which polls every minute and prints one line per
+   new report, once (silent otherwise), armed as a persistent `Monitor`:
 
    ```
-   /loop 5m just bugs-check
+   Monitor(command: "scripts/bugs-monitor.sh", description: "new shake reports on the phone", persistent: true)
    ```
 
-   It prints "phone not reachable" (exit 0) when the phone is locked or away; that is not a failure.
+   This is cheaper than `/loop 5m just bugs-check` (the fallback when Monitor is not available): a monitor wakes
+   the model only when a report appears, a loop wakes it every five minutes to find nothing. "phone not
+   reachable" from `bugs-check` (locked or away) is not a failure; the monitor stays quiet.
 3. **When it exits 1**: `just pull-logs && just file-bugs`. Each new report becomes one issue with the note, the
    context table, and the screenshot and frame hosted on a gist (`scripts/gist-images.sh`); the marker
    `<!-- bug:<reported_at> -->` in the body is what makes filing idempotent.
