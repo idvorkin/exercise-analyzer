@@ -572,6 +572,11 @@ at (0.70, 0.70) is 0.043 × 0.09 and Igor's is 0.037 × 0.049 at the hinge; H27 
 within 0.2 of a visible wrist, previous frame's wrists in the overlapped app pass. Mac replay of the 13-rep
 clip: identical to cap 30 (seen 90, held 67, inReps 61, noSight 43); by eye 12 of the graded in-hands frames
 circled (3 frames ungraded, transport error), misses 2, false 12. Prediction met; false circles are H27/H25.
+**H27 tried (09:00, pass-lab Muse, 481b451, reverted): rejected.** Furniture from any full 3 s window at ≥ 60 %
+(union with the whole-clip rule). Replay: 13-rep held 67→51, inReps 61→59, zone 121→254; TGU held 61→57,
+inReps 91→89, zone 0→426 (the resting get-up bell zoned); 4reps/1h unchanged. By eye, same 30 frames:
+circles on his bell 12→10, misses 2→6, false 12→9. The window catches the swung bell's own cells at the
+hinge and apex and the get-up's floor rests; the walk-in box needs identity, not a shorter clock (H25).
 **H28b by eye (05:40): a wash, not shipped.** Circles on Igor's bell 14→13, false circles 12→9 (the rack side
 533/622/677/801 gone, 719 and 309 stay, 394 newly wrong), misses 3→6. Precision 54→59 %, recall 56→52 %:
 inside the grader's noise, and the proxy's 11-point drop was mostly false holds it had been counting as
