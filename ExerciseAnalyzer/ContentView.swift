@@ -717,6 +717,7 @@ struct ContentView: View {
       }
     }
     if env["SWING_SHOW_WORKOUTS"] == "1" { showRecents = true }
+    if env["SWING_SHOW_GALLERY"] == "1" { showGallery = true }
     if env["SWING_WORKOUTS_COLLAPSED"] == "1" { workoutsDetent = WorkoutGalleryView.collapsedDetent }
     if let wanted = env["SWING_OPEN_RECENT"], !wanted.isEmpty {
       // Test hook: reopen a Recents entry, the newest for "1" or the one with this id (a long clip for a memory run).

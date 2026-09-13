@@ -34,4 +34,14 @@ public struct Pose: Codable {
     self.xy = xyn.map { PosePoint(x: $0.x * Float(imageSize.width), y: $0.y * Float(imageSize.height)) }
     self.conf = conf
   }
+
+  /// The pose in a sub-rect's coordinates: gallery stills are cut to the person crop while the stored
+  /// keypoints are full-frame, so cut and remap together to keep still and skeleton aligned (#61).
+  public func cropped(to crop: CGRect, imageSize: CGSize) -> Pose {
+    guard crop.width > 0, crop.height > 0 else { return self }
+    let xyn = xyn.map {
+      PosePoint(x: Float((Double($0.x) - crop.minX) / crop.width), y: Float((Double($0.y) - crop.minY) / crop.height))
+    }
+    return Pose(xyn: xyn, conf: conf, imageSize: imageSize)
+  }
 }

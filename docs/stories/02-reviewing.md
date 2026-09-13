@@ -29,7 +29,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 006:
 
 - **Summary:** Line up the same moment of every rep to compare form
-- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone
+- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone; [#61](https://github.com/idvorkin/exercise-analyzer/issues/61): rep stills are cut to the me-view crop before storing (whole frame when no person found)
 
 #### Use Case:
 - **As a** lifter looking for the rep where form slipped
@@ -41,6 +41,13 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** a set with 10 reps is open
 - **When:** I double-tap the Bottom column in the gallery
 - **Then:** the Bottom thumbnails of all 10 reps enlarge side by side and tapping one seeks the video to that frame
+
+- **Scenario:** Thumbnails show me, not the gym
+- **Given:** a set is open
+- **When:** I look at the rep gallery
+- **Then:** each still is the me-view crop (the whole frame stays when no person was found)
+
+- **Issues:** [#61](https://github.com/idvorkin/exercise-analyzer/issues/61)
 
 ---
 
