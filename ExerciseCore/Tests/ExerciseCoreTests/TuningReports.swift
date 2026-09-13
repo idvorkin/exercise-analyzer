@@ -167,3 +167,88 @@ extension TuningReports {
     return acos(max(-1, min(1, dot / mag))) * 180 / .pi
   }
 }
+
+extension TuningReports {
+  /// Held-bell evidence for the kettlebell-detector lab (docs/analysis/kettlebell-detector.md): for every
+  /// fixture with sightings, hand frames, detector recall at the hands, tracker hold, and the loss classes,
+  /// under the tracker's defaults through AnalysisPipeline.analyze. Prints, never asserts. BELL_LAB_FIXTURES
+  /// names a directory of <label>-<clip>.json fixture files to report instead of the repo fixtures.
+  func testBellTrackerHeldPerFixture() throws {
+    var sources: [(label: String, frames: [FrameRecord], exercise: ExerciseKind)] = []
+    if let dir = ProcessInfo.processInfo.environment["BELL_LAB_FIXTURES"], !dir.isEmpty,
+      let files = try? FileManager.default.contentsOfDirectory(atPath: dir)
+        .filter({ $0.hasSuffix(".json") }).sorted(), !files.isEmpty
+    {
+      for file in files {
+        let url = URL(fileURLWithPath: dir).appendingPathComponent(file)
+        let label = (file as NSString).deletingPathExtension
+        let exercise: ExerciseKind =
+          label.contains("tgu") ? .turkishGetUp
+          : label.contains("pistol") ? .pistolSquat
+          : label.contains("bulgarian") ? .bulgarianSplitSquat : .kettlebellSwing
+        sources.append((label, try Fixture.frames(at: url), exercise))
+      }
+    } else {
+      for (name, exercise) in [
+        ("swing-4reps", ExerciseKind.kettlebellSwing), ("swing-1h-9reps", ExerciseKind.kettlebellSwing),
+        ("tgu-phone-2min", ExerciseKind.turkishGetUp), ("pistol-6reps", ExerciseKind.pistolSquat),
+        ("bulgarian-10reps", ExerciseKind.bulgarianSplitSquat),
+      ] as [(String, ExerciseKind)] {
+        let fixture = Fixture(name: name, expectedExercise: exercise, expectedReps: 0, humanVerified: false)
+        sources.append((name, try fixture.frames(), exercise))
+      }
+    }
+    for source in sources {
+      let pipeline = AnalysisPipeline.analyze(frames: source.frames, exercise: source.exercise)
+      print(Self.bellHeldLine(label: source.label, frames: pipeline.track.frames, zones: pipeline.bellTracker.staticZones))
+    }
+  }
+
+  /// One line per fixture: hands-visible frames, detector recall and tracker hold at the hands, then the
+  /// loss classes for seen-but-not-held frames (no near-hand sighting at all; every near-hand sighting in
+  /// a static zone; track dead with nothing / something startable; track recently alive with nothing in
+  /// reach (= blind gap) or something in reach refused (= follow gate)).
+  private static func bellHeldLine(label: String, frames: [FrameRecord], zones: Set<Int>) -> String {
+    let startConf = BellTracker.Thresholds().startConf
+    var handFrames = 0, seenAtHand = 0, trackedAtHand = 0
+    var noSight = 0, zone = 0, cold = 0, restartBlocked = 0, dropGap = 0, followRej = 0
+    var lastHeld: BellSighting? = nil
+    var framesSinceHeld = 9999
+    for f in frames {
+      guard let pose = f.pose else { continue }
+      let wrists = [CocoKeypoint.leftWrist, .rightWrist].compactMap { k -> CGPoint? in
+        let i = k.rawValue
+        guard i < pose.xyn.count, i < pose.conf.count, pose.conf[i] > BodySkeleton.visibleThreshold else { return nil }
+        return CGPoint(x: CGFloat(pose.xyn[i].x), y: CGFloat(pose.xyn[i].y))
+      }
+      guard !wrists.isEmpty else { continue }
+      handFrames += 1
+      func nearHand(_ b: BellSighting) -> Bool {
+        wrists.contains { hypot($0.x - b.center.x, $0.y - b.center.y) <= 0.2 }
+      }
+      let near = f.bells.filter(nearHand)
+      let held = f.bell.map(nearHand) ?? false
+      if !near.isEmpty { seenAtHand += 1 }
+      if held {
+        trackedAtHand += 1
+        lastHeld = f.bell
+        framesSinceHeld = 0
+        continue
+      }
+      framesSinceHeld += 1
+      guard !near.isEmpty else { noSight += 1; continue }
+      let nonZone = near.filter { !zones.contains(BellTracker.gridKey($0.center, cell: 0.02)) }
+      guard !nonZone.isEmpty else { zone += 1; continue }
+      if framesSinceHeld <= 30, lastHeld != nil {
+        // Track recently alive: a non-zone near-hand sighting exists but was not followed.
+        dropGap += nonZone.allSatisfy { $0.conf < BellTracker.Thresholds().followConf } ? 1 : 0
+        followRej += nonZone.contains { $0.conf >= BellTracker.Thresholds().followConf } ? 1 : 0
+        continue
+      }
+      if nonZone.contains(where: { $0.conf >= startConf }) { restartBlocked += 1 } else { cold += 1 }
+    }
+    func pct(_ n: Int) -> Int { handFrames > 0 ? 100 * n / handFrames : 0 }
+    return
+      "bell-held \(label): hands \(handFrames) seen \(pct(seenAtHand))% held \(pct(trackedAtHand))% | noSight=\(noSight) zone=\(zone) cold=\(cold) restartBlocked=\(restartBlocked) dropGap=\(dropGap) followRej=\(followRej)"
+  }
+}

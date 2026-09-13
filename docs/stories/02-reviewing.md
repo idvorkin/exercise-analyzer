@@ -156,4 +156,9 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** it plays back
 - **Then:** a dot in the bell's own colour rides on the bell in my hands and not on the ones on the rack, the set's line reads the weight the colour maps to (a black cast-iron bell gets none), the stored track keeps every bell sighting so re-analysis needs no second detector run, and live recording and the watch are unchanged
 
+- **Scenario:** The bell stays marked through the whole rep
+- **Given:** a swing or a get-up clip analyzed with the detector
+- **When:** the detector blinks for a frame or two on the fast bottom of a swing, or reads the overhead bell faintly through a get-up phase
+- **Then:** the dot stays on the bell (carried for up to three frames while a hand is still near it, and followed on faint readings once it has started on a confident one), it passes over the floor bell at the bottom of a hinge without jumping to it, and on a set with no bell in the hands (a pistol, a Bulgarian) no dot appears on the rack behind me
+
 - **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)

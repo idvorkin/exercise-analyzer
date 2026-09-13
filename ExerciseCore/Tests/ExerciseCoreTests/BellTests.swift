@@ -30,8 +30,11 @@ final class BellTests: XCTestCase {
     // Frame 2: the bell moved 0.05 and reads 0.3 (motion blur); the wrists moved with it. Still ours.
     let second = tracker.track([rack, bell(0.52, 0.55, conf: 0.3)], pose: pose(wrist: CGPoint(x: 0.52, y: 0.57)))
     XCTAssertEqual(second?.center.y ?? 0, 0.55, accuracy: 0.001)
-    // Frame 3: nothing near it this frame; the track waits rather than jumping to the rack.
-    XCTAssertNil(tracker.track([rack], pose: pose(wrist: CGPoint(x: 0.54, y: 0.5))))
+    // Frame 3: nothing near it this frame; the tracker coasts the last box by its velocity
+    // ((0.52, 0.55) + (0.02, -0.05)) while a hand is still near, rather than jumping to the rack.
+    let coasted = tracker.track([rack], pose: pose(wrist: CGPoint(x: 0.54, y: 0.5)))
+    XCTAssertEqual(coasted?.center.x ?? 0, 0.54, accuracy: 0.001)
+    XCTAssertEqual(coasted?.center.y ?? 0, 0.50, accuracy: 0.001)
     // Frame 4: back, still followed from the last position.
     XCTAssertEqual(tracker.track([rack, bell(0.55, 0.5, conf: 0.4)], pose: nil)?.center.x ?? 0, 0.55, accuracy: 0.001)
   }
@@ -83,9 +86,34 @@ final class BellTests: XCTestCase {
     let red = BellSighting(box: CGRect(x: 0.47, y: 0.57, width: 0.06, height: 0.06), conf: 0.9, color: [0.9, 0.1, 0.1])
     _ = tracker.track([red], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
     let blue = BellSighting(box: CGRect(x: 0.49, y: 0.55, width: 0.06, height: 0.06), conf: 0.9, color: [0.1, 0.2, 0.9])
-    XCTAssertNil(tracker.track([blue], pose: pose(wrist: CGPoint(x: 0.52, y: 0.58))), "a blue bell is not the red one")
+    // A blue bell is not the red one: the tracker refuses to switch and coasts the red box instead.
+    let coasted = tracker.track([blue], pose: pose(wrist: CGPoint(x: 0.52, y: 0.58)))
+    XCTAssertEqual(coasted?.center.x ?? 0, 0.5, accuracy: 0.001)
+    XCTAssertEqual(coasted?.center.y ?? 0, 0.6, accuracy: 0.001)
     let darkRed = BellSighting(box: CGRect(x: 0.49, y: 0.55, width: 0.06, height: 0.06), conf: 0.5, color: [0.5, 0.1, 0.1])
     XCTAssertNotNil(tracker.track([darkRed], pose: pose(wrist: CGPoint(x: 0.52, y: 0.58))), "the same red, darker")
+  }
+
+  func testFlatLittleBoxesNeverStartWhileTallOnesDo() {
+    let tracker = BellTracker()
+    let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
+    // Wide and flat (2:1) under 0.2 of the person's height: rack junk, never starts.
+    let flat = BellSighting(box: CGRect(x: 0.44, y: 0.57, width: 0.12, height: 0.06), conf: 0.9)
+    XCTAssertNil(tracker.track([flat], pose: hands, personHeight: 0.5))
+    // A tall handle-up profile at the same spot starts.
+    let tall = BellSighting(box: CGRect(x: 0.475, y: 0.56, width: 0.05, height: 0.08), conf: 0.9)
+    XCTAssertNotNil(tracker.track([tall], pose: hands, personHeight: 0.5))
+  }
+
+  func testCoastingNeedsAHandNearTheCarriedBox() {
+    let tracker = BellTracker()
+    _ = tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
+    // Hands still at the bell: the blink is coasted over.
+    XCTAssertNotNil(tracker.track([], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6))))
+    // Hands gone elsewhere: no coast, and nothing to start on either.
+    let tracker2 = BellTracker()
+    _ = tracker2.track([bell(0.5, 0.6, conf: 0.9)], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
+    XCTAssertNil(tracker2.track([], pose: pose(wrist: CGPoint(x: 0.1, y: 0.1))))
   }
 
   func testDropsTheTrackAfterEnoughUnseenFrames() {
@@ -93,7 +121,11 @@ final class BellTests: XCTestCase {
     thresholds.lostAfter = 2
     let tracker = BellTracker(thresholds: thresholds)
     _ = tracker.track([bell(0.5, 0.6, conf: 0.9)], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
-    for _ in 0..<3 { XCTAssertNil(tracker.track([], pose: nil)) }
+    // Two coasted frames first (missed 1–2 ≤ coastFrames 3; velocity is zero so the box stays put)…
+    XCTAssertEqual(tracker.track([], pose: nil)?.center.x ?? 0, 0.5, accuracy: 0.001)
+    XCTAssertEqual(tracker.track([], pose: nil)?.center.y ?? 0, 0.6, accuracy: 0.001)
+    // …then the drop (missed 3 > lostAfter 2).
+    XCTAssertNil(tracker.track([], pose: nil))
     // Lost: a low-confidence box at the old place no longer counts as following.
     XCTAssertNil(tracker.track([bell(0.5, 0.6, conf: 0.3)], pose: nil))
   }

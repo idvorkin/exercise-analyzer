@@ -29,6 +29,8 @@ struct Options {
   var confidence: Float = 0.25
   /// Nil for "the package next to the pose model, if it is there"; `--no-bells` sets it to "".
   var bellModel: String?
+  /// Detector floor; the tracker gates by wrist and rest anyway, so a low floor is cheap to try.
+  var bellConfidence: Float = 0.15
   var posesFrom: String?
 
   init(_ args: [String]) {
@@ -42,6 +44,7 @@ struct Options {
       case "--fixture": fixture = value()
       case "--conf": confidence = Float(value()) ?? 0.25
       case "--bell-model": bellModel = value()
+      case "--bell-conf": bellConfidence = Float(value()) ?? 0.15
       case "--no-bells": bellModel = ""
       case "--poses-from": posesFrom = value()
       default: if video.isEmpty { video = a }
@@ -101,7 +104,10 @@ let bellDetector: BellDetector? = try {
   case "gpu": units = .cpuAndGPU
   default: units = .all
   }
-  return try BellDetector(compiledModelURL: try compiled(URL(fileURLWithPath: path)), computeUnits: units)
+  let detector = try BellDetector(compiledModelURL: try compiled(URL(fileURLWithPath: path)), computeUnits: units)
+  detector.minConfidence = options.bellConfidence
+  if let max = ProcessInfo.processInfo.environment["POSETRACK_BELL_MAX"].flatMap(Int.init) { detector.maxSightings = max }
+  return detector
 }()
 guard let imageInput = mlModel.modelDescription.inputDescriptionsByName.values.first(where: { $0.type == .image }),
   let constraint = imageInput.imageConstraint
@@ -257,6 +263,24 @@ if bellDetector != nil {
   let weights = colors.compactMap(BellColor.weightKg(rgb:))
   let weight = weights.isEmpty ? "no colour code (cast iron?)" : "\(Dictionary(grouping: weights) { $0 }.max { $0.value.count < $1.value.count }!.key) kg by colour"
   print("bell in play in \(withBell) frames (\(frames.count > 0 ? 100 * withBell / frames.count : 0)%), \(weight)")
+  // Two questions apart: did the detector see a bell at the hands at all (any sighting within 0.2 of a visible
+  // wrist), and did the tracker keep it. Frames without a visible wrist are left out of both.
+  var handFrames = 0, seenAtHand = 0, trackedAtHand = 0
+  for f in pipeline.track.frames {
+    guard let pose = f.pose else { continue }
+    let wrists = [9, 10].compactMap { i -> CGPoint? in
+      pose.conf[i] > BodySkeleton.visibleThreshold ? CGPoint(x: CGFloat(pose.xyn[i].x), y: CGFloat(pose.xyn[i].y)) : nil
+    }
+    guard !wrists.isEmpty else { continue }
+    handFrames += 1
+    func nearHand(_ b: BellSighting) -> Bool { wrists.contains { hypot($0.x - b.box.midX, $0.y - b.box.midY) <= 0.2 } }
+    if f.bells.contains(where: nearHand) { seenAtHand += 1 }
+    if let bell = f.bell, nearHand(bell) { trackedAtHand += 1 }
+  }
+  if handFrames > 0 {
+    print(String(format: "hands visible in %d frames: detector saw a bell at the hands in %.0f%%, tracker held it in %.0f%%",
+      handFrames, 100.0 * Double(seenAtHand) / Double(handFrames), 100.0 * Double(trackedAtHand) / Double(handFrames)))
+  }
 }
 print("detected: \(detection.exercise.rawValue) \(detection.confidence)% (\(detection.reason))")
 print("analyzed as \(exercise.rawValue): \(pipeline.reps.count) reps")

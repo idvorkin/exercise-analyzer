@@ -181,6 +181,61 @@ or the `bellDetector` user default turns it on for a trial. Sets analyzed with i
 runs fewer models does not re-run them). The pass is back at ~94 fps. What would make it worth turning on is the
 plan below: the swing on the bell's path and the get-up's stacking, neither built.
 
+## 2026-09-12 night: the bell in (nearly) every frame it is in the hands (#18)
+
+Igor: get the bell in every frame on the swing and get-up clips, controls (pistols with a floor bell, a
+Bulgarian with no bell in view) staying near zero. The lab ran on the Mac with Muse doing the grinding; the
+notebook with every hypothesis and result is `~/tmp/agent/notes/2026-09-12-bell-lab-notebook.md`.
+
+**Two questions, measured apart.** For frames with a visible wrist: did the detector put any box within 0.2 of
+it (*seen*), and did the tracker report a bell there (*held*). `100 − seen` is the detector's ceiling, the gap is
+the tracker's loss. posetrack prints both; the tracker questions then ran on stored fixtures through the real
+`BellTracker` in under a second (`TuningReports.testBellTrackerHeldPerFixture` is the durable form), with each
+lost frame classed as detector-blind, suppressed as furniture, no confident box to start on, a box too far from
+the wrist to start, a gap with no box in reach, or a box in reach refused by a rule.
+
+**Where the frames went (nano 640, floor 0.25, the old tracker):** swings lost most to gaps the detector
+left and to the swung bell passing through the floor bell's static cell at the bottom of every hinge; the
+get-up lost 18 points to starts (no box at 0.4 while dead, or a good box just outside 0.12 of the wrist) and to
+following (the overhead bell reads 0.15–0.25 for whole phases and the follow gate was 0.25).
+
+**What moved the number, in order found** (held %, 4reps / 1h / TGU / pistols / bulgarian, floor 0.15 for the
+rows that need it, the 1h clip with a 12-box cap):
+
+| change | 4reps | 1h | TGU | pistols | bulgarian |
+|---|---|---|---|---|---|
+| old tracker, floor 0.25, cap 6 | 67 | 58 | 47 | 1 | 2 |
+| lostAfter 30 + startDistance 0.15 | 67 | 68 | 56 | 1 | 7 |
+| + static zones gate starts only | 81 | 69 | 56 | 1 | 2 |
+| + followConf 0.15 (floor 0.15) | 96 | 69 | 76 | 1 | 13 |
+| + coast 3 frames on the last velocity | 98 | 87 | 80 | 2 | 20 |
+| + cap 12 (the 1h gym rack holds more than six confident bells) | 98 | 92 | 80 | 2 | 20 |
+| + no start on a flat box under 0.2 of the person's height | 98 | 92 | 80 | 2 | **0** |
+| **posetrack on the clips, shipped defaults** | **99** | **93** | **78** | **4** | **0** |
+
+Rejected, with the numbers that rejected them: `startConf` 0.3 (TGU +9 but the Bulgarian 4→21: rack junk
+at 0.3–0.4 next to hanging hands; the start gate is what keeps a bell-less clip clean); `stillFrames` 150
+(nothing); a wider `stillRadius` (nothing on the Bulgarian, TGU −10: the overhead hold reads as furniture);
+predictive follow from the last velocity (1h +3 frames, Bulgarian +2); reporting a track only once it has moved
+(the Bulgarian's phantoms wander past 0.05 anyway, the 1h loses 26 points at the slow top of every swing);
+coasting 10 frames (the carried box drifts, 4reps 98→83); `followDistance` 0.15 (1h +3, Bulgarian +3).
+The Bulgarian phantoms were separated by shape, not place: they start as wide boxes (aspect 1.2–2.3) under
+0.19 of the person's height, swing bells are tall (aspect ≤ 0.81), get-up bells are wide but big.
+
+**Models and input sizes** (seen / held with the new tracker): nano at 960 sees the small get-up bell in 94 %
+of frames (held 81) but only 41 % of the one-hand swing and holds a phantom in 89 % of the Bulgarian; 26s at
+640 holds one in 92 %; 26s at 960 holds the pistols' floor bell in 72 %. Nano at 640 stays. A second package
+at 960 for get-ups only is the one thing left on the table there.
+
+**Also learned:** the detector floor never changed *held* on its own (every gate sat above it), it only
+relabels the loss; lowering it to 0.15 matters only because `followConf` now sits there. The 1h clip's colour
+vote moved from 28 kg to 16 kg with the fuller track: Igor knows which bell that was.
+
+Shipped: `BellTracker.Thresholds` startDistance 0.15, followConf 0.15, lostAfter 30, coastFrames 3,
+flatStartMaxHeight 0.2 (zones veto starts only); `BellDetector` minConfidence 0.15, maxSightings 12;
+AnalysisVersion 2026-09-12.9. Verified on the host (`BellTests`, the report) and the Mac model rung (the
+table's last row); the phone is Igor's.
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),

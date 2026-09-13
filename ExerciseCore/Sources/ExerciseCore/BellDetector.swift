@@ -43,9 +43,10 @@
     public let model: VNCoreMLModel
     public let compiledModelURL: URL
     public let inputSize: (width: Int, height: Int)
-    public var minConfidence: Float = 0.25
-    /// Sightings kept per frame, most confident first (a rack holds many bells; six is plenty for the tracker).
-    public var maxSightings = 6
+    public var minConfidence: Float = 0.15  // the tracker's followConf: it starts only on 0.4, follows down to here
+    /// Sightings kept per frame, most confident first. A gym rack holds a dozen confident bells and a blurred
+    /// swung bell can rank behind all of them: six truncated it in a fifth of a one-hand swing's frames.
+    public var maxSightings = 12
     /// Milliseconds spent in the last `detect` call, for the session log.
     public private(set) var lastInferenceMs = 0.0
     /// Whether each box's mean colour is sampled from the pixels (off for experiments).

@@ -12,6 +12,7 @@ numpy is pinned below 2: coremltools' torch frontend fails in the YOLOE segmenta
 ("only 0-dimensional arrays can be converted to Python scalars"). The CLIP package is what YOLO-World needs for
 its text prompt; YOLOE fetches MobileCLIP itself.
 """
+import os
 import shutil
 import sys
 
@@ -33,11 +34,16 @@ elif which == "yoloe":
     names = sys.argv[4].split(",") if len(sys.argv) > 4 else ["kettlebell"]
     m = YOLOE(f"yoloe-{size}-seg.pt")
     m.set_classes(names, m.get_text_pe(names))
-    out = m.export(format="coreml", imgsz=imgsz, nms=True, half=True)
+    # nms=None traces the dense one-to-many head with no NMS op: static [1, 4+nc+32, anchors] output, overlaps
+    # suppressed in Swift. nms=True bakes an NMS op with data-dependent shapes (crashed Core ML, #43); nms=False
+    # exports the end-to-end head, which misses the blurred bell in hand. See docs/analysis/kettlebell-detector.md.
+    out = m.export(format="coreml", imgsz=imgsz, nms=None, half=True)
     dest = f"yoloe-{size}-{'-'.join(n.replace(' ', '') for n in names)}-{imgsz}.mlpackage"
 else:
     m = YOLO("yolo11n.pt")
     out = m.export(format="coreml", imgsz=640, nms=True, half=True)
     dest = "yolo11n-coco.mlpackage"
+if os.path.isdir(dest):
+    shutil.rmtree(dest)  # shutil.move into an existing package folder nests it instead of replacing it
 shutil.move(str(out), dest)
 print("EXPORTED", dest)

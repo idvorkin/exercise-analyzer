@@ -38,7 +38,8 @@ public final class AnalysisPipeline: @unchecked Sendable {
   @discardableResult
   public func process(extracted: FrameRecord, image: () -> CGImage?) -> FrameRecord {
     let analysis = extracted.pose.map { analyzer.process(pose: $0, time: extracted.time, image: image) }
-    let bell = extracted.bell ?? (extracted.bells.isEmpty ? nil : bellTracker.track(extracted.bells, pose: extracted.pose))
+    let bell = extracted.bell
+      ?? (extracted.bells.isEmpty ? nil : bellTracker.track(extracted.bells, pose: extracted.pose, personHeight: extracted.box?.height))
     let frame = FrameRecord(
       time: extracted.time, imageSize: extracted.imageSize, pose: extracted.pose, box: extracted.box,
       analysis: analysis, bells: extracted.bells, bell: bell)
