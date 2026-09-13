@@ -143,7 +143,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 034:
 
 - **Summary:** See the bell on the video, and its weight from its colour
-- **Status:** implemented in [3b997e1](https://github.com/idvorkin/exercise-analyzer/commit/3b997e1); verified on the host (`BellTests`, four fixtures with bells) and the simulator (swing-sample-4reps: a bell in 165/165 frames, 4 reps, 88 % detection); the dot and the phone's cost need the phone
+- **Status:** implemented in [3b997e1](https://github.com/idvorkin/exercise-analyzer/commit/3b997e1), [ab4f1a5](https://github.com/idvorkin/exercise-analyzer/commit/ab4f1a5), [9552f70](https://github.com/idvorkin/exercise-analyzer/commit/9552f70); verified on the host (`BellTests`, five fixtures with bells), the simulator, and the phone (IMG_4342, 3989 frames: 91 s at 43.7 fps, detector 12 ms a frame, memory flat at 73 MB, bell in 2962 frames); the dot on the video needs Igor's eye
 
 #### Use Case:
 - **As a** lifter reviewing a swing or a get-up

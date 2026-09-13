@@ -134,10 +134,33 @@ Also found on the way: the phone's Neural Engine hands the output back as Float1
 `BellDetector` now reads by data type (`BellDetectorParseTests`). And a self-inflicted detour: a second export
 moved *into* the first package's folder instead of replacing it, so one run loaded the old model.
 
-Tracker after the study (`BellTests`): a box still within 0.02 for 90 frames is a bell at rest and is never
-started on or followed; following also requires the box within 0.2 of a visible wrist (the bell in play is in the
-hands by definition). Measured with the gate off, half the "tracked" frames on the swing clips sat 0.2 or more
-from any wrist: rack bells, which had padded the earlier percentages. With the dense head and the gates:
+### The phone, after the export fix: two more leaks and two more stops
+
+- The dense-model build still died within a second of the pass, with no signal caught and no MetricKit report: a
+  kill from outside the process. `offline_progress` (memory every 60 frames) settled it: 132 MB at frame 1, 3367 MB
+  at frame 421 with 9 MB left. Nine MB a frame is one 1080 × 1920 BGRA frame: `CIImage(cvPixelBuffer:)` +
+  `CIAreaAverage` on a shared `CIContext` kept every frame alive on iOS (the Mac peaked at 229 MB). The sampler
+  reads the BGRA bytes now.
+- Then ~1.4 MB a frame: Vision's observations and the two output tensors are autoreleased and a detached loop never
+  drains its pool; `autoreleasepool` per frame. Flat at 73 MB from then on.
+- "Model not ready": a set opened in the first second after launch reached the pass before the model loaded (#45);
+  the pass waits up to 10 s.
+- "Operation Interrupted" at 43 s: auto-lock backgrounded the app mid-pass and AVFoundation stopped the reader
+  (#46); the pass holds the idle timer like recording does.
+
+Phone, IMG_4342 (3989 frames), untouched: 91.3 s at 43.7 fps, pose 10.7 ms, detector 12.0 ms, decode 0.35 ms per
+frame, footprint 73 MB flat, bell in 2962 frames, 2 reps. Before the detector the same pass ran at ~94 fps: the
+second model is the whole cost; decoding is free. Levers, Igor's first: detector only inside the padded rep span
+the pose pass finds (this clip ~57 % of frames, saves ~20 s of 91); every second frame with the tracker bridging
+(~24 s); a detect-only export without the mask branch (untested).
+
+Tracker after the study (`BellTests`): a box still within 0.02 for 90 frames is a bell at rest, and so is any box
+in a grid cell that holds a bell in 60 % of the clip's frames (known before an offline analysis; 30 % caught a
+swung bell's own apex); neither is started on or followed. Following also requires the box within 0.2 of a visible
+wrist (the bell in play is in the hands by definition) and a colour within 60° of hue of the tracked bell when
+both are vivid (45° flipped a dark red bell between orange and yellow readings under gym light). Measured with the
+wrist gate off, half the "tracked" frames on the swing clips sat 0.2 or more from any wrist: rack bells, which had
+padded the earlier percentages. With the dense head and the gates:
 
 | Clip | Bell in play | Count |
 |---|---|---|
