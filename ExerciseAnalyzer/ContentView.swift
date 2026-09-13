@@ -69,6 +69,9 @@ struct ContentView: View {
             if session.source == .file { session.togglePlayback() }
           }
         }
+        if session.source == .file, session.duration > 0 {
+          edgeControls
+        }
         if session.source == .none, session.activity == .idle {
           startPanel
         }
@@ -341,6 +344,41 @@ struct ContentView: View {
     }
     .padding(.horizontal).padding(.vertical, 6)
     .disabled(busy)
+  }
+
+  /// Left and right edges of the picture: tap steps a frame, hold shows Rep / Frame / Position keys (story 030).
+  /// They sit between the HUD's top and bottom rows so those buttons keep working.
+  private var edgeControls: some View {
+    GeometryReader { geo in
+      let width = geo.size.width * 0.24
+      let inset = geo.size.height * 0.16
+      HStack {
+        EdgeStepper(
+          side: .previous, onTap: { session.stepFrame(-1) },
+          onKey: { key in
+            switch key {
+            case .rep: session.seekToRep(offset: -1)
+            case .frame: session.stepFrame(-1)
+            case .position: session.seekToCheckpoint(offset: -1)
+            }
+          }
+        )
+        .frame(width: width)
+        Spacer()
+        EdgeStepper(
+          side: .next, onTap: { session.stepFrame(1) },
+          onKey: { key in
+            switch key {
+            case .rep: session.seekToRep(offset: 1)
+            case .frame: session.stepFrame(1)
+            case .position: session.seekToCheckpoint(offset: 1)
+            }
+          }
+        )
+        .frame(width: width)
+      }
+      .padding(.vertical, inset)
+    }
   }
 
   /// Nothing loaded: a centred panel with the four ways to start, big enough for the gym.

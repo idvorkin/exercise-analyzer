@@ -92,3 +92,23 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Then:** the playhead lands on rep 4's bottom checkpoint, and a tap on the picture afterwards starts playback
 
 - **Issues:** [#28](https://github.com/idvorkin/exercise-analyzer/issues/28)
+
+---
+
+### User Story 030:
+
+- **Summary:** Move through a set from the edges of the picture, no chrome needed
+
+#### Use Case:
+- **As a** lifter scrubbing a rep with a thumb on each edge of the phone
+- **I want to** tap an edge to step a frame, and hold an edge to pick rep, frame or position
+- **so that** every move is a big target on the picture itself, in the direction I'm pressing
+
+#### Acceptance Criteria:
+- **Scenario:** Jumping to the next rep from the right edge
+- **Given:** a set is open and paused
+- **When:** I press and hold the right edge, slide to the top key and let go
+- **Then:** three keys (Rep, Frame, Position) appeared stacked on the right edge while I held, the top one lit as I slid onto it, and the playhead moved to the next rep; a quick tap on the same edge would have stepped one frame instead
+
+- **Issues:** [#33](https://github.com/idvorkin/exercise-analyzer/issues/33)
+

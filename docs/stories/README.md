@@ -8,7 +8,7 @@ question per story is [../USER_STORIES.md](../USER_STORIES.md).
 | Journey | Stories | What it covers |
 |---|---|---|
 | [Recording and counting](01-recording.md) | 001, 002, 003, 004, 020, 021, 029 | Getting a trusted count out of a set recorded at the gym. |
-| [Reviewing a set](02-reviewing.md) | 005, 006, 007, 008, 024 | Seeing what the camera measured and finding the rep where form slipped. |
+| [Reviewing a set](02-reviewing.md) | 005, 006, 007, 008, 024, 030 | Seeing what the camera measured and finding the rep where form slipped. |
 | [Clips and Photos](03-clips.md) | 009, 010, 011, 025, 028 | Trimming, opening and saving video without copies or quality loss. |
 | [Workouts](04-workouts.md) | 012, 013, 014, 015 | Training as sets per day and exercise, kept honest over time. |
 | [From the wrist](05-watch.md) | 016, 017, 018, 019, 023, 027 | Running a session from the Apple Watch with the phone on a tripod. |
@@ -48,3 +48,4 @@ Built and where each story was verified (host tests, simulator, or phone).
 | 027 Watch mode | yes | simulator screenshot (idle); recording view needs the phone |
 | 028 Cancel an analysis | yes | simulator (cancel hook) |
 | 029 Throw away a false start | yes | needs phone (recording) |
+| 030 Edge controls | yes | needs phone (gestures) |
