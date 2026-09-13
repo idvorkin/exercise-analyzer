@@ -61,6 +61,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// Watch mode: the phone shows big digits readable from across the room and is driven from the wrist. It only
   /// exists while a set is being recorded and ends with the set (#36).
   @Published private(set) var watchMode = false
+  /// The lifter left watch mode on the phone this set: the watch coming to the front must not switch back (#68).
+  private var watchModeDeclined = false
+  /// The current camera start was asked from the watch: enter watch mode once it attaches (#68).
+  private var startRequestedFromWatch = false
   /// Whether the athlete is inside the picture (live camera only); mirrored to the watch.
   @Published private(set) var frameStatus = FrameStatus(box: nil, pose: nil)
   let watch = WatchBridge()
@@ -193,6 +197,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     watch.$reachable.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in self?.updateKeepAwake() }
       .store(in: &cancellables)
+    watch.$watchActive.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] active in
+      guard let self, active, self.source == .camera else { return }
+      // A set started on the phone switches the moment the watch app comes to the front (#68); leaving on the
+      // phone declines for the rest of the set, and idle or playback stays refused as before (#36 stands).
+      if self.watchModeDeclined {
+        self.log.event("watch_mode_refused", ["from": "watch_front", "reason": "declined"])
+      } else {
+        self.setWatchMode(true, from: "watch_front")
+      }
+    }.store(in: &cancellables)
     Task {
       await refreshStaleEntries()
       // Test hook: SWING_DEBUG_RUN=1 starts an instrumented run once the gallery has caught up (simulator runs
@@ -1276,6 +1290,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     switch command {
     case .start:
       if source == .camera { break }
+      // The set about to record was asked from the wrist: it opens in watch mode (#68), whether the camera
+      // starts now or later from the notification tap, which inherits the flag. A start from the phone's own
+      // Record button never sets it.
+      startRequestedFromWatch = true
       if UIApplication.shared.applicationState == .active {
         startCamera(position: cameraPosition)
       } else {
@@ -1337,6 +1355,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     extractedFrames = []
     extractionComplete = false
     analysisInterrupted = false
+    watchModeDeclined = false
     reps = []
     lastQuality = nil
     latestFrame = nil
@@ -1368,6 +1387,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self.updateKeepAwake()  // a set is longer than the auto-lock timeout
           self.frameStatus = FrameStatus(box: nil, pose: nil)
           self.pushWatchStatus(force: true)
+          if self.startRequestedFromWatch {
+            self.startRequestedFromWatch = false
+            self.setWatchMode(true, from: "watch_start")
+          }
+        } else {
+          // A watch-asked start that never attached (camera denied) must not arm the next phone start.
+          self.startRequestedFromWatch = false
         }
       }
     }
@@ -1463,6 +1489,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
     if on, source != .camera {
       log.event("watch_mode_refused", ["from": origin, "source": "\(source)"])
       return
+    }
+    if !on, origin == "phone_button" || origin == "phone_doubletap" || origin == "phone_longpress" {
+      watchModeDeclined = true
+    } else if on, origin == "watch" {
+      watchModeDeclined = false
     }
     watchMode = on
     log.event("watch_mode", ["on": on, "from": origin])
