@@ -273,6 +273,13 @@ boxes drifting off the bell during a blink and strict grading of near-misses. Ne
 itself (fewer carried frames, drawn only where the bell can be), then the get-up's head and chest classes.
 Tooling: `scripts/model-trials/cut-dot-frames.sh` and `grade-dots.sh` (docs/TESTING.md).
 
+Coasting, by eye: the same 35 swing frames with 0, 1 and 3 coasted frames grade 17/23, 15/22 and 17/24 on the
+one-hand clip and 7/9, 8/10 and 8/8 on the 4-rep clip, inside the grader's own noise (its count of frames with
+the bell in hand moves by one or two between runs of identical frames), while the proxy prefers 3 by 7 to 21
+points. 3 stays. The one-hand clip's remaining "floor bell" holds are the backward pass drawing the dot on the
+bell during the pick-up: the right bell, not yet in the hands. Headless Muse and the interactive Muse's
+sub-agents agree within two frames per clip.
+
 Rejected by its own numbers: classifying box shape in source pixels instead of normalized units (Bulgarian
 0→19, the gate is a camera-calibrated classifier, not geometry), and seeding a start from a sustained overhead
 arm (no recoverable gap has such a box). Its untested ideas, worth a later round: bridge a gap by the bell's
