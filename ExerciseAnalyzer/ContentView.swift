@@ -17,6 +17,8 @@ struct ContentView: View {
   @State private var showFileImporter = false
   @State private var showPhotosPicker = false
   @State private var showRecents = false
+  /// Workouts sheet height (#58): collapsed is the handle plus today's summary row; pull up for the full gallery.
+  @State private var workoutsDetent: PresentationDetent = .large
   @State private var showOpenDialog = false
   @Environment(\.openURL) private var openURL
   @State private var lastClockLog = Date.distantPast
@@ -137,6 +139,12 @@ struct ContentView: View {
         pickerItem = nil
       }
     }
+    .onChange(of: showRecents) { _, open in
+      // Reopening shows the full gallery (story 012); the collapsed hook keeps it down for screenshots.
+      if open, ProcessInfo.processInfo.environment["SWING_WORKOUTS_COLLAPSED"] != "1" {
+        workoutsDetent = .large
+      }
+    }
     .onChange(of: session.currentTime) { _, time in
       if !isScrubbing { scrubTime = time }
       // Why the slider might not follow the clock (#23): log the view's side every 5 s.
@@ -154,7 +162,10 @@ struct ContentView: View {
       WorkoutGalleryView(
         store: session.recents, onOpen: { session.open(recent: $0) },
         onImport: { identifier, date in Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) } },
-        onEvent: { session.log.event($0, $1) }, session: session, bugReport: $showWorkoutsBugReport)
+        onEvent: { session.log.event($0, $1) }, session: session, bugReport: $showWorkoutsBugReport,
+        detent: $workoutsDetent)
+        .presentationDetents([WorkoutGalleryView.collapsedDetent, .large], selection: $workoutsDetent)
+        .presentationDragIndicator(.visible)
     }
     .fileImporter(
       isPresented: $showFileImporter, allowedContentTypes: [.movie, .video, .mpeg4Movie]
@@ -631,6 +642,7 @@ struct ContentView: View {
       }
     }
     if env["SWING_SHOW_WORKOUTS"] == "1" { showRecents = true }
+    if env["SWING_WORKOUTS_COLLAPSED"] == "1" { workoutsDetent = WorkoutGalleryView.collapsedDetent }
     if let wanted = env["SWING_OPEN_RECENT"], !wanted.isEmpty {
       // Test hook: reopen a Recents entry, the newest for "1" or the one with this id (a long clip for a memory run).
       let entry = wanted == "1" ? session.recents.entries.first : session.recents.entries.first { $0.id == wanted }
