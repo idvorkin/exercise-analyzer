@@ -21,6 +21,8 @@ struct ContentView: View {
   @Environment(\.openURL) private var openURL
   @State private var lastClockLog = Date.distantPast
   @State private var showBugReport = false
+  /// A shake while Workouts is up: the report sheet is presented from inside that sheet so Workouts stays (#41).
+  @State private var showWorkoutsBugReport = false
   @State private var showGallery = false
   @State private var showKeyframeViewer = false
   @State private var focusedPhase: String?
@@ -109,7 +111,11 @@ struct ContentView: View {
       controls
     }
     .background(Color(.systemBackground))
-    .background(ShakeDetector { session.captureBugScreenshot(); showBugReport = true })
+    .background(
+      ShakeDetector {
+        session.captureBugScreenshot()
+        if showRecents { showWorkoutsBugReport = true } else { showBugReport = true }
+      })
     .sheet(isPresented: $showBugReport) { BugReportSheet(session: session) }
     .confirmationDialog(
       "No reps found in this recording", isPresented: $session.emptyRecordingPrompt, titleVisibility: .visible
@@ -144,7 +150,7 @@ struct ContentView: View {
       WorkoutGalleryView(
         store: session.recents, onOpen: { session.open(recent: $0) },
         onImport: { identifier, date in Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) } },
-        onEvent: { session.log.event($0, $1) })
+        onEvent: { session.log.event($0, $1) }, session: session, bugReport: $showWorkoutsBugReport)
     }
     .fileImporter(
       isPresented: $showFileImporter, allowedContentTypes: [.movie, .video, .mpeg4Movie]

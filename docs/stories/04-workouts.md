@@ -97,3 +97,22 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Then:** the screen shows "Downloading from iCloud" with its progress until the clip plays, or says the clip is no longer in Photos, and the session log records the fetch (`recents_tap`, `photos_fetch` with seconds, in_cloud and any error)
 
 - **Issues:** [#35](https://github.com/idvorkin/exercise-analyzer/issues/35)
+
+---
+
+### User Story 032:
+
+- **Summary:** Hide the Photos clips I have already analyzed
+
+#### Use Case:
+- **As a** lifter who imports every set from Photos
+- **I want to** hide the analyzed clips in the From Photos strip, and have a trimmed-and-saved set count as analyzed
+- **so that** the strip is only what is left to do, and a set I trimmed does not come back as "new"
+
+#### Acceptance Criteria:
+- **Scenario:** Hiding the done ones
+- **Given:** the strip shows three clips, two of them analyzed, one of which I trimmed and saved back to Photos
+- **When:** I tap Hide analyzed in the strip's header
+- **Then:** only the unanalyzed clip remains, the choice sticks across launches, and the trimmed set stays hidden because its new Photos identity is the one Workouts knows
+
+- **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41)

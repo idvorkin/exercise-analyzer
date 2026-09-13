@@ -13,6 +13,9 @@ struct WorkoutGalleryView: View {
   /// Opens a Photos video that has not been analyzed yet (identifier and creation date).
   var onImport: ((String, Date?) -> Void)? = nil
   var onEvent: ((String, [String: Any]) -> Void)? = nil
+  /// For a shake while this sheet is up: the report is presented over Workouts rather than in its place (#41).
+  var session: VideoPoseSession? = nil
+  var bugReport: Binding<Bool> = .constant(false)
   @Environment(\.dismiss) private var dismiss
   @StateObject private var suggestions = PhotosSuggestions()
   /// Days folded shut, by start-of-day time; days older than a week start folded, today and this week start open.
@@ -89,6 +92,9 @@ struct WorkoutGalleryView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
       }
+      .sheet(isPresented: bugReport) {
+        if let session { BugReportSheet(session: session) }
+      }
       .onAppear {
         if !collapseSeeded {
           collapseSeeded = true
@@ -110,6 +116,10 @@ struct WorkoutGalleryView: View {
 struct PhotosSuggestionsRow: View {
   @ObservedObject var suggestions: PhotosSuggestions
   let onImport: (PhotosSuggestions.Clip) -> Void
+  /// Igor's choice (#41): the strip can hide clips that are already sets, leaving only what is left to analyze.
+  @AppStorage("hideAnalyzedClips") private var hideAnalyzed = false
+
+  private var shown: [PhotosSuggestions.Clip] { suggestions.clips.filter { !hideAnalyzed || !$0.analyzed } }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -123,10 +133,14 @@ struct PhotosSuggestionsRow: View {
         Spacer(minLength: 8)
         Text(suggestions.unanalyzedCount == 0 ? "all analyzed" : "\(suggestions.unanalyzedCount) not analyzed")
           .font(.caption).foregroundStyle(.secondary)
+        if suggestions.clips.contains(where: \.analyzed) {
+          Button(hideAnalyzed ? "Show analyzed" : "Hide analyzed") { hideAnalyzed.toggle() }
+            .font(.caption).buttonStyle(.bordered).controlSize(.mini)
+        }
       }
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
-          ForEach(suggestions.clips) { clip in
+          ForEach(shown) { clip in
             PhotosClipCard(clip: clip, suggestions: suggestions)
               .onTapGesture { onImport(clip) }
           }

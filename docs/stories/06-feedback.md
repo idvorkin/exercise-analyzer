@@ -22,6 +22,8 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I shake the phone, type "rep 3 isn't a rep" and send
 - **Then:** the report is stored with the clip name, the playhead time and the session log's name, and shows up as a GitHub issue after the developer pulls logs
 
+- **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41) a shake from the Workouts sheet replaced that sheet with the report; the report now opens over it
+
 ---
 
 ### User Story 026:
