@@ -150,7 +150,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 038:
 
 - **Summary:** See what I did today at a glance when the Workouts sheet is collapsed
-- **Status:** requested ([#58](https://github.com/idvorkin/exercise-analyzer/issues/58), Igor by shake report, 2026-09-13); not built
+- **Status:** implemented in [52ecac2](https://github.com/idvorkin/exercise-analyzer/commit/52ecac2); verified by simulator screenshot (`/tmp/bell-lab/summary.png`: the collapsed sheet reads "Bulgarian · swing · pistols" with a stick-figure glyph per exercise, the full gallery opens on drag); Igor's eye is the last rung
 
 #### Use Case:
 - **As a** lifter between sets with the Workouts sheet pulled down
