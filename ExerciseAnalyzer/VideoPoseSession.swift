@@ -39,7 +39,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   let player = AVPlayer()
-  let log = SessionLog()
+  let log: SessionLog
   let recents = RecentsStore()
   /// Both models and their compute plans behind one readiness gate (#52 step 4); kicks loading on creation.
   let models: ModelSet
@@ -136,6 +136,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   override init() {
     exerciseMode = ExerciseMode(storageValue: UserDefaults.standard.string(forKey: "exerciseMode"))
+    log = SessionLog()
+    models = ModelSet(log: log)
     super.init()
     if case .fixed(let kind) = exerciseMode { exercise = kind }
     pipeline = AnalysisPipeline(exercise: exercise)
@@ -172,7 +174,6 @@ final class VideoPoseSession: NSObject, ObservableObject {
     ) { [weak self] _ in
       Task { @MainActor in self?.isPlaying = false }
     }
-    models = ModelSet(log: log)
     models.onStatus = { [weak self] in self?.modelStatus = $0 }
     modelStatus = models.status
     RecordPrompt.prepare(log: log)
