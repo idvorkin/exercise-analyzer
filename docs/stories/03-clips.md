@@ -61,7 +61,7 @@ Part of the [user stories](README.md); persona and format are described there.
 
 ### User Story 025:
 
-- **Summary:** An Open sheet with big rows, most-used first
+- **Summary:** Start from a centred panel; Open as a sheet with big rows, most-used first
 
 #### Use Case:
 - **As a** lifter opening a clip with sweaty hands
@@ -69,10 +69,10 @@ Part of the [user stories](README.md); persona and format are described there.
 - **so that** I hit the one I mean, and the one I use most is first
 
 #### Acceptance Criteria:
-- **Scenario:** Opening a clip from Workouts
-- **Given:** the main screen is showing
-- **When:** I tap Open
-- **Then:** a sheet slides up with Workouts, Photos, Files and Report a problem as full-width rows, Workouts first and Files last
+- **Scenario:** Launching the app with nothing loaded
+- **Given:** the app has just opened and no clip or camera is active
+- **When:** the main screen appears
+- **Then:** a centred panel offers Live, Workouts, Photos and Files as big rows (and once something is loaded, Open shows the same choices plus Report a problem as a sheet, Workouts first and Files last)
 
 - **Issues:** [#25](https://github.com/idvorkin/exercise-analyzer/issues/25)
 

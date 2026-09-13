@@ -69,6 +69,9 @@ struct ContentView: View {
             if session.source == .file { session.togglePlayback() }
           }
         }
+        if session.source == .none, session.activity == .idle {
+          startPanel
+        }
         if case .working(let label, let progress) = session.activity, session.source != .camera {
           VStack(spacing: 8) {
             ProgressView(value: progress).frame(width: 160)
@@ -338,6 +341,41 @@ struct ContentView: View {
     }
     .padding(.horizontal).padding(.vertical, 6)
     .disabled(busy)
+  }
+
+  /// Nothing loaded: a centred panel with the four ways to start, big enough for the gym.
+  private var startPanel: some View {
+    VStack(spacing: 10) {
+      Text("Exercise Analyzer").font(.title2.bold()).foregroundStyle(.white).padding(.bottom, 4)
+      startRow("Live", "camera.fill") { session.startCamera() }
+      startRow("Workouts", "calendar") { showRecents = true }
+      startRow("Photos", "photo.on.rectangle") {
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+          Task { @MainActor in showPhotosPicker = true }
+        }
+      }
+      startRow("Files", "folder") { showFileImporter = true }
+    }
+    .padding(20)
+    .frame(maxWidth: 320)
+    .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 20))
+    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.15)))
+  }
+
+  private func startRow(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 12) {
+        Image(systemName: symbol).font(.title3).frame(width: 28)
+        Text(title).font(.title3.weight(.semibold))
+        Spacer()
+        Image(systemName: "chevron.right").font(.footnote).opacity(0.5)
+      }
+      .padding(.horizontal, 16).padding(.vertical, 14)
+      .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+      .foregroundStyle(.white)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
   }
 
   private var cameraControls: some View {
