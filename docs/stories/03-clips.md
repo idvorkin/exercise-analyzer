@@ -87,7 +87,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 028:
 
 - **Summary:** Stop an analysis I didn't mean to start
-- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb); verified on the simulator (cancel hook)
+- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9); verified on the simulator (`check_cancel` in sim-smoke.sh: stopped 33 ms after Cancel)
 
 #### Use Case:
 - **As a** lifter who opened the wrong clip, or a long one
