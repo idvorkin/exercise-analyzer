@@ -16,6 +16,8 @@ struct WorkoutGalleryView: View {
   /// For a shake while this sheet is up: the report is presented over Workouts rather than in its place (#41).
   var session: VideoPoseSession? = nil
   var bugReport: Binding<Bool> = .constant(false)
+  /// Selected sheet height, owned by ContentView: collapsed shows only today's summary row (#58).
+  @Binding var detent: PresentationDetent
   @Environment(\.dismiss) private var dismiss
   @StateObject private var suggestions = PhotosSuggestions()
   /// Days folded shut, by start-of-day time; days older than a week start folded, today and this week start open.
@@ -30,7 +32,40 @@ struct WorkoutGalleryView: View {
 
   private var knownPhotosIDs: Set<String> { Set(store.entries.compactMap(\.photosIdentifier)) }
 
+  /// Collapsed height: the drag handle plus one summary row.
+  static let collapsedDetent: PresentationDetent = .height(128)
+
+  private var isCollapsed: Bool { detent == Self.collapsedDetent }
+
+  /// Today's grouping, if today has any sets.
+  private var todayDay: WorkoutDay? {
+    WorkoutDay.group(store.entries).first { Calendar.current.isDateInToday($0.date) }
+  }
+
   var body: some View {
+    Group {
+      if isCollapsed {
+        collapsedBody
+      } else {
+        galleryBody
+      }
+    }
+  }
+
+  /// Collapsed sheet (#58): the handle plus today's exercises in set order, nothing else.
+  /// Absent on an empty day (the handle alone).
+  private var collapsedBody: some View {
+    Group {
+      if let today = todayDay, !today.exercises.isEmpty {
+        TodaySummaryRow(day: today)
+          .padding(.horizontal, 16)
+          .padding(.vertical, 14)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+  }
+
+  private var galleryBody: some View {
     NavigationStack {
       Group {
         if store.entries.isEmpty && suggestions.clips.isEmpty {
@@ -276,6 +311,34 @@ struct DayHeader: View {
     var parts = ["\(day.setCount) set\(day.setCount == 1 ? "" : "s")", "\(day.repCount) reps"]
     if let span = day.span, span >= 60 { parts.append("\(Int(span / 60)) min") }
     return parts.joined(separator: " · ")
+  }
+}
+
+/// Collapsed Workouts summary (#58): today's exercises in the order first done that day
+/// (`WorkoutDay.exercises` already keeps first-done order), a glyph and short word each, no counts.
+/// One line, gym-first type; extra exercises clip at the trailing edge.
+struct TodaySummaryRow: View {
+  let day: WorkoutDay
+
+  var body: some View {
+    HStack(spacing: 10) {
+      ForEach(day.exercises.indices, id: \.self) { index in
+        let exercise = day.exercises[index]
+        if index > 0 {
+          Text("·").foregroundStyle(.secondary)
+        }
+        HStack(spacing: 5) {
+          ExerciseGlyph(kind: exercise.kind)
+          Text(exercise.kind.shortWord)
+            .font(.headline)
+            .lineLimit(1)
+        }
+      }
+    }
+    .lineLimit(1)
+    .truncationMode(.tail)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Today: " + day.exercises.map { $0.kind.shortWord }.joined(separator: ", "))
   }
 }
 

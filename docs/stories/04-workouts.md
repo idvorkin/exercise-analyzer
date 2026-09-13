@@ -125,7 +125,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 035:
 
 - **Summary:** A set made by older models is run through the new ones when I reopen it (technical)
-- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952); verified on the phone (a get-up stored before the detector reopened: `recents_rerun` with the stored and current model sets, the pass from the video, `analyzed` with reason rerun_models on the same entry); [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e) unifies the reopen decision with the refresh into StoredSetPlan, verified on the host (16 tests)
+- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952); verified on the phone (a get-up stored before the detector reopened: `recents_rerun` with the stored and current model sets, the pass from the video, `analyzed` with reason rerun_models on the same entry); a replay running today's tracker in [a37440b](https://github.com/idvorkin/exercise-analyzer/commit/a37440b), verified on the host (#49); [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e) unifies the reopen decision with the refresh into StoredSetPlan, verified on the host (16 tests) and the simulator (the five smoke checks)
 
 #### Use Case:
 - **As a** developer shipping a new model (a detector, a bigger pose model)
@@ -144,3 +144,23 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Then:** those sets go through the models again from their clips one at a time in the background (`recents_rerun` and `offline_pass` with `where: refresh` in the log), each replacing its own entry, without my opening them; opening a set while that runs takes priority and the interrupted set waits for the next launch; a set whose clip is out of reach is refreshed from its stored poses as before, and that replay runs today's tracker over the stored sightings (the bell a set was saved with is never kept through a replay)
 
 - **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)
+
+---
+
+### User Story 038:
+
+- **Summary:** See what I did today at a glance when the Workouts sheet is collapsed
+- **Status:** implemented in [52ecac2](https://github.com/idvorkin/exercise-analyzer/commit/52ecac2); verified by simulator screenshot (`/tmp/bell-lab/summary.png`: the collapsed sheet reads "Bulgarian · swing · pistols" with a stick-figure glyph per exercise, the full gallery opens on drag); Igor's eye is the last rung
+
+#### Use Case:
+- **As a** lifter between sets with the Workouts sheet pulled down
+- **I want to** see the day's exercises as short words with a small stick-figure icon each (pistols, swing, TGU, Bulgarian)
+- **so that** I know what I have done today without opening the sheet
+
+#### Acceptance Criteria:
+- **Scenario:** Glancing at the day between sets
+- **Given:** today has a swing set and two pistol sets stored, and the Workouts sheet is collapsed to its handle
+- **When:** I look at the collapsed sheet
+- **Then:** it reads "swing · pistols" with an icon per exercise (a stick figure in the exercise's shape, drawn once as assets), in the order the sets were done, and nothing else; pulling the sheet up shows the full day as before
+
+- **Issues:** [#58](https://github.com/idvorkin/exercise-analyzer/issues/58)

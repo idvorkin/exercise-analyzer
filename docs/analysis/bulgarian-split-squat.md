@@ -31,3 +31,12 @@ Reports: `TuningReports.testBulgarianPhoneSetUnderThresholds`, `testBulgarianTen
   the diagonal camera while the head dropped by a steady fraction of leg length 8 times; phases moved from the
   front knee to head height (commit 681f98d and the AGENTS.md rule).
 - Both counts are analyzer baselines. Next: Igor confirms 8 on one of them and it becomes `humanVerified`.
+- **2026-09-13, tracks/bulgarian-split-squat-20260909-98B26725 ([#55](https://github.com/idvorkin/exercise-analyzer/issues/55))**:
+  the Bottom pill could never light — `bottom` existed only as a stored peak while the live phase went
+  descending straight to ascending (the swing, the pistol and the get-up all report their pill phases live,
+  and this note already listed BOTTOM as a phase). The machine now rests in `bottom` from the dip
+  confirmation until the head rises a second `riseFraction` (pistol parity). Reps byte-identical pre/post on
+  all three Bulgarian tracks (8/8/8); frames 31.16–31.19 read `bottom` in rep 7's dip; no `bottom` outside rep
+  spans. Evidence: `BulgarianBottomPhaseTests` over the archived track. Also note the brief's premise was
+  wrong: the log's `phase_pill` seeks to 30.72 already landed on rep 7's bottom peak (the "(descending)"
+  annotation was that frame's live phase, not the tapped pill) — the lookup worked, the phase was missing.

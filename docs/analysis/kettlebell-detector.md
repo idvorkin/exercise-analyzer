@@ -329,6 +329,34 @@ phone only because the detector's model name changed the same night. Now `analyz
 the raw `bells` and only `restored(frames:reps:)` keeps a stored bell (`BellTests`, host). AnalysisVersion
 2026-09-13.1, so every stored set replays once.
 
+**Igor's 13-rep swing by eye (2026-09-13, the first real-gym clip on the Mac).** The phone's set replays
+identically on the Mac with its poses kept (held 55 %, inside reps 45 %; phone 58 / 48). Thirty seeded frames
+graded by Muse: of 25 with the bell in his hands the circle is on it in **7**, on a rack or floor bell in 8 and
+absent in 9; three of four empty-hand frames carry a circle on a rack bell. Recall 28 %, precision 37 %,
+against a proxy of 55 %. The fixture says why: 11.9 boxes a frame and **853 of 940 frames at the detector's cap
+of 12**. The cap was set on the 4-rep sample clip with three bells in view; this gym has more than twelve, so
+the swung bell, blurred at speed, is crowded out (no sighting in 155 frames) and two floor-lineup bells seen in
+only a quarter of frames never become furniture and take starts.
+
+| 13-rep swing | proxy held | inside reps | blind frames | circle on his bell (of 25) | false circles (of 30) |
+|---|---|---|---|---|---|
+| cap 12 (shipped) | 55 % | 45 % | 155 | 7 | 11 |
+| cap 30 | 67 % | 61 % | 43 | **14** | 12 |
+| cap 30 + furniture veto one cell wider, starts only | 62 % | 50 % | 41 | 13 | 9 |
+
+The cap is the lever: every swing frame that had no circle has one at 30. The false circles are two things
+the cap does not touch: one floor box at (0.58, 0.71), 0.036 × 0.080, seen in 25 % of the clip and never
+anywhere else (hidden whenever Igor is in front of it; it never reaches the 0.6 share that makes a cell
+furniture, and the track starts on it during the walk-in), and rack-bell starts one cell from a furniture cell
+(the grid veto has no margin for a 0.09-tall bell's jitter). Widening the veto to the 3 × 3 neighbourhood for
+follows too cost the 4-rep clip 17 points (the swung bell passes within a cell of the ski-erg wheel) and the
+13-rep clip 13 (the hinge bottom is one cell from the lineup row); for starts only it was a wash by eye
+(13 vs 14 right, 9 vs 12 false, inside the grader's noise) and was not shipped. Next, in order: a cap that
+keeps the twelve by confidence and adds any box within reach of a wrist (30 everywhere costs memory and a
+colour sample per box); furniture from any 3 s window a box sits still in, not 60 % of the clip (the walk-in
+box); size identity for the rack bell beside the hinge (0.043 × 0.09 against 0.037 × 0.049). Lab record:
+[lab/2026-09-12-bell-lab-notebook.md](lab/2026-09-12-bell-lab-notebook.md), H26–H28.
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),

@@ -184,7 +184,7 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
         framesAscendingAfterBottom = 0
       }
       if machine.canTransition, let bottom = bottomCandidate, framesAscendingAfterBottom >= 3 {
-        trace?(String(format: "%.2fs ascending: bottom ear %.0f at %.2fs", time, bottom.earY, bottom.time))
+        trace?(String(format: "%.2fs bottom: bottom ear %.0f at %.2fs", time, bottom.earY, bottom.time))
         machine.storePeak(
           RepPosition(
             phase: Self.bottom, time: bottom.time, pose: bottom.pose, metrics: bottom.metrics,
@@ -200,6 +200,16 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
                 score: closest.earY, image: nil))
           }
         }
+        machine.transition(to: Self.bottom)
+      }
+    case Self.bottom:
+      // The dip is confirmed and the peak stored; stay in bottom until the head has clearly left it, so the
+      // pills and the log show a bottom moment like the pistol's (#55). The exit sits a second riseFraction
+      // above the confirmation level, far below the completion height, so every rep that completed before
+      // still completes.
+      if machine.canTransition, let bottom = bottomCandidate,
+        earY < bottom.earY - legLength * thresholds.riseFraction * 2
+      {
         machine.transition(to: Self.ascending)
       }
     default:  // ascending: back near the standing height completes the rep

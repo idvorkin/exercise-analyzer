@@ -141,9 +141,12 @@ The simulator cannot be tapped from a script, so the app has **launch hooks** re
 | `SWING_AUTO_TRIM=1` | trim to the rep span right after the first analysis |
 | `SWING_UNDO_TRIM=1` | undo that trim 3 s later (with `SWING_AUTO_TRIM`) |
 | `SWING_CANCEL_ANALYSIS=1` | cancel the offline pass one second in |
+| `SWING_INTERRUPT_READER=<frame>` | fail the first pass at that frame with `readerFailed("Operation Interrupted")`, like a backgrounded decoder (#57) |
+| `SWING_MODE=<exercise\|auto>` | switch exercise 2 s after an interrupted pass, proving a mode switch re-runs the clip (#57) |
 | `SWING_OPEN_RECENT=1` | reopen the newest Recents entry |
 | `SWING_BUG=text` | file a bug report on launch |
 | `SWING_SHOW_WORKOUTS=1` | open the workout gallery on launch (screenshots) |
+| `SWING_WORKOUTS_COLLAPSED=1` | open Workouts collapsed to today's summary row (with `SWING_SHOW_WORKOUTS`) |
 | `SWING_PHOTOS_ACCESS=1` | ask for Photos access when the gallery opens (the simulator cannot be granted Photos access from the command line on iOS 26, so this dialog needs a hand) |
 
 Results are read from the **session log** (`Documents/logs/*.jsonl` in the app container), not the screen. The
