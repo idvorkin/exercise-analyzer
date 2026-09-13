@@ -20,3 +20,22 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** a clip is open at the rep that was counted wrong
 - **When:** I shake the phone, type "rep 3 isn't a rep" and send
 - **Then:** the report is stored with the clip name, the playhead time and the session log's name, and shows up as a GitHub issue after the developer pulls logs
+
+---
+
+### User Story 026:
+
+- **Summary:** Attach what I was looking at to a bug report
+
+#### Use Case:
+- **As a** lifter reporting a wrong count or a display glitch
+- **I want to** have a screenshot of the screen attached to my shake report
+- **so that** the developer sees what I saw, not just the clip name and playhead
+
+#### Acceptance Criteria:
+- **Scenario:** Reporting a glitch on screen
+- **Given:** a clip is open and something looks wrong on screen
+- **When:** I shake the phone and send a report
+- **Then:** the report carries a screenshot taken at the moment of the shake, and the developer can open it next to the log
+
+- **Issues:** [#24](https://github.com/idvorkin/exercise-analyzer/issues/24) (not built yet)

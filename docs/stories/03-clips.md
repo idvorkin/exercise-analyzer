@@ -21,6 +21,8 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap Trim
 - **Then:** the clip starts about 5 s before the first rep and ends about 5 s after the last, plays from its first frame, keeps HDR, and the cut takes under a second; an Undo button restores the untrimmed clip
 
+- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed (fixed)
+
 ---
 
 ### User Story 010:
@@ -54,3 +56,22 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** a recording has been trimmed to its set
 - **When:** I tap Save
 - **Then:** a new video of the trimmed clip appears in Photos with no overlay, and the Workouts entry points at it
+
+---
+
+### User Story 025:
+
+- **Summary:** An Open sheet with big rows, most-used first
+
+#### Use Case:
+- **As a** lifter opening a clip with sweaty hands
+- **I want to** see Workouts, Photos and Files as full-width rows, in that order
+- **so that** I hit the one I mean, and the one I use most is first
+
+#### Acceptance Criteria:
+- **Scenario:** Opening a clip from Workouts
+- **Given:** the main screen is showing
+- **When:** I tap Open
+- **Then:** a sheet slides up with Workouts, Photos, Files and Report a problem as full-width rows, Workouts first and Files last
+
+- **Issues:** [#25](https://github.com/idvorkin/exercise-analyzer/issues/25)

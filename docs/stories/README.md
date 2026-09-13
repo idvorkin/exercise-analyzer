@@ -8,11 +8,11 @@ question per story is [../USER_STORIES.md](../USER_STORIES.md).
 | Journey | Stories | What it covers |
 |---|---|---|
 | [Recording and counting](01-recording.md) | 001, 002, 003, 004, 020, 021 | Getting a trusted count out of a set recorded at the gym. |
-| [Reviewing a set](02-reviewing.md) | 005, 006, 007, 008 | Seeing what the camera measured and finding the rep where form slipped. |
-| [Clips and Photos](03-clips.md) | 009, 010, 011 | Trimming, opening and saving video without copies or quality loss. |
+| [Reviewing a set](02-reviewing.md) | 005, 006, 007, 008, 024 | Seeing what the camera measured and finding the rep where form slipped. |
+| [Clips and Photos](03-clips.md) | 009, 010, 011, 025 | Trimming, opening and saving video without copies or quality loss. |
 | [Workouts](04-workouts.md) | 012, 013, 014, 015 | Training as sets per day and exercise, kept honest over time. |
 | [From the wrist](05-watch.md) | 016, 017, 018, 019, 023 | Running a session from the Apple Watch with the phone on a tripod. |
-| [Reporting problems](06-feedback.md) | 022 | Getting a wrong count in front of the developer with the evidence attached. |
+| [Reporting problems](06-feedback.md) | 022, 026 | Getting a wrong count in front of the developer with the evidence attached. |
 
 ## Status
 
@@ -42,3 +42,6 @@ Built and where each story was verified (host tests, simulator, or phone).
 | 021 Music never interrupted | yes | phone |
 | 022 Shake to report | yes | phone (13 reports filed) |
 | 023 Complication | yes | needs a look at the watch face |
+| 024 Phase pills and tap to play | yes | needs phone check |
+| 025 Open sheet | yes | needs phone check |
+| 026 Screenshot in reports | no | not built |

@@ -55,6 +55,8 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap the "phase" button on the right
 - **Then:** the playhead lands on rep 3's connect checkpoint and the scrubber moves with it
 
+- **Issues:** [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) scrubber not following a gallery tap; [#23](https://github.com/idvorkin/exercise-analyzer/issues/23) slider not following playback (logging added)
+
 ---
 
 ### User Story 008:
@@ -71,3 +73,22 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** a clip is open in which I occupy under a third of the frame
 - **When:** I tap the person icon
 - **Then:** the video zooms to one steady region that keeps my whole body in view for every rep, HDR colours unchanged
+
+---
+
+### User Story 024:
+
+- **Summary:** Jump to a phase by tapping its name, and play or pause by tapping the picture
+
+#### Use Case:
+- **As a** lifter comparing the same moment across reps
+- **I want to** tap a phase name in the HUD to jump there, and tap the picture to play or pause
+- **so that** moving around a rep takes one tap on something big instead of a hunt for the small controls
+
+#### Acceptance Criteria:
+- **Scenario:** Jumping to the bottom of the current rep
+- **Given:** a set is open and paused inside rep 4
+- **When:** I tap the Bottom pill in the HUD
+- **Then:** the playhead lands on rep 4's bottom checkpoint, and a tap on the picture afterwards starts playback
+
+- **Issues:** [#28](https://github.com/idvorkin/exercise-analyzer/issues/28)
