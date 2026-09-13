@@ -271,6 +271,10 @@ head twice, the chest while the bell is clutched to it three times), pistols and
 frames. So the proxy's 98 % on the swings is a 0.6–0.7 by eye; what remains between them is mostly carried
 boxes drifting off the bell during a blink and strict grading of near-misses. Next branch of the tree: coasting
 itself (fewer carried frames, drawn only where the bell can be), then the get-up's head and chest classes.
+Tried for those two classes and reverted: a veto on boxes containing a visible head keypoint, and a follow
+tie-break toward the box nearest a wrist. Inside reps nothing changed; outside reps the get-up's whole-clip
+number fell 82→61 (the bell clutched beside the face between reps has an ear or the nose inside its box), and
+the ten-frame regrade disagreed with itself between runs. Judge them on a larger sample of rest-phase frames.
 Tooling: `scripts/model-trials/cut-dot-frames.sh` and `grade-dots.sh` (docs/TESTING.md).
 
 Coasting, by eye: the same 35 swing frames with 0, 1 and 3 coasted frames grade 17/23, 15/22 and 17/24 on the
