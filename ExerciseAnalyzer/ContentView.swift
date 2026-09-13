@@ -545,7 +545,7 @@ struct ContentView: View {
       }
       VStack(spacing: 10) {
         Text("Exercise Analyzer").font(.title2.bold()).foregroundStyle(.white).padding(.bottom, 4)
-        startRow("Live", "camera.fill") { showOpenDialog = false; session.startCamera() }
+        startRow("Live", "camera.fill") { showOpenDialog = false; session.startCamera(position: session.cameraPosition) }
         startRow("Workouts", "calendar") { showOpenDialog = false; showRecents = true }
         startRow("Photos", "photo.on.rectangle") {
           showOpenDialog = false
@@ -699,7 +699,7 @@ struct ContentView: View {
         }
         Spacer()
         Button {
-          session.startCamera()
+          session.startCamera(position: session.cameraPosition)
         } label: {
           Label("Camera", systemImage: "camera")
         }

@@ -23,6 +23,13 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I perform ten kettlebell swings and tap Done
 - **Then:** the clip shows exactly ten reps, each with a 0–100 score and a one-line reason for any lost points
 
+- **Scenario:** Live opens on the camera I used last time
+- **Given:** my last set was recorded on the front camera (or the back camera at 0.5×)
+- **When:** I open Live for the next set
+- **Then:** the preview is already on that camera and zoom, and `camera_start` logs the restored choice
+
+- **Issues:** [#66](https://github.com/idvorkin/exercise-analyzer/issues/66)
+
 ---
 
 ### User Story 002:

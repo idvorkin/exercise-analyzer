@@ -132,6 +132,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   override init() {
     exerciseMode = ExerciseMode(storageValue: UserDefaults.standard.string(forKey: "exerciseMode"))
+    // Live opens on the camera the lifter used last time (#66): front/back and the zoom step.
+    cameraPosition = UserDefaults.standard.string(forKey: "cameraPosition") == "front" ? .front : .back
+    let savedZoom = UserDefaults.standard.double(forKey: "cameraZoom")
+    cameraZoom = savedZoom > 0 ? savedZoom : 1
     log = SessionLog()
     models = ModelSet(log: log)
     super.init()
@@ -1368,8 +1372,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
   }
 
+  /// The camera the lifter last used, written on every switch from the phone or the watch (#66).
+  private func persistCameraChoice() {
+    UserDefaults.standard.set(cameraPosition == .front ? "front" : "back", forKey: "cameraPosition")
+    UserDefaults.standard.set(cameraZoom, forKey: "cameraZoom")
+  }
+
   /// Builds the capture source for `position`, feeding frames to the current recorder and the analyzer.
   private func attachCamera(position: AVCaptureDevice.Position, orientation: AVCaptureVideoOrientation? = nil) {
+    // The persisted zoom survives the 1× reset below, so a fresh Live starts where the last set left off.
+    let restoredZoom = cameraZoom
     do {
       let orientation = orientation ?? currentVideoOrientation()
       cameraOrientation = orientation
@@ -1386,8 +1398,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
       cameraPreviewLayer = camera.previewLayer
       source = .camera
       previewSentThisSet = false
-      log.event("camera_start", ["position": position == .front ? "front" : "back"])
       camera.start()
+      // start() resets to 1×: re-apply the zoom the lifter last used, back camera only (the front has 1× only).
+      if position == .back, restoredZoom != 1, camera.zoomPresets.contains(restoredZoom) {
+        camera.setZoom(restoredZoom)
+        cameraZoom = camera.zoom
+      }
+      log.event("camera_start", ["camera": position == .front ? "front" : "back", "zoom": cameraZoom])
     } catch {
       statusMessage = "Camera failed: \(error.localizedDescription)"
       log.event("error", ["where": "camera", "message": "\(error)"])
@@ -1471,6 +1488,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       flipCamera()  // back 1× → front
     }
     log.event("camera_level", ["position": cameraPosition == .front ? "front" : "back", "zoom": cameraZoom])
+    persistCameraChoice()
     pushWatchStatus(force: true)
   }
 
@@ -1496,6 +1514,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     old.stop()
     log.event("camera_switch", ["to": other == .front ? "front" : "back", "at_s": duration])
     attachCamera(position: other)
+    persistCameraChoice()
     pushWatchStatus(force: true)
   }
 
