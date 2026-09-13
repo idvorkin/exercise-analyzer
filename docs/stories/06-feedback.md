@@ -49,7 +49,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 036:
 
 - **Summary:** A crash comes back with the logs (technical)
-- **Status:** implemented (commit named in the next docs commit); verified by build; needs the phone (the next crash, or none: the first one caught was the Float16 tensor read, fixed in the same commit)
+- **Status:** implemented in [42b50ff](https://github.com/idvorkin/exercise-analyzer/commit/42b50ff); verified by build; needs the phone (the next crash, or none: the first one caught was the Float16 tensor read, fixed in the same commit)
 
 #### Use Case:
 - **As a** developer reading a session log that stops mid-work
