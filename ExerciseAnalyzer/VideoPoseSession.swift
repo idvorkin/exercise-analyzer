@@ -132,6 +132,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     pipeline = AnalysisPipeline(exercise: exercise)
     watch.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     CrashReports.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
+    CrashReports.shared.reportSignalLogs { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
     watch.onExercise = { [weak self] mode in
       guard let self else { return }
@@ -246,14 +247,24 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Where Core ML schedules the model's ops (CPU / GPU / Neural Engine), the same assignment Xcode's performance
   /// report shows (#44). Logged as model_plan with per-device op counts.
+  /// Loading a plan compiles the model for analysis; it must not overlap inference on the same model, so the
+  /// offline pass waits for these before it starts (#43: the second phone crash landed as the pose plan finished).
+  private var planTasks: [Task<Void, Never>] = []
+
   private func logPlan(model: String, url: URL) {
-    Task { [weak self] in
-      let counts = await ModelPlan.summary(compiledModelURL: url)
-      guard let self, !counts.isEmpty else { return }
-      var fields: [String: Any] = ["model": model]
-      for (k, v) in counts { fields[k] = v }
-      self.log.event("model_plan", fields)
-    }
+    planTasks.append(
+      Task { [weak self] in
+        let counts = await ModelPlan.summary(compiledModelURL: url)
+        guard let self, !counts.isEmpty else { return }
+        var fields: [String: Any] = ["model": model]
+        for (k, v) in counts { fields[k] = v }
+        self.log.event("model_plan", fields)
+      })
+  }
+
+  private func waitForPlans() async {
+    for task in planTasks { await task.value }
+    planTasks = []
   }
 
   /// The bell detector is optional: the app counts without it, it just does not see the bell.
@@ -490,6 +501,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     installPlayerItem(url: url, pipeline: AnalysisPipeline(exercise: exercise))
     liveInferenceEnabled = false
     activity = .working("Analyzing", progress: 0)
+    await waitForPlans()
     canCancelAnalysis = true
     defer { canCancelAnalysis = false; analysisTask = nil }
     let task = Task { [weak self] in
