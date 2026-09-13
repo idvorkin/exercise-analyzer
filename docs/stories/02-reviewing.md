@@ -127,8 +127,8 @@ Part of the [user stories](README.md); persona and format are described there.
 
 ### User Story 033:
 
-- **Summary:** See a get-up step by step: elbow, hand, kneel, lunge, stand, and back down
-- **Status:** implemented in [1f815f5](https://github.com/idvorkin/exercise-analyzer/commit/1f815f5); verified on the host (`GetUpStageTests`: four reps under two cameras land in the study's windows); the pills and the nine-column gallery need the phone
+- **Summary:** See a get-up step by step: floor, elbow, hand, kneel, lunge, stand, and back down to the floor
+- **Status:** implemented in [1f815f5](https://github.com/idvorkin/exercise-analyzer/commit/1f815f5); verified on the host (`GetUpStageTests`: four reps under two cameras land in the study's windows); the pills and the nine-column gallery need the phone; [#48](https://github.com/idvorkin/exercise-analyzer/issues/48): Floor brackets every rep (flat lying just before the first movement, back flat after the elbow), eleven gallery columns, the Floor pill in place of Lying
 
 #### Use Case:
 - **As a** lifter reviewing a get-up
@@ -139,7 +139,7 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Reviewing a two-sided set
 - **Given:** a clip with one get-up per side is analyzed
 - **When:** I open it
-- **Then:** each rep shows Lying, Elbow, Hand, Kneel, Lunge, Standing and the way down's Lunge, Kneel and Elbow in the gallery, the HUD's six pills follow the step as it plays (a way-down step lights the same pill as its way-up step), tapping a pill jumps to that step's nearest occurrence in the current rep, and the rep count is unchanged
+- **Then:** each rep shows Floor, Lying, Elbow, Hand, Kneel, Lunge, Standing and the way down's Lunge, Kneel, Elbow and Floor in the gallery (eleven columns), the HUD's six pills follow the step as it plays (Floor in place of Lying; a way-down step lights the same pill as its way-up step), tapping a pill jumps to that step's nearest occurrence in the current rep, and the rep count is unchanged
 
 - **Issues:** none (Igor: "the get-up is going to need more stages")
 

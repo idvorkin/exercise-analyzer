@@ -24,6 +24,7 @@ drives a stage.
 
 | Stage | Enter when | Position stored | Threshold |
 |---|---|---|---|
+| Floor | flat lying `floorLeadSeconds` before the rep-start floor frame (Igor: "right before the movement") | latest flat frame in the lying window (flattest buffered frame when the run is shorter) | `floorLeadSeconds` 2.0 s |
 | Elbow | raw uprightness above `lyingMax` with the support elbow bent, even before the coarse machine calls it rising (the step can be over in half a second) | first such frame | `elbowBentMax` 140° |
 | Hand | support elbow straight, held 8 frames | first frame | `handElbowMin` 150° |
 | Kneel | uprightness in [`kneelMin`, `kneelMax`] for `kneelHoldSeconds` | middle of the plateau | 0.25–0.45, 1 s |
@@ -33,11 +34,13 @@ drives a stage.
 | Kneel ↓ | uprightness at or below `kneelMax` for `kneelHoldSeconds` | middle of the plateau | |
 | Elbow ↓ | support elbow bent with uprightness at or below `kneelMax`, held 8 frames | first frame | |
 | Lying | `lyingMax` after ≥ 2 s down (coarse) | last lying frame before the elbow step | |
+| Floor ↓ | back flat after the elbow (rep complete) | completion frame | |
 
 A stage that was never entered (a fast rep, an unmeasured elbow) gets the frame nearest its typical uprightness
-between the neighbouring stages that were, so every rep carries all nine positions. Gallery order: Lying, Elbow,
-Hand, Kneel, Lunge, Standing, ↓ Lunge, ↓ Kneel, ↓ Elbow; the HUD shows six pills and a down stage lights the
-same pill as its up stage. Quality: arm drift, a rushed descent (down < 0.6 × up), and which arm held the bell
+between the neighbouring stages that were, so every rep carries all eleven positions. Gallery order: Floor,
+Lying, Elbow, Hand, Kneel, Lunge, Standing, ↓ Lunge, ↓ Kneel, ↓ Elbow, ↓ Floor; the HUD shows six pills
+(Floor in place of Lying — lying flat reports floor) and a down stage lights the same pill as its way-up step.
+Quality: arm drift, a rushed descent (down < 0.6 × up), and which arm held the bell
 (majority of `overheadArmSide` over the rep) so a set reads as one rep per side.
 
 ## Fixtures
@@ -92,6 +95,7 @@ Landmarks across the four reps (times in seconds; L/R is the overhead arm):
 
 | Landmark | 2sides rep 1 (L) | 2sides rep 2 (R) | 2min rep 1 (L) | 2min rep 2 (R) |
 |---|---|---|---|---|
+| **Floor** (flat, 2 s before rep start) | 22.0 | 95.5 | 20.9 | 88.9 |
 | leaves lying (up > 0.15) | 23.0 | 97.5 | 22.5 | 91.0 |
 | **Elbow**: support elbow bent | 24.5–25.0 (81–107°) | 96.5–97.5 (86–104°) | 23.5–24.5 (71–111°) | 91.5–92.0 (128–135°) |
 | **Hand**: support elbow straight ≥ 150° | 25.5 (146°) | 98.0 (175°) | 25.0 (174°) | 93.0 (179°) |
@@ -103,6 +107,7 @@ Landmarks across the four reps (times in seconds; L/R is the overhead arm):
 | Kneel ↓ plateau | 50.5–51.5 (0.27–0.32) | 117.0–118.0 (0.33) | 49.0–50.0 (0.28–0.56) | 111.5–113.0 (0.36–0.44) |
 | Elbow ↓: support elbow bent again | 53.5 (106°) | (outside the window) | 54.0 (94°) | 115.5–116.0 (79–81°) |
 | lying (up ≤ 0.15) | 53.1 | ~121 | 54.5 | 116.0 |
+| **Floor ↓** (completion frame) | 53.1 | 121.1 | 54.1 | 116.1 |
 
 What the numbers say:
 
@@ -136,3 +141,20 @@ uprightness. Stored positions after the change (seconds):
 Lying and Elbow share a frame when the elbow step starts on the last floor frame. ↓ Kneel of 2min rep 1 never
 held the band (uprightness jittered 0.28–0.56 on the way down, see the table above), so it is a filled frame
 between ↓ Lunge and ↓ Elbow; the count and the other stages are unaffected.
+
+### 2026-09-13: floor stage, both ends ([#48](https://github.com/idvorkin/exercise-analyzer/issues/48))
+
+Igor (voice): a get-up starts and ends on the floor — the gallery and the pills should show it, both ways up
+and down; pose first ("see where we're lying"), timing heuristic as fallback. The half-second signal tables
+above decide it without the fallback: in all four reps the stretch 2 s before the rep-start floor frame is
+flat (median uprightness at or below `lyingMax`), with the first raw rise 0.5–1.5 s later —
+2sides rep 1: floor 22.0 (flat −0.65), first movement 23.0; rep 2: floor 95.5 (flat −0.19), movement ~96.0;
+2min rep 1: floor 20.9 (flat −0.9), movement 22.0; rep 2: floor 88.9 (flat −0.9), movement 90.0. A 1.5 s lead
+would already stand in the movement on 2sides rep 2 (raw +0.11 at 96.0), so the lead is 2.0 s
+(`floorLeadSeconds`), anchored on the rep-start floor frame, taken from a window of flat-lying frames (an
+abandoned false start never leaves the floor, so the window survives it; a completed rep starts a new one).
+Floor ↓ is the completion frame, the first flat frame after the elbow — no rule needed. Lying flat now
+reports floor, so the Floor pill (in place of Lying — still six pills) lights while lying and the roll to
+the elbow takes over from it. Counts and every other stage byte-identical pre/post on both fixtures (2/2)
+and on all three archived get-up tracks; floor positions bracket their reps, and the lying rest between reps
+reports floor so the pill stays lit. Evidence: `GetUpStageTests` floor windows over both fixtures.
