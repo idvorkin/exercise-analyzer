@@ -796,7 +796,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         if let mode = ProcessInfo.processInfo.environment["SWING_MODE"], !mode.isEmpty {
           Task {
             try? await Task.sleep(for: .seconds(2))
-            self.setExerciseMode(ExerciseMode(storageValue: mode))
+            self.setExerciseMode(ExerciseMode(storageValue: mode), persist: false)
           }
         }
       }
@@ -899,9 +899,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Lifter picked an exercise (or Auto): persist it and re-analyze whatever is loaded, without re-running inference.
-  func setExerciseMode(_ mode: ExerciseMode) {
+  /// Test hooks pass persist: false so one launch never leaks its mode into later launches (#57).
+  func setExerciseMode(_ mode: ExerciseMode, persist: Bool = true) {
     exerciseMode = mode
-    UserDefaults.standard.set(mode.storageValue, forKey: "exerciseMode")
+    if persist { UserDefaults.standard.set(mode.storageValue, forKey: "exerciseMode") }
     log.event("exercise_mode", ["mode": mode.storageValue])
     if case .fixed(let kind) = mode { exercise = kind }
     switch source {
