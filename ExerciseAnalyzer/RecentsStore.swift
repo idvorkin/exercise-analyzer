@@ -210,6 +210,16 @@ final class RecentsStore: ObservableObject {
     return snapshot.analysisVersion != AnalysisVersion.current
   }
 
+  /// The analyzer version the stored reps were computed with (nil in files from before it existed, and when the
+  /// snapshot is unreadable). Step 2 (#52) moves this into index.json; until then it decodes like the two above.
+  func version(for entry: RecentEntry) -> String? {
+    let dir = folder(for: entry.id)
+    guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),
+      let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data)
+    else { return nil }
+    return snapshot.analysisVersion
+  }
+
   func loadPipeline(for entry: RecentEntry) -> AnalysisPipeline? {
     let dir = folder(for: entry.id)
     guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),

@@ -223,14 +223,26 @@ final class VideoPoseSession: NSObject, ObservableObject {
     log.event("recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current, "models": loadedModels])
     for entry in stale {
       guard let stored = recents.loadPipeline(for: entry) else { continue }
-      if !Set(loadedModels).isSubset(of: storedModels(entry)), await rerunFromClip(entry, stored: stored, where: "refresh") {
+      let frames = stored.track.frames
+      let plan = StoredSetPlan.decide(
+        storedVersion: recents.version(for: entry), storedModels: storedModels(entry),
+        currentVersion: AnalysisVersion.current, currentModels: loadedModels,
+        mode: exerciseMode, storedExercise: stored.exercise, detection: nil)
+      if case .rerunFromClip = plan, await rerunFromClip(entry, stored: stored, where: "refresh") {
         continue
       }
-      let frames = stored.track.frames
-      var kind = stored.exercise
-      if case .auto = exerciseMode {
-        let fresh = ExerciseDetector.detect(frames: frames)
-        if fresh.exercise != kind, fresh.confidence >= 70 { kind = fresh.exercise }
+      // Replaying the stored poses: the plan's exercise — except a re-run that fell back for an out-of-reach
+      // clip, which replays the stored exercise re-detected in Auto, as before.
+      let kind: ExerciseKind
+      switch plan {
+      case .replay(let exercise, _):
+        kind = exercise
+      case .rerunFromClip:
+        kind = StoredSetPlan.exercise(
+          mode: exerciseMode, stored: stored.exercise,
+          detection: exerciseMode == .auto ? ExerciseDetector.detect(frames: frames) : nil)
+      case .keep:  // unreachable: the filter above only keeps stale-or-models-changed entries
+        kind = stored.exercise
       }
       let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: kind)
       let clipURL = await recents.clipURL(for: entry)
@@ -356,24 +368,26 @@ final class VideoPoseSession: NSObject, ObservableObject {
         "thermal": ProcessInfo.processInfo.thermalState.rawValue, "low_power": ProcessInfo.processInfo.isLowPowerModeEnabled,
         "battery": UIDevice.current.batteryLevel, "footprint_mb": memory.footprint, "available_mb": memory.available,
       ])
-    let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: stored.exercise)
+    // A re-run analyzes the set's own exercise whatever the mode: no detection here (#42).
+    let kind = StoredSetPlan.exercise(mode: exerciseMode, stored: stored.exercise, detection: nil)
+    let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: kind)
     var held: [String: Any] = BellTracker.heldSummary(
       frames: analyzed.track.frames, reps: analyzed.reps.map { ($0.startTime, $0.endTime) }
     ).fields.mapValues { $0 as Any }
     held["id"] = entry.id
     held["where"] = `where`
-    held["exercise"] = stored.exercise.rawValue
+    held["exercise"] = kind.rawValue
     log.event("bell_held", held)
     await analyzed.fillRepImages(from: AVURLAsset(url: url), frameDuration: frameDuration)
     do {
       try recents.save(
         id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
-        pipeline: analyzed, clipURL: nil, thumbnail: galleryThumbnail(analyzed, kind: stored.exercise, entry: entry),
+        pipeline: analyzed, clipURL: nil, thumbnail: galleryThumbnail(analyzed, kind: kind, entry: entry),
         originalName: entry.originalName, models: loadedModels)
       log.event(
         "recents_refreshed",
         ["id": entry.id, "where": `where`, "was": "\(stored.exercise.rawValue) \(stored.reps.count)",
-         "now": "\(stored.exercise.rawValue) \(analyzed.reps.count)", "models": loadedModels])
+         "now": "\(kind.rawValue) \(analyzed.reps.count)", "models": loadedModels])
       return true
     } catch {
       log.event("error", ["where": "recents_rerun_\(`where`)", "id": entry.id, "message": "\(error)"])
@@ -384,6 +398,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func loadModel() {
     guard let url = Bundle.main.url(forResource: "yolo26n-pose", withExtension: "mlmodelc") else {
       modelStatus = "yolo26n-pose.mlpackage missing from bundle"
+      // A build without the gitignored model packages launches with no predictor and nothing after the launch
+      // refresh but silence; say so in the log (2026-09-13: a fresh worktree's test-sim failed all five checks).
+      log.event("model_missing", ["model": "yolo26n-pose"])
       return
     }
     BasePredictor.create(for: .pose, modelURL: url, isRealTime: true) { [weak self] result in
@@ -567,35 +584,39 @@ final class VideoPoseSession: NSObject, ObservableObject {
       // Only a model this build has and the set lacks means a re-run; a set made with more models than this build
       // runs (the detector off again) keeps what it has. Files from before the field were pose-only.
       let storedModels = recents.models(for: entry).isEmpty ? ["yolo26n-pose"] : recents.models(for: entry)
-      if !Set(loadedModels).isSubset(of: storedModels) {
+      let fresh: ExerciseDetection?
+      if case .auto = exerciseMode, !recents.isStale(entry) {
+        fresh = ExerciseDetector.detect(frames: extractedFrames)
+      } else {
+        fresh = nil
+      }
+      switch StoredSetPlan.decide(
+        storedVersion: recents.version(for: entry), storedModels: storedModels,
+        currentVersion: AnalysisVersion.current, currentModels: loadedModels,
+        mode: exerciseMode, storedExercise: pipeline.exercise, detection: fresh)
+      {
+      case .rerunFromClip(let exercise, _):
         log.event(
           "recents_rerun",
-          ["id": entry.id, "reason": "models_changed", "stored": storedModels, "current": loadedModels, "exercise": pipeline.exercise.rawValue])
-        rerunExercise = pipeline.exercise
+          ["id": entry.id, "reason": "models_changed", "stored": storedModels, "current": loadedModels, "exercise": exercise.rawValue])
+        rerunExercise = exercise
         await analyzeAndPlay(url: url)
         return
-      }
-      // A stored analysis can predate an exercise the detector now knows (#17) or an analyzer fix (#19): re-analyze
-      // over the stored poses when the analyzers moved on or, in Auto, when the detector now says something else.
-      // No inference, so this is quick.
-      var reason: String?
-      if recents.isStale(entry) {
-        reason = "analyzer_version"
-      } else if case .auto = exerciseMode {
-        let fresh = ExerciseDetector.detect(frames: extractedFrames)
-        if fresh.exercise != pipeline.exercise, fresh.confidence >= 70 {
-          reason = "recents_redetect"
+      case .replay(let exercise, let reason):
+        // A stored analysis can predate an exercise the detector now knows (#17) or an analyzer fix (#19): re-analyze
+        // over the stored poses. No inference, so this is quick.
+        if reason == .recentsRedetect, let fresh {
           log.event(
             "recents_redetect",
-            ["id": entry.id, "was": pipeline.exercise.rawValue, "now": fresh.exercise.rawValue, "confidence": fresh.confidence])
+            ["id": entry.id, "was": pipeline.exercise.rawValue, "now": exercise.rawValue, "confidence": fresh.confidence])
         }
-      }
-      if let reason {
         activity = .working("Re-analyzing", progress: nil)
-        await analyzeExtracted(url: url, reason: reason, stored: pipeline.exercise)
+        await analyzeExtracted(url: url, reason: reason.rawValue, stored: pipeline.exercise)
         statusMessage = "Re-analyzed as \(exercise.definition.name): \(self.pipeline.reps.count) reps"
         rememberCurrent(clipURL: url)
         activity = .idle
+      case .keep:
+        break
       }
       play()
     }
@@ -774,7 +795,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         ])
       let rerun = rerunExercise
       rerunExercise = nil
-      await analyzeExtracted(url: url, reason: rerun == nil ? "load" : "rerun_models", stored: rerun)
+      await analyzeExtracted(url: url, reason: (rerun == nil ? StoredSetReason.load : .rerunModels).rawValue, stored: rerun)
       statusMessage = recordedLine(reps: pipeline.reps.count) + String(
         format: " · %d frames in %.1fs", summary.frames, summary.elapsed)
       rememberCurrent(clipURL: url)
@@ -815,13 +836,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func analyzeExtracted(url: URL, reason: String, stored: ExerciseKind? = nil) async {
     let chosen: ExerciseKind
     switch exerciseMode {
-    case .fixed(let kind):
-      chosen = stored ?? kind
+    case .fixed:
+      chosen = StoredSetPlan.exercise(mode: exerciseMode, stored: stored, detection: nil)
       detection = nil
     case .auto:
       let result = ExerciseDetector.detect(frames: extractedFrames)
       detection = result
-      chosen = result.exercise
+      chosen = StoredSetPlan.exercise(mode: exerciseMode, stored: stored, detection: result)
       log.event(
         "detection",
         ["exercise": result.exercise.rawValue, "confidence": result.confidence, "reason": result.reason]
