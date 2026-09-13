@@ -104,6 +104,14 @@ struct ContentView: View {
     .background(Color(.systemBackground))
     .background(ShakeDetector { showBugReport = true })
     .sheet(isPresented: $showBugReport) { BugReportSheet(session: session) }
+    .confirmationDialog(
+      "No reps found in this recording", isPresented: $session.emptyRecordingPrompt, titleVisibility: .visible
+    ) {
+      Button("Delete recording", role: .destructive) { session.deleteCurrentRecording() }
+      Button("Keep it", role: .cancel) {}
+    } message: {
+      Text("Nothing was saved to Photos. Delete the recording, or keep it to look at?")
+    }
     .onAppear(perform: loadFromEnvironment)
     .onChange(of: pickerItem) { _, item in
       guard let item else { return }

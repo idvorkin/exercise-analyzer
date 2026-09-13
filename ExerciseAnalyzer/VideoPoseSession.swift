@@ -388,6 +388,19 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
   }
 
+  /// The running offline pass, so Cancel can stop it.
+  private var analysisTask: Task<Void, Never>?
+  @Published private(set) var canCancelAnalysis = false
+  /// Set after an analysis that found no reps in a recording made by this app: offer to delete it.
+  @Published var emptyRecordingPrompt = false
+
+  /// Stops the offline pass; the clip stays loaded (paused) with no analysis and nothing saved.
+  func cancelAnalysis() {
+    guard let analysisTask else { return }
+    log.event("analysis_cancel", ["url": currentFileURL?.lastPathComponent ?? ""])
+    analysisTask.cancel()
+  }
+
   private func analyzeAndPlay(url: URL) async {
     guard let predictor else {
       statusMessage = "Model not ready"
@@ -445,17 +458,35 @@ final class VideoPoseSession: NSObject, ObservableObject {
       statusMessage = recordedLine(reps: pipeline.reps.count) + String(
         format: " · %d frames in %.1fs", summary.frames, summary.elapsed)
       rememberCurrent(clipURL: url)
+      // A recording with no reps is usually a false start: offer to throw it away (nothing was saved to Photos).
+      if pipeline.reps.count == 0, case .recording = currentOrigin {
+        log.event("empty_recording", ["url": url.lastPathComponent, "frames": frames.count])
+        emptyRecordingPrompt = true
+      }
     } catch {
       statusMessage = "Analysis failed: \(error.localizedDescription)"
       log.event("error", ["where": "offline_pass", "message": "\(error)"])
     }
-    activity = .idle
-    liveInferenceEnabled = true
-    play()
-    // Test hook: SWING_AUTO_TRIM=1 trims right after the first analysis (simulator runs can't tap the UI).
-    if trimmedURL == nil, ProcessInfo.processInfo.environment["SWING_AUTO_TRIM"] == "1" {
-      trimToReps()
-    }
+  }
+
+  /// Throws away the current recording (file and Workouts entry) after the empty-recording prompt.
+  func deleteCurrentRecording() {
+    guard case .recording = currentOrigin, let url = currentFileURL else { return }
+    pause()
+    player.replaceCurrentItem(with: nil)
+    if let id = currentEntryID { recents.remove(id: id) }
+    try? FileManager.default.removeItem(at: url)
+    if let trimmedURL { try? FileManager.default.removeItem(at: trimmedURL) }
+    log.event("recording_deleted", ["url": url.lastPathComponent])
+    currentFileURL = nil
+    trimmedURL = nil
+    currentEntryID = nil
+    source = .none
+    reps = []
+    extractedFrames = []
+    latestFrame = nil
+    duration = 0
+    statusMessage = "Recording deleted"
   }
 
   /// Picks the exercise (detects it in Auto), runs its analyzer over the extracted poses, and pulls rep stills
