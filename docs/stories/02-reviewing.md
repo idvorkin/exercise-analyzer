@@ -83,7 +83,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 024:
 
 - **Summary:** Jump to a phase by tapping its name, and play or pause by tapping the picture
-- **Status:** implemented in [3abd301](https://github.com/idvorkin/exercise-analyzer/commit/3abd301); needs a phone check
+- **Status:** implemented in [3abd301](https://github.com/idvorkin/exercise-analyzer/commit/3abd301); needs a phone check; [#55](https://github.com/idvorkin/exercise-analyzer/issues/55): bottom is now a live Bulgarian phase (it was peak-only, so the pill could never light); the pill seeks to the dip's lowest frame as before
 
 #### Use Case:
 - **As a** lifter comparing the same moment across reps
