@@ -96,11 +96,13 @@ struct WatchContentView: View {
     .tabViewStyle(.verticalPage)
   }
 
-  /// Page one: the preview filling the screen, chips over its top corners, the hint bar and the round buttons
-  /// over its bottom edge. No picture yet: the same overlays on black. Only the picture ignores the safe area:
-  /// the chips sit below the system clock line, and the button row lives in a bottom safeAreaInset lifted 20 pt,
-  /// inset 8 pt from both sides with 40 pt buttons 10 pt apart (202 pt on the Ultra's 205 pt face), so the bezel
-  /// and the rounded corners keep nothing (refs #74). A row wider than the face widens the whole overlay.
+  /// Page one: the preview filling the screen, small chips right under the clock line, a compact hint capsule
+  /// and the round buttons along the bottom edge of the safe area. No picture yet: the same overlays on black.
+  /// Only the picture ignores the safe area. The overlays cover as little of the picture as 40 pt targets allow
+  /// (Igor, 2026-09-14: "avoid covering the screen, buttons at the bottom, more transparency"): the row is
+  /// inset 10 pt from both sides with 40 pt buttons 8 pt apart (200 pt on the Ultra's 205 pt face), inside the
+  /// bottom safe area and lifted 18 pt, so the rounded corners keep nothing (refs #74). A row wider than the face
+  /// widens the whole overlay.
   /// The picture is a `background`, never a ZStack sibling: a scaled-to-fill image reports its overflowing size
   /// and a ZStack grows to it, which pushed the chips and the row past the screen edges on the Ultra.
   private var recordingPicturePage: some View {
@@ -127,45 +129,45 @@ struct WatchContentView: View {
           HStack {
             Spacer()
             Text("PREVIEW")
-              .font(.system(size: 20, weight: .semibold, design: .rounded))
-              .padding(.horizontal, 10).padding(.vertical, 4)
+              .font(.system(size: 15, weight: .semibold, design: .rounded))
+              .padding(.horizontal, 8).padding(.vertical, 2)
               .background(.ultraThinMaterial, in: Capsule())
             Spacer()
           }
           .padding(.horizontal, 8)
-          .padding(.top, 20)
+          .padding(.top, 2)
         } else {
           HStack {
             Text("\(status.reps)")
-              .font(.system(size: 30, weight: .bold, design: .rounded))
-              .padding(.horizontal, 10).padding(.vertical, 2)
+              .font(.system(size: 24, weight: .bold, design: .rounded))
+              .padding(.horizontal, 8).padding(.vertical, 1)
               .background(.ultraThinMaterial, in: Capsule())
             Spacer()
             Text(elapsed).monospacedDigit()
-              .font(.system(size: 20, weight: .semibold, design: .rounded))
-              .padding(.horizontal, 10).padding(.vertical, 4)
+              .font(.system(size: 16, weight: .semibold, design: .rounded))
+              .padding(.horizontal, 8).padding(.vertical, 3)
               .background(.ultraThinMaterial, in: Capsule())
           }
           .padding(.horizontal, 8)
-          .padding(.top, 20)
+          .padding(.top, 2)
         }
         Spacer()
+        // A capsule as wide as its words, not a bar across the picture; red stays strong enough to read.
         Text(hintText)
-          .font(.caption).multilineTextAlignment(.center)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 6)
-          .background(status.frame.inFrame ? Color.green.opacity(0.5) : Color.red.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
-          .padding(.horizontal, 8)
+          .font(.caption2.weight(.semibold)).multilineTextAlignment(.center)
+          .padding(.horizontal, 10).padding(.vertical, 3)
+          .background(status.frame.inFrame ? Color.green.opacity(0.4) : Color.red.opacity(0.7), in: Capsule())
+          .padding(.bottom, 2)
       }
       .safeAreaInset(edge: .bottom) {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
           if status.viewfinder {
             // Record · Camera · Cancel: no Pause, no Done (047).
             Button { phone.send(.start) } label: {
               Image(systemName: "record.circle")
                 .font(.body)
                 .frame(width: 40, height: 40)
-                .background(Color.red, in: Circle())
+                .background(Color.red.opacity(0.8), in: Circle())
                 .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
@@ -177,7 +179,7 @@ struct WatchContentView: View {
               Image(systemName: status.paused ? "play.fill" : "pause.fill")
                 .font(.body)
                 .frame(width: 40, height: 40)
-                .background(status.paused ? Color.orange : Color.gray.opacity(0.5), in: Circle())
+                .background(status.paused ? AnyShapeStyle(Color.orange.opacity(0.8)) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
                 .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
@@ -187,7 +189,7 @@ struct WatchContentView: View {
               Image(systemName: "checkmark")
                 .font(.body.bold())
                 .frame(width: 40, height: 40)
-                .background(Color.green, in: Circle())
+                .background(Color.green.opacity(0.75), in: Circle())
                 .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
@@ -195,9 +197,13 @@ struct WatchContentView: View {
             faceCancelButton
           }
         }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 20)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 18)
       }
+      // The row lives in the bottom safe area (the Ultra reserves ~34 pt there): lifted 18 pt and inset 10 pt,
+      // the outer buttons' lower corners stay outside a 60 pt corner radius. The phone rung is the truth for
+      // the real bezel; the simulator raster has no corner mask.
+      .ignoresSafeArea(edges: .bottom)
   }
 
   /// The round camera-cycler both face rows share.
@@ -207,7 +213,7 @@ struct WatchContentView: View {
         .font(.caption.bold())
         .minimumScaleFactor(0.5).lineLimit(1)
         .frame(width: 40, height: 40)
-        .background(Color.gray.opacity(0.5), in: Circle())
+        .background(.ultraThinMaterial, in: Circle())
         .foregroundStyle(.white)
     }
     .buttonStyle(.plain)
@@ -220,8 +226,8 @@ struct WatchContentView: View {
       Image(systemName: "xmark")
         .font(.body.bold())
         .frame(width: 36, height: 36)
-        .background(Color.red.opacity(0.7), in: Circle())
-        .foregroundStyle(.white)
+        .background(.ultraThinMaterial, in: Circle())
+        .foregroundStyle(.red)
     }
     .buttonStyle(.plain)
     .accessibilityLabel("Cancel")

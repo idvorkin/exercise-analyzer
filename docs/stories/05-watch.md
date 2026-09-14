@@ -16,9 +16,9 @@ it. Not states: the face complication (043, requested) and the phone's lock-scre
 | background | phone-in-background art, unlock-and-open instruction | "Send a reminder to the phone" (no Record: it would die silently) | 018 |
 | idle | "Phone ready", exercise picker, rest length picker, rest count while resting, last-set line (or "Analyzing…" while the pass runs) | Record (red; from the wrist the phone follows into watch mode), Preview (neutral, below Record) | 017, 041, 045, 046, 047 |
 | viewfinder | full-screen picture, "PREVIEW" chip, in-frame bar | Record (red) · Camera · Cancel (no Pause, no Done) | 047 |
-| live | full-screen picture, rep chip 0, time chip 0:04 under the clock line, green "IN FRAME" bar; chips, bar and buttons whole inside the face | Pause, Camera, Done, Cancel (round, over the picture; Cancel red and last); second page: Cancel, watch-mode toggle | 016, 017, 042 |
-| recording | full-screen picture, 6-rep chip, 0:42, red "FEET CUT OFF" bar | Pause, Camera, Done, Cancel; second page: Cancel, watch-mode toggle | 016, 017, 042 |
-| paused | "PAUSED · FEET CUT OFF" bar, frozen count and time, picture keeps refreshing | orange Resume, Camera, Done, Cancel; second page: Cancel | 040 |
+| live | full-screen picture, small rep chip 0 and time chip 0:04 right under the clock line, green "IN FRAME" capsule above the row; chips, capsule and buttons whole inside the face and covering as little of the picture as 40 pt targets allow | Pause, Camera, Done, Cancel (round, translucent glass except Done green and Record red, along the bottom edge; Cancel a red X last); second page: Cancel, watch-mode toggle | 016, 017, 042 |
+| recording | full-screen picture, 6-rep chip, 0:42, red "FEET CUT OFF" capsule | Pause, Camera, Done, Cancel; second page: Cancel, watch-mode toggle | 016, 017, 042 |
+| paused | "PAUSED · FEET CUT OFF" capsule, frozen count and time, picture keeps refreshing | orange Resume, Camera, Done, Cancel; second page: Cancel | 040 |
 | done | "Phone ready", "Last set: 9 reps · Kettlebell Swing · 0:48", rest counting up ("Rest 0:35", orange past the length) | Record (clears the rest), rest picker, exercise picker | 045, 046 |
 
 Igor's framing-loop rule: the camera-live page needs the picture, the in-frame bar, Camera, Done and Cancel, all
@@ -208,7 +208,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 ### User Story 042:
 
 - **Summary:** The picture fills the watch and the controls sit on it
-- **Status:** implemented in 08c563c; layout redone for the Ultra in a0053c6, c550f16, 1c34133, 5622ee1 (picture as a background, four buttons inside the 205 pt face, chips under the clock) and verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; framing-before-recording scenario in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b) (story 047); on phone + watch 2026-09-14 ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot"; [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the regression that cost the controls)
+- **Status:** implemented in 08c563c; layout redone for the Ultra in a0053c6, c550f16, 1c34133, 5622ee1 (picture as a background, four buttons inside the 205 pt face, chips under the clock) and verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; framing-before-recording scenario in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b) (story 047); the transparency pass (small chips under the clock, capsule hint, glass buttons along the bottom edge) is the commit after 34c17fa, verified on the Ultra 3 simulator, needs the wrist for the corner check; on phone + watch 2026-09-14 ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot"; [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the regression that cost the controls)
 - **Why:** the preview is a 90 pt strip above a column of buttons; from across the room the strip is what matters and the buttons are what Igor already knows.
 
 #### Use Case:
@@ -220,7 +220,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **Scenario:** The recording screen on a 45 mm watch
 - **Given:** a set is being recorded and the watch app is in front
 - **When:** I raise my wrist
-- **Then:** the picture fills the screen edge to edge, the rep count and the elapsed time sit on translucent chips under the clock line, the in-frame hint is a bar over its bottom edge (green in frame, red when cut off), four round buttons overlay the bottom, Pause/Resume, Camera, Done and a smaller red Cancel last, all whole inside the face's rounded corners; the watch-mode toggle, the exercise and a second Cancel are on the page below (vertical page swipe); the picture refreshes about once a second at twice today's resolution (long side 320 px instead of 176, about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
+- **Then:** the picture fills the screen edge to edge, the rep count and the elapsed time sit on small translucent chips right under the clock line, the in-frame hint is a capsule as wide as its words just above the buttons (green in frame, red when cut off), four round buttons sit along the bottom edge, Pause/Resume, Camera, Done and a smaller Cancel last, translucent glass except Done (green) and Record (red) so the picture shows through, 40 pt targets, all whole inside the face's rounded corners, covering as little of the picture as those targets allow (Igor, 2026-09-14: "avoid covering the screen, buttons at the bottom, more transparency"); the watch-mode toggle, the exercise and a second Cancel are on the page below (vertical page swipe); the picture refreshes about once a second at twice today's resolution (long side 320 px instead of 176, about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
 
 - **Scenario:** Framing the shot from Live's first frame
 - **Given:** the phone is ready and the watch app is in front
