@@ -1553,7 +1553,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
           return
         }
         // The recorder split: a viewfinder attaches the camera with no recorder, so nothing is written.
-        self.recorder = viewfinder ? nil : makeRecorder()
+        self.recorder = viewfinder ? nil : self.makeRecorder()
         self.attachCamera(position: position)
         if self.source == .camera {
           self.activity = .working(viewfinder ? "Viewfinder" : "Recording", progress: nil)
