@@ -4,6 +4,26 @@ Running a session from the Apple Watch with the phone on a tripod.
 
 Part of the [user stories](README.md); persona and format are described there.
 
+## Control inventory by state
+
+What each watch screen must show and offer. `just watch-screens` renders every row on the watch simulator
+from a fixed status (`WATCH_STATE`) and the pictures are compared against this table. Story edits must update
+it. Not states: the face complication (043, requested) and the phone's lock-screen control (044).
+
+| State | Must show | Must offer | Stories |
+|---|---|---|---|
+| disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status was recording | Retry | 018 |
+| background | phone-in-background art, unlock-and-open instruction | "Send a reminder to the phone" (no Record: it would die silently) | 018 |
+| idle | "Phone ready", exercise picker, rest length picker, rest count while resting, last-set line (or "Analyzing…" while the pass runs) | Record (red; from the wrist the phone follows into watch mode); Camera beside it once #73 lands | 017, 041, 045, 046, 042 |
+| live | full-screen picture, rep chip 0, time chip 0:04, green "IN FRAME" bar | Pause, Camera, Done (round, over the picture); second page: Cancel, watch-mode toggle | 016, 017, 042 |
+| recording | full-screen picture, 6-rep chip, 0:42, red "FEET CUT OFF" bar | Pause, Camera, Done; second page: Cancel, watch-mode toggle | 016, 017, 042 |
+| paused | "PAUSED · FEET CUT OFF" bar, frozen count and time, picture keeps refreshing | orange Resume, Camera, Done; second page: Cancel | 040 |
+| done | "Phone ready", "Last set: 9 reps · Kettlebell Swing · 0:48", rest counting up ("Rest 0:35", orange past the length) | Record (clears the rest), rest picker, exercise picker | 045, 046 |
+
+Igor's framing-loop rule: the camera-live page needs the picture, the in-frame bar, Camera, Done and Cancel;
+before a set, Record and Camera — Camera is still pending (#73), so the idle screenshot lags the table by
+exactly that button.
+
 ---
 
 ### User Story 016:
@@ -193,6 +213,13 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** a set is being recorded and the watch app is in front
 - **When:** I raise my wrist
 - **Then:** the picture fills the screen edge to edge, the rep count and the elapsed time sit on translucent chips over its top corners, the in-frame hint is a bar over its bottom edge (green in frame, red when cut off), three round buttons overlay the bottom, Pause/Resume, Camera and Done, and Cancel, the watch-mode toggle and the exercise are on the page below (vertical page swipe) so a stray touch cannot end a set; the picture refreshes about once a second at twice today's resolution (long side 320 px instead of 176, about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
+
+- **Scenario:** Framing the shot before I press Record
+- **Given:** the phone's camera is up (Live) but nothing is recording yet, and the watch app is in front
+- **When:** I raise my wrist
+- **Then:** the same full-screen picture shows, with the in-frame bar and two round buttons over its bottom, Record and Camera (switch front/back), so I can set the phone on the rack, check the framing from where I lift, switch cameras and start the set from the wrist; once recording, the buttons become Pause/Resume, Camera and Done as above (Igor, 2026-09-13: "I need to see the preview before I'm recording, so when I have a full-screen record I still need to be able to switch cameras and pause and stop")
+
+- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73) the picture only fills the watch once recording has started; before Record the watch shows the idle pages
 
 ---
 

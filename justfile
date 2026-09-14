@@ -20,6 +20,10 @@ test:
 test-sim: build-sim
     bash scripts/sim-smoke.sh "{{sim}}" {{bundle}} {{sim_app}}
 
+# Rung 2b: every watch state on the watch simulator, screenshotted from a fixed status (no phone).
+watch-screens watch="Apple Watch Series 11 (46mm)": build-sim
+    bash scripts/watch-screens.sh "{{watch}}"
+
 # Rung 3 is the phone: just run-device, then use the app and just pull-logs.
 
 # Download the bundled pose model (yolo26n-pose) from the Ultralytics release into the app folder.
