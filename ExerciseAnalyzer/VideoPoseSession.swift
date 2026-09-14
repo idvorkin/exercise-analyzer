@@ -1356,9 +1356,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// A small JPEG of the live frame for the wrist, about once a second; shared by the live and paused paths.
   private func sendPreviewIfDue(pixelBuffer: CVPixelBuffer) {
-    // Reachable already means the watch app is in front (watchOS only reports reachability then), so that is the
-    // whole gate: the scene-active message was missed at launch and starved the preview (#38).
-    if watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
+    // Previews stream only while the watch app is in front and reachable (#76): gating on reachability alone
+    // sent ~1 fps into suspended watches (18 of 19 logged previews fired while watch_active=false). Safe from
+    // #38 (a scene-active message missed at launch starved the preview for the whole set): the watch resends
+    // .watchActive on every foreground and pings for a forced status on wake (PhoneLink.sceneActive), so a
+    // missed message only delays previews until the next wrist raise instead of starving them.
+    if watch.watchActive, watch.reachable, Date().timeIntervalSince(lastPreviewSent) >= 1 {
       lastPreviewSent = Date()
       // Long side 320 (about 15–25 KB a frame at quality 0.45): the watch shows the picture full-screen
       // now, and the first watch_preview event's bytes must stay under 30 000, well under the 65 536

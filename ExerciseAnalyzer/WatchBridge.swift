@@ -17,6 +17,7 @@ final class WatchBridge: NSObject, ObservableObject {
 
   private var lastSent: WatchStatus?
   private var lastSentAt = Date.distantPast
+  private var lastPreviewAt = Date.distantPast
   private var lastContextAt = Date.distantPast
   private var unreachableLogged = false
   private let minInterval = 0.3
@@ -75,6 +76,7 @@ final class WatchBridge: NSObject, ObservableObject {
   func sendPreview(_ jpeg: Data) {
     guard WCSession.isSupported(), WCSession.default.activationState == .activated, WCSession.default.isReachable
     else { return }
+    lastPreviewAt = Date()
     WCSession.default.sendMessageData(jpeg, replyHandler: nil) { [weak self] error in
       Task { @MainActor in self?.onEvent?("watch_preview_failed", ["message": "\(error)"]) }
     }
@@ -104,7 +106,13 @@ extension WatchBridge: WCSessionDelegate {
     Task { @MainActor in
       self.reachable = reachable
       if reachable { self.unreachableLogged = false }
-      self.onEvent?("watch_reachable", ["reachable": reachable])
+      // Bridge state at the flip (#76): ms_since_preview is -1 when no preview was sent yet, so the field is
+      // always present and downstream analysis never has to guess about a missing key.
+      let msSincePreview =
+        self.lastPreviewAt == .distantPast ? -1 : Int(Date().timeIntervalSince(self.lastPreviewAt) * 1000)
+      self.onEvent?(
+        "watch_reachable",
+        ["reachable": reachable, "watch_active": self.watchActive, "ms_since_preview": msSincePreview])
     }
   }
 
