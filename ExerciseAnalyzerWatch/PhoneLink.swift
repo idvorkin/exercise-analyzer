@@ -86,7 +86,8 @@ final class PhoneLink: NSObject, ObservableObject {
     let session = WCSession.default
     logEvent("command", ["command": command.rawValue, "reachable": session.isReachable, "activation": session.activationState.rawValue, "live": isLive])
     guard session.activationState == .activated else { return }
-    if command == .start { rest.clear() }  // Record clears the count (story 046)
+    // A new set owns the idle screen: Record and Preview both clear the rest count (046, 047).
+    if command == .start || command == .viewfinder { rest.clear() }
     if command != .status { WKInterfaceDevice.current().play(.click) }
     session.sendMessage(["command": command.rawValue], replyHandler: { [weak self] reply in
       Task { @MainActor in self?.logEvent("command_reply", ["command": command.rawValue, "reply": "\(reply)"]) }

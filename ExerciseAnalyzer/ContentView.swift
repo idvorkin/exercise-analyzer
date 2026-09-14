@@ -235,11 +235,17 @@ struct ContentView: View {
     let analysis = session.latestFrame?.analysis
     return VStack {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
-        Text("\(displayedRepCount)")
-          .font(.system(size: 34, weight: .bold, design: .rounded))
-          .monospacedDigit()
+        if session.viewfinder {
+          // Framing, not recording: the count area names the state and no REC pill shows (047).
+          Text("VIEWFINDER")
+            .font(.system(size: 34, weight: .bold, design: .rounded))
+        } else {
+          Text("\(displayedRepCount)")
+            .font(.system(size: 34, weight: .bold, design: .rounded))
+            .monospacedDigit()
+        }
         exerciseMenu
-        if session.source == .camera {
+        if session.source == .camera, !session.viewfinder {
           if session.paused {
             Text("❚❚ PAUSED").font(.caption.bold()).foregroundStyle(.orange)
           } else {
@@ -609,18 +615,32 @@ struct ContentView: View {
       }
       .accessibilityLabel("Camera \(session.cameraLevelLabel), tap for \(session.nextCameraLevelLabel)")
       Spacer()
-      Button {
-        session.paused ? session.resumeCamera(from: "phone") : session.pauseCamera(from: "phone")
-      } label: {
-        Label(session.paused ? "Resume" : "Pause", systemImage: session.paused ? "play.fill" : "pause.fill")
+      // No pause in the viewfinder: there is nothing to freeze (047).
+      if !session.viewfinder {
+        Button {
+          session.paused ? session.resumeCamera(from: "phone") : session.pauseCamera(from: "phone")
+        } label: {
+          Label(session.paused ? "Resume" : "Pause", systemImage: session.paused ? "play.fill" : "pause.fill")
+        }
+        .accessibilityLabel(session.paused ? "Resume the set" : "Pause the set")
       }
-      .accessibilityLabel(session.paused ? "Resume the set" : "Pause the set")
-      Button {
-        session.finishCamera()
-      } label: {
-        Text("Done").font(.headline).padding(.horizontal, 24)
+      if session.viewfinder {
+        // The viewfinder's Done is a red Record: it starts the set without touching the camera (047).
+        Button {
+          session.beginRecording()
+        } label: {
+          Text("Record").font(.headline).padding(.horizontal, 24)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.red)
+      } else {
+        Button {
+          session.finishCamera()
+        } label: {
+          Text("Done").font(.headline).padding(.horizontal, 24)
+        }
+        .buttonStyle(.borderedProminent)
       }
-      .buttonStyle(.borderedProminent)
       Spacer()
       Button(role: .destructive) {
         session.cancelCamera()

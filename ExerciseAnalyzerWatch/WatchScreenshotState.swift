@@ -8,7 +8,7 @@ import ExerciseCore
 import SwiftUI
 
 enum WatchScreenshotState: String, CaseIterable {
-  case disconnected, background, idle, live, recording, paused, done
+  case disconnected, background, idle, live, recording, paused, done, viewfinder
 
   /// The state named by WATCH_STATE, or nil for the live phone connection.
   static var launch: Self? {
@@ -54,6 +54,12 @@ enum WatchScreenshotState: String, CaseIterable {
       status.lastSet = LastSet(
         reps: 9, exercise: "Kettlebell Swing", seconds: 48, at: Date().timeIntervalSince1970 - 35)
       return (status, true, nil)
+    case .viewfinder:
+      var status = WatchStatus(
+        recording: true, frame: FrameStatus(personSeen: true, clippedEdges: [], coverage: 0.8), reps: 0,
+        phase: "", elapsed: 0, camera: "back", exercise: "Kettlebell Swing")
+      status.viewfinder = true
+      return (status, true, WatchPreviewFigure.image())
     }
   }
 
