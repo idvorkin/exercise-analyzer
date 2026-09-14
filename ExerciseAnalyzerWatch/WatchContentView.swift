@@ -94,15 +94,28 @@ struct WatchContentView: View {
   /// Page one: the preview filling the screen, chips over its top corners, the hint bar and the round buttons
   /// over its bottom edge. No picture yet: the same overlays on black. Only the picture ignores the safe area:
   /// the chips sit below the system clock line, and the button row lives in a bottom safeAreaInset lifted 20 pt,
-  /// inset 16 pt from both sides with 40 pt buttons, so the bezel and the rounded corners keep nothing (refs #74).
+  /// inset 8 pt from both sides with 40 pt buttons 10 pt apart (202 pt on the Ultra's 205 pt face), so the bezel
+  /// and the rounded corners keep nothing (refs #74). A row wider than the face widens the whole overlay.
+  /// The picture is a `background`, never a ZStack sibling: a scaled-to-fill image reports its overflowing size
+  /// and a ZStack grows to it, which pushed the chips and the row past the screen edges on the Ultra.
   private var recordingPicturePage: some View {
-    ZStack {
-      if let preview = phone.preview {
-        Image(uiImage: preview).resizable().scaledToFill()
+    recordingOverlays
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background {
+        Color.clear
+          .overlay {
+            if let preview = phone.preview {
+              Image(uiImage: preview).resizable().scaledToFill()
+            } else {
+              Color.black
+            }
+          }
+          .clipped()
           .ignoresSafeArea()
-      } else {
-        Color.black.ignoresSafeArea()
       }
+  }
+
+  private var recordingOverlays: some View {
       VStack(spacing: 6) {
         HStack {
           Text("\(status.reps)")
@@ -116,7 +129,7 @@ struct WatchContentView: View {
             .background(.ultraThinMaterial, in: Capsule())
         }
         .padding(.horizontal, 8)
-        .padding(.top, 40)
+        .padding(.top, 20)
         Spacer()
         Text(hintText)
           .font(.caption).multilineTextAlignment(.center)
@@ -126,7 +139,7 @@ struct WatchContentView: View {
           .padding(.horizontal, 8)
       }
       .safeAreaInset(edge: .bottom) {
-        HStack(spacing: 14) {
+        HStack(spacing: 10) {
           Button { phone.send(status.paused ? .resume : .pause) } label: {
             Image(systemName: status.paused ? "play.fill" : "pause.fill")
               .font(.body)
@@ -165,10 +178,9 @@ struct WatchContentView: View {
           .buttonStyle(.plain)
           .accessibilityLabel("Cancel")
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 8)
         .padding(.bottom, 20)
       }
-    }
   }
 
   /// Page two (swipe up): the exercise, Cancel, the watch-mode toggle and the last error, in the list style.
