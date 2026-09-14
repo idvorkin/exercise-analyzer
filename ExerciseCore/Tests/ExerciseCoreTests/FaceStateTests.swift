@@ -18,7 +18,7 @@ final class FaceStateTests: XCTestCase {
   func testLastSetMappingFromWire() {
     // The phone's authoritative post-pass value (story 045) into the face's shape; `at` stays phone-side.
     let wire = LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62, at: 1_700_000_100)
-    XCTAssertEqual(FaceState.LastSet(from: wire), FaceState.LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62))
+    XCTAssertEqual(FaceState.LastSet(wire: wire), FaceState.LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62))
   }
 
   func testIdleFaceStateDecodesWithoutDates() throws {

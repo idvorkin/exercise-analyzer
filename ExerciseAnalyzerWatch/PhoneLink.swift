@@ -138,9 +138,7 @@ final class PhoneLink: NSObject, ObservableObject {
     // The pass's final count lands in a non-transition status after Done: adopt it when it changes, so the
     // face shows the pass's count within seconds and a cancelled set (no pass, no arrival) keeps the previous
     // final (043).
-    // A closure, not `.map(FaceState.LastSet.init(from:))`: the unapplied reference is ambiguous with
-    // Decodable's `init(from: Decoder)` and the type checker gives up.
-    let arrived: FaceState.LastSet? = next.lastSet.map { FaceState.LastSet(from: $0) }
+    let arrived = next.lastSet.map(FaceState.LastSet.init(wire:))
     let lastSetArrived = !finished && arrived != nil && arrived != face.lastSet
     let transition = started || finished || resumed || lastSetArrived
     guard transition || (next.recording && now.timeIntervalSince(lastFaceWrite) >= 10) else { return }

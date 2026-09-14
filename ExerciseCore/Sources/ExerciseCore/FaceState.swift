@@ -49,7 +49,8 @@ public struct FaceState: Codable, Equatable, Sendable {
 extension FaceState.LastSet {
   /// The phone's authoritative post-pass value (story 045's `LastSet`) into the face's shape; `at` stays
   /// phone-side, the face only shows reps, the exercise and the seconds.
-  init(from wire: ExerciseCore.LastSet) {
+  /// `wire:`, not `from:`: the watch module would only see Decodable's `init(from: Decoder)`.
+  public init(wire: ExerciseCore.LastSet) {
     self.init(reps: wire.reps, exercise: wire.exercise, seconds: wire.seconds)
   }
 }
