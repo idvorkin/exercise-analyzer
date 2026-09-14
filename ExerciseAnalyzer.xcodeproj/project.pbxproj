@@ -580,7 +580,6 @@
 		5A1A00000000000000000033 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatch/ExerciseAnalyzerWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 45P6D3439T;
@@ -608,7 +607,6 @@
 		5A1A00000000000000000034 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatch/ExerciseAnalyzerWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 45P6D3439T;
@@ -636,7 +634,6 @@
 		5A1A00000000000000000043 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatchComplication/ExerciseAnalyzerWatchComplication.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 45P6D3439T;
@@ -664,7 +661,6 @@
 		5A1A00000000000000000044 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatchComplication/ExerciseAnalyzerWatchComplication.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 45P6D3439T;
