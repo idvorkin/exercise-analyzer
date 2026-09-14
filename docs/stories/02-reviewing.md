@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 005:
 
 - **Summary:** See the numbers over the video while it plays
-- **Status:** implemented in [2abe7f2](https://github.com/idvorkin/exercise-analyzer/commit/2abe7f2); verified by simulator screenshot and on the phone
+- **Status:** implemented in [2abe7f2](https://github.com/idvorkin/exercise-analyzer/commit/2abe7f2); verified by simulator screenshot and on the phone; eyeless overlay in [32182ec](https://github.com/idvorkin/exercise-analyzer/commit/32182ec) (needs the simulator screenshot)
 
 #### Use Case:
 - **As a** lifter reviewing a set
