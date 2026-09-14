@@ -69,6 +69,11 @@ struct WatchContentView: View {
           }
           .tint(.red)
           .disabled(!phone.reachable)
+          // Framing first: the camera without the recorder, then Record from the picture (047, #73).
+          Button { phone.send(.viewfinder) } label: {
+            Label("Preview", systemImage: "camera.fill").frame(maxWidth: .infinity)
+          }
+          .disabled(!phone.reachable)
           restStatus
           restPicker
           exercisePicker
@@ -117,19 +122,33 @@ struct WatchContentView: View {
 
   private var recordingOverlays: some View {
       VStack(spacing: 6) {
-        HStack {
-          Text("\(status.reps)")
-            .font(.system(size: 30, weight: .bold, design: .rounded))
-            .padding(.horizontal, 10).padding(.vertical, 2)
-            .background(.ultraThinMaterial, in: Capsule())
-          Spacer()
-          Text(elapsed).monospacedDigit()
-            .font(.system(size: 20, weight: .semibold, design: .rounded))
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(.ultraThinMaterial, in: Capsule())
+        if status.viewfinder {
+          // Framing, not recording: one chip, no count, no time (047).
+          HStack {
+            Spacer()
+            Text("PREVIEW")
+              .font(.system(size: 20, weight: .semibold, design: .rounded))
+              .padding(.horizontal, 10).padding(.vertical, 4)
+              .background(.ultraThinMaterial, in: Capsule())
+            Spacer()
+          }
+          .padding(.horizontal, 8)
+          .padding(.top, 20)
+        } else {
+          HStack {
+            Text("\(status.reps)")
+              .font(.system(size: 30, weight: .bold, design: .rounded))
+              .padding(.horizontal, 10).padding(.vertical, 2)
+              .background(.ultraThinMaterial, in: Capsule())
+            Spacer()
+            Text(elapsed).monospacedDigit()
+              .font(.system(size: 20, weight: .semibold, design: .rounded))
+              .padding(.horizontal, 10).padding(.vertical, 4)
+              .background(.ultraThinMaterial, in: Capsule())
+          }
+          .padding(.horizontal, 8)
+          .padding(.top, 20)
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 20)
         Spacer()
         Text(hintText)
           .font(.caption).multilineTextAlignment(.center)
@@ -140,47 +159,72 @@ struct WatchContentView: View {
       }
       .safeAreaInset(edge: .bottom) {
         HStack(spacing: 10) {
-          Button { phone.send(status.paused ? .resume : .pause) } label: {
-            Image(systemName: status.paused ? "play.fill" : "pause.fill")
-              .font(.body)
-              .frame(width: 40, height: 40)
-              .background(status.paused ? Color.orange : Color.gray.opacity(0.5), in: Circle())
-              .foregroundStyle(.white)
+          if status.viewfinder {
+            // Record · Camera · Cancel: no Pause, no Done (047).
+            Button { phone.send(.start) } label: {
+              Image(systemName: "record.circle")
+                .font(.body)
+                .frame(width: 40, height: 40)
+                .background(Color.red, in: Circle())
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Record")
+            faceCameraButton
+            faceCancelButton
+          } else {
+            Button { phone.send(status.paused ? .resume : .pause) } label: {
+              Image(systemName: status.paused ? "play.fill" : "pause.fill")
+                .font(.body)
+                .frame(width: 40, height: 40)
+                .background(status.paused ? Color.orange : Color.gray.opacity(0.5), in: Circle())
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(status.paused ? "Resume" : "Pause")
+            faceCameraButton
+            Button { phone.send(.finish) } label: {
+              Image(systemName: "checkmark")
+                .font(.body.bold())
+                .frame(width: 40, height: 40)
+                .background(Color.green, in: Circle())
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Done")
+            faceCancelButton
           }
-          .buttonStyle(.plain)
-          .accessibilityLabel(status.paused ? "Resume" : "Pause")
-          Button { phone.send(.switchCamera) } label: {
-            Text(cameraLevel)
-              .font(.caption.bold())
-              .minimumScaleFactor(0.5).lineLimit(1)
-              .frame(width: 40, height: 40)
-              .background(Color.gray.opacity(0.5), in: Circle())
-              .foregroundStyle(.white)
-          }
-          .buttonStyle(.plain)
-          .accessibilityLabel("Camera: \(cameraLevel)")
-          Button { phone.send(.finish) } label: {
-            Image(systemName: "checkmark")
-              .font(.body.bold())
-              .frame(width: 40, height: 40)
-              .background(Color.green, in: Circle())
-              .foregroundStyle(.white)
-          }
-          .buttonStyle(.plain)
-          .accessibilityLabel("Done")
-          Button { phone.send(.cancel) } label: {
-            Image(systemName: "xmark")
-              .font(.body.bold())
-              .frame(width: 36, height: 36)
-              .background(Color.red.opacity(0.7), in: Circle())
-              .foregroundStyle(.white)
-          }
-          .buttonStyle(.plain)
-          .accessibilityLabel("Cancel")
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 20)
       }
+  }
+
+  /// The round camera-cycler both face rows share.
+  private var faceCameraButton: some View {
+    Button { phone.send(.switchCamera) } label: {
+      Text(cameraLevel)
+        .font(.caption.bold())
+        .minimumScaleFactor(0.5).lineLimit(1)
+        .frame(width: 40, height: 40)
+        .background(Color.gray.opacity(0.5), in: Circle())
+        .foregroundStyle(.white)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Camera: \(cameraLevel)")
+  }
+
+  /// The round cancel both face rows share.
+  private var faceCancelButton: some View {
+    Button { phone.send(.cancel) } label: {
+      Image(systemName: "xmark")
+        .font(.body.bold())
+        .frame(width: 36, height: 36)
+        .background(Color.red.opacity(0.7), in: Circle())
+        .foregroundStyle(.white)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Cancel")
   }
 
   /// Page two (swipe up): the exercise, Cancel, the watch-mode toggle and the last error, in the list style.

@@ -184,11 +184,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
       guard let self, self.watch.reachable else { return }
       self.pushWatchStatus(force: true)
     }.store(in: &cancellables)
-    NotificationCenter.default.addObserver(forName: RecordPrompt.tapped, object: nil, queue: .main) { [weak self] _ in
+    NotificationCenter.default.addObserver(forName: RecordPrompt.tapped, object: nil, queue: .main) { [weak self] note in
       Task { @MainActor in
         guard let self, self.source != .camera else { return }
-        self.log.event("ui", ["action": "start", "from": "watch_notification"])
-        self.startCamera(position: self.cameraPosition)
+        let viewfinder = note.object as? Bool ?? false
+        self.log.event("ui", ["action": "start", "from": "watch_notification", "viewfinder": viewfinder])
+        self.startCamera(position: self.cameraPosition, viewfinder: viewfinder)
       }
     }
     // Lock-screen / Control Center button (#70): the intent sets the flag and opens the app; activation (cold
@@ -1330,7 +1331,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     log.frame(
       frame, source: source == .camera ? "live" : "file", inferenceMs: result.inferenceMs, fps: fps,
       personConf: personConf)
-    if let rep = frame.analysis?.completedRep {
+    // The viewfinder's pipeline runs for phases and the in-frame status, but its reps stay empty (047).
+    if !viewfinder, let rep = frame.analysis?.completedRep {
       reps = pipeline.reps
       lastQuality = rep.quality
       log.rep(rep, source: source == .camera ? "live" : "file")
@@ -1388,6 +1390,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// The last analyzed recording for the watch idle screen, and whether its offline pass is still running (045).
   private var lastSet: LastSet?
   private var analyzingLastSet = false
+  /// The camera is up for framing only: the pipeline runs but the recorder does not (story 047, #73).
+  @Published private(set) var viewfinder = false
+  /// When the viewfinder attached, for the `viewfinder_s` framing seconds on `record_start`.
+  private var viewfinderSince: Date?
   private var cancellables = Set<AnyCancellable>()
   private var keepAwake = false
 
@@ -1419,6 +1425,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     status.watchMode = watchMode
     status.paused = paused
     status.lastSet = lastSet
+    status.viewfinder = viewfinder
     // No new field: phase is free when not recording, and the old watch app never reads it (045).
     if analyzingLastSet { status.phase = "analyzing" }
     watch.send(status, force: force || heartbeat)
@@ -1430,6 +1437,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
       ["action": command.rawValue, "from": "watch", "source": "\(source)", "app_state": UIApplication.shared.applicationState.rawValue])
     switch command {
     case .start:
+      // Record from the viewfinder starts the set without touching the camera; otherwise as today (047).
+      if source == .camera, viewfinder {
+        beginRecording()
+        break
+      }
       if source == .camera { break }
       // The set about to record was asked from the wrist: it opens in watch mode (#68), whether the camera
       // starts now or later from the notification tap, which inherits the flag. A start from the phone's own
@@ -1441,6 +1453,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
         // The watch woke the app in the background; iOS will not let it come forward or use the camera from
         // there, so ask the lifter to tap the notification, which opens the app straight into recording.
         RecordPrompt.post(log: log)
+      }
+    case .viewfinder:
+      if source == .camera { break }
+      // Framing from the wrist: the camera without the recorder, in watch mode like Record (047, #73).
+      // Backgrounded, the notification carries the flag so the tap opens into the viewfinder, not recording.
+      startRequestedFromWatch = true
+      if UIApplication.shared.applicationState == .active {
+        startCamera(position: cameraPosition, viewfinder: true)
+      } else {
+        RecordPrompt.post(log: log, viewfinder: true)
       }
     case .switchCamera: cycleCameraLevel()
     case .pause: pauseCamera(from: "watch")
@@ -1486,11 +1508,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   // MARK: - Live camera
 
-  func startCamera(position: AVCaptureDevice.Position = .back) {
+  /// Attaches the camera and runs the pipeline. With `viewfinder`, no recorder is created: the picture,
+  /// the in-frame status and the watch previews work, but nothing is written and no reps count (047, #73).
+  func startCamera(position: AVCaptureDevice.Position = .back, viewfinder: Bool = false) {
     pause()
     player.replaceCurrentItem(with: nil)
     duration = 0
     stopCamera()
+    self.viewfinder = viewfinder
+    viewfinderSince = nil
     pipeline = AnalysisPipeline(exercise: exercise)
     liveDetector.reset()
     liveDetectionLocked = false
@@ -1531,14 +1557,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self.log.event("error", ["where": "camera", "message": "access denied"])
           return
         }
-        let recorder = FrameRecorder()
-        recorder.onError = { [weak self] message in
-          Task { @MainActor in self?.log.event("error", ["where": "recorder", "message": message]) }
-        }
-        self.recorder = recorder
+        // The recorder split: a viewfinder attaches the camera with no recorder, so nothing is written.
+        self.recorder = viewfinder ? nil : self.makeRecorder()
         self.attachCamera(position: position)
         if self.source == .camera {
-          self.activity = .working("Recording", progress: nil)
+          self.activity = .working(viewfinder ? "Viewfinder" : "Recording", progress: nil)
+          if viewfinder { self.viewfinderSince = Date() }
           self.updateKeepAwake()  // a set is longer than the auto-lock timeout
           self.frameStatus = FrameStatus(box: nil, pose: nil)
           self.pushWatchStatus(force: true)
@@ -1552,6 +1576,41 @@ final class VideoPoseSession: NSObject, ObservableObject {
         }
       }
     }
+  }
+
+  /// A recorder exactly as `startCamera` builds: shared by the recording start and `beginRecording`,
+  /// so the viewfinder's set rolls the same writer the live flow would have (047).
+  private func makeRecorder() -> FrameRecorder {
+    let recorder = FrameRecorder()
+    recorder.onError = { [weak self] message in
+      Task { @MainActor in self?.log.event("error", ["where": "recorder", "message": message]) }
+    }
+    return recorder
+  }
+
+  /// Starts the set from the viewfinder: the recorder rolls without re-attaching the camera, so it is
+  /// instant. The pipeline, reps, elapsed, segments and pause state reset so the set starts clean (047).
+  func beginRecording() {
+    guard source == .camera, viewfinder else { return }
+    recorder = makeRecorder()
+    pipeline = AnalysisPipeline(exercise: exercise)
+    reps = []
+    lastQuality = nil
+    duration = 0
+    currentTime = 0
+    recordedSegments = []
+    paused = false
+    pausedTotal = 0
+    pausedAt = nil
+    lastCameraPts = nil
+    cameraFirstTime = nil
+    let framing = viewfinderSince.map { Date().timeIntervalSince($0) } ?? 0
+    viewfinder = false
+    viewfinderSince = nil
+    activity = .working("Recording", progress: nil)
+    log.event("record_start", ["viewfinder_s": framing])
+    updateKeepAwake()
+    pushWatchStatus(force: true)
   }
 
   /// The camera the lifter last used, written on every switch from the phone or the watch (#66).
@@ -1586,7 +1645,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
         camera.setZoom(restoredZoom)
         cameraZoom = camera.zoom
       }
-      log.event("camera_start", ["camera": position == .front ? "front" : "back", "zoom": cameraZoom])
+      log.event(
+        "camera_start",
+        ["camera": position == .front ? "front" : "back", "zoom": cameraZoom, "viewfinder": viewfinder])
     } catch {
       statusMessage = "Camera failed: \(error.localizedDescription)"
       log.event("error", ["where": "camera", "message": "\(error)"])
@@ -1595,7 +1656,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   private func cameraFrame(pixelBuffer: CVPixelBuffer, pts: Double) {
     guard source == .camera else { return }
-    if cameraFirstTime == nil { cameraFirstTime = pts }
+    // The viewfinder has no elapsed time: the first frame must not start its clock (047).
+    if !viewfinder, cameraFirstTime == nil { cameraFirstTime = pts }
     lastCameraPts = pts
     if !paused, let at = pausedAt {
       // First frame after a resume: cut the pause out of live time in camera time, not wall time (#67).
@@ -1638,10 +1700,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let zoom = camera.zoom
     camera.stop()
     let finished = recorder
-    let next = FrameRecorder()
-    next.onError = finished?.onError
-    next.setSuspended(paused)  // a rotation mid-pause must not wake the new segment (#67)
-    recorder = next
+    // A rotation in the viewfinder must not create the recorder it deliberately has none of (047).
+    if !viewfinder {
+      let next = makeRecorder()
+      next.onError = finished?.onError
+      next.setSuspended(paused)  // a rotation mid-pause must not wake the new segment (#67)
+      recorder = next
+    }
     log.event(
       "camera_rotate",
       ["from": cameraOrientation.rawValue, "to": wanted.rawValue, "segment": recordedSegments.count + 1, "at_s": duration])
@@ -1727,7 +1792,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// The pause is a segment boundary, the same mechanism as rotating the phone mid-set (#22): the current
   /// recorder is finished off and a fresh suspended one takes its place (#67).
   func pauseCamera(from: String) {
-    guard source == .camera, !paused else { return }
+    // No pause in the viewfinder: there is no recorder to suspend and nothing to freeze (047).
+    guard source == .camera, !viewfinder, !paused else { return }
     let finished = recorder
     let next = FrameRecorder()
     next.onError = finished?.onError
@@ -1753,8 +1819,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
     pushWatchStatus(force: true)
   }
 
-  /// Stops the camera without keeping the recording.
+  /// Stops the camera without keeping the recording. A viewfinder cancel leaves nothing behind (047).
   func cancelCamera() {
+    // Clear first: stopCamera's push must carry the idle state, not a framing one.
+    viewfinder = false
+    viewfinderSince = nil
     stopCamera()
     recorder = nil
     activity = .idle
@@ -1778,7 +1847,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Done: stop, trim the recording to the rep span, run the offline pass on the clip, and show it.
+  /// Done in the viewfinder is a cancel: nothing was recorded, so there is nothing to save (047).
   func finishCamera() {
+    if viewfinder {
+      cancelCamera()
+      return
+    }
     let livePipeline = pipeline
     let recordedDuration = duration
     let delivered = cameraFramesDelivered

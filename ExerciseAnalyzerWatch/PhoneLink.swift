@@ -86,7 +86,8 @@ final class PhoneLink: NSObject, ObservableObject {
     let session = WCSession.default
     logEvent("command", ["command": command.rawValue, "reachable": session.isReachable, "activation": session.activationState.rawValue, "live": isLive])
     guard session.activationState == .activated else { return }
-    if command == .start { rest.clear() }  // Record clears the count (story 046)
+    // A new set owns the idle screen: Record and Preview both clear the rest count (046, 047).
+    if command == .start || command == .viewfinder { rest.clear() }
     if command != .status { WKInterfaceDevice.current().play(.click) }
     session.sendMessage(["command": command.rawValue], replyHandler: { [weak self] reply in
       Task { @MainActor in self?.logEvent("command_reply", ["command": command.rawValue, "reply": "\(reply)"]) }
@@ -116,9 +117,10 @@ final class PhoneLink: NSObject, ObservableObject {
       if previous.frame.inFrame && !next.frame.inFrame { WKInterfaceDevice.current().play(.notification) }
       if next.reps > previous.reps { WKInterfaceDevice.current().play(.success) }
     }
-    if previous.recording, !next.recording, isLive {
+    // The rest counts sets, not previews: a cancelled Preview ended nothing (046, 047).
+    if previous.rolling, !next.rolling, isLive {
       rest.setEnded()
-    } else if next.recording, !previous.recording {
+    } else if next.rolling, !previous.rolling {
       rest.clear()
     }
   }
@@ -128,9 +130,10 @@ final class PhoneLink: NSObject, ObservableObject {
   /// in front. Never per rep — WidgetKit throttles frequent reloads and the timer ticks by itself.
   private func updateFace(previous: WatchStatus, next: WatchStatus) {
     let now = Date()
-    let started = !previous.recording && next.recording
-    let finished = previous.recording && !next.recording
-    let resumed = previous.paused && !next.paused && next.recording
+    // `rolling` = the recorder rolls: a Preview (camera live, nothing recorded) is not a set on the face (047).
+    let started = !previous.rolling && next.rolling
+    let finished = previous.rolling && !next.rolling
+    let resumed = previous.paused && !next.paused && next.rolling
     var face = loadFace() ?? FaceState()
     // The pass's final count lands in a non-transition status after Done: adopt it when it changes, so the
     // face shows the pass's count within seconds and a cancelled set (no pass, no arrival) keeps the previous

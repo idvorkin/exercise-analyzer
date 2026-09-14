@@ -100,6 +100,12 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   public var paused: Bool = false
   /// The last analyzed recording (story 045); nil clears the idle screen's line. Old payloads decode as nil.
   public var lastSet: LastSet? = nil
+  /// The camera is up for framing only: the pipeline runs but the recorder does not (story 047, #73).
+  /// `recording && !viewfinder` is "the recorder rolls". Old payloads decode as false.
+  public var viewfinder: Bool = false
+  /// The recorder rolls: a set is being written. The face and the rest count key off this, never off
+  /// `recording` alone, so a Preview (camera live, nothing written) is not a set (043, 046, 047).
+  public var rolling: Bool { recording && !viewfinder }
 
   public init(
     recording: Bool, frame: FrameStatus, reps: Int, phase: String, elapsed: Double, camera: String, exercise: String,
@@ -117,7 +123,7 @@ public struct WatchStatus: Codable, Equatable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case recording, frame, reps, phase, elapsed, camera, exercise, phoneActive, mode, zoom, zoomPresets, watchMode,
-      paused, lastSet
+      paused, lastSet, viewfinder
   }
 
   public init(from decoder: Decoder) throws {
@@ -136,6 +142,7 @@ public struct WatchStatus: Codable, Equatable, Sendable {
     watchMode = try c.decodeIfPresent(Bool.self, forKey: .watchMode) ?? false
     paused = try c.decodeIfPresent(Bool.self, forKey: .paused) ?? false
     lastSet = try c.decodeIfPresent(LastSet.self, forKey: .lastSet)
+    viewfinder = try c.decodeIfPresent(Bool.self, forKey: .viewfinder) ?? false
   }
 
   public static let idle = WatchStatus(
@@ -145,6 +152,8 @@ public struct WatchStatus: Codable, Equatable, Sendable {
 
 public enum WatchCommand: String, Codable, CaseIterable, Sendable {
   case start, switchCamera, finish, cancel
+  /// Start the camera without the recorder, for framing from the wrist (story 047, #73).
+  case viewfinder
   /// Freeze the clip, the count and the elapsed time mid-set; resume carries on where the pause began (#67).
   case pause, resume
   /// The watch asks for a fresh status (it treats anything older than a few seconds as stale).

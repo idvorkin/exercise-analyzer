@@ -14,15 +14,17 @@ it. Not states: the face complication (043, requested) and the phone's lock-scre
 |---|---|---|---|
 | disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status was recording | Retry | 018 |
 | background | phone-in-background art, unlock-and-open instruction | "Send a reminder to the phone" (no Record: it would die silently) | 018 |
-| idle | "Phone ready", exercise picker, rest length picker, rest count while resting, last-set line (or "Analyzing…" while the pass runs) | Record (red; from the wrist the phone follows into watch mode) | 017, 041, 045, 046 |
+| idle | "Phone ready", exercise picker, rest length picker, rest count while resting, last-set line (or "Analyzing…" while the pass runs) | Record (red; from the wrist the phone follows into watch mode), Preview (neutral, below Record) | 017, 041, 045, 046, 047 |
+| viewfinder | full-screen picture, "PREVIEW" chip, in-frame bar | Record (red) · Camera · Cancel (no Pause, no Done) | 047 |
 | live | full-screen picture, rep chip 0, time chip 0:04 under the clock line, green "IN FRAME" bar; chips, bar and buttons whole inside the face | Pause, Camera, Done, Cancel (round, over the picture; Cancel red and last); second page: Cancel, watch-mode toggle | 016, 017, 042 |
 | recording | full-screen picture, 6-rep chip, 0:42, red "FEET CUT OFF" bar | Pause, Camera, Done, Cancel; second page: Cancel, watch-mode toggle | 016, 017, 042 |
 | paused | "PAUSED · FEET CUT OFF" bar, frozen count and time, picture keeps refreshing | orange Resume, Camera, Done, Cancel; second page: Cancel | 040 |
 | done | "Phone ready", "Last set: 9 reps · Kettlebell Swing · 0:48", rest counting up ("Rest 0:35", orange past the length) | Record (clears the rest), rest picker, exercise picker | 045, 046 |
 
 Igor's framing-loop rule: the camera-live page needs the picture, the in-frame bar, Camera, Done and Cancel, all
-inside the safe area, from Live's first frame (the recorder rolls from that frame; a camera-only framing state is
-the open decision on #73).
+inside the safe area. The framing state is the viewfinder (047, #73): Preview opens the camera without the
+recorder and the face offers Record · Camera · Cancel; Record starts the set from zero and Cancel leaves
+nothing. The phone's own Live still records from the first frame (story 001).
 
 ---
 
@@ -51,7 +53,7 @@ the open decision on #73).
 ### User Story 017:
 
 - **Summary:** Start, switch camera and finish a set from the wrist
-- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe); verified on phone + watch, camera cycle verified from the log
+- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe), [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b); verified on phone + watch, camera cycle verified from the log
 
 #### Use Case:
 - **As a** lifter who set the phone down across the room
@@ -64,6 +66,11 @@ the open decision on #73).
 - **and Given:** the watch shows the live status
 - **When:** I tap the camera button on the watch
 - **Then:** the phone switches to Front, the watch shows "Front", and the recording and rep count continue
+
+- **Scenario:** Framing before the set
+- **Given:** the phone app is open in front and idle
+- **When:** I tap Preview on the watch
+- **Then:** the camera opens without recording and the watch shows the picture with Record · Camera · Cancel (story 047)
 
 ---
 
@@ -201,7 +208,7 @@ the open decision on #73).
 ### User Story 042:
 
 - **Summary:** The picture fills the watch and the controls sit on it
-- **Status:** implemented in 08c563c; layout redone for the Ultra in a0053c6, c550f16, 1c34133, 5622ee1 (picture as a background, four buttons inside the 205 pt face, chips under the clock) and verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; on phone + watch 2026-09-14 ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot"; [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the regression that cost the controls)
+- **Status:** implemented in 08c563c; layout redone for the Ultra in a0053c6, c550f16, 1c34133, 5622ee1 (picture as a background, four buttons inside the 205 pt face, chips under the clock) and verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; framing-before-recording scenario in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b) (story 047); on phone + watch 2026-09-14 ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot"; [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the regression that cost the controls)
 - **Why:** the preview is a 90 pt strip above a column of buttons; from across the room the strip is what matters and the buttons are what Igor already knows.
 
 #### Use Case:
@@ -218,11 +225,14 @@ the open decision on #73).
 - **Scenario:** Framing the shot from Live's first frame
 - **Given:** the phone is ready and the watch app is in front
 - **When:** I tap Record on the wrist (or Live on the phone)
-- **Then:** from the camera's first frame the wrist shows the full-screen picture with the in-frame bar and the four round buttons, Pause/Resume, Camera (cycle Front, 0.5×, 1×), Done and Cancel, all inside the screen's safe area, so I can set the phone on the rack, check the framing from where I lift and switch cameras before the first rep; the recorder rolls from that first frame and Trim cuts the walk-in as today (Igor, 2026-09-13: "I need to see the preview before I'm recording, so when I have a full-screen record I still need to be able to switch cameras and pause and stop")
+- **Then:** from the camera's first frame the wrist shows the full-screen picture with the in-frame bar and the four round buttons, Pause/Resume, Camera (cycle Front, 0.5×, 1×), Done and Cancel, all inside the screen's safe area; the recorder rolls from that first frame and Trim cuts the walk-in as today
 
-- **Decision open (#73):** a camera-only framing state, where the picture streams but the recorder starts only on a second Record, would change the phone's Live flow (story 001: Live is the set); not built unless Igor wants it
+- **Scenario:** Framing the shot before recording
+- **Given:** the phone is ready on the tripod and the watch app is in front
+- **When:** I tap Preview on the wrist
+- **Then:** the full-screen picture shows with the in-frame bar and Record · Camera · Cancel, the phone's count reads VIEWFINDER, and nothing is recorded; Record starts the set from zero and Cancel leaves nothing behind (Igor, 2026-09-13: "I need to see the preview before I'm recording, so when I have a full-screen record I still need to be able to switch cameras and pause and stop"; story 047, [#73](https://github.com/idvorkin/exercise-analyzer/issues/73))
 
-- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73) the picture only fills the watch once recording has started; before Record the watch shows the idle pages
+- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73) closed by the Preview button (story 047): the picture fills the watch before Record
 
 ---
 
@@ -344,6 +354,46 @@ the open decision on #73).
 - **Notes:** Watch only, no phone change; the rest length is a watch setting (60, 90, 120, 180 s). With the wrist
   down the app is suspended, so the tap at 90 s is a scheduled local notification on the watch (one permission
   prompt, on the watch, the first time); without that permission the count still shows, the tap does not come.
+
+---
+
+### User Story 047:
+
+- **Summary:** Preview the shot from the wrist before recording
+- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b); needs phone + watch ([#73](https://github.com/idvorkin/exercise-analyzer/issues/73))
+- **Why:** Igor, 2026-09-14: "Can I start with two different buttons for Record? Start Recording, Start Viewfinder. When I start Viewfinder, then I can start recording, because normally, when I start on my watch, I don't know if I'm in frame or not. I walk away from my phone, set my phone up, and think I'm in frame. Then I walk to my watch, make sure I'm good, maybe adjust the camera a bit, and then I hit Start."
+
+#### Use Case:
+- **As a** lifter who set the phone on the rack and walked to the bar
+- **I want to** open the camera from the wrist without recording, check the framing, and start the set from the picture
+- **so that** the set starts with me in frame instead of finding out afterwards I was not
+
+#### Acceptance Criteria:
+- **Scenario:** Framing from the wrist
+- **Given:** the phone is ready on the tripod and the watch app is open
+- **When:** I tap Preview on the wrist
+- **Then:** the picture fills the face with the in-frame bar and Record · Camera · Cancel and nothing is recorded
+
+- **Scenario:** Record from the preview
+- **Given:** the viewfinder picture is up on the wrist
+- **When:** I tap Record
+- **Then:** the set records from that moment with the count and the time from zero
+
+- **Scenario:** Cancel from the preview
+- **Given:** the viewfinder picture is up on the wrist
+- **When:** I tap Cancel
+- **Then:** the camera stops and nothing is left behind
+
+- **Scenario:** Preview while the phone app is backgrounded
+- **Given:** the phone app is backgrounded and the watch app is open
+- **When:** I tap Preview on the wrist
+- **Then:** the phone posts its notification and the tap opens the camera without recording
+
+- **Notes:** Wire: `WatchStatus.viewfinder` (recording stays "the camera is live"; `recording && !viewfinder`
+  is "the recorder rolls"), `WatchCommand.viewfinder`, `beginRecording` (recorder starts without touching the
+  camera), `record_start` (`viewfinder_s`) and the `viewfinder` field on `camera_start`; the Record
+  notification carries the flag in its `userInfo`, so the tap route opens into the viewfinder too. The phone's
+  own Live still records from the first frame (story 001).
 
 ---
 

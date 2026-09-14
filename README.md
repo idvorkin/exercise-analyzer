@@ -33,8 +33,14 @@ Captured from the simulator by `scripts/screenshots.sh` (sample clips, CPU infer
 |---|---|
 | ![Watch paused: frozen count and Resume](docs/screenshots/watch-paused.png) | ![Watch done: last set and rest count](docs/screenshots/watch-done.png) |
 
+| Preview | Recording |
+|---|---|
+| ![Watch preview: the picture with the in-frame bar and Record, Camera, Cancel, nothing recorded yet](docs/screenshots/watch-preview.png) | ![Watch recording: six reps, feet cut off](docs/screenshots/watch-recording.png) |
+
 The Apple Watch runs the session with the phone on a tripod. Record, cycle the camera through Front,
-0.5× and 1×, and tap Done from the wrist, so a session never costs a walk back to the tripod (017). The watch shows whether
+0.5× and 1×, and tap Done from the wrist, so a session never costs a walk back to the tripod (017). Preview
+starts the camera without recording: walk over, check the in-frame bar, fix the camera, then Record from the
+wrist starts the set from that moment (047). The watch shows whether
 the camera sees you ("Feet cut off") and taps your wrist when you leave the picture, over a small preview
 that refreshes about once a second (016). The picture fills the face with the count, the time and round
 Pause, Camera, Done and Cancel buttons over it, every one whole inside the face's corners (checked on the
