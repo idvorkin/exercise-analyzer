@@ -94,7 +94,7 @@ struct WatchContentView: View {
   /// Page one: the preview filling the screen, chips over its top corners, the hint bar and the round buttons
   /// over its bottom edge. No picture yet: the same overlays on black. Only the picture ignores the safe area:
   /// the chips sit below the system clock line, and the button row lives in a bottom safeAreaInset lifted 20 pt,
-  /// so the bezel keeps neither (refs #74).
+  /// inset 16 pt from both sides with 40 pt buttons, so the bezel and the rounded corners keep nothing (refs #74).
   private var recordingPicturePage: some View {
     ZStack {
       if let preview = phone.preview {
@@ -126,11 +126,11 @@ struct WatchContentView: View {
           .padding(.horizontal, 8)
       }
       .safeAreaInset(edge: .bottom) {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
           Button { phone.send(status.paused ? .resume : .pause) } label: {
             Image(systemName: status.paused ? "play.fill" : "pause.fill")
               .font(.body)
-              .frame(width: 44, height: 44)
+              .frame(width: 40, height: 40)
               .background(status.paused ? Color.orange : Color.gray.opacity(0.5), in: Circle())
               .foregroundStyle(.white)
           }
@@ -140,7 +140,7 @@ struct WatchContentView: View {
             Text(cameraLevel)
               .font(.caption.bold())
               .minimumScaleFactor(0.5).lineLimit(1)
-              .frame(width: 44, height: 44)
+              .frame(width: 40, height: 40)
               .background(Color.gray.opacity(0.5), in: Circle())
               .foregroundStyle(.white)
           }
@@ -149,7 +149,7 @@ struct WatchContentView: View {
           Button { phone.send(.finish) } label: {
             Image(systemName: "checkmark")
               .font(.body.bold())
-              .frame(width: 44, height: 44)
+              .frame(width: 40, height: 40)
               .background(Color.green, in: Circle())
               .foregroundStyle(.white)
           }
@@ -165,6 +165,7 @@ struct WatchContentView: View {
           .buttonStyle(.plain)
           .accessibilityLabel("Cancel")
         }
+        .padding(.horizontal, 16)
         .padding(.bottom, 20)
       }
     }
