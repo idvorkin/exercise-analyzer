@@ -52,7 +52,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 ### User Story 017:
 
 - **Summary:** Start, switch camera and finish a set from the wrist
-- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe); verified on phone + watch, camera cycle verified from the log
+- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe), [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b); verified on phone + watch, camera cycle verified from the log
 
 #### Use Case:
 - **As a** lifter who set the phone down across the room
@@ -207,7 +207,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 ### User Story 042:
 
 - **Summary:** The picture fills the watch and the controls sit on it
-- **Status:** implemented in 08c563c; layout redone for the Ultra in a0053c6, c550f16, 1c34133, 5622ee1 (picture as a background, four buttons inside the 205 pt face, chips under the clock) and verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; on phone + watch 2026-09-14 ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot"; [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the regression that cost the controls)
+- **Status:** implemented in 08c563c; layout redone for the Ultra in a0053c6, c550f16, 1c34133, 5622ee1 (picture as a background, four buttons inside the 205 pt face, chips under the clock) and verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; framing-before-recording scenario in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b) (story 047); on phone + watch 2026-09-14 ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot"; [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the regression that cost the controls)
 - **Why:** the preview is a 90 pt strip above a column of buttons; from across the room the strip is what matters and the buttons are what Igor already knows.
 
 #### Use Case:
@@ -344,7 +344,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 ### User Story 047:
 
 - **Summary:** Preview the shot from the wrist before recording
-- **Status:** implemented in [<sha>](https://github.com/idvorkin/exercise-analyzer/commit/<sha>); needs phone + watch ([#73](https://github.com/idvorkin/exercise-analyzer/issues/73))
+- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b); needs phone + watch ([#73](https://github.com/idvorkin/exercise-analyzer/issues/73))
 - **Why:** Igor, 2026-09-14: "Can I start with two different buttons for Record? Start Recording, Start Viewfinder. When I start Viewfinder, then I can start recording, because normally, when I start on my watch, I don't know if I'm in frame or not. I walk away from my phone, set my phone up, and think I'm in frame. Then I walk to my watch, make sure I'm good, maybe adjust the camera a bit, and then I hit Start."
 
 #### Use Case:
