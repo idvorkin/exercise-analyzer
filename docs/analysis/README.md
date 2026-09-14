@@ -68,6 +68,12 @@ far-side knee.
   can cut a fixture without the phone. Fixtures from the phone come from `Documents/recents/<id>/analysis.json`
   ([TESTING.md](../TESTING.md) has the steps).
 
+## Keypoints
+
+The web app this was ported from uses BlazePose-33; the YOLO pose models here emit COCO-17. Every keypoint
+the analyzers need (shoulders, elbows, wrists, hips, knees, ankles) exists in both, so the angle math was
+ported over COCO indices. Pose-track files are not interchangeable between the two apps.
+
 ## Keeping these notes
 
 Every analyzer change adds an entry to that exercise's **Experiments** log: the date, the clip or fixture, what was
