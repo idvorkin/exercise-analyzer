@@ -1,7 +1,7 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-//  Skeleton drawing shared by the live overlay and the rep-gallery thumbnails: COCO-17 bones, with the spine and
-//  right arm that drive the analysis highlighted.
+//  Skeleton drawing shared by the live overlay and the rep-gallery thumbnails: the drawn bones
+//  (COCO-17 minus the eyes, #62), with the spine and right arm that drive the analysis highlighted.
 
 import AVFoundation
 import ExerciseCore
@@ -9,14 +9,9 @@ import SwiftUI
 import UltralyticsYOLO
 
 enum PoseDrawing {
-  private static let bones: [(CocoKeypoint, CocoKeypoint)] = [
-    (.leftAnkle, .leftKnee), (.leftKnee, .leftHip), (.rightAnkle, .rightKnee),
-    (.rightKnee, .rightHip), (.leftHip, .rightHip), (.leftShoulder, .leftHip),
-    (.rightShoulder, .rightHip), (.leftShoulder, .rightShoulder), (.leftShoulder, .leftElbow),
-    (.rightShoulder, .rightElbow), (.leftElbow, .leftWrist), (.rightElbow, .rightWrist),
-    (.leftEye, .rightEye), (.nose, .leftEye), (.nose, .rightEye), (.leftEye, .leftEar),
-    (.rightEye, .rightEar), (.leftEar, .leftShoulder), (.rightEar, .rightShoulder),
-  ]
+  /// The single drawn edge list lives on BodySkeleton so the host suite can pin it; the rep-gallery
+  /// thumbnails draw through here too, and the Workouts stick figures never had eyes.
+  private static var bones: [(CocoKeypoint, CocoKeypoint)] { BodySkeleton.drawnBones }
 
   /// The bell in play (#18): a dot in the bell's own colour with a white ring, at the box's centre.
   static func drawBell(_ context: GraphicsContext, bell: BellSighting, in rect: CGRect) {
@@ -62,7 +57,7 @@ enum PoseDrawing {
     }
 
     let r = lineWidth * 0.6  // small joint markers; the bones carry the shape
-    for k in CocoKeypoint.allCases {
+    for k in CocoKeypoint.allCases where k != .leftEye && k != .rightEye {  // no eyes (#62)
       guard let p = mapped(k) else { continue }
       context.fill(
         Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)),

@@ -22,6 +22,11 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I scrub to the bottom of rep 5
 - **Then:** the HUD highlights the Bottom phase and shows that frame's spine, arm, hip and knee angles
 
+- **Scenario:** The skeleton draws no eyes
+- **Given:** a set is open with the skeleton overlay on
+- **When:** I look at the head
+- **Then:** the nose and both ears are drawn with a nose–ear line on each side and no eye dots or eye bones; the count and the analysis are unchanged
+
 - **Issues:** [#62](https://github.com/idvorkin/exercise-analyzer/issues/62) low priority: the skeleton should not draw the eyes, the nose is plenty
 
 ---

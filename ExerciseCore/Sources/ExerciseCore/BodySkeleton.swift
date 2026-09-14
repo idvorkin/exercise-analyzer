@@ -33,6 +33,16 @@ public struct BodySkeleton {
   /// Stricter confidence used for arm and wrist selection (web: `minConf` in arm/wrist queries).
   public static let reliableThreshold: Float = 0.3
 
+  /// The bones the overlay draws (#62): every COCO edge except the eyes — nose and ears stay, and
+  /// the head line runs nose–ear. Drawing only: the analysis and the stored tracks keep all 17 joints.
+  public static let drawnBones: [(CocoKeypoint, CocoKeypoint)] = [
+    (.leftAnkle, .leftKnee), (.leftKnee, .leftHip), (.rightAnkle, .rightKnee),
+    (.rightKnee, .rightHip), (.leftHip, .rightHip), (.leftShoulder, .leftHip),
+    (.rightShoulder, .rightHip), (.leftShoulder, .rightShoulder), (.leftShoulder, .leftElbow),
+    (.rightShoulder, .rightElbow), (.leftElbow, .leftWrist), (.rightElbow, .rightWrist),
+    (.nose, .leftEar), (.nose, .rightEar), (.leftEar, .leftShoulder), (.rightEar, .rightShoulder),
+  ]
+
   private let points: [CGPoint]
   private let conf: [Float]
 
