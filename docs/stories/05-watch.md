@@ -44,7 +44,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **and Given:** the watch app is open and connected
 - **When:** I stand where my feet are below the bottom edge of the frame
 - **Then:** the watch shows "Feet cut off" within a second and taps my wrist, over a small picture from the camera that refreshes about once a second whenever the watch app is in front
-- **And:** previews stream only while the watch app is in front and reachable (#76)
+- **And:** previews stream only while the watch app is in front and reachable (#76); any command from the wrist counts as "in front", because the watch's own scene message can be lost when it lands before the phone sees the watch as reachable (2026-09-14: a whole Preview session with no picture)
 
 - **Issues:** [#38](https://github.com/idvorkin/exercise-analyzer/issues/38) preview never started (gated on a scene message the watch does not send at launch)
 

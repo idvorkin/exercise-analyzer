@@ -64,6 +64,15 @@ final class WatchBridge: NSObject, ObservableObject {
       }
       return
     }
+    // Every other command is a tap on the wrist (or the wake ping), which proves the watch app is in front even
+    // when its scene message was lost: on 2026-09-14 the watch said "active" 56 ms before the phone saw it as
+    // reachable, the flag stayed false and not one preview went out for the whole session (#76, #38).
+    Task { @MainActor in
+      if !self.watchActive {
+        self.watchActive = true
+        self.onEvent?("watch_scene", ["active": true, "from": command.rawValue])
+      }
+    }
     if command == .exercise, let mode = message["exercise"] as? String {
       Task { @MainActor in self.onExercise?(mode) }
       return
