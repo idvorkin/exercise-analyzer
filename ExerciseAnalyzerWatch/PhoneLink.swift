@@ -130,23 +130,39 @@ final class PhoneLink: NSObject, ObservableObject {
     let now = Date()
     let started = !previous.recording && next.recording
     let finished = previous.recording && !next.recording
-    guard started || finished || (next.recording && now.timeIntervalSince(lastFaceWrite) >= 10) else { return }
+    let resumed = previous.paused && !next.paused && next.recording
     var face = loadFace() ?? FaceState()
+    // The pass's final count lands in a non-transition status after Done: adopt it when it changes, so the
+    // face shows the pass's count within seconds and a cancelled set (no pass, no arrival) keeps the previous
+    // final (043).
+    let arrived = next.lastSet.map(FaceState.LastSet.init(from:))
+    let lastSetArrived = !finished && arrived != nil && arrived != face.lastSet
+    let transition = started || finished || resumed || lastSetArrived
+    guard transition || (next.recording && now.timeIntervalSince(lastFaceWrite) >= 10) else { return }
     face.updatedAt = now
     if started {
       face.recording = true
       face.reps = next.reps
       face.exercise = next.exercise
       face.startedAt = now.addingTimeInterval(-next.elapsed)
+      face.lastSet = nil  // the final shows until the next set
     } else if finished {
-      // The freshest truth wins on each field: a stale context (relaunch after Done) must not shrink the
-      // final count or lose the exercise.
+      // Done and Cancel look identical here and neither fabricates a final: a stale context (relaunch after
+      // Done) must not shrink the count or lose the exercise, and the pass's value arrives below.
       face.recording = false
       face.reps = max(previous.reps, next.reps)
       face.exercise = previous.exercise.isEmpty ? next.exercise : previous.exercise
       face.startedAt = nil
-      face.lastSet = FaceState.LastSet(
-        reps: face.reps, exercise: face.exercise, seconds: max(previous.elapsed, next.elapsed))
+    } else if resumed {
+      // The pause left live time on the next frame in camera time: re-base the face timer on the phone's
+      // pause-excluded elapsed so it rejoins the wrist exactly instead of leading by the pause (040).
+      face.reps = next.reps
+      face.exercise = next.exercise
+      face.startedAt = now.addingTimeInterval(-next.elapsed)
+    } else if lastSetArrived, let arrived {
+      face.lastSet = arrived
+      face.reps = next.reps
+      face.exercise = next.exercise
     } else {
       face.reps = next.reps
       face.exercise = next.exercise
@@ -162,7 +178,7 @@ final class PhoneLink: NSObject, ObservableObject {
       lastFaceWrite = now
       WidgetCenter.shared.reloadTimelines(ofKind: FaceState.widgetKind)
       logEvent(
-        "face", ["recording": face.recording, "reps": face.reps, "reason": started || finished ? "transition" : "scene"])
+        "face", ["recording": face.recording, "reps": face.reps, "reason": transition ? "transition" : "scene"])
     } catch {
       guard !faceWriteFailedLogged else { return }
       faceWriteFailedLogged = true

@@ -228,7 +228,7 @@ the open decision on #73).
 ### User Story 043:
 
 - **Summary:** The watch face shows the set
-- **Status:** implemented in 375e3aa (merged 544a621); **not on the wrist**: the App Group entitlement needs `group.com.idvorkin.exerciseanalyzer` registered on the developer portal, which `xcodebuild -allowProvisioningUpdates` cannot do ("No Accounts" on this Mac: no Apple ID signed into Xcode), so the two `.entitlements` files are unwired from the watch targets until Igor signs in and adds the App Groups capability to `ExerciseAnalyzerWatch` and `ExerciseAnalyzerWatchComplication` in Signing & Capabilities; until then the face shows the launcher and the watch app logs `watch_face_failed` once per run ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; the Muse research of 2026-09-13 sized it)
+- **Status:** implemented, not on the wrist (#75): the App Group entitlement needs `group.com.idvorkin.exerciseanalyzer` registered on the developer portal, which `xcodebuild -allowProvisioningUpdates` cannot do ("No Accounts" on this Mac: no Apple ID signed into Xcode), so the two `.entitlements` files are unwired from the watch targets until Igor signs in and adds the App Groups capability to `ExerciseAnalyzerWatch` and `ExerciseAnalyzerWatchComplication` in Signing & Capabilities; until then the face shows the launcher and the watch app logs `watch_face_failed` once per run. The pause-excluding timer and the pass-final fixes are in on top ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; the Muse research of 2026-09-13 sized it)
 - **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and today's complication is only a launcher.
 
 #### Use Case:
@@ -241,6 +241,21 @@ the open decision on #73).
 - **Given:** the Exercise Analyzer complication is on my face and a set is recording
 - **When:** I lower my wrist and raise it 20 s later without opening the app
 - **Then:** the face shows "● REC", a timer counting up from the set's start that ticks by itself, and the rep count as of the last time the watch app heard from the phone; tapping it opens the app for the exact count, and after Done the face shows the final count and the exercise until the next set
+
+- **Scenario:** A pause mid-set
+- **Given:** a set is recording with the face complication showing
+- **When:** I pause from the wrist, wait 40 s, and resume
+- **Then:** the face timer rejoins the wrist's elapsed (the 40 s never appear) and the count is unchanged
+
+- **Scenario:** Done beats the live count
+- **Given:** the live count at Done is below what the offline pass settles
+- **When:** the pass completes a few seconds later
+- **Then:** the face shows the pass's final count within seconds
+
+- **Scenario:** A cancelled set
+- **Given:** the face shows the previous set's final
+- **When:** I record and cancel a set
+- **Then:** the face still shows the previous final, and starting the next set clears it
 
 - **Notes:** The complication cannot talk to the phone: it reads a shared App Group container that the watch app
   writes on each status and reloads through WidgetKit. WidgetKit throttles reloads, so the count on the face is

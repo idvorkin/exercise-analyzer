@@ -15,6 +15,12 @@ final class FaceStateTests: XCTestCase {
     XCTAssertEqual(decoded, state)
   }
 
+  func testLastSetMappingFromWire() {
+    // The phone's authoritative post-pass value (story 045) into the face's shape; `at` stays phone-side.
+    let wire = LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62, at: 1_700_000_100)
+    XCTAssertEqual(FaceState.LastSet(from: wire), FaceState.LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62))
+  }
+
   func testIdleFaceStateDecodesWithoutDates() throws {
     // A missing file means idle; an explicit idle state carries no dates and no last set.
     let decoded = try JSONDecoder().decode(
