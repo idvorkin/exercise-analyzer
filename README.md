@@ -27,7 +27,7 @@ Captured from the simulator by `scripts/screenshots.sh` (sample clips, CPU infer
 
 | Idle | Live |
 |---|---|
-| ![Watch idle: Phone ready with Record](docs/screenshots/watch-idle.png) | ![Watch live: the picture fills the face with Pause, Camera and Done over it](docs/screenshots/watch-live.png) |
+| ![Watch idle: Phone ready with Record](docs/screenshots/watch-idle.png) | ![Watch live: the picture fills the face with Pause, Camera, Done and Cancel over it](docs/screenshots/watch-live.png) |
 
 | Paused | Done |
 |---|---|
@@ -37,8 +37,8 @@ The Apple Watch runs the session with the phone on a tripod. Record, cycle the c
 0.5× and 1×, and tap Done from the wrist, so a session never costs a walk back to the tripod (017). The watch shows whether
 the camera sees you ("Feet cut off") and taps your wrist when you leave the picture, over a small preview
 that refreshes about once a second (016). The picture fills the face with the count, the time and round
-Pause, Camera and Done buttons over it; Cancel and the watch-mode toggle sit a swipe away so a stray touch
-cannot end a set (042). Pause and Resume freeze the count and the elapsed time while the framing stays live,
+Pause, Camera, Done and Cancel buttons over it, every one whole inside the face's corners (checked on the
+watch simulator before every wrist install); the watch-mode toggle sits a swipe away (042). Pause and Resume freeze the count and the elapsed time while the framing stays live,
 and the paused stretch is cut out of the clip before the trim and the offline pass (040). Start a set from
 the wrist and the phone follows into watch mode: giant digits readable from across the room, out by button,
 double tap, hold, or the end of the set (041, 027). After Done the wrist shows the final count once the

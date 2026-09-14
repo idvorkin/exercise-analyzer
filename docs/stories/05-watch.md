@@ -15,9 +15,9 @@ it. Not states: the face complication (043, requested) and the phone's lock-scre
 | disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status was recording | Retry | 018 |
 | background | phone-in-background art, unlock-and-open instruction | "Send a reminder to the phone" (no Record: it would die silently) | 018 |
 | idle | "Phone ready", exercise picker, rest length picker, rest count while resting, last-set line (or "Analyzing…" while the pass runs) | Record (red; from the wrist the phone follows into watch mode) | 017, 041, 045, 046 |
-| live | full-screen picture, rep chip 0, time chip 0:04, green "IN FRAME" bar | Pause, Camera, Done (round, over the picture); second page: Cancel, watch-mode toggle | 016, 017, 042 |
-| recording | full-screen picture, 6-rep chip, 0:42, red "FEET CUT OFF" bar | Pause, Camera, Done; second page: Cancel, watch-mode toggle | 016, 017, 042 |
-| paused | "PAUSED · FEET CUT OFF" bar, frozen count and time, picture keeps refreshing | orange Resume, Camera, Done; second page: Cancel | 040 |
+| live | full-screen picture, rep chip 0, time chip 0:04 under the clock line, green "IN FRAME" bar; chips, bar and buttons whole inside the face | Pause, Camera, Done, Cancel (round, over the picture; Cancel red and last); second page: Cancel, watch-mode toggle | 016, 017, 042 |
+| recording | full-screen picture, 6-rep chip, 0:42, red "FEET CUT OFF" bar | Pause, Camera, Done, Cancel; second page: Cancel, watch-mode toggle | 016, 017, 042 |
+| paused | "PAUSED · FEET CUT OFF" bar, frozen count and time, picture keeps refreshing | orange Resume, Camera, Done, Cancel; second page: Cancel | 040 |
 | done | "Phone ready", "Last set: 9 reps · Kettlebell Swing · 0:48", rest counting up ("Rest 0:35", orange past the length) | Record (clears the rest), rest picker, exercise picker | 045, 046 |
 
 Igor's framing-loop rule: the camera-live page needs the picture, the in-frame bar, Camera, Done and Cancel, all
@@ -200,7 +200,7 @@ the open decision on #73).
 ### User Story 042:
 
 - **Summary:** The picture fills the watch and the controls sit on it
-- **Status:** implemented in 08c563c; needs phone + watch ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot")
+- **Status:** implemented in 08c563c; layout redone for the Ultra in a0053c6, c550f16, 1c34133, 5622ee1 (picture as a background, four buttons inside the 205 pt face, chips under the clock) and verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; on phone + watch 2026-09-14 ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot"; [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the regression that cost the controls)
 - **Why:** the preview is a 90 pt strip above a column of buttons; from across the room the strip is what matters and the buttons are what Igor already knows.
 
 #### Use Case:
@@ -212,12 +212,12 @@ the open decision on #73).
 - **Scenario:** The recording screen on a 45 mm watch
 - **Given:** a set is being recorded and the watch app is in front
 - **When:** I raise my wrist
-- **Then:** the picture fills the screen edge to edge, the rep count and the elapsed time sit on translucent chips over its top corners, the in-frame hint is a bar over its bottom edge (green in frame, red when cut off), three round buttons overlay the bottom, Pause/Resume, Camera and Done, and Cancel, the watch-mode toggle and the exercise are on the page below (vertical page swipe) so a stray touch cannot end a set; the picture refreshes about once a second at twice today's resolution (long side 320 px instead of 176, about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
+- **Then:** the picture fills the screen edge to edge, the rep count and the elapsed time sit on translucent chips under the clock line, the in-frame hint is a bar over its bottom edge (green in frame, red when cut off), four round buttons overlay the bottom, Pause/Resume, Camera, Done and a smaller red Cancel last, all whole inside the face's rounded corners; the watch-mode toggle, the exercise and a second Cancel are on the page below (vertical page swipe); the picture refreshes about once a second at twice today's resolution (long side 320 px instead of 176, about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
 
 - **Scenario:** Framing the shot from Live's first frame
 - **Given:** the phone is ready and the watch app is in front
 - **When:** I tap Record on the wrist (or Live on the phone)
-- **Then:** from the camera's first frame the wrist shows the full-screen picture with the in-frame bar and the three round buttons, Pause/Resume, Camera (cycle Front, 0.5×, 1×) and Done, all inside the screen's safe area, so I can set the phone on the rack, check the framing from where I lift and switch cameras before the first rep; the recorder rolls from that first frame and Trim cuts the walk-in as today (Igor, 2026-09-13: "I need to see the preview before I'm recording, so when I have a full-screen record I still need to be able to switch cameras and pause and stop")
+- **Then:** from the camera's first frame the wrist shows the full-screen picture with the in-frame bar and the four round buttons, Pause/Resume, Camera (cycle Front, 0.5×, 1×), Done and Cancel, all inside the screen's safe area, so I can set the phone on the rack, check the framing from where I lift and switch cameras before the first rep; the recorder rolls from that first frame and Trim cuts the walk-in as today (Igor, 2026-09-13: "I need to see the preview before I'm recording, so when I have a full-screen record I still need to be able to switch cameras and pause and stop")
 
 - **Decision open (#73):** a camera-only framing state, where the picture streams but the recorder starts only on a second Record, would change the phone's Live flow (story 001: Live is the set); not built unless Igor wants it
 
@@ -228,7 +228,7 @@ the open decision on #73).
 ### User Story 043:
 
 - **Summary:** The watch face shows the set
-- **Status:** implemented in 375e3aa; needs phone + watch (face check by Igor) ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; the Muse research of 2026-09-13 sized it)
+- **Status:** implemented in 375e3aa (merged 544a621); **not on the wrist**: the App Group entitlement needs `group.com.idvorkin.exerciseanalyzer` registered on the developer portal, which `xcodebuild -allowProvisioningUpdates` cannot do ("No Accounts" on this Mac: no Apple ID signed into Xcode), so the two `.entitlements` files are unwired from the watch targets until Igor signs in and adds the App Groups capability to `ExerciseAnalyzerWatch` and `ExerciseAnalyzerWatchComplication` in Signing & Capabilities; until then the face shows the launcher and the watch app logs `watch_face_failed` once per run ([#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; the Muse research of 2026-09-13 sized it)
 - **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and today's complication is only a launcher.
 
 #### Use Case:
