@@ -27,17 +27,25 @@ enum RecordPrompt {
     }
   }
 
-  static func post(log: SessionLog) {
+  /// A Preview asked while the phone app is backgrounded carries the viewfinder flag, so the tap opens
+  /// into the viewfinder instead of recording (047).
+  static func post(log: SessionLog, viewfinder: Bool = false) {
     let center = UNUserNotificationCenter.current()
     center.getNotificationSettings { settings in
       let granted = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
-      log.event("record_prompt", ["status": settings.authorizationStatus.rawValue, "granted": granted])
+      log.event(
+        "record_prompt",
+        ["status": settings.authorizationStatus.rawValue, "granted": granted, "viewfinder": viewfinder])
       guard granted else { return }
       let content = UNMutableNotificationContent()
-      content.title = "Ready to record"
-      content.body = "Tap to open Exercise Analyzer and start the camera."
+      content.title = viewfinder ? "Ready to frame" : "Ready to record"
+      content.body =
+        viewfinder
+        ? "Tap to open Exercise Analyzer and frame the shot."
+        : "Tap to open Exercise Analyzer and start the camera."
       content.sound = .default
       content.categoryIdentifier = category
+      content.userInfo = ["viewfinder": viewfinder]
       let request = UNNotificationRequest(identifier: "record-from-watch", content: content, trigger: nil)
       center.add(request) { error in
         if let error { log.event("error", ["where": "record_prompt", "message": "\(error)"]) }
@@ -74,7 +82,8 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
     if response.notification.request.content.categoryIdentifier == RecordPrompt.category {
-      NotificationCenter.default.post(name: RecordPrompt.tapped, object: nil)
+      let viewfinder = response.notification.request.content.userInfo["viewfinder"] as? Bool ?? false
+      NotificationCenter.default.post(name: RecordPrompt.tapped, object: viewfinder)
     }
     completionHandler()
   }

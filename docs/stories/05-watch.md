@@ -368,11 +368,16 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **When:** I tap Cancel
 - **Then:** the camera stops and nothing is left behind
 
+- **Scenario:** Preview while the phone app is backgrounded
+- **Given:** the phone app is backgrounded and the watch app is open
+- **When:** I tap Preview on the wrist
+- **Then:** the phone posts its notification and the tap opens the camera without recording
+
 - **Notes:** Wire: `WatchStatus.viewfinder` (recording stays "the camera is live"; `recording && !viewfinder`
   is "the recorder rolls"), `WatchCommand.viewfinder`, `beginRecording` (recorder starts without touching the
-  camera), `record_start` (`viewfinder_s`) and the `viewfinder` field on `camera_start`. The phone's own Live
-  still records from the first frame (story 001); a Preview asked while the phone app is backgrounded falls
-  back to the Record notification, which opens straight into recording.
+  camera), `record_start` (`viewfinder_s`) and the `viewfinder` field on `camera_start`; the Record
+  notification carries the flag in its `userInfo`, so the tap route opens into the viewfinder too. The phone's
+  own Live still records from the first frame (story 001).
 
 ---
 

@@ -184,11 +184,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
       guard let self, self.watch.reachable else { return }
       self.pushWatchStatus(force: true)
     }.store(in: &cancellables)
-    NotificationCenter.default.addObserver(forName: RecordPrompt.tapped, object: nil, queue: .main) { [weak self] _ in
+    NotificationCenter.default.addObserver(forName: RecordPrompt.tapped, object: nil, queue: .main) { [weak self] note in
       Task { @MainActor in
         guard let self, self.source != .camera else { return }
-        self.log.event("ui", ["action": "start", "from": "watch_notification"])
-        self.startCamera(position: self.cameraPosition)
+        let viewfinder = note.object as? Bool ?? false
+        self.log.event("ui", ["action": "start", "from": "watch_notification", "viewfinder": viewfinder])
+        self.startCamera(position: self.cameraPosition, viewfinder: viewfinder)
       }
     }
     // Lock-screen / Control Center button (#70): the intent sets the flag and opens the app; activation (cold
@@ -1453,11 +1454,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
     case .viewfinder:
       if source == .camera { break }
       // Framing from the wrist: the camera without the recorder, in watch mode like Record (047, #73).
+      // Backgrounded, the notification carries the flag so the tap opens into the viewfinder, not recording.
       startRequestedFromWatch = true
       if UIApplication.shared.applicationState == .active {
         startCamera(position: cameraPosition, viewfinder: true)
       } else {
-        RecordPrompt.post(log: log)
+        RecordPrompt.post(log: log, viewfinder: true)
       }
     case .switchCamera: cycleCameraLevel()
     case .pause: pauseCamera(from: "watch")
