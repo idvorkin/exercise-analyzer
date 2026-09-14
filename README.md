@@ -17,7 +17,36 @@ How poses become phases, reps and scores, with the evidence behind every rule: [
 |---|---|
 | ![Bulgarian split squat analysis](docs/screenshots/bulgarian-split-squat.png) | ![Pistol squat analysis](docs/screenshots/pistol-squat.png) |
 
+| Rep gallery, cut to the lifter | Collapsed Workouts summary | Instrumented run |
+|---|---|---|
+| ![Rep gallery stills cut to the lifter](docs/screenshots/rep-gallery-zoomed.png) | ![Collapsed Workouts sheet with the day's exercises as words and stick figures](docs/screenshots/workouts-collapsed.png) | ![Instrumented run banner](docs/screenshots/instrumented-run.png) |
+
 Captured from the simulator by `scripts/screenshots.sh` (sample clips, CPU inference, so the fps readout is low).
+
+## From the wrist
+
+| Idle | Live |
+|---|---|
+| ![Watch idle: Phone ready with Record](docs/screenshots/watch-idle.png) | ![Watch live: the picture fills the face with Pause, Camera and Done over it](docs/screenshots/watch-live.png) |
+
+| Paused | Done |
+|---|---|
+| ![Watch paused: frozen count and Resume](docs/screenshots/watch-paused.png) | ![Watch done: last set and rest count](docs/screenshots/watch-done.png) |
+
+The Apple Watch runs the session with the phone on a tripod. Record, cycle the camera through Front,
+0.5× and 1×, and tap Done from the wrist, so a session never costs a walk back to the tripod (017). The watch shows whether
+the camera sees you ("Feet cut off") and taps your wrist when you leave the picture, over a small preview
+that refreshes about once a second (016). The picture fills the face with the count, the time and round
+Pause, Camera and Done buttons over it; Cancel and the watch-mode toggle sit a swipe away so a stray touch
+cannot end a set (042). Pause and Resume freeze the count and the elapsed time while the framing stays live,
+and the paused stretch is cut out of the clip before the trim and the offline pass (040). Start a set from
+the wrist and the phone follows into watch mode: giant digits readable from across the room, out by button,
+double tap, hold, or the end of the set (041, 027). After Done the wrist shows the final count once the
+offline pass settles it, then counts the rest up and taps at the set length (045, 046). A face complication
+shows REC with a ticking timer and the count during a set, the final count after it (043). The watch never
+lies about the phone: no signal for 8 s means a "not connected" screen with the last count, a backgrounded
+phone means an unlock-and-open instruction instead of a dead Record button (018). One deliberate limit: no
+workout session on the watch (018), so no heart rate and nothing new on wrist-down.
 
 ## What it does
 
@@ -31,6 +60,17 @@ Captured from the simulator by `scripts/screenshots.sh` (sample clips, CPU infer
 - **Rep gallery.** Rows of reps × phases (bottom, release, top, connect) with skeletons; tap to seek, tap a phase
   header to zoom that column, open the grid button for the full-screen gallery with compare mode (2–4 reps).
 - **Navigation.** Previous/next rep, previous/next checkpoint, frame stepping, scrubber, ¼× ½× 1× speed.
+  Hold the middle of the picture for both edges' keys at once; a held key keeps firing, every half second for
+  reps and positions, every tenth of a second for frames (039).
+- **Rep gallery, cut to the lifter.** Every still is the me-view crop with the skeleton remapped into it; the
+  whole frame stays when no person was found (006).
+- **Collapsed Workouts summary.** The sheet pulled down to its handle reads the day's exercises as short words
+  with a stick figure each; drag it open for the full gallery (038).
+- **Lock-screen Exercise control.** One press opens the app on Live with the camera already running (044).
+- **Instrumented run.** Replays the stored sets on the phone with the detector and tracker numbers in the log
+  (037).
+- **Bell detector, off by default.** A tracker holds the bell through the rep when it is on; the by-eye numbers
+  are in [docs/analysis/kettlebell-detector.md](docs/analysis/kettlebell-detector.md) (034).
 - **Save** writes the trimmed clip to Photos.
 
 ## Session log
@@ -43,7 +83,8 @@ catalogue, the pull commands and the reading recipes are in [docs/DEBUGGING.md](
 
 Cheapest rung first: `just test` (host, ~1 s, everything in `ExerciseCore` against real pose tracks),
 `just analyze clip.mov` (the model plus the analyzers on the Mac, any clip, 130 fps), `just test-sim` (simulator,
-minutes, the app end to end judged from its log), `just run-device` (phone: camera, HDR, Photos, watch). Which kind of change is verified where, how fixtures are made, the launch hooks, and the
+minutes, the app end to end judged from its log), `just watch-screens` (watch simulator, ~1 min, every watch
+page from a fixed status, judged by eye), `just run-device` (phone: camera, HDR, Photos, watch). Which kind of change is verified where, how fixtures are made, the launch hooks, and the
 screenshot script are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Bug reports

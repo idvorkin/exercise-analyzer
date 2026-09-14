@@ -10,6 +10,7 @@
 		5A1A00000000000000000012 /* UltralyticsYOLO in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1A00000000000000000011 /* UltralyticsYOLO */; };
 		5A1A00000000000000000022 /* ExerciseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1A00000000000000000021 /* ExerciseCore */; };
 		5A1A0000000000000000003A /* ExerciseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1A00000000000000000039 /* ExerciseCore */; };
+		5A1A0000000000000000003F /* ExerciseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A1A00000000000000000039 /* ExerciseCore */; };
 		5A1A0000000000000000003C /* ExerciseAnalyzerWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5A1A00000000000000000035 /* ExerciseAnalyzerWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5A1A0000000000000000004C /* ExerciseAnalyzerWatchComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5A1A00000000000000000045 /* ExerciseAnalyzerWatchComplication.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5C1A00000000000000000050 /* ExerciseAnalyzerControls.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5C1A00000000000000000053 /* ExerciseAnalyzerControls.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -125,6 +126,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5A1A0000000000000000003F /* ExerciseCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -578,6 +580,7 @@
 		5A1A00000000000000000033 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatch/ExerciseAnalyzerWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 45P6D3439T;
@@ -605,6 +608,7 @@
 		5A1A00000000000000000034 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatch/ExerciseAnalyzerWatch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 45P6D3439T;
@@ -632,6 +636,7 @@
 		5A1A00000000000000000043 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatchComplication/ExerciseAnalyzerWatchComplication.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 45P6D3439T;
@@ -659,6 +664,7 @@
 		5A1A00000000000000000044 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ExerciseAnalyzerWatchComplication/ExerciseAnalyzerWatchComplication.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 45P6D3439T;

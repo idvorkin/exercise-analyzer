@@ -189,6 +189,10 @@ What only the phone can show: the Neural Engine (offline pass at 100–190 fps),
 `edr_headroom`; never transform or clip an `AVPlayerLayer` ancestor), Photos in-place import, audio mixing, and the
 watch.
 
+The watch face complication is verified only by looking at it: no simulator, no log line can show what the
+face renders. Record from the watch, lower the wrist, raise it: REC, a ticking timer and the count; Done: the
+final count within seconds. `watch_face` in the log proves the mirror writes behind it, not the pixels.
+
 **Log before theorizing.** When a phone symptom is unexplained, the first change is a log event, not a fix. The
 log carries per-frame metrics, every phase transition, reps, detection reasons, seeks (which control asked, player
 time before and after), trims (requested and aligned start, passthrough or re-encode), camera events, watch

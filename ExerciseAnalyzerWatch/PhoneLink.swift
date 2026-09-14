@@ -4,6 +4,7 @@ import ExerciseCore
 import Foundation
 import WatchConnectivity
 import WatchKit
+import WidgetKit
 
 /// Watch side of the connection: receives WatchStatus from the phone, sends WatchCommand back, taps the wrist
 /// when the lifter leaves the frame and on every rep.
@@ -15,6 +16,9 @@ final class PhoneLink: NSObject, ObservableObject {
   @Published private(set) var receivedAt: Date?
   /// Latest preview frame from the phone (about 1 fps while recording).
   @Published private(set) var preview: UIImage?
+  /// Last face.json write, and whether its failure is already logged (once per spell, story 043).
+  private var lastFaceWrite = Date.distantPast
+  private var faceWriteFailedLogged = false
   /// Rest since the last set ended; driven by recording transitions below, cleared on Record. Assigned right
   /// after `super.init` (its closure captures `self`), so it cannot be a `let`.
   private(set) var rest: RestTimer!
@@ -107,6 +111,7 @@ final class PhoneLink: NSObject, ObservableObject {
     if previous.paused != next.paused {
       logEvent("status", ["paused": next.paused])
     }
+    updateFace(previous: previous, next: next)
     if next.recording {
       if previous.frame.inFrame && !next.frame.inFrame { WKInterfaceDevice.current().play(.notification) }
       if next.reps > previous.reps { WKInterfaceDevice.current().play(.success) }
@@ -117,6 +122,65 @@ final class PhoneLink: NSObject, ObservableObject {
       rest.clear()
     }
   }
+
+  /// Mirrors the set into the shared container for the face complication (story 043): transitions always,
+  /// otherwise at most every 10 s while the set runs, so the face count is at most 10 s old while the app is
+  /// in front. Never per rep — WidgetKit throttles frequent reloads and the timer ticks by itself.
+  private func updateFace(previous: WatchStatus, next: WatchStatus) {
+    let now = Date()
+    let started = !previous.recording && next.recording
+    let finished = previous.recording && !next.recording
+    guard started || finished || (next.recording && now.timeIntervalSince(lastFaceWrite) >= 10) else { return }
+    var face = loadFace() ?? FaceState()
+    face.updatedAt = now
+    if started {
+      face.recording = true
+      face.reps = next.reps
+      face.exercise = next.exercise
+      face.startedAt = now.addingTimeInterval(-next.elapsed)
+    } else if finished {
+      // The freshest truth wins on each field: a stale context (relaunch after Done) must not shrink the
+      // final count or lose the exercise.
+      face.recording = false
+      face.reps = max(previous.reps, next.reps)
+      face.exercise = previous.exercise.isEmpty ? next.exercise : previous.exercise
+      face.startedAt = nil
+      face.lastSet = FaceState.LastSet(
+        reps: face.reps, exercise: face.exercise, seconds: max(previous.elapsed, next.elapsed))
+    } else {
+      face.reps = next.reps
+      face.exercise = next.exercise
+      if face.startedAt == nil { face.startedAt = now.addingTimeInterval(-next.elapsed) }
+    }
+    do {
+      guard let dir = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: FaceState.groupID)
+      else { throw FaceStoreError.noGroupContainer }
+      try JSONEncoder().encode(face).write(
+        to: dir.appendingPathComponent(FaceState.fileName), options: .atomic)
+      faceWriteFailedLogged = false
+      lastFaceWrite = now
+      WidgetCenter.shared.reloadTimelines(ofKind: FaceState.widgetKind)
+      logEvent(
+        "face", ["recording": face.recording, "reps": face.reps, "reason": started || finished ? "transition" : "scene"])
+    } catch {
+      guard !faceWriteFailedLogged else { return }
+      faceWriteFailedLogged = true
+      logEvent("face_failed", ["message": "\(error)"])
+    }
+  }
+
+  /// The face the complication last saw, if any: carries `lastSet` across sets and seeds a mid-set launch.
+  private func loadFace() -> FaceState? {
+    guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: FaceState.groupID),
+      let data = try? Data(contentsOf: dir.appendingPathComponent(FaceState.fileName))
+    else { return nil }
+    return try? JSONDecoder().decode(FaceState.self, from: data)
+  }
+}
+
+private enum FaceStoreError: Error {
+  case noGroupContainer
 }
 
 extension PhoneLink: WCSessionDelegate {
