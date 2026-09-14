@@ -29,7 +29,7 @@ the open decision on #73).
 ### User Story 016:
 
 - **Summary:** Know from the wrist whether the camera can see me
-- **Status:** implemented in [96e6e19](https://github.com/idvorkin/exercise-analyzer/commit/96e6e19), [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [fead72e](https://github.com/idvorkin/exercise-analyzer/commit/fead72e); verified on phone + watch ([#21](https://github.com/idvorkin/exercise-analyzer/issues/21) tuned the rule)
+- **Status:** implemented in [96e6e19](https://github.com/idvorkin/exercise-analyzer/commit/96e6e19), [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [fead72e](https://github.com/idvorkin/exercise-analyzer/commit/fead72e); verified on phone + watch ([#21](https://github.com/idvorkin/exercise-analyzer/issues/21) tuned the rule); this commit (#76) gates previews on watch-in-front (host rung blocked by sandbox, sim rungs are Igor's)
 
 #### Use Case:
 - **As a** lifter standing across the room from the tripod
@@ -42,6 +42,7 @@ the open decision on #73).
 - **and Given:** the watch app is open and connected
 - **When:** I stand where my feet are below the bottom edge of the frame
 - **Then:** the watch shows "Feet cut off" within a second and taps my wrist, over a small picture from the camera that refreshes about once a second whenever the watch app is in front
+- **And:** previews stream only while the watch app is in front and reachable (#76)
 
 - **Issues:** [#38](https://github.com/idvorkin/exercise-analyzer/issues/38) preview never started (gated on a scene message the watch does not send at launch)
 
