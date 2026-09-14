@@ -360,7 +360,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 ### User Story 047:
 
 - **Summary:** Preview the shot from the wrist before recording
-- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b); needs phone + watch ([#73](https://github.com/idvorkin/exercise-analyzer/issues/73))
+- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), b3defc0; on phone + watch 2026-09-14 ([#73](https://github.com/idvorkin/exercise-analyzer/issues/73)); the code review of 2026-09-14 (`~/tmp/agent/notes/2026-09-14-muse-code-review.md`, eleven findings) is fixed in the commit after 27602df: the preview runs no analyzer and no detector, a cancelled preview keeps the rest and the last set, Record on a locked phone waits for the tap, the set's counters start at Record
 - **Why:** Igor, 2026-09-14: "Can I start with two different buttons for Record? Start Recording, Start Viewfinder. When I start Viewfinder, then I can start recording, because normally, when I start on my watch, I don't know if I'm in frame or not. I walk away from my phone, set my phone up, and think I'm in frame. Then I walk to my watch, make sure I'm good, maybe adjust the camera a bit, and then I hit Start."
 
 #### Use Case:
@@ -372,7 +372,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **Scenario:** Framing from the wrist
 - **Given:** the phone is ready on the tripod and the watch app is open
 - **When:** I tap Preview on the wrist
-- **Then:** the picture fills the face with the in-frame bar and Record · Camera · Cancel and nothing is recorded
+- **Then:** the picture fills the face with the in-frame bar and Record · Camera · Cancel and nothing is recorded; no rep is counted or buzzed and the exercise detector sees none of the framing (the analyzer does not run until Record)
 
 - **Scenario:** Record from the preview
 - **Given:** the viewfinder picture is up on the wrist
@@ -382,12 +382,17 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **Scenario:** Cancel from the preview
 - **Given:** the viewfinder picture is up on the wrist
 - **When:** I tap Cancel
-- **Then:** the camera stops and nothing is left behind
+- **Then:** the camera stops and nothing is left behind; the rest count and the last-set line on the idle page are exactly as before the Preview
 
 - **Scenario:** Preview while the phone app is backgrounded
 - **Given:** the phone app is backgrounded and the watch app is open
 - **When:** I tap Preview on the wrist
 - **Then:** the phone posts its notification and the tap opens the camera without recording
+
+- **Scenario:** Record while the phone locked itself in the preview
+- **Given:** the preview is up and the phone has locked (iOS stops the camera)
+- **When:** I tap Record on the wrist
+- **Then:** no recorder is armed on a dead camera; the phone posts its notification and the tap starts the set the moment the app is in front (the 2026-09-14 review: a recorder armed here got no frames and the set ended in "Nothing recorded")
 
 - **Notes:** Wire: `WatchStatus.viewfinder` (recording stays "the camera is live"; `recording && !viewfinder`
   is "the recorder rolls"), `WatchCommand.viewfinder`, `beginRecording` (recorder starts without touching the

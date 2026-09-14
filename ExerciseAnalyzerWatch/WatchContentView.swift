@@ -36,7 +36,7 @@ struct WatchContentView: View {
           Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
           Text(phone.reachable ? "Waiting for the phone…" : "Not connected to the phone. It reconnects on its own; if it doesn't, open Exercise Analyzer on the phone.")
             .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
-          if status.recording {
+          if status.rolling {
             Text("Last seen recording: \(status.reps) reps").font(.caption2).foregroundStyle(.tertiary)
           }
           if let since = phone.receivedAt {

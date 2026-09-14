@@ -19,6 +19,9 @@ final class PhoneLink: NSObject, ObservableObject {
   /// Last face.json write, and whether its failure is already logged (once per spell, story 043).
   private var lastFaceWrite = Date.distantPast
   private var faceWriteFailedLogged = false
+  private var faceLoadFailedLogged = false
+  /// The watch app's scene is active (in front), as last told to us by the view; gates the scene resend.
+  private var inFront = false
   /// Rest since the last set ended; driven by recording transitions below, cleared on Record. Assigned right
   /// after `super.init` (its closure captures `self`), so it cannot be a `let`.
   private(set) var rest: RestTimer!
@@ -41,6 +44,9 @@ final class PhoneLink: NSObject, ObservableObject {
   func ping() {
     guard screenshot == nil else { return }
     guard WCSession.default.activationState == .activated, WCSession.default.isReachable else { return }
+    // Say "in front" again while the phone is not live, in case the scene message was lost; only when the
+    // scene really is in front (the 2 s retry also pings, and an always-on watch sits at inactive).
+    if inFront, !isLive { sendScene(true) }
     send(.status)
   }
 
@@ -66,9 +72,23 @@ final class PhoneLink: NSObject, ObservableObject {
   func sceneActive(_ active: Bool) {
     guard screenshot == nil else { return }
     logEvent("scene", ["active": active])
-    guard WCSession.default.activationState == .activated else { return }
-    WCSession.default.sendMessage(["command": (active ? WatchCommand.watchActive : .watchInactive).rawValue], replyHandler: nil) { _ in }
+    inFront = active
+    sendScene(active)
     if active { ping() }
+  }
+
+  /// Tells the phone whether the watch app is in front, the message its preview gate keys on. Its failure is
+  /// logged (#76: a lost one starved every preview of a session and the log could not say why) and `ping`
+  /// resends it while the phone is not live, so a lost message costs one reconnect, not a set.
+  private func sendScene(_ active: Bool) {
+    guard WCSession.default.activationState == .activated else { return }
+    WCSession.default.sendMessage(
+      ["command": (active ? WatchCommand.watchActive : .watchInactive).rawValue], replyHandler: nil
+    ) { [weak self] error in
+      Task { @MainActor in
+        self?.logEvent("scene_send_failed", ["active": active, "message": error.localizedDescription])
+      }
+    }
   }
 
   /// Watch-side log: forwarded to the phone's session log as `watch_<type>` (queued user info, so it arrives even
@@ -86,8 +106,10 @@ final class PhoneLink: NSObject, ObservableObject {
     let session = WCSession.default
     logEvent("command", ["command": command.rawValue, "reachable": session.isReachable, "activation": session.activationState.rawValue, "live": isLive])
     guard session.activationState == .activated else { return }
-    // A new set owns the idle screen: Record and Preview both clear the rest count (046, 047).
-    if command == .start || command == .viewfinder { rest.clear() }
+    // A new set owns the idle screen: Record clears the rest count; a Preview is not a set, so the count
+    // survives a look at the tripod and a Cancel (046, 047). Record from the preview clears it in `apply`
+    // when the phone reports the recorder rolling.
+    if command == .start { rest.clear() }
     if command != .status { WKInterfaceDevice.current().play(.click) }
     session.sendMessage(["command": command.rawValue], replyHandler: { [weak self] reply in
       Task { @MainActor in self?.logEvent("command_reply", ["command": command.rawValue, "reply": "\(reply)"]) }
@@ -106,8 +128,10 @@ final class PhoneLink: NSObject, ObservableObject {
     status = next
     receivedAt = Date()
     lastError = nil
-    if previous.recording != next.recording || previous.reps != next.reps {
-      logEvent("status", ["recording": next.recording, "reps": next.reps, "in_frame": next.frame.inFrame])
+    if previous.recording != next.recording || previous.rolling != next.rolling || previous.reps != next.reps {
+      logEvent(
+        "status",
+        ["recording": next.recording, "viewfinder": next.viewfinder, "reps": next.reps, "in_frame": next.frame.inFrame])
     }
     if previous.paused != next.paused {
       logEvent("status", ["paused": next.paused])
@@ -141,7 +165,8 @@ final class PhoneLink: NSObject, ObservableObject {
     let arrived = next.lastSet.map(FaceState.LastSet.init(wire:))
     let lastSetArrived = !finished && arrived != nil && arrived != face.lastSet
     let transition = started || finished || resumed || lastSetArrived
-    guard transition || (next.recording && now.timeIntervalSince(lastFaceWrite) >= 10) else { return }
+    // The periodic write is for a rolling set only: a preview would reload the face for nothing (047).
+    guard transition || (next.rolling && now.timeIntervalSince(lastFaceWrite) >= 10) else { return }
     face.updatedAt = now
     if started {
       face.recording = true
@@ -169,7 +194,7 @@ final class PhoneLink: NSObject, ObservableObject {
     } else {
       face.reps = next.reps
       face.exercise = next.exercise
-      if face.startedAt == nil { face.startedAt = now.addingTimeInterval(-next.elapsed) }
+      if face.recording, face.startedAt == nil { face.startedAt = now.addingTimeInterval(-next.elapsed) }
     }
     do {
       guard let dir = FileManager.default.containerURL(
@@ -192,9 +217,21 @@ final class PhoneLink: NSObject, ObservableObject {
   /// The face the complication last saw, if any: carries `lastSet` across sets and seeds a mid-set launch.
   private func loadFace() -> FaceState? {
     guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: FaceState.groupID),
-      let data = try? Data(contentsOf: dir.appendingPathComponent(FaceState.fileName))
+      let data = try? Data(contentsOf: dir.appendingPathComponent(FaceState.fileName))  // no file yet is normal
     else { return nil }
-    return try? JSONDecoder().decode(FaceState.self, from: data)
+    do {
+      let face = try JSONDecoder().decode(FaceState.self, from: data)
+      faceLoadFailedLogged = false
+      return face
+    } catch {
+      // A face.json the app cannot read (a shape change between the app and the complication) is replaced
+      // by a fresh state below; say so once, or the lost last set looks like a face bug.
+      if !faceLoadFailedLogged {
+        faceLoadFailedLogged = true
+        logEvent("face_load_failed", ["message": "\(error)"])
+      }
+      return nil
+    }
   }
 }
 

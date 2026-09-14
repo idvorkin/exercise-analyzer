@@ -186,8 +186,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }.store(in: &cancellables)
     NotificationCenter.default.addObserver(forName: RecordPrompt.tapped, object: nil, queue: .main) { [weak self] note in
       Task { @MainActor in
-        guard let self, self.source != .camera else { return }
+        guard let self else { return }
         let viewfinder = note.object as? Bool ?? false
+        if self.source == .camera {
+          // Record asked from the wrist while the phone was locked in the viewfinder: the tap brought the
+          // app in front, so the set can start now (047).
+          guard self.viewfinder, !viewfinder else { return }
+          self.log.event("ui", ["action": "start", "from": "watch_notification", "viewfinder": false, "source": "viewfinder"])
+          self.beginRecording()
+          return
+        }
         self.log.event("ui", ["action": "start", "from": "watch_notification", "viewfinder": viewfinder])
         self.startCamera(position: self.cameraPosition, viewfinder: viewfinder)
       }
@@ -1281,11 +1289,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func handle(result: YOLOResult) {
     guard let pending = pendingFrame else { return }
     pendingFrame = nil
-    if paused {
-      // While paused the picture and the in-frame hint keep refreshing, but nothing is counted, shown or
-      // logged per frame: the box and pose are picked exactly the way the live path picks them (#67).
+    if paused || viewfinder {
+      // While paused, and while framing in the viewfinder (047), the picture and the in-frame hint keep
+      // refreshing, but nothing is counted, shown or logged per frame and the exercise detector sees nothing:
+      // the box and pose are picked exactly the way the live path picks them (#67). The review of 2026-09-14
+      // found the viewfinder running the analyzer at time 0, which completed reps and buzzed the wrist.
       guard source == .camera else { return }
       let sighting = FrameRecord(result: result, time: pending.time)
+      if viewfinder {
+        // The phone's own picture keeps its skeleton and its zoom-to-me while framing; nothing is analysed.
+        show(sighting)
+        updateLiveCrop(sighting)
+      }
       frameStatus = FrameStatus(box: sighting.box, pose: sighting.pose)
       pushWatchStatus()
       sendPreviewIfDue(pixelBuffer: pending.pixelBuffer)
@@ -1331,8 +1346,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     log.frame(
       frame, source: source == .camera ? "live" : "file", inferenceMs: result.inferenceMs, fps: fps,
       personConf: personConf)
-    // The viewfinder's pipeline runs for phases and the in-frame status, but its reps stay empty (047).
-    if !viewfinder, let rep = frame.analysis?.completedRep {
+    if let rep = frame.analysis?.completedRep {
       reps = pipeline.reps
       lastQuality = rep.quality
       log.rep(rep, source: source == .camera ? "live" : "file")
@@ -1438,8 +1452,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
     switch command {
     case .start:
       // Record from the viewfinder starts the set without touching the camera; otherwise as today (047).
+      // Backgrounded (the phone locked while framing), iOS has stopped the capture, so a recorder armed now
+      // would get no frames and the set would end in "Nothing recorded": ask for the notification tap, whose
+      // handler begins the recording once the app is in front.
       if source == .camera, viewfinder {
-        beginRecording()
+        if UIApplication.shared.applicationState == .active {
+          beginRecording()
+        } else {
+          RecordPrompt.post(log: log)
+        }
         break
       }
       if source == .camera { break }
@@ -1515,39 +1536,20 @@ final class VideoPoseSession: NSObject, ObservableObject {
     player.replaceCurrentItem(with: nil)
     duration = 0
     stopCamera()
+    bellBusy = false  // only here, after the camera stopped: a bell run can still be in flight at Record
     self.viewfinder = viewfinder
     viewfinderSince = nil
-    pipeline = AnalysisPipeline(exercise: exercise)
-    liveDetector.reset()
-    liveDetectionLocked = false
-    detection = nil
-    // A new set owns the idle screen: the old final count and any pass flag go (045).
-    lastSet = nil
-    analyzingLastSet = false
+    // A viewfinder is not a set: the last set's line and its pass flag stay until Record (045, 047).
+    resetSet(clearingLastSet: !viewfinder)
     extractedFrames = []
     extractionComplete = false
     analysisInterrupted = false
     watchModeDeclined = false
-    reps = []
-    lastQuality = nil
     latestFrame = nil
     statusMessage = nil
     canSave = false
     trimmedURL = nil
     cameraPosition = position
-    cameraFirstTime = nil
-    cameraFramesDelivered = 0
-    cameraFramesAnalyzed = 0
-    liveLastWrists = []
-    bellBusy = false
-    liveBellFrames = 0
-    liveBellTotalMs = 0
-    liveBellsDropped = 0
-    recordedSegments = []
-    paused = false
-    pausedTotal = 0
-    pausedAt = nil
-    lastCameraPts = nil
 
     AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
       Task { @MainActor in
@@ -1588,22 +1590,47 @@ final class VideoPoseSession: NSObject, ObservableObject {
     return recorder
   }
 
-  /// Starts the set from the viewfinder: the recorder rolls without re-attaching the camera, so it is
-  /// instant. The pipeline, reps, elapsed, segments and pause state reset so the set starts clean (047).
-  func beginRecording() {
-    guard source == .camera, viewfinder else { return }
-    recorder = makeRecorder()
+  /// Everything a set owns, back to zero: the pipeline and the detector, the counts, the clock, the per-set
+  /// frame and bell counters that `camera_done` reports, the segments and the pause state. Shared by
+  /// `startCamera` and `beginRecording`, so a set started from the viewfinder carries nothing of the framing
+  /// time (the 2026-09-14 review: framing frames were counted into the set and the detector locked on them).
+  private func resetSet(clearingLastSet: Bool) {
     pipeline = AnalysisPipeline(exercise: exercise)
+    liveDetector.reset()
+    liveDetectionLocked = false
+    detection = nil
+    if clearingLastSet {
+      // A new set owns the idle screen: the old final count and any pass flag go (045).
+      lastSet = nil
+      analyzingLastSet = false
+    }
     reps = []
     lastQuality = nil
     duration = 0
     currentTime = 0
+    cameraFirstTime = nil
+    cameraFramesDelivered = 0
+    cameraFramesAnalyzed = 0
+    liveLastWrists = []
+    liveBellFrames = 0
+    liveBellTotalMs = 0
+    liveBellsDropped = 0
+    previewSentThisSet = false
+    lastLoggedPhase = nil
+    recentBoxes = []
     recordedSegments = []
     paused = false
     pausedTotal = 0
     pausedAt = nil
     lastCameraPts = nil
-    cameraFirstTime = nil
+  }
+
+  /// Starts the set from the viewfinder: the recorder rolls without re-attaching the camera, so it is
+  /// instant. Everything the set owns resets so it starts clean (047).
+  func beginRecording() {
+    guard source == .camera, viewfinder else { return }
+    recorder = makeRecorder()
+    resetSet(clearingLastSet: true)
     let framing = viewfinderSince.map { Date().timeIntervalSince($0) } ?? 0
     viewfinder = false
     viewfinderSince = nil
