@@ -2,7 +2,7 @@
 # Rung 2 of the test ladder: run each sample clip through the simulator build and check the log.
 # Usage: sim-smoke.sh <simulator name or udid> <bundle id> <app path>. Clips come from $SAMPLES (mp4s).
 set -euo pipefail
-SIM=$1; BUNDLE=$2; APP=$3
+SIM=$("$(dirname "$0")/sim-udid.sh" "$1"); BUNDLE=$2; APP=$3  # one device, whatever runtimes share the name
 SAMPLES=${SAMPLES:-$HOME/tmp/agent/swing-samples}
 xcrun simctl boot "$SIM" 2>/dev/null || true
 xcrun simctl install "$SIM" "$APP"

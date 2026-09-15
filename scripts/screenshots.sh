@@ -3,7 +3,7 @@
 # SWING_VIDEO hook, presets the view through user defaults, waits for the analysis, and grabs the screen.
 # Usage: scripts/screenshots.sh <simulator name> <bundle id> <app path>   (clips from $SAMPLES, see sim-smoke.sh)
 set -euo pipefail
-SIM=$1; BUNDLE=$2; APP=$3
+SIM=$("$(dirname "$0")/sim-udid.sh" "$1"); BUNDLE=$2; APP=$3  # one device, whatever runtimes share the name
 SAMPLES=${SAMPLES:-$HOME/tmp/agent/swing-samples}
 OUT="$(pwd)/docs/screenshots"
 xcrun simctl boot "$SIM" 2>/dev/null || true

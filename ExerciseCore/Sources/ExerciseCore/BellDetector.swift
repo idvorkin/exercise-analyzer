@@ -8,7 +8,9 @@
 //  coefficients for the segmentation head, which are ignored) plus a mask prototype tensor, also ignored. Rows
 //  are mapped back to the image with the same letterbox math the pose model uses.
 
-#if canImport(Vision)
+// Not on watchOS: the watchOS 27 SDK makes `canImport(Vision)` true there, but VNCoreMLModel and
+// VNCoreMLRequest do not exist on the watch, and the watch app never runs the detector (Xcode 27, 2026-09-15).
+#if canImport(Vision) && !os(watchOS)
   import CoreGraphics
   import CoreML
   import CoreVideo

@@ -167,6 +167,10 @@ Sample clips live outside the repo in `~/tmp/agent/swing-samples/` (`$SAMPLES`);
 [`scripts/screenshots.sh`](../scripts/screenshots.sh) presets view modes through user defaults (`overlayMode`,
 `meView`, `galleryHeight`), launches each clip, waits for `analyzed`, and captures with `simctl io screenshot`.
 
+Simulator names are not unique: every Xcode update leaves the previous runtime's "iPhone 17" behind, and
+`simctl` by name can boot one device and launch on another. Every script resolves the name through
+`scripts/sim-udid.sh` (the newest available runtime) before touching the device; pass a UDID to skip it.
+
 ## Rung 2b: the watch simulator
 
 Every watch change runs [`scripts/watch-screens.sh`](../scripts/watch-screens.sh) (`just watch-screens`,

@@ -4,7 +4,7 @@
 # ~/tmp/agent/sim/), goes through the set with the detector on, and ends with the held-bell numbers in the log.
 # Usage: sim-debug-run.sh <simulator name> <bundle id> <app path>
 set -uo pipefail
-SIM=$1 BUNDLE=$2 APP=$3
+SIM=$("$(dirname "$0")/sim-udid.sh" "$1") BUNDLE=$2 APP=$3  # one device, whatever runtimes share the name
 SAMPLES=$HOME/tmp/agent/swing-samples
 SHOTS=$HOME/tmp/agent/sim
 mkdir -p "$SHOTS"

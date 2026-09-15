@@ -3,7 +3,7 @@
 # (WATCH_STATE, no phone) and screenshot it. Compare the pictures against the control inventory at the
 # top of docs/stories/05-watch.md. Usage: watch-screens.sh [watch simulator name].
 set -uo pipefail
-WATCH=${1:-"Apple Watch Series 11 (46mm)"}
+WATCH=$("$(dirname "$0")/sim-udid.sh" "${1:-Apple Watch Ultra 3 (49mm)}")  # one device, whatever runtimes share the name
 BUNDLE=com.idvorkin.exerciseanalyzer.watchkitapp
 SCREENS=${SCREENS:-$HOME/tmp/agent/sim}
 WATCHAPP=$(find Build/Build/Products/Debug-iphonesimulator -maxdepth 4 -name "ExerciseAnalyzerWatch.app" 2>/dev/null | head -1)
