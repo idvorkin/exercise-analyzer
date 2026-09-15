@@ -2,14 +2,14 @@
 
 Getting a trusted count out of a set recorded at the gym.
 
-Part of the [user stories](README.md); persona and format are described there.
+Part of the [user stories](README.md); persona, format and the Status vocabulary are described there.
 
 ---
 
 ### User Story 001:
 
 - **Summary:** Record a set and get a trusted rep count without touching the phone afterwards
-- **Status:** implemented in [0517562](https://github.com/idvorkin/exercise-analyzer/commit/0517562), [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529); verified on the phone (daily use)
+- **Status:** implemented in [0517562](https://github.com/idvorkin/exercise-analyzer/commit/0517562), [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529); verified on the phone (daily use); the camera memory in [#66](https://github.com/idvorkin/exercise-analyzer/issues/66) on the phone since 2026-09-13
 
 #### Use Case:
 - **As a** solo lifter with the phone on a tripod
@@ -28,6 +28,10 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I open Live for the next set
 - **Then:** the preview is already on that camera and zoom, and `camera_start` logs the restored choice
 
+- **Notes:** Live is the set: the recorder rolls from the camera's first frame and Trim cuts the walk-in
+  (story 009). Framing before the recorder rolls is the watch's Preview (story 047); the phone has no
+  camera-only state of its own.
+
 - **Issues:** [#66](https://github.com/idvorkin/exercise-analyzer/issues/66)
 
 ---
@@ -35,7 +39,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 002:
 
 - **Summary:** Auto-detect the exercise so a mixed session needs no menu taps
-- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [8bc27b5](https://github.com/idvorkin/exercise-analyzer/commit/8bc27b5); verified by host fixtures for all four exercises and on the phone
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [8bc27b5](https://github.com/idvorkin/exercise-analyzer/commit/8bc27b5); verified on the host (fixtures for all four exercises) and the phone
 
 #### Use Case:
 - **As a** lifter who moves between swings, pistols, split squats and get-ups in one session
@@ -54,7 +58,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 003:
 
 - **Summary:** Override the detector when it guesses wrong, without re-running the video
-- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f); verified on the phone; interrupted-pass fix in [4543828](https://github.com/idvorkin/exercise-analyzer/commit/4543828) (simulator rung pending: `ONLY=interrupt just test-sim`)
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f), [4543828](https://github.com/idvorkin/exercise-analyzer/commit/4543828); verified on the phone and the simulator (the `interrupt` check of `just test-sim`)
 
 #### Use Case:
 - **As a** lifter whose set was mislabelled
@@ -71,17 +75,17 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** An interrupted pass
 - **Given:** a clip whose offline pass was interrupted by the reader ("Operation Interrupted")
 - **and Given:** the status line reads "Analysis interrupted" with a retry, and no partial track was kept
-- **When:** I choose an exercise from the exercise menu (or tap the status to retry)
-- **Then:** the clip is re-scanned from the video (an `offline_pass` precedes any `analyzed`), the full skeleton returns, and with a complete extraction a later switch still re-reads instantly without re-scanning
+- **When:** I choose an exercise from the menu (or tap the status to retry)
+- **Then:** the clip is re-scanned from the video (an `offline_pass` precedes any `analyzed`), the full skeleton returns, and once the extraction is complete a later switch re-reads instantly without re-scanning
 
-- **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) a pass interrupted by the reader ("Operation Interrupted") left a partial track, and the mode switch re-read it instead of re-running the clip: no skeleton past the interruption
+- **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) an interrupted pass left a partial track and the mode switch re-read it instead of re-running the clip
 
 ---
 
 ### User Story 004:
 
 - **Summary:** Count the swings that are swings, not the walk-in, the setup or the bell park
-- **Status:** implemented in [6b74a93](https://github.com/idvorkin/exercise-analyzer/commit/6b74a93), [4344155](https://github.com/idvorkin/exercise-analyzer/commit/4344155), [f3e7955](https://github.com/idvorkin/exercise-analyzer/commit/f3e7955); verified by host fixtures (walk-in, pick-up, low camera)
+- **Status:** implemented in [6b74a93](https://github.com/idvorkin/exercise-analyzer/commit/6b74a93), [4344155](https://github.com/idvorkin/exercise-analyzer/commit/4344155), [f3e7955](https://github.com/idvorkin/exercise-analyzer/commit/f3e7955); verified on the host (walk-in, pick-up and low-camera fixtures)
 
 #### Use Case:
 - **As a** lifter who picks the bell up on camera and puts it down on camera
@@ -100,7 +104,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 020:
 
 - **Summary:** Turning the phone turns the picture, even mid-set
-- **Status:** implemented in [99a8525](https://github.com/idvorkin/exercise-analyzer/commit/99a8525); needs a phone check ([#22](https://github.com/idvorkin/exercise-analyzer/issues/22))
+- **Status:** implemented in [99a8525](https://github.com/idvorkin/exercise-analyzer/commit/99a8525); on the phone, Igor's check pending
 
 #### Use Case:
 - **As a** lifter who reframes from portrait to landscape after starting
@@ -112,6 +116,8 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Given:** the phone is recording in portrait
 - **When:** I turn the phone to landscape and keep swinging
 - **Then:** the preview turns with the phone, the rep count continues, and after Done the saved clip plays upright throughout
+
+- **Issues:** [#22](https://github.com/idvorkin/exercise-analyzer/issues/22)
 
 ---
 
@@ -136,7 +142,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 029:
 
 - **Summary:** Throw away a false start
-- **Status:** implemented in [2eaa003](https://github.com/idvorkin/exercise-analyzer/commit/2eaa003); needs the phone (recording)
+- **Status:** implemented in [2eaa003](https://github.com/idvorkin/exercise-analyzer/commit/2eaa003); on the phone, Igor's check pending (needs a recording with no reps)
 
 #### Use Case:
 - **As a** lifter whose recording caught nothing (camera pointed wrong, set never happened)
@@ -150,4 +156,4 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** the analysis finishes
 - **Then:** the app asks "Delete recording or keep it?", Delete removes the file and its Workouts entry, and a clip from Photos is never deleted
 
-- **Issues:** #31
+- **Issues:** [#31](https://github.com/idvorkin/exercise-analyzer/issues/31)

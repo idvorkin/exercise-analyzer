@@ -2,7 +2,7 @@
 
 Getting a wrong count in front of the developer with the evidence attached.
 
-Part of the [user stories](README.md); persona and format are described there.
+Part of the [user stories](README.md); persona, format and the Status vocabulary are described there.
 
 ---
 
@@ -49,7 +49,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 036:
 
 - **Summary:** A crash comes back with the logs (technical)
-- **Status:** implemented in [42b50ff](https://github.com/idvorkin/exercise-analyzer/commit/42b50ff); verified by build; needs the phone (the next crash, or none: the first one caught was the Float16 tensor read, fixed in the same commit)
+- **Status:** implemented in [42b50ff](https://github.com/idvorkin/exercise-analyzer/commit/42b50ff); verified by build and by the first crash it caught (the Float16 tensor read, fixed in the same commit); the pruning in [#72](https://github.com/idvorkin/exercise-analyzer/issues/72) on the phone since 2026-09-13
 
 #### Use Case:
 - **As a** developer reading a session log that stops mid-work
@@ -67,12 +67,14 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** the app launches
 - **Then:** the new session's log carries `logs_pruned` (count, bytes freed, kept_for_reports) and the old logs are gone except the reported one
 
-- **Issues:** [#72](https://github.com/idvorkin/exercise-analyzer/issues/72) (prune session logs older than 30 days); previously none (Igor: "let's get a crash log library")
+- **Issues:** [#72](https://github.com/idvorkin/exercise-analyzer/issues/72) prune session logs older than 30 days
+
+---
 
 ### User Story 037:
 
 - **Summary:** An instrumented run of my stored sets, on the phone, with the numbers in the log (technical)
-- **Status:** implemented in [8fde7b7](https://github.com/idvorkin/exercise-analyzer/commit/8fde7b7); verified in the simulator (`scripts/sim-debug-run.sh`: the run starts from the launch hook, the banner shows, the set goes through the detector, `bell_held` and `debug_run` end land in the log) and on the phone (eight sets, `SWING_DEBUG_RUN=1`, 38.6 fps mean; the same run measured [3ba7902](https://github.com/idvorkin/exercise-analyzer/commit/3ba7902) at 77.1 fps); the banner and the start-panel row need Igor's eye
+- **Status:** implemented in [8fde7b7](https://github.com/idvorkin/exercise-analyzer/commit/8fde7b7); verified on the simulator (`scripts/sim-debug-run.sh`) and the phone (eight sets under `SWING_DEBUG_RUN=1`; the numbers are in [docs/analysis/performance.md](../analysis/performance.md)); the banner and the start-panel row are Igor's check
 
 #### Use Case:
 - **As a** developer measuring the bell detector and the tracker on the phone
@@ -83,6 +85,6 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** An instrumented run from the start panel
 - **Given:** sets in Workouts with their clips reachable, the detector on or off
 - **When:** I tap "Instrumented run" on the start panel (or the app launches with `SWING_DEBUG_RUN=1`)
-- **Then:** a banner reads "Instrumented run · n of N · <set>" with the frames, fps and per-model milliseconds of the pass under way, a shake shows no report sheet, each set goes through the pose model and the detector from its clip and replaces its own entry, the log carries `debug_run` (start and end, with the mean fps), and per set `offline_pass` (with `where: debug`, the detector's floor and cap, thermal state, low power, battery and memory) and `bell_held` (hand frames, the detector's sightings at the hands, the tracker's holds, and both inside detected reps); Cancel on the banner stops after the set in progress
+- **Then:** a banner reads "Instrumented run · n of N · <set>" with the frames, fps and per-model milliseconds of the pass under way, a shake shows no report sheet, each set goes through the pose model and the detector from its clip and replaces its own entry, the log carries `debug_run` (start and end, with the mean fps) and per set `offline_pass` (`where: debug`, the detector's floor and cap, thermal state, low power, battery and memory) and `bell_held`; Cancel on the banner stops after the set in progress
 
 - **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)

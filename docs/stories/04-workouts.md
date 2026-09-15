@@ -2,14 +2,14 @@
 
 Training as sets per day and exercise, kept honest over time.
 
-Part of the [user stories](README.md); persona and format are described there.
+Part of the [user stories](README.md); persona, format and the Status vocabulary are described there.
 
 ---
 
 ### User Story 012:
 
 - **Summary:** See a day's training as sets per exercise, not a list of files
-- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header needs the phone
+- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header is Igor's check
 
 #### Use Case:
 - **As a** lifter reviewing the week
@@ -47,7 +47,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 014:
 
 - **Summary:** Surface the gym videos I haven't analyzed yet, and mark the ones I have
-- **Status:** implemented in [f4da4a2](https://github.com/idvorkin/exercise-analyzer/commit/f4da4a2), [17f2398](https://github.com/idvorkin/exercise-analyzer/commit/17f2398); needs the phone (the simulator cannot grant Photos)
+- **Status:** implemented in [f4da4a2](https://github.com/idvorkin/exercise-analyzer/commit/f4da4a2), [17f2398](https://github.com/idvorkin/exercise-analyzer/commit/17f2398); on the phone, Igor's check pending (the simulator cannot grant Photos)
 
 #### Use Case:
 - **As a** lifter who records first and reviews later
@@ -65,7 +65,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 015:
 
 - **Summary:** Old sets are re-read when the analyzer improves
-- **Status:** implemented in [d269b25](https://github.com/idvorkin/exercise-analyzer/commit/d269b25), [c92e8c6](https://github.com/idvorkin/exercise-analyzer/commit/c92e8c6); verified on the simulator (22 stale entries refreshed); [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e) unifies the refresh/open decision into StoredSetPlan, verified on the host (16 tests)
+- **Status:** implemented in [d269b25](https://github.com/idvorkin/exercise-analyzer/commit/d269b25), [c92e8c6](https://github.com/idvorkin/exercise-analyzer/commit/c92e8c6), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the simulator (22 stale entries refreshed) and the host (`StoredSetPlan` tests)
 
 #### Use Case:
 - **As a** lifter whose old sets were counted by an older analyzer
@@ -78,14 +78,19 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I launch the updated app
 - **Then:** those sets are re-analyzed in the background and their counts in Workouts update without me opening them
 
-- **Issues:** [#42](https://github.com/idvorkin/exercise-analyzer/issues/42) a stale get-up reopened under a fixed Swing mode was re-read as swings (0 reps); a stored set now re-reads as its own exercise unless the mode is Auto
+- **Scenario:** A stale set keeps its own exercise
+- **Given:** a stale get-up in Workouts and the exercise menu fixed on Swing
+- **When:** the set is re-read
+- **Then:** it is re-read as a get-up (a stored set re-reads as its own exercise unless the mode is Auto)
+
+- **Issues:** [#42](https://github.com/idvorkin/exercise-analyzer/issues/42) a stale get-up reopened under a fixed Swing mode was re-read as swings
 
 ---
 
 ### User Story 031:
 
 - **Summary:** Open an old set whose clip now lives only in iCloud
-- **Status:** implemented in [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); needs the phone (an iCloud-only clip)
+- **Status:** implemented in [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); on the phone, Igor's check pending (needs an iCloud-only clip)
 
 #### Use Case:
 - **As a** lifter looking back at a set from months ago
@@ -105,6 +110,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 032:
 
 - **Summary:** Hide the Photos clips I have already analyzed
+- **Status:** implemented in [48d4c33](https://github.com/idvorkin/exercise-analyzer/commit/48d4c33); on the phone, Igor's check pending (Photos)
 
 #### Use Case:
 - **As a** lifter who imports every set from Photos
@@ -117,7 +123,6 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap Hide analyzed in the strip's header
 - **Then:** only the unanalyzed clip remains, the choice sticks across launches, and the trimmed set stays hidden because its new Photos identity is the one Workouts knows
 
-- **Status:** implemented in [48d4c33](https://github.com/idvorkin/exercise-analyzer/commit/48d4c33); needs the phone (Photos)
 - **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41)
 
 ---
@@ -125,7 +130,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 035:
 
 - **Summary:** A set made by older models is run through the new ones when I reopen it (technical)
-- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952); verified on the phone (a get-up stored before the detector reopened: `recents_rerun` with the stored and current model sets, the pass from the video, `analyzed` with reason rerun_models on the same entry); a replay running today's tracker in [a37440b](https://github.com/idvorkin/exercise-analyzer/commit/a37440b), verified on the host (#49); [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e) unifies the reopen decision with the refresh into StoredSetPlan, verified on the host (16 tests) and the simulator (the five smoke checks)
+- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952), [a37440b](https://github.com/idvorkin/exercise-analyzer/commit/a37440b), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the host (`StoredSetPlan` tests, the replay of [#49](https://github.com/idvorkin/exercise-analyzer/issues/49)), the simulator (the smoke checks) and the phone (a pre-detector get-up reopened: `recents_rerun`, the pass from the video, `analyzed` with reason rerun_models)
 
 #### Use Case:
 - **As a** developer shipping a new model (a detector, a bigger pose model)
@@ -141,16 +146,16 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** The gallery catches up on its own after a model or its settings change
 - **Given:** stored sets whose tracks lack a model this build runs, or were made by the detector at other settings (the model set names the detector with its floor and box cap)
 - **When:** I launch the app and leave it on the gallery
-- **Then:** those sets go through the models again from their clips one at a time in the background (`recents_rerun` and `offline_pass` with `where: refresh` in the log), each replacing its own entry, without my opening them; opening a set while that runs takes priority and the interrupted set waits for the next launch; a set whose clip is out of reach is refreshed from its stored poses as before, and that replay runs today's tracker over the stored sightings (the bell a set was saved with is never kept through a replay)
+- **Then:** those sets go through the models again from their clips one at a time in the background (`recents_rerun` and `offline_pass` with `where: refresh` in the log), each replacing its own entry, without my opening them; opening a set while that runs takes priority and the interrupted set waits for the next launch; a set whose clip is out of reach is refreshed from its stored poses, and that replay runs today's tracker over the stored sightings (the bell a set was saved with is never kept through a replay)
 
-- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18)
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#49](https://github.com/idvorkin/exercise-analyzer/issues/49)
 
 ---
 
 ### User Story 038:
 
 - **Summary:** See what I did today at a glance when the Workouts sheet is collapsed
-- **Status:** implemented in [52ecac2](https://github.com/idvorkin/exercise-analyzer/commit/52ecac2); verified by simulator screenshot (`/tmp/bell-lab/summary.png`: the collapsed sheet reads "Bulgarian · swing · pistols" with a stick-figure glyph per exercise, the full gallery opens on drag); Igor's eye is the last rung
+- **Status:** implemented in [52ecac2](https://github.com/idvorkin/exercise-analyzer/commit/52ecac2); verified by simulator screenshot ([docs/screenshots/workouts-collapsed.png](../screenshots/workouts-collapsed.png)); on the phone since 2026-09-13, Igor's check pending
 
 #### Use Case:
 - **As a** lifter between sets with the Workouts sheet pulled down
@@ -161,6 +166,6 @@ Part of the [user stories](README.md); persona and format are described there.
 - **Scenario:** Glancing at the day between sets
 - **Given:** today has a swing set and two pistol sets stored, and the Workouts sheet is collapsed to its handle
 - **When:** I look at the collapsed sheet
-- **Then:** it reads "swing · pistols" with an icon per exercise (a stick figure in the exercise's shape, drawn once as assets), in the order the sets were done, and nothing else; pulling the sheet up shows the full day as before
+- **Then:** it reads "swing · pistols" with an icon per exercise (a stick figure in the exercise's shape), in the order the sets were done, and nothing else; pulling the sheet up shows the full day as before
 
 - **Issues:** [#58](https://github.com/idvorkin/exercise-analyzer/issues/58)

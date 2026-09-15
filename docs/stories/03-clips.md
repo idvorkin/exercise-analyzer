@@ -2,14 +2,14 @@
 
 Trimming, opening and saving video without copies or quality loss.
 
-Part of the [user stories](README.md); persona and format are described there.
+Part of the [user stories](README.md); persona, format and the Status vocabulary are described there.
 
 ---
 
 ### User Story 009:
 
 - **Summary:** Keep only the set, losslessly and fast
-- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (passthrough, first frame at 0); an HDR clip on the phone is pending
+- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check
 
 #### Use Case:
 - **As a** lifter who leaves the camera running while setting up
@@ -22,7 +22,7 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap Trim
 - **Then:** the clip starts about 5 s before the first rep and ends about 5 s after the last, plays from its first frame, keeps HDR, and the cut takes under a second; an Undo button restores the untrimmed clip
 
-- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed (fixed)
+- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed
 
 ---
 
@@ -67,7 +67,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 025:
 
 - **Summary:** Start from a centred panel; Open as a sheet with big rows, most-used first
-- **Status:** implemented in [5fead59](https://github.com/idvorkin/exercise-analyzer/commit/5fead59), [387e252](https://github.com/idvorkin/exercise-analyzer/commit/387e252), [4059301](https://github.com/idvorkin/exercise-analyzer/commit/4059301); needs a phone check
+- **Status:** implemented in [5fead59](https://github.com/idvorkin/exercise-analyzer/commit/5fead59), [387e252](https://github.com/idvorkin/exercise-analyzer/commit/387e252), [4059301](https://github.com/idvorkin/exercise-analyzer/commit/4059301); on the phone, Igor's check pending
 
 #### Use Case:
 - **As a** lifter opening a clip with sweaty hands
@@ -87,7 +87,7 @@ Part of the [user stories](README.md); persona and format are described there.
 ### User Story 028:
 
 - **Summary:** Stop an analysis I didn't mean to start
-- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9); verified on the simulator (`check_cancel` in sim-smoke.sh: stopped 33 ms after Cancel)
+- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9); verified on the simulator (the `cancel` check of `just test-sim`)
 
 #### Use Case:
 - **As a** lifter who opened the wrong clip, or a long one
@@ -100,4 +100,4 @@ Part of the [user stories](README.md); persona and format are described there.
 - **When:** I tap Cancel on the overlay
 - **Then:** the analysis stops within a second, the clip stays open and paused with no reps, and nothing is added to Workouts
 
-- **Issues:** #30, [#37](https://github.com/idvorkin/exercise-analyzer/issues/37) Cancel only landed after the whole pass (detached task never saw the cancellation)
+- **Issues:** [#30](https://github.com/idvorkin/exercise-analyzer/issues/30), [#37](https://github.com/idvorkin/exercise-analyzer/issues/37) Cancel only landed after the whole pass

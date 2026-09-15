@@ -2,36 +2,37 @@
 
 Running a session from the Apple Watch with the phone on a tripod.
 
-Part of the [user stories](README.md); persona and format are described there.
+Part of the [user stories](README.md); persona, format and the Status vocabulary are described there.
 
 ## Control inventory by state
 
-What each watch screen must show and offer. `just watch-screens` renders every row on the watch simulator
-from a fixed status (`WATCH_STATE`) and the pictures are compared against this table. Story edits must update
-it. Not states: the face complication (043, requested) and the phone's lock-screen control (044).
+What each watch screen must show and offer. `just watch-screens` renders every row on the watch simulator from
+a fixed status (`WATCH_STATE`) and the pictures are compared against this table before any watch build reaches
+the wrist. A story edit that changes a screen edits its row. The face complication (043) and the phone's
+lock-screen control (044) are not watch-app states and are not in the table.
 
 | State | Must show | Must offer | Stories |
 |---|---|---|---|
-| disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status was recording | Retry | 018 |
-| background | phone-in-background art, unlock-and-open instruction | "Send a reminder to the phone" (no Record: it would die silently) | 018 |
-| idle | "Phone ready", exercise picker, rest length picker, rest count while resting, last-set line (or "Analyzing…" while the pass runs) | Record (red; from the wrist the phone follows into watch mode), Preview (neutral, below Record) | 017, 041, 045, 046, 047 |
-| viewfinder | full-screen picture, "PREVIEW" chip, in-frame bar | Record (red) · Camera · Cancel (no Pause, no Done) | 047 |
-| live | full-screen picture, small rep chip 0 and time chip 0:04 right under the clock line, green "IN FRAME" capsule above the row; chips, capsule and buttons whole inside the face and covering as little of the picture as 40 pt targets allow | Pause, Camera, Done, Cancel (round, translucent glass except Done green and Record red, along the bottom edge; Cancel a red X last); second page: Cancel, watch-mode toggle | 016, 017, 042 |
-| recording | full-screen picture, 6-rep chip, 0:42, red "FEET CUT OFF" capsule | Pause, Camera, Done, Cancel; second page: Cancel, watch-mode toggle | 016, 017, 042 |
-| paused | "PAUSED · FEET CUT OFF" capsule, frozen count and time, picture keeps refreshing | orange Resume, Camera, Done, Cancel; second page: Cancel | 040 |
-| done | "Phone ready", "Last set: 9 reps · Kettlebell Swing · 0:48", rest counting up ("Rest 0:35", orange past the length) | Record (clears the rest), rest picker, exercise picker | 045, 046 |
+| disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status had the recorder rolling | Retry | 018 |
+| background | phone-in-background art, the unlock-and-open instruction | "Send a reminder to the phone" (no Record: it would die silently) | 018 |
+| idle | "Phone ready", exercise picker, rest length picker, the rest count while resting, the last-set line (or "Analyzing…" while the pass runs) | Record (red), Preview (below it) | 017, 041, 045, 046, 047 |
+| viewfinder (Preview) | the picture filling the face, a PREVIEW chip, the in-frame capsule | Record (red) · Camera · Cancel; no Pause, no Done | 047 |
+| live | the picture filling the face, small rep and time chips right under the clock line, the green "IN FRAME" capsule above the row; chips, capsule and buttons whole inside the face and covering as little of the picture as 40 pt targets allow | Pause · Camera · Done · Cancel along the bottom edge, translucent glass except Done (green); second page: Cancel, the watch-mode toggle | 016, 017, 042 |
+| recording | as live, with the count (6) and the time (0:42) and a red "FEET CUT OFF" capsule when cut off | as live | 016, 017, 042 |
+| paused | "PAUSED · FEET CUT OFF" capsule, the count and the time frozen, the picture still refreshing | orange Resume · Camera · Done · Cancel; second page: Cancel | 040 |
+| done | "Phone ready", "Last set: 9 reps · Kettlebell Swing · 0:48", the rest counting up ("Rest 0:35", orange past the length) | Record (clears the rest), Preview, the rest and exercise pickers | 045, 046 |
 
-Igor's framing-loop rule: the camera-live page needs the picture, the in-frame bar, Camera, Done and Cancel, all
-inside the safe area. The framing state is the viewfinder (047, #73): Preview opens the camera without the
-recorder and the face offers Record · Camera · Cancel; Record starts the set from zero and Cancel leaves
-nothing. The phone's own Live still records from the first frame (story 001).
+The rule behind the table (Igor, 2026-09-13, after the picture page lost its controls in #74): the framing loop
+needs the picture, the in-frame hint, Camera, Done and Cancel on the camera-live page, inside the safe area,
+from the camera's first frame. Preview (047) is the framing state; the phone's own Live still records from
+the first frame (story 001).
 
 ---
 
 ### User Story 016:
 
 - **Summary:** Know from the wrist whether the camera can see me
-- **Status:** implemented in [96e6e19](https://github.com/idvorkin/exercise-analyzer/commit/96e6e19), [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [fead72e](https://github.com/idvorkin/exercise-analyzer/commit/fead72e); verified on phone + watch ([#21](https://github.com/idvorkin/exercise-analyzer/issues/21) tuned the rule); this commit (#76) gates previews on watch-in-front (host rung blocked by sandbox, sim rungs are Igor's)
+- **Status:** implemented in [96e6e19](https://github.com/idvorkin/exercise-analyzer/commit/96e6e19), [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [fead72e](https://github.com/idvorkin/exercise-analyzer/commit/fead72e); verified on phone + watch; the preview gate of [#76](https://github.com/idvorkin/exercise-analyzer/issues/76) ([db90d52](https://github.com/idvorkin/exercise-analyzer/commit/db90d52), [ae93fb3](https://github.com/idvorkin/exercise-analyzer/commit/ae93fb3), [2c9cc58](https://github.com/idvorkin/exercise-analyzer/commit/2c9cc58)) on the phone since 2026-09-14, read from the logs after a few gym sessions
 
 #### Use Case:
 - **As a** lifter standing across the room from the tripod
@@ -40,20 +41,24 @@ nothing. The phone's own Live still records from the first frame (story 001).
 
 #### Acceptance Criteria:
 - **Scenario:** Feet out of the picture
-- **Given:** the phone app is open and recording
+- **Given:** the phone app is open and the camera is live
 - **and Given:** the watch app is open and connected
 - **When:** I stand where my feet are below the bottom edge of the frame
-- **Then:** the watch shows "Feet cut off" within a second and taps my wrist, over a small picture from the camera that refreshes about once a second whenever the watch app is in front
-- **And:** previews stream only while the watch app is in front and reachable (#76); any command from the wrist counts as "in front", because the watch's own scene message can be lost when it lands before the phone sees the watch as reachable (2026-09-14: a whole Preview session with no picture)
+- **Then:** the watch shows "Feet cut off" within a second and taps my wrist, over the camera picture, which refreshes about once a second
 
-- **Issues:** [#38](https://github.com/idvorkin/exercise-analyzer/issues/38) preview never started (gated on a scene message the watch does not send at launch)
+- **Scenario:** The picture streams only to a watch that is in front
+- **Given:** the camera is live on the phone
+- **When:** the watch app is in front and reachable
+- **Then:** the phone sends a preview about once a second; when the watch app is not in front, none; any command from the wrist counts as "in front", because the watch's own scene message can arrive before the phone sees the watch as reachable and be lost
+
+- **Issues:** [#21](https://github.com/idvorkin/exercise-analyzer/issues/21) tuned the in-frame rule; [#38](https://github.com/idvorkin/exercise-analyzer/issues/38) the preview never started (gated on a scene message the watch did not send at launch); [#76](https://github.com/idvorkin/exercise-analyzer/issues/76) reachability flaps 54–126 times a session, the previews were streaming to a suspended app
 
 ---
 
 ### User Story 017:
 
 - **Summary:** Start, switch camera and finish a set from the wrist
-- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe), [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b); verified on phone + watch, camera cycle verified from the log
+- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe); verified on phone + watch, the camera cycle from the log
 
 #### Use Case:
 - **As a** lifter who set the phone down across the room
@@ -67,10 +72,8 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **When:** I tap the camera button on the watch
 - **Then:** the phone switches to Front, the watch shows "Front", and the recording and rep count continue
 
-- **Scenario:** Framing before the set
-- **Given:** the phone app is open in front and idle
-- **When:** I tap Preview on the watch
-- **Then:** the camera opens without recording and the watch shows the picture with Record · Camera · Cancel (story 047)
+- **Notes:** The idle page has two buttons: Record, which records from the camera's first frame, and Preview
+  (story 047), which opens the camera without recording.
 
 ---
 
@@ -90,14 +93,19 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **When:** the phone app has not reported for 8 s
 - **Then:** the watch shows the not-reachable screen with how long since it last heard and the last rep count, and retries every 2 s until the phone reports again
 
-- **Issues:** [#32](https://github.com/idvorkin/exercise-analyzer/issues/32) drops on wrist-down while the watch app is suspended (a workout session would fix it but Igor doesn't want one; state now arrives via application context on wake)
+- **Notes:** With the wrist down the watch app is suspended and the status stops; that is the price of having no
+  workout session ([#32](https://github.com/idvorkin/exercise-analyzer/issues/32), see the end of this file). The
+  state arrives through the application context on wake, and the face complication (043) is the screen that
+  stays right meanwhile.
+
+- **Issues:** [#32](https://github.com/idvorkin/exercise-analyzer/issues/32)
 
 ---
 
 ### User Story 019:
 
 - **Summary:** The phone stays awake while the watch is in charge
-- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); needs a phone check
+- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); on the phone, Igor's check pending
 
 #### Use Case:
 - **As a** lifter controlling sets from the watch
@@ -115,7 +123,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 ### User Story 023:
 
 - **Summary:** Get to the watch app with one tap on the face
-- **Status:** implemented in [c8762f7](https://github.com/idvorkin/exercise-analyzer/commit/c8762f7); needs a look at the watch face
+- **Status:** implemented in [c8762f7](https://github.com/idvorkin/exercise-analyzer/commit/c8762f7); on the watch, Igor's check pending; the complication now also shows the set (story 043)
 
 #### Use Case:
 - **As a** lifter between sets
@@ -133,7 +141,7 @@ nothing. The phone's own Live still records from the first frame (story 001).
 ### User Story 027:
 
 - **Summary:** Watch mode: the phone becomes a scoreboard while the wrist drives
-- **Status:** implemented in [78517b6](https://github.com/idvorkin/exercise-analyzer/commit/78517b6), [4eb5026](https://github.com/idvorkin/exercise-analyzer/commit/4eb5026), [934ccef](https://github.com/idvorkin/exercise-analyzer/commit/934ccef); needs phone + watch (recording only since #36)
+- **Status:** implemented in [78517b6](https://github.com/idvorkin/exercise-analyzer/commit/78517b6), [4eb5026](https://github.com/idvorkin/exercise-analyzer/commit/4eb5026), [934ccef](https://github.com/idvorkin/exercise-analyzer/commit/934ccef); on phone + watch, Igor's check pending
 
 #### Use Case:
 - **As a** lifter who set the phone down and controls sets from the watch
@@ -147,15 +155,15 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **When:** I glance at the phone from across the room
 - **Then:** it shows the rep count in digits that fill the screen, a red "feet cut off" style banner when I am out of frame, the elapsed time and the exercise; only a long press, a double tap or the end of the set leaves the mode
 
-- **Issues:** [#29](https://github.com/idvorkin/exercise-analyzer/issues/29), [#36](https://github.com/idvorkin/exercise-analyzer/issues/36)
+- **Issues:** [#29](https://github.com/idvorkin/exercise-analyzer/issues/29), [#36](https://github.com/idvorkin/exercise-analyzer/issues/36) watch mode is a recording-only screen
 
 ---
 
 ### User Story 040:
 
 - **Summary:** Pause and resume a set from the wrist
-- **Status:** implemented in 5fe2561; needs phone + watch ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "Give me the ability to pause and resume on my watch")
-- **Why:** a set gets interrupted (chalk, someone crossing the frame, a tripod that needs moving) and today the only choices are to keep recording the interruption or to cancel the set.
+- **Status:** implemented in [5fe2561](https://github.com/idvorkin/exercise-analyzer/commit/5fe2561); on phone + watch since 2026-09-13, Igor's check pending
+- **Why:** Igor, 2026-09-13: "Give me the ability to pause and resume on my watch." A set gets interrupted (chalk, someone crossing the frame, a tripod to move) and the choices were to record the interruption or cancel the set.
 
 #### Use Case:
 - **As a** lifter who has to stop in the middle of a set
@@ -166,23 +174,25 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **Scenario:** A pause to move the tripod
 - **Given:** a set is being recorded and the watch shows the live status
 - **When:** I tap Pause on the watch, move the tripod, and tap Resume 40 s later
-- **Then:** the watch and the phone show PAUSED with the count and the elapsed time frozen for those 40 s, the picture and the in-frame hint keep refreshing so I can check the new framing, no rep is counted while paused, and Done gives a clip and a count without the 40 s: the two recorded segments are joined without re-encoding (same orientation), the trim and the offline pass run on the joined clip, and the rep gallery shows the halves back to back
+- **Then:** the watch and the phone show PAUSED with the count and the elapsed time frozen for those 40 s, the picture and the in-frame hint keep refreshing so I can check the new framing, no rep is counted while paused, and Done gives a clip and a count without the 40 s: the two recorded segments are joined without re-encoding, the trim and the offline pass run on the joined clip, and the rep gallery shows the halves back to back
 
-- **Notes:** Pause is also a button on the phone's recording HUD and PAUSED shows on the watch-mode screen (the
-  watch may be out of reach or unreachable). Done and Cancel work while paused. A pause is a segment boundary,
-  the same mechanism as rotating the phone mid-set (story 020, #22): rotation across a pause still takes the
-  re-encoding stitch, a plain pause takes a passthrough join (seconds, no quality loss). A rep in progress at the
-  pause is lost: the analyzer sees the frame before and the frame after as neighbours, which is exactly what the
-  offline pass sees in the joined clip, so the live and final counts agree. Wire: `WatchStatus.paused` and
-  `WatchCommand.pause` / `.resume`; an old watch app ignores the new field and never sends the commands.
+- **Notes:** Pause is also a button on the phone's recording HUD and PAUSED shows on the watch-mode screen. Done
+  and Cancel work while paused. A pause is a segment boundary, the same mechanism as rotating the phone mid-set
+  (story 020): a plain pause takes a passthrough join, a rotation across a pause takes the re-encoding stitch. A
+  rep in progress at the pause is lost: the analyzer sees the frame before and the frame after as neighbours,
+  which is what the offline pass sees in the joined clip, so the live and final counts agree. Wire:
+  `WatchStatus.paused`, `WatchCommand.pause` / `.resume`; an old watch app ignores the field and never sends the
+  commands.
+
+- **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67)
 
 ---
 
 ### User Story 041:
 
 - **Summary:** The phone follows the wrist into watch mode
-- **Status:** implemented in [d6b2963](https://github.com/idvorkin/exercise-analyzer/commit/d6b2963); needs phone + watch ([#68](https://github.com/idvorkin/exercise-analyzer/issues/68), Igor by voice, 2026-09-13: "If I start my watch, switch the iPhone to watch mode")
-- **Why:** once the watch is in use the phone's full screen is never wanted; today watch mode needs a tap on the phone or a scroll on the watch.
+- **Status:** implemented in [d6b2963](https://github.com/idvorkin/exercise-analyzer/commit/d6b2963); on phone + watch since 2026-09-13, Igor's check pending
+- **Why:** Igor, 2026-09-13: "If I start my watch, switch the iPhone to watch mode." Once the watch is in use the phone's full screen is never wanted.
 
 #### Use Case:
 - **As a** lifter who picked up the watch to run the set
@@ -192,24 +202,24 @@ nothing. The phone's own Live still records from the first frame (story 001).
 #### Acceptance Criteria:
 - **Scenario:** Record from the wrist
 - **Given:** the phone app is open in front and idle, and the watch app is open
-- **When:** I tap Record on the watch
+- **When:** I tap Record (or Preview) on the watch
 - **Then:** the phone starts the camera and shows the watch-mode screen at once, the watch shows "Phone: watch mode on", a set started on the phone switches the same way the moment the watch app comes to the front, and leaving watch mode on the phone (button, double tap or hold) keeps it off for the rest of that set even if the watch app comes to the front again, while the watch's own toggle still works
 
-- **Notes:** What "switch" can and cannot mean. WatchConnectivity delivers a watch message to the phone app even
-  when it is in the background (iOS launches it briefly for that), but it can neither bring the app to the front
-  nor start the camera from there, and watch mode is a recording-only screen ([#36](https://github.com/idvorkin/exercise-analyzer/issues/36)).
-  So: phone app in front, it switches immediately; phone app in the background or the phone locked, nothing changes
-  on the phone until the existing "Ready to record" notification is tapped, and a set started from that tap goes
-  straight to watch mode because the request came from the watch. No wire change: the watch already sends
-  `watchActive` on every scene change and `start` on Record.
+- **Notes:** WatchConnectivity delivers a watch message to the phone app even in the background (iOS launches it
+  briefly for that), but it can neither bring the app to the front nor start the camera from there, and watch
+  mode is a recording-only screen (#36). So: phone app in front, it switches immediately; phone app in the
+  background or the phone locked, nothing changes until the "Ready to record" notification is tapped, and a set
+  started from that tap goes straight to watch mode because the request came from the watch.
+
+- **Issues:** [#68](https://github.com/idvorkin/exercise-analyzer/issues/68)
 
 ---
 
 ### User Story 042:
 
 - **Summary:** The picture fills the watch and the controls sit on it
-- **Status:** implemented in 08c563c; layout redone for the Ultra in a0053c6, c550f16, 1c34133, 5622ee1 (picture as a background, four buttons inside the 205 pt face, chips under the clock) and verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; framing-before-recording scenario in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b) (story 047); the transparency pass (small chips under the clock, capsule hint, glass buttons along the bottom edge) is the commit after 34c17fa, verified on the Ultra 3 simulator, needs the wrist for the corner check; on phone + watch 2026-09-14 ([#67](https://github.com/idvorkin/exercise-analyzer/issues/67), Igor by voice, 2026-09-13: "make the preview larger and overlay the buttons a lot"; [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the regression that cost the controls)
-- **Why:** the preview is a 90 pt strip above a column of buttons; from across the room the strip is what matters and the buttons are what Igor already knows.
+- **Status:** implemented in [08c563c](https://github.com/idvorkin/exercise-analyzer/commit/08c563c); the layout redone for the Ultra's 205 pt face in [5622ee1](https://github.com/idvorkin/exercise-analyzer/commit/5622ee1) and lightened in [83751cf](https://github.com/idvorkin/exercise-analyzer/commit/83751cf); verified with `just watch-screens` on the Apple Watch Ultra 3 (49mm) simulator; on phone + watch since 2026-09-14, Igor's check of the bottom corners pending
+- **Why:** Igor, 2026-09-13: "make the preview larger and overlay the buttons a lot"; 2026-09-14: "avoid covering the screen, get those buttons in the bottom, make sure my tap targets are usable, use more transparency."
 
 #### Use Case:
 - **As a** lifter checking the framing from across the room
@@ -217,30 +227,25 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **so that** one glance says whether I am in frame, without scrolling past a thumbnail
 
 #### Acceptance Criteria:
-- **Scenario:** The recording screen on a 45 mm watch
+- **Scenario:** The recording screen
 - **Given:** a set is being recorded and the watch app is in front
 - **When:** I raise my wrist
-- **Then:** the picture fills the screen edge to edge, the rep count and the elapsed time sit on small translucent chips right under the clock line, the in-frame hint is a capsule as wide as its words just above the buttons (green in frame, red when cut off), four round buttons sit along the bottom edge, Pause/Resume, Camera, Done and a smaller Cancel last, translucent glass except Done (green) and Record (red) so the picture shows through, 40 pt targets, all whole inside the face's rounded corners, covering as little of the picture as those targets allow (Igor, 2026-09-14: "avoid covering the screen, buttons at the bottom, more transparency"); the watch-mode toggle, the exercise and a second Cancel are on the page below (vertical page swipe); the picture refreshes about once a second at twice today's resolution (long side 320 px instead of 176, about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
+- **Then:** the picture fills the screen edge to edge; the rep count and the elapsed time sit on small translucent chips right under the clock line; the in-frame hint is a capsule as wide as its words just above the buttons (green in frame, red when cut off); four round 40 pt buttons sit along the bottom edge, Pause/Resume, Camera, Done and a smaller Cancel last, translucent glass except Done (green) so the picture shows through, all whole inside the face's rounded corners; the watch-mode toggle, the exercise and a second Cancel are on the page below; the picture refreshes about once a second at a long side of 320 px (about 15–25 KB a frame, under WatchConnectivity's 65 KB message limit)
 
-- **Scenario:** Framing the shot from Live's first frame
+- **Scenario:** Record without a Preview
 - **Given:** the phone is ready and the watch app is in front
 - **When:** I tap Record on the wrist (or Live on the phone)
-- **Then:** from the camera's first frame the wrist shows the full-screen picture with the in-frame bar and the four round buttons, Pause/Resume, Camera (cycle Front, 0.5×, 1×), Done and Cancel, all inside the screen's safe area; the recorder rolls from that first frame and Trim cuts the walk-in as today
+- **Then:** from the camera's first frame the wrist shows the recording screen above, with the four buttons, and the recorder rolls from that frame (Trim cuts the walk-in, story 009); to frame the shot before anything is recorded, tap Preview instead (story 047)
 
-- **Scenario:** Framing the shot before recording
-- **Given:** the phone is ready on the tripod and the watch app is in front
-- **When:** I tap Preview on the wrist
-- **Then:** the full-screen picture shows with the in-frame bar and Record · Camera · Cancel, the phone's count reads VIEWFINDER, and nothing is recorded; Record starts the set from zero and Cancel leaves nothing behind (Igor, 2026-09-13: "I need to see the preview before I'm recording, so when I have a full-screen record I still need to be able to switch cameras and pause and stop"; story 047, [#73](https://github.com/idvorkin/exercise-analyzer/issues/73))
-
-- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73) closed by the Preview button (story 047): the picture fills the watch before Record
+- **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67); [#74](https://github.com/idvorkin/exercise-analyzer/issues/74) the picture page was gated on the phone app being active and lost its controls; [#73](https://github.com/idvorkin/exercise-analyzer/issues/73) the picture before Record, closed by story 047
 
 ---
 
 ### User Story 043:
 
 - **Summary:** The watch face shows the set
-- **Status:** implemented in 375e3aa (merged 544a621), the pause-excluding timer and the pass-final fixes in 0bde654; entitlements wired again once Igor signed into Xcode (2026-09-14: `xcodebuild -allowProvisioningUpdates` registered the App Group on the watch app's profile itself, and the complication's bundle id became `…watchkitapp.face` because `…watchkitapp.complication` could not be registered to the team); on phone + watch 2026-09-14, **needs the face check by Igor** (add the complication to a face, record a set, wrist down, raise: REC, the ticking timer, the count; after Done the pass's final) ([#75](https://github.com/idvorkin/exercise-analyzer/issues/75); [#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; the Muse research of 2026-09-13 sized it)
-- **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and today's complication is only a launcher.
+- **Status:** implemented in [375e3aa](https://github.com/idvorkin/exercise-analyzer/commit/375e3aa), [0bde654](https://github.com/idvorkin/exercise-analyzer/commit/0bde654), [3255a38](https://github.com/idvorkin/exercise-analyzer/commit/3255a38); verified on the host (`FaceStateTests`) and by device signing; on the watch since 2026-09-14, Igor's check pending (add the complication to a face; its bundle id changed, so the old one is gone from the face)
+- **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and the complication was only a launcher.
 
 #### Use Case:
 - **As a** lifter between reps with the wrist down
@@ -270,22 +275,20 @@ nothing. The phone's own Live still records from the first frame (story 001).
 
 - **Notes:** The complication cannot talk to the phone: it reads a shared App Group container that the watch app
   writes on each status and reloads through WidgetKit. WidgetKit throttles reloads, so the count on the face is
-  refreshed on transitions (record, finish, cancel) and while the app is in front, not per rep; the timer is a date,
-  so it ticks without any update. `transferCurrentComplicationUserInfo` (50 a day) is not used. Needs one
-  App Group entitlement on the watch app and the complication, no user permission, no HealthKit. Wrist-down still
-  suspends the app: the face is the answer to that, not a workout session (018 stands).
+  refreshed on transitions (record, finish, cancel, the final count arriving) and every 10 s while a set rolls,
+  not per rep; the timer is a date, so it ticks without any update. A Preview writes nothing to the face. The
+  complication's bundle id is `…watchkitapp.face` (the `.complication` id could not be registered to the team).
+  No HealthKit; wrist-down still suspends the app (018 stands).
+
+- **Issues:** [#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; [#75](https://github.com/idvorkin/exercise-analyzer/issues/75) the App Group registration
 
 ---
 
 ### User Story 044:
 
 - **Summary:** A lock-screen button opens the app into Live
-- **Status:** implemented in [e9d47f1](https://github.com/idvorkin/exercise-analyzer/commit/e9d47f1); needs the phone
-- **Why:** Igor: "There's a ChatGPT button I can put on my lock screen. Give me an exercise button I can put on
-  my lock screen that pops me open." A Live Activity was researched first and rejected: the recording phone is
-  never on its lock screen (locking backgrounds the app and iOS stops the camera; story 019 keeps the phone
-  awake for exactly this reason), so a live lock-screen scoreboard is impossible and only an after-the-set card
-  could exist. A button that opens the app is what the lock screen can do, and it is what Igor asked for.
+- **Status:** implemented in [e9d47f1](https://github.com/idvorkin/exercise-analyzer/commit/e9d47f1); on the phone since 2026-09-13, Igor's check pending
+- **Why:** Igor: "There's a ChatGPT button I can put on my lock screen. Give me an exercise button I can put on my lock screen that pops me open." A Live Activity was considered and rejected: the recording phone is never on its lock screen (locking backgrounds the app and iOS stops the camera; story 019 keeps it awake for exactly this reason), so a live lock-screen scoreboard is impossible. A button that opens the app is what the lock screen can do.
 
 #### Use Case:
 - **As a** lifter at the rack with a locked phone
@@ -303,21 +306,20 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **When:** I tap it
 - **Then:** the app opens on Live with the camera running, same as from the lock screen
 
-- **Notes:** An iOS 18 `ControlWidget` in a new widget extension target `ExerciseAnalyzerControls` (bundle id
-  `com.idvorkin.exerciseanalyzer.controls`, embedded in the app; the watch complication target is the pbxproj
-  pattern; watch targets untouched). The action is an `AppIntent` with `openAppWhenRun` that sets a UserDefaults
-  flag; the session consumes it on activation, logs `launch_control` and starts the camera — the same route as
-  the `RecordPrompt` notification tap. No App Group: the intent runs in the app's process. The extension's
-  deployment target is iOS 18.0 (the app stays 17.0) and every declaration carries `@available(iOS 18, *)`. The
-  lock screen needs nothing beyond the Control: whatever Igor can add in Customize, Control Center takes too.
+- **Notes:** An iOS 18 `ControlWidget` in the `ExerciseAnalyzerControls` extension (bundle id
+  `com.idvorkin.exerciseanalyzer.controls`). Its `AppIntent` opens the app and sets a UserDefaults flag; the
+  session consumes it on activation, logs `launch_control` and starts the camera, the same route as the
+  `RecordPrompt` notification tap. No App Group. The extension targets iOS 18; the app stays on 17.
+
+- **Issues:** [#70](https://github.com/idvorkin/exercise-analyzer/issues/70)
 
 ---
 
 ### User Story 045:
 
 - **Summary:** The final count reaches the wrist
-- **Status:** implemented in [0ea930c](https://github.com/idvorkin/exercise-analyzer/commit/0ea930c); needs phone + watch
-- **Why:** the watch drops to "Phone ready" the moment the camera stops, and the live count it showed is not the one the offline pass settles on a few seconds later; Igor walks to the phone to learn the set.
+- **Status:** implemented in [0ea930c](https://github.com/idvorkin/exercise-analyzer/commit/0ea930c); on phone + watch since 2026-09-13, Igor's check pending
+- **Why:** the watch dropped to "Phone ready" the moment the camera stopped, and the live count it showed is not the one the offline pass settles a few seconds later; Igor walked to the phone to learn the set.
 
 #### Use Case:
 - **As a** lifter who tapped Done on the watch
@@ -332,13 +334,15 @@ nothing. The phone's own Live still records from the first frame (story 001).
 
 - **Notes:** Wire: `WatchStatus.lastSet` (reps, exercise, seconds, when), optional, ignored by an old watch app.
 
+- **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67)
+
 ---
 
 ### User Story 046:
 
 - **Summary:** Rest timer on the wrist
-- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); needs phone + watch (design lead, 2026-09-13, for Igor's "think through other good watch user stories" in #67)
-- **Why:** rest length is the one number between sets, and the watch is the only screen on the lifter; today it shows nothing between Done and the next Record.
+- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); on phone + watch since 2026-09-13, Igor's check pending
+- **Why:** rest length is the one number between sets, and the watch is the only screen on the lifter; it showed nothing between Done and the next Record.
 
 #### Use Case:
 - **As a** lifter resting between sets
@@ -349,19 +353,21 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **Scenario:** A 90 s rest
 - **Given:** a set just ended from the watch and the rest length is set to 90 s
 - **When:** 90 s pass
-- **Then:** the watch has been counting the rest up under the Record button since Done, taps twice at 90 s (once, no repeat), and Record clears the count
+- **Then:** the watch has been counting the rest up under the Record button since Done, taps twice at 90 s (once, no repeat), and Record clears the count; a Preview and its Cancel leave the count alone (story 047)
 
 - **Notes:** Watch only, no phone change; the rest length is a watch setting (60, 90, 120, 180 s). With the wrist
   down the app is suspended, so the tap at 90 s is a scheduled local notification on the watch (one permission
   prompt, on the watch, the first time); without that permission the count still shows, the tap does not come.
+
+- **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67)
 
 ---
 
 ### User Story 047:
 
 - **Summary:** Preview the shot from the wrist before recording
-- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), b3defc0; on phone + watch 2026-09-14 ([#73](https://github.com/idvorkin/exercise-analyzer/issues/73)); the code review of 2026-09-14 (`~/tmp/agent/notes/2026-09-14-muse-code-review.md`, eleven findings) is fixed in the commit after 27602df: the preview runs no analyzer and no detector, a cancelled preview keeps the rest and the last set, Record on a locked phone waits for the tap, the set's counters start at Record
-- **Why:** Igor, 2026-09-14: "Can I start with two different buttons for Record? Start Recording, Start Viewfinder. When I start Viewfinder, then I can start recording, because normally, when I start on my watch, I don't know if I'm in frame or not. I walk away from my phone, set my phone up, and think I'm in frame. Then I walk to my watch, make sure I'm good, maybe adjust the camera a bit, and then I hit Start."
+- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), [b3defc0](https://github.com/idvorkin/exercise-analyzer/commit/b3defc0) and the review fixes of [2c9cc58](https://github.com/idvorkin/exercise-analyzer/commit/2c9cc58); verified on the host, the simulator (the eight watch states, the six checks) and by two code reviews; on the phone since 2026-09-14, the watch app of 2c9cc58 pending the tunnel, Igor's check pending
+- **Why:** Igor, 2026-09-14: "Can I start with two different buttons for Record? Start Recording, Start Viewfinder. Normally, when I start on my watch, I don't know if I'm in frame or not. I walk away from my phone, set my phone up, and think I'm in frame. Then I walk to my watch, make sure I'm good, maybe adjust the camera a bit, and then I hit Start."
 
 #### Use Case:
 - **As a** lifter who set the phone on the rack and walked to the bar
@@ -372,40 +378,46 @@ nothing. The phone's own Live still records from the first frame (story 001).
 - **Scenario:** Framing from the wrist
 - **Given:** the phone is ready on the tripod and the watch app is open
 - **When:** I tap Preview on the wrist
-- **Then:** the picture fills the face with the in-frame bar and Record · Camera · Cancel and nothing is recorded; no rep is counted or buzzed and the exercise detector sees none of the framing (the analyzer does not run until Record)
+- **Then:** the picture fills the face with the in-frame capsule and Record · Camera · Cancel, and nothing is recorded: no rep is counted or buzzed, the exercise detector sees none of the framing, the phone's count reads VIEWFINDER, and the phone follows into watch mode as for Record
 
 - **Scenario:** Record from the preview
-- **Given:** the viewfinder picture is up on the wrist
+- **Given:** the preview is up on the wrist
 - **When:** I tap Record
-- **Then:** the set records from that moment with the count and the time from zero
+- **Then:** the set records from that moment, with the count and the time from zero and the four recording buttons in place of the three
 
 - **Scenario:** Cancel from the preview
-- **Given:** the viewfinder picture is up on the wrist
+- **Given:** the preview is up on the wrist
 - **When:** I tap Cancel
 - **Then:** the camera stops and nothing is left behind; the rest count and the last-set line on the idle page are exactly as before the Preview
 
-- **Scenario:** Preview while the phone app is backgrounded
-- **Given:** the phone app is backgrounded and the watch app is open
+- **Scenario:** Preview while the phone app is in the background
+- **Given:** the phone app is in the background and the watch app is open
 - **When:** I tap Preview on the wrist
 - **Then:** the phone posts its notification and the tap opens the camera without recording
 
 - **Scenario:** Record while the phone locked itself in the preview
 - **Given:** the preview is up and the phone has locked (iOS stops the camera)
 - **When:** I tap Record on the wrist
-- **Then:** no recorder is armed on a dead camera; the phone posts its notification and the tap starts the set the moment the app is in front (the 2026-09-14 review: a recorder armed here got no frames and the set ended in "Nothing recorded")
+- **Then:** no recorder is armed on a stopped camera; the phone posts its notification and the tap starts the set the moment the app is in front
 
-- **Notes:** Wire: `WatchStatus.viewfinder` (recording stays "the camera is live"; `recording && !viewfinder`
-  is "the recorder rolls"), `WatchCommand.viewfinder`, `beginRecording` (recorder starts without touching the
-  camera), `record_start` (`viewfinder_s`) and the `viewfinder` field on `camera_start`; the Record
-  notification carries the flag in its `userInfo`, so the tap route opens into the viewfinder too. The phone's
-  own Live still records from the first frame (story 001).
+- **Notes:** Wire: `WatchStatus.viewfinder` (`recording` stays "the camera is live"; `rolling` is
+  `recording && !viewfinder`, the recorder is writing) and `WatchCommand.viewfinder`. On the phone,
+  `beginRecording` creates the recorder without touching the camera; `camera_start` carries `viewfinder` and
+  `record_start` carries the seconds spent framing. The Record notification carries the flag, so the tap
+  route opens into the preview too. The phone's own Live still records from the first frame (story 001).
+
+- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73)
 
 ---
 
-### Not stories (while 018 stands)
+### Not stories, while 018 stands
 
 Heart rate during a set, surviving wrist-down (#32) and launching the watch app from the phone all need an
-`HKWorkoutSession`, which ends whatever other workout the watch is running (watchOS runs one at a time); Igor
-declined that in #32. They come back together as one decision, "a workout session only while recording", with the
-trade-off table in `~/tmp/agent/notes/2026-09-13-watch-research-muse.md` §2.
-
+`HKWorkoutSession`: it is the only door Apple gives a phone to open a watch app, and the only way a watch app
+keeps running with the wrist down. Igor declined it in #32. What it would cost, from the 2026-09-13 research:
+a HealthKit permission prompt in front of a camera remote that today needs none, a workout written to Health
+for every set unless discarded, workout-app battery drain while the session runs, the "workout running" chrome,
+and a session lifecycle to get right across start, finish, cancel, disconnect and crash. What it would buy:
+no drops while recording, a watch app that opens itself when the phone records, and heart rate. The three come
+back together as one decision, "a workout session only while recording", if the face complication (043) is not
+enough.
