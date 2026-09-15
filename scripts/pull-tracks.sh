@@ -16,8 +16,15 @@ BUNDLE=com.idvorkin.exerciseanalyzer
 STAGE=${PULL_TRACKS_STAGE:-$HOME/tmp/agent/swing-logs/phone/Documents/recents}
 OUT=${PULL_TRACKS_OUT:-ExerciseCore/Tests/ExerciseCoreTests/Fixtures/tracks}
 mkdir -p "$STAGE" "$OUT"
-xcrun devicectl device copy from --device "$DEVICE" --domain-type appDataContainer --domain-identifier $BUNDLE \
-  --source Documents/recents --destination "$STAGE" 2>&1 | grep -E "received|rror" | grep -v provisioning || true
+# A failed copy (phone locked, unplugged) must stop here, or a stale stage is re-archived as if fresh.
+copy_log=$(mktemp)
+if ! xcrun devicectl device copy from --device "$DEVICE" --domain-type appDataContainer --domain-identifier $BUNDLE \
+  --source Documents/recents --destination "$STAGE" >"$copy_log" 2>&1; then
+  grep -E "rror" "$copy_log" | grep -v provisioning || true
+  echo "FAIL  devicectl could not copy Documents/recents from the phone (locked? unplugged?)"
+  exit 1
+fi
+grep -E "received" "$copy_log" || true
 python3 - "$STAGE" "$OUT" <<'PY'
 import json, pathlib, sys, datetime, re
 stage, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])

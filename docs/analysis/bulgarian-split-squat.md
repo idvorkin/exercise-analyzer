@@ -39,3 +39,10 @@ Reports: `TuningReports.testBulgarianPhoneSetUnderThresholds`, `testBulgarianTen
   all three Bulgarian tracks (8/8/8); frames 31.16–31.19 read `bottom` in rep 7's dip; no `bottom` outside rep
   spans. Evidence: `BulgarianBottomPhaseTests` over the archived track. The pill's seek had always landed on
   the bottom peak; it was the live phase under the playhead that never said `bottom`.
+- **2026-09-15, review of the entry above (no fixture)**: the bottom exit (`bottom.earY − 2 × riseFraction × L`,
+  0.04 L above the confirmation level) sat *above* the completion line (`top + returnFraction × L`, 0.05 L
+  below the top) for any dip shallower than 0.09 L, so such a rep could cross the completion line while still
+  in `bottom` and never complete, taking every later rep with it. The exit is now the lower of the two, so
+  ascending is always entered first. The three archived tracks still count 8/8/8 (their dips are all deeper);
+  no fixture has a dip that shallow, which is a gap ([#77](https://github.com/idvorkin/exercise-analyzer/issues/77)).
+  AnalysisVersion 2026-09-15.1.

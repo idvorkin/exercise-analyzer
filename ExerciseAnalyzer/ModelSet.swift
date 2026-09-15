@@ -89,12 +89,27 @@ final class ModelSet {
   func ensureBellDetector() {
     guard bellDetector == nil else { return }
     loadBellDetector(force: true)
+    bellDetectorForced = bellDetector != nil
   }
 
-  /// Drain the compute-plan summaries outstanding now (a forced bell load appends one after ready).
+  /// Drop a detector that only the instrumented run asked for, so the rest of the session runs as the
+  /// lifter's switch says (it halves the pass) and every set saved carries the model set the next launch has.
+  func releaseForcedBellDetector() {
+    guard bellDetectorForced else { return }
+    bellDetector = nil
+    bellDetectorForced = false
+    log.event("model_released", ["model": "yoloe-26n-kettlebell", "reason": "instrumented run ended"])
+  }
+
+  private var bellDetectorForced = false
+
+  /// Drain the compute-plan summaries outstanding now, including any appended while waiting (a forced bell
+  /// load appends one after ready): a plan must never overlap inference (#43).
   func waitForPlans() async {
-    for task in planTasks { await task.value }
-    planTasks = []
+    while let task = planTasks.first {
+      await task.value
+      planTasks.removeAll { $0 == task }
+    }
   }
 
   private func resumeReady() {

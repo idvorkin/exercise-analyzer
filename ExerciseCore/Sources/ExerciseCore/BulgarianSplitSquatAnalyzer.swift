@@ -205,12 +205,13 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     case Self.bottom:
       // The dip is confirmed and the peak stored; stay in bottom until the head has clearly left it, so the
       // pills and the log show a bottom moment like the pistol's (#55). The exit sits a second riseFraction
-      // above the confirmation level, far below the completion height, so every rep that completed before
-      // still completes.
-      if machine.canTransition, let bottom = bottomCandidate,
-        earY < bottom.earY - legLength * thresholds.riseFraction * 2
-      {
-        machine.transition(to: Self.ascending)
+      // above the confirmation level, or at the completion line when that is lower (a dip shallower than
+      // 0.09 L), so ascending is always entered before the rep can complete and no rep is ever stuck in
+      // bottom (the 2026-09-15 review).
+      if machine.canTransition, let bottom = bottomCandidate {
+        let exit = bottom.earY - legLength * thresholds.riseFraction * 2
+        let completion = standingEarY.map { $0 + legLength * thresholds.returnFraction } ?? exit
+        if earY < max(exit, completion) { machine.transition(to: Self.ascending) }
       }
     default:  // ascending: back near the standing height completes the rep
       if machine.canTransition, let top = standingEarY, earY < top + legLength * thresholds.returnFraction {

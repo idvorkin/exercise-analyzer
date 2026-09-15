@@ -440,7 +440,8 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   private func floorFrame(before anchor: Double) -> Frame? {
     let target = anchor - thresholds.floorLeadSeconds
     if let frame = lyingWindow.last(where: { $0.time <= target }) { return frame }
-    return lyingWindow.min(by: { $0.upright < $1.upright })
+    // A short lying run: the flattest frame, but never one after the anchor (the 2026-09-15 review).
+    return lyingWindow.filter { $0.time <= anchor }.min(by: { $0.upright < $1.upright })
   }
 
   /// Drops the partial rep without touching the rep count.

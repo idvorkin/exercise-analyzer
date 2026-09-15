@@ -173,6 +173,8 @@ extension TuningReports {
   /// archived track, the exercise-blind count beside the known count and the detector's confidence. The number
   /// that decides: how many fixtures land within ±1 of the known count. Prints, never asserts.
   func testGenericRepCounter() throws {
+    // An unwired experiment (#71) and the slowest report in the suite: run it on request.
+    try XCTSkipUnless(ProcessInfo.processInfo.environment["GENERIC_REPS"] == "1", "set GENERIC_REPS=1 to run the generic-rep report")
     for fixture in Fixture.all {
       let frames = try fixture.frames()
       print(genericLine(label: fixture.name, known: "\(fixture.expectedReps)", frames: frames))

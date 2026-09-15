@@ -180,9 +180,10 @@ the first frame (story 001).
   and Cancel work while paused. A pause is a segment boundary, the same mechanism as rotating the phone mid-set
   (story 020): a plain pause takes a passthrough join, a rotation across a pause takes the re-encoding stitch. A
   rep in progress at the pause is lost: the analyzer sees the frame before and the frame after as neighbours,
-  which is what the offline pass sees in the joined clip, so the live and final counts agree. Wire:
-  `WatchStatus.paused`, `WatchCommand.pause` / `.resume`; an old watch app ignores the field and never sends the
-  commands.
+  which is what the offline pass sees in the joined clip, so the live and final counts agree. Done right after
+  Pause waits for the paused segment's file to finish before joining, so a quick Pause–Done never loses the
+  set. Wire: `WatchStatus.paused`, `WatchCommand.pause` / `.resume`; an old watch app ignores the field and
+  never sends the commands.
 
 - **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67)
 
@@ -203,7 +204,7 @@ the first frame (story 001).
 - **Scenario:** Record from the wrist
 - **Given:** the phone app is open in front and idle, and the watch app is open
 - **When:** I tap Record (or Preview) on the watch
-- **Then:** the phone starts the camera and shows the watch-mode screen at once, the watch shows "Phone: watch mode on", a set started on the phone switches the same way the moment the watch app comes to the front, and leaving watch mode on the phone (button, double tap or hold) keeps it off for the rest of that set even if the watch app comes to the front again, while the watch's own toggle still works
+- **Then:** the phone starts the camera and shows the watch-mode screen at once, the watch shows "Phone: watch mode on", a set started on the phone switches the same way the moment the watch app comes to the front, and leaving watch mode on the phone (button, double tap or hold) or from the watch's own toggle keeps it off for the rest of that set even if the watch app comes to the front again, while the watch's toggle can turn it back on
 
 - **Notes:** WatchConnectivity delivers a watch message to the phone app even in the background (iOS launches it
   briefly for that), but it can neither bring the app to the front nor start the camera from there, and watch
@@ -307,9 +308,11 @@ the first frame (story 001).
 - **Then:** the app opens on Live with the camera running, same as from the lock screen
 
 - **Notes:** An iOS 18 `ControlWidget` in the `ExerciseAnalyzerControls` extension (bundle id
-  `com.idvorkin.exerciseanalyzer.controls`). Its `AppIntent` opens the app and sets a UserDefaults flag; the
-  session consumes it on activation, logs `launch_control` and starts the camera, the same route as the
-  `RecordPrompt` notification tap. No App Group. The extension targets iOS 18; the app stays on 17.
+  `com.idvorkin.exerciseanalyzer.controls`). Its `AppIntent` opens the app through the URL scheme
+  `exerciseanalyzer://live`; the app's scene hands the URL to the session, which logs `launch_control` and
+  starts the camera, the same route as the `RecordPrompt` notification tap. A URL, not a shared flag: the
+  extension and the app are separate processes (the 2026-09-15 review found the original UserDefaults flag
+  never reached the app). The extension targets iOS 18; the app stays on 17.
 
 - **Issues:** [#70](https://github.com/idvorkin/exercise-analyzer/issues/70)
 
@@ -330,7 +333,7 @@ the first frame (story 001).
 - **Scenario:** Done from the wrist
 - **Given:** a set was recorded and finished from the watch
 - **When:** the phone's offline pass completes, a few seconds after Done
-- **Then:** the watch shows "Analyzing…" while the pass runs and then "Last set: 12 reps · Kettlebell Swing · 1:02" above the Record button until the next set starts
+- **Then:** the watch shows "Analyzing…" while the pass runs and then "Last set: 12 reps · Kettlebell Swing · 1:02" above the Record button until the next set starts; a pass that cannot land a count (interrupted, cancelled, nothing recorded, another set opened) takes "Analyzing…" down with it
 
 - **Notes:** Wire: `WatchStatus.lastSet` (reps, exercise, seconds, when), optional, ignored by an old watch app.
 
@@ -357,7 +360,8 @@ the first frame (story 001).
 
 - **Notes:** Watch only, no phone change; the rest length is a watch setting (60, 90, 120, 180 s). With the wrist
   down the app is suspended, so the tap at 90 s is a scheduled local notification on the watch (one permission
-  prompt, on the watch, the first time); without that permission the count still shows, the tap does not come.
+  prompt, on the watch, the first time; the notification is scheduled once the answer is known, so the first
+  rest taps too); without that permission the count still shows, the tap does not come, and the log says so.
 
 - **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67)
 

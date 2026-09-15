@@ -12,8 +12,13 @@ enum WatchScreenshotState: String, CaseIterable {
 
   /// The state named by WATCH_STATE, or nil for the live phone connection.
   static var launch: Self? {
-    guard let name = ProcessInfo.processInfo.environment["WATCH_STATE"], !name.isEmpty else { return nil }
-    return Self(rawValue: name)
+    // Simulator only: a real watch never presents a fixed state, whatever its environment says.
+    #if targetEnvironment(simulator)
+      guard let name = ProcessInfo.processInfo.environment["WATCH_STATE"], !name.isEmpty else { return nil }
+      return Self(rawValue: name)
+    #else
+      return nil
+    #endif
   }
 
   /// Only the disconnected page distrusts the status; every other state renders as heard-from-the-phone.

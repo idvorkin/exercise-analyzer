@@ -8,5 +8,16 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.idvorkin.exerciseanalyzer</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>exerciseanalyzer</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -124,7 +124,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var recorder: FrameRecorder?
   /// Orientation the capture is rotated to; a rotation mid-recording restarts the capture into a new segment.
   private var cameraOrientation: AVCaptureVideoOrientation = .portrait
-  private var recordedSegments: [URL] = []
+  /// Segments closed by a pause or a rotation, each still finishing its file; Done awaits them in order.
+  /// A new set or a cancel drops them (a late finish from a cancelled set never reaches the next one).
+  private var segmentFinishes: [Task<URL?, Never>] = []
   private var cameraFirstTime: Double?
   private var cameraFramesDelivered = 0
   private var cameraFramesAnalyzed = 0
@@ -200,14 +202,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
         self.startCamera(position: self.cameraPosition, viewfinder: viewfinder)
       }
     }
-    // Lock-screen / Control Center button (#70): the intent sets the flag and opens the app; activation (cold
-    // or warm) picks it up. Consumed first so the flag clears even when the camera is already running.
-    NotificationCenter.default.addObserver(
-      forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
-    ) { [weak self] _ in
+    // Lock-screen / Control Center button (#70): the control opens exerciseanalyzer://live, the scene posts it
+    // here, once per press, cold or warm. A camera already live is left alone and the press is still logged.
+    NotificationCenter.default.addObserver(forName: ControlLaunch.live, object: nil, queue: .main) { [weak self] _ in
       Task { @MainActor in
-        guard let self, ControlLaunch.consumeLive(), self.source != .camera else { return }
-        self.log.event("launch_control", ["action": "live"])
+        guard let self else { return }
+        self.log.event("launch_control", ["action": "live", "already_live": self.source == .camera])
+        guard self.source != .camera else { return }
         self.startCamera(position: self.cameraPosition)
       }
     }
@@ -286,9 +287,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
         storedVersion: entry.analysisVersion, storedModels: storedModels(entry),
         currentVersion: AnalysisVersion.current, currentModels: models.names,
         mode: exerciseMode, storedExercise: stored.exercise, detection: nil)
-      if case .rerunFromClip = plan,
-        !userPassActive, let predictor = models.predictor,
-        let clipURL = await recents.clipURL(for: entry)
+      // The clip fetch can take seconds (iCloud); the user-pass check comes after it, at the moment the job is
+      // described, and run() refuses a replay over a user pass regardless (the 2026-09-15 review).
+      if case .rerunFromClip = plan, let predictor = models.predictor,
+        let clipURL = await recents.clipURL(for: entry), !userPassActive
       {
         let job = describeJob(
           url: clipURL, kind: .replay(entry: entry, where: "refresh", exercise: stored.exercise),
@@ -361,8 +363,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
       guard let stored = recents.loadPipeline(for: entry) else { continue }
       let name = entry.originalName ?? "\(stored.exercise.definition.name) \(stored.reps.count)"
       instrumentedRun = InstrumentedRun(index: i + 1, total: entries.count, name: name, line: "running the models")
-      guard !userPassActive, let predictor = models.predictor,
-        let clipURL = await recents.clipURL(for: entry)
+      guard let predictor = models.predictor,
+        let clipURL = await recents.clipURL(for: entry), !userPassActive  // checked after the fetch, see refresh
       else { continue }
       let job = describeJob(
         url: clipURL, kind: .replay(entry: entry, where: "debug", exercise: stored.exercise),
@@ -384,6 +386,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       ["phase": instrumentedRunCancelled ? "cancelled" : "end", "sets": entries.count, "done": done,
        "fps_mean": passes.isEmpty ? 0 : passes.reduce(0, +) / Double(passes.count)])
     instrumentedRun = nil
+    models.releaseForcedBellDetector()  // the run measured with it; the lifter's switch decides the rest
   }
 
   func cancelInstrumentedRun() {
@@ -395,6 +398,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// (callers cancel any occupant first); the extract task stays cancellable until it settles. Rendering and
   /// clearing are the caller's.
   private func run(_ job: ClipJob) async -> ClipResult {
+    // A replay never takes the slot from the set the user opened: its caller re-checked after its clip fetch,
+    // but a user pass can start between that check and this registration.
+    if !job.isUserPass, currentJob?.isUserPass == true {
+      log.event("recents_rerun_yield", ["generation": job.generation, "where": job.replayWhere ?? ""])
+      return .cancelled
+    }
     if case .replay(let entry, let replayWhere, let exercise) = job.kind {
       log.event(
         "recents_rerun",
@@ -785,25 +794,31 @@ final class VideoPoseSession: NSObject, ObservableObject {
     task.cancel()
   }
 
+  /// What the last user pass was asked to do, so a retry after an interruption re-runs the same thing: a
+  /// stored get-up reopened under a fixed Swing mode must retry as a get-up, not as swings (#42, #57).
+  private var lastUserPass: (reason: String, stored: ExerciseKind?) = (StoredSetReason.load.rawValue, nil)
+
   /// Re-runs the offline pass from the clip after an interruption (status tap or retry button, #57).
   func retryAnalysis() {
     guard source == .file, !userPassActive, let url = trimmedURL ?? currentFileURL else { return }
-    Task { await analyzeAndPlay(url: url) }
+    let last = lastUserPass
+    Task { await analyzeAndPlay(url: url, reason: last.reason, stored: last.stored) }
   }
 
   private func analyzeAndPlay(
     url: URL, reason: String = StoredSetReason.load.rawValue, stored: ExerciseKind? = nil
   ) async {
-    // One pass at a time: a background re-run of a stored set yields to the set the user opened (and a previous
-    // user pass, orphaned today, is discarded at its gate).
-    currentTask?.cancel()
+    lastUserPass = (reason, stored)
     // A set opened in the first second after launch (a Recents tap, the reopen hook) arrives before the model has
-    // loaded; wait for it rather than abandoning the pass with "Model not ready" (#45).
+    // loaded; wait for it rather than abandoning the pass (#45).
     guard let predictor = await models.ready() else {
-      statusMessage = "Model not ready"
-      log.event("error", ["where": "offline_pass", "message": "model not loaded after 10 s"])
+      statusMessage = "Pose model unavailable"
+      log.event("error", ["where": "offline_pass", "message": "no pose model (package missing or load failed)"])
       return
     }
+    // One pass at a time: whatever holds the slot now yields to the set the user opened. The cancel comes after
+    // the await above, so two passes that both waited for the model cannot both run (the 2026-09-15 review).
+    currentTask?.cancel()
     let job = describeJob(
       url: url, kind: .userPass(exercise: stored, reason: reason),
       predictor: predictor, bellDetector: models.bellDetector)
@@ -817,7 +832,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     activity = .working("Analyzing", progress: 0)
     canCancelAnalysis = true
     defer {
-      canCancelAnalysis = false
+      // A superseded pass leaves the newer pass's Cancel alone.
+      if jobGeneration == job.generation { canCancelAnalysis = false }
       clearJob(job)
       updateKeepAwake()
     }
@@ -825,13 +841,23 @@ final class VideoPoseSession: NSObject, ObservableObject {
     if ProcessInfo.processInfo.environment["SWING_CANCEL_ANALYSIS"] == "1" {
       Task { try? await Task.sleep(for: .seconds(1)); self.cancelAnalysis() }
     }
-    switch await run(job) {
+    let result = await run(job)
+    // Superseded while extracting (the lifter opened another set): the newer pass owns the screen, the status
+    // line and playback; this one renders nothing, not even "Analysis cancelled".
+    guard jobGeneration == job.generation else {
+      lastSetPassEnded("superseded")
+      return
+    }
+    switch result {
     case .done(let frames, let summary):
       await finishAnalysis(job: job, frames: frames, summary: summary)
+      lastSetPassEnded("no final count")  // a pass that was not the recording's own leaves nothing to land
     case .cancelled:
+      lastSetPassEnded("cancelled")
       statusMessage = "Analysis cancelled"
       log.event("analysis_cancelled", ["url": url.lastPathComponent])
     case .failed(let error):
+      lastSetPassEnded("interrupted")
       // A failed pass leaves no partial track: the mode switch re-runs from the clip (#57).
       extractedFrames = []
       extractionComplete = false
@@ -863,22 +889,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
     guard case .userPass(let exercise, let reason) = job.kind,
       currentJob?.generation == job.generation
     else { return }
-    do {
-      extractedFrames = frames
-      await analyzeExtracted(url: job.url, reason: reason, stored: exercise)
-      extractionComplete = true
-      analysisInterrupted = false
-      statusMessage = recordedLine(reps: pipeline.reps.count) + String(
-        format: " · %d frames in %.1fs", summary.frames, summary.elapsed)
-      rememberCurrent(clipURL: job.url)
-      // A recording with no reps is usually a false start: offer to throw it away (nothing was saved to Photos).
-      if pipeline.reps.count == 0, case .recording = currentOrigin {
-        log.event("empty_recording", ["url": job.url.lastPathComponent, "frames": frames.count])
-        emptyRecordingPrompt = true
-      }
-    } catch {
-      statusMessage = "Analysis failed: \(error.localizedDescription)"
-      log.event("error", ["where": "offline_pass", "message": "\(error)"])
+    extractedFrames = frames
+    await analyzeExtracted(url: job.url, reason: reason, stored: exercise)
+    extractionComplete = true
+    analysisInterrupted = false
+    statusMessage = recordedLine(reps: pipeline.reps.count) + String(
+      format: " · %d frames in %.1fs", summary.frames, summary.elapsed)
+    rememberCurrent(clipURL: job.url)
+    // A recording with no reps is usually a false start: offer to throw it away (nothing was saved to Photos).
+    if pipeline.reps.count == 0, case .recording = currentOrigin {
+      log.event("empty_recording", ["url": job.url.lastPathComponent, "frames": frames.count])
+      emptyRecordingPrompt = true
     }
   }
 
@@ -966,7 +987,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
       // No complete extraction (an interrupted pass left none, #57): re-run from the clip instead of
       // re-reading partial frames. A pass already running picks the new mode up when it finishes.
       guard !userPassActive, let url = trimmedURL ?? currentFileURL else { return }
-      Task { await analyzeAndPlay(url: url) }
+      let reason = lastUserPass.reason
+      Task { await analyzeAndPlay(url: url, reason: reason) }  // the lifter chose the exercise: stored stays nil
     case .camera:
       liveDetector.reset()
       liveDetectionLocked = false
@@ -1216,7 +1238,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     // Live bells (#69): camera only, behind the detector switch plus the live switch. One detector
     // run at a time: a frame that arrives while the previous run is still going goes pose-only and
     // counts as dropped, like one whose run is slower than the wait below.
-    let bellDetector = (source == .camera && ModelSet.liveBellsEnabled) ? models.bellDetector : nil
+    // Not while framing or paused: those frames are never analysed, so a detector run would be thrown away.
+    let bellDetector = (source == .camera && !viewfinder && !paused && ModelSet.liveBellsEnabled) ? models.bellDetector : nil
     let runBell = bellDetector != nil && !bellBusy
     if bellDetector != nil {
       if runBell {
@@ -1618,7 +1641,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     previewSentThisSet = false
     lastLoggedPhase = nil
     recentBoxes = []
-    recordedSegments = []
+    segmentFinishes = []
     paused = false
     pausedTotal = 0
     pausedAt = nil
@@ -1694,7 +1717,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       let time = pts - (cameraFirstTime ?? pts) - pausedTotal
       duration = time
       currentTime = time
-      log.event("camera_resume", ["at_s": duration, "paused_s": gap, "segment": recordedSegments.count])
+      log.event("camera_resume", ["at_s": duration, "paused_s": gap, "segment": segmentFinishes.count])
     }
     cameraFramesDelivered += 1
     guard !paused else {
@@ -1736,17 +1759,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     log.event(
       "camera_rotate",
-      ["from": cameraOrientation.rawValue, "to": wanted.rawValue, "segment": recordedSegments.count + 1, "at_s": duration])
+      ["from": cameraOrientation.rawValue, "to": wanted.rawValue, "segment": segmentFinishes.count + 1, "at_s": duration])
     attachCamera(position: position, orientation: wanted)
     if zoom != 1, let back = self.camera, back.zoomPresets.contains(zoom) {
       back.setZoom(zoom)
       cameraZoom = back.zoom
     }
-    Task {
-      if let finished, let url = await finished.finish() ?? finished.partialURL {
-        recordedSegments.append(url)
-      }
-    }
+    // The closed segment finishes on its own; Done collects it in order, however long finishWriting takes.
+    segmentFinishes.append(
+      Task { () -> URL? in
+        guard let finished else { return nil }
+        return await finished.finish() ?? finished.partialURL
+      })
   }
 
   func setWatchMode(_ on: Bool, from origin: String) {
@@ -1755,7 +1779,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
       log.event("watch_mode_refused", ["from": origin, "source": "\(source)"])
       return
     }
-    if !on, origin == "phone_button" || origin == "phone_doubletap" || origin == "phone_longpress" {
+    // Any explicit off, from the phone or the watch's own toggle, declines for the rest of the set; only the
+    // set ending turns it off silently (the 2026-09-15 review: an off from the wrist came back on the next
+    // wrist raise because only phone origins declined).
+    if !on, origin != "set_ended" {
       watchModeDeclined = true
     } else if on, origin == "watch" {
       watchModeDeclined = false
@@ -1828,13 +1855,14 @@ final class VideoPoseSession: NSObject, ObservableObject {
     recorder = next
     paused = true
     pausedAt = lastCameraPts
-    log.event("camera_pause", ["at_s": duration, "reps": pipeline.reps.count, "segment": recordedSegments.count])
+    log.event("camera_pause", ["at_s": duration, "reps": pipeline.reps.count, "segment": segmentFinishes.count])
     pushWatchStatus(force: true)
-    Task {
-      if let finished, let url = await finished.finish() ?? finished.partialURL {
-        recordedSegments.append(url)
-      }
-    }
+    // The closed segment finishes on its own; Done collects it in order, however long finishWriting takes.
+    segmentFinishes.append(
+      Task { () -> URL? in
+        guard let finished else { return nil }
+        return await finished.finish() ?? finished.partialURL
+      })
   }
 
   /// Carries on where the pause began: the gap leaves live time on the next frame, and the suspended recorder
@@ -1853,6 +1881,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     viewfinderSince = nil
     stopCamera()
     recorder = nil
+    segmentFinishes = []  // a segment of the cancelled set must never land in the next set
     activity = .idle
     log.event("camera_cancel")
   }
@@ -1870,6 +1899,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
       setWatchMode(false, from: "set_ended")
     }
     updateKeepAwake()
+    pushWatchStatus(force: true)
+  }
+
+  /// The recording's pass will not land a final count (cancelled, interrupted, superseded by another set,
+  /// nothing to trim): the wrist must not sit on "Analyzing…" until the next Record (the 2026-09-15 review).
+  private func lastSetPassEnded(_ reason: String) {
+    guard analyzingLastSet else { return }
+    analyzingLastSet = false
+    log.event("watch_last_set", ["ended": reason])
     pushWatchStatus(force: true)
   }
 
@@ -1901,12 +1939,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
         "live_reps": livePipeline.reps.count, "live_bell_frames": liveBellFrames,
         "live_bell_avg_infer_ms": liveBellFrames == 0 ? 0 : liveBellTotalMs / Double(liveBellFrames),
         "live_fps": fps, "live_bells_dropped": liveBellsDropped,
-        "paused_s": pausedTime, "segments": recordedSegments.count + 1,
+        "paused_s": pausedTime, "segments": segmentFinishes.count + 1,
       ])
     Task {
       let finished = await recorder.finish()
-      var segments = recordedSegments
-      recordedSegments = []
+      // Segments closed by a pause or a rotation may still be finishing (finishWriting takes 100–300 ms):
+      // wait for each, in order, so Done right after Pause never reads an empty list and loses the set
+      // (the 2026-09-15 review).
+      let closing = segmentFinishes
+      segmentFinishes = []
+      var segments: [URL] = []
+      for task in closing { if let url = await task.value { segments.append(url) } }
       if let url = finished ?? recorder.partialURL {
         if finished == nil {
           statusMessage = "Recording was cut short, keeping what was captured"
@@ -1916,6 +1959,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       guard !segments.isEmpty else {
         statusMessage = "Nothing recorded"
+        lastSetPassEnded("nothing recorded")
         log.event("error", ["where": "recorder", "message": "finish returned no file"])
         activity = .idle
         return
@@ -2079,6 +2123,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     } catch {
       statusMessage = "Trim failed: \(error.localizedDescription)"
       log.event("error", ["where": "trim", "message": "\(error)"])
+      lastSetPassEnded("trim failed")
       activity = .idle
     }
   }
@@ -2233,7 +2278,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     let dir = docs.appendingPathComponent("logs", isDirectory: true)
     let now = Date()
-    let referenced = Self.referencedLogs(at: docs.appendingPathComponent("bugs.jsonl"))
+    // A bugs.jsonl that exists but cannot be read means the reported logs are unknown: prune nothing rather
+    // than delete evidence (the 2026-09-15 review).
+    guard let referenced = Self.referencedLogs(at: docs.appendingPathComponent("bugs.jsonl")) else {
+      log.event("error", ["where": "logs_prune", "message": "bugs.jsonl unreadable; nothing pruned"])
+      return
+    }
     let files = ((try? FileManager.default.contentsOfDirectory(
       at: dir, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey])) ?? [])
       .filter { $0.pathExtension == "jsonl" }
@@ -2247,9 +2297,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
       files: files.map { (name: $0.name, age: $0.age) }, referenced: referenced))
     var count = 0, freed = 0
     for file in files where victims.contains(file.name) {
-      if (try? FileManager.default.removeItem(at: dir.appendingPathComponent(file.name))) != nil {
+      do {
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(file.name))
         count += 1
         freed += file.size
+      } catch {
+        log.event("error", ["where": "logs_prune", "file": file.name, "message": "\(error)"])
       }
     }
     let kept = files.filter { $0.age > LogRetention.retentionSeconds && referenced.contains($0.name) }.count
@@ -2257,8 +2310,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Log file names referenced by bugs.jsonl (each report names its log); malformed lines are skipped.
-  private static func referencedLogs(at url: URL) -> Set<String> {
-    guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else { return [] }
+  /// The session logs bug reports name; nil when bugs.jsonl exists but cannot be read (no file: empty set).
+  private static func referencedLogs(at url: URL) -> Set<String>? {
+    guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+    guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else { return nil }
     var names = Set<String>()
     for line in text.split(separator: "\n") {
       guard let lineData = line.data(using: .utf8),

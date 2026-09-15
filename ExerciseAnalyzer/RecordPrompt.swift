@@ -54,19 +54,19 @@ enum RecordPrompt {
   }
 }
 
-/// Lock-screen / Control Center button (#70): the control's intent runs in the app's process and sets this
-/// flag; the session consumes it on activation, logs `launch_control` and starts the camera, the same as a
-/// RecordPrompt tap. Plain UserDefaults, not an App Group: both sides run in the app. The extension holds a
-/// mirror that writes the same key (it cannot import the host app).
+/// Lock-screen / Control Center button (#70): the control's intent (ExerciseAnalyzerControls) opens
+/// `exerciseanalyzer://live`; the app's scene hands the URL here, and the session, observing `live`, logs
+/// `launch_control` and starts the camera, the same as a RecordPrompt tap. A URL, not a flag: the extension
+/// and the app are separate processes with separate defaults, and a URL arrives exactly once, at the press.
 enum ControlLaunch {
-  private static let key = "ExerciseAnalyzer.controlLaunchLive"
+  static let scheme = "exerciseanalyzer"
+  static let live = Notification.Name("ExerciseAnalyzer.controlLaunchLive")
 
-  static func requestLive() { UserDefaults.standard.set(true, forKey: key) }
-
-  /// True once per request: clears the flag whether or not the camera was already running.
-  static func consumeLive() -> Bool {
-    guard UserDefaults.standard.bool(forKey: key) else { return false }
-    UserDefaults.standard.set(false, forKey: key)
+  /// True when the URL was the control's; posts `live` for the session.
+  @discardableResult
+  static func handle(_ url: URL) -> Bool {
+    guard url.scheme == scheme, url.host == "live" else { return false }
+    NotificationCenter.default.post(name: live, object: nil)
     return true
   }
 }

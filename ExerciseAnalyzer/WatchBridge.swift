@@ -59,8 +59,10 @@ final class WatchBridge: NSObject, ObservableObject {
     guard let raw = message["command"] as? String, let command = WatchCommand(rawValue: raw) else { return }
     if command == .watchActive || command == .watchInactive {
       Task { @MainActor in
-        self.watchActive = command == .watchActive
-        self.onEvent?("watch_scene", ["active": command == .watchActive])
+        let active = command == .watchActive
+        // Assign only on a change: the session's sink follows the wrist into watch mode on every emission.
+        if self.watchActive != active { self.watchActive = active }
+        self.onEvent?("watch_scene", ["active": active])
       }
       return
     }

@@ -21,7 +21,6 @@ final class RestTimer: ObservableObject {
   static let requestID = "rest-over"
 
   private var log: (String, [String: Any]) -> Void
-  private var authRequested = false
   /// In-front double tap at length (the notification covers suspended).
   private var tapTask: Task<Void, Never>?
 
@@ -29,11 +28,34 @@ final class RestTimer: ObservableObject {
     self.log = log
   }
 
-  /// A set ended with the phone live: start counting and schedule the tap.
+  /// A set ended with the phone live: start counting, then schedule the tap once permission is known. The
+  /// first Done after install asks (story 046: one prompt on the watch); scheduling before the answer added a
+  /// request the system refused, silently, so the first rest never tapped (the 2026-09-15 review).
   func setEnded() {
     restEnded = Date()
-    requestAuthOnce()
-    schedule()
+    let center = UNUserNotificationCenter.current()
+    center.getNotificationSettings { [weak self] settings in
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        switch settings.authorizationStatus {
+        case .notDetermined:
+          self.log("watch_notification_auth", ["status": settings.authorizationStatus.rawValue])
+          center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            Task { @MainActor [weak self] in
+              self?.log(
+                "watch_notification_auth",
+                ["requested": true, "granted": granted, "error": error.map { "\($0)" } ?? ""])
+              self?.schedule(notify: granted)
+            }
+          }
+        case .authorized, .provisional, .ephemeral:
+          self.schedule(notify: true)
+        default:
+          self.log("watch_notification_auth", ["status": settings.authorizationStatus.rawValue])
+          self.schedule(notify: false)
+        }
+      }
+    }
   }
 
   /// Screenshot rung: backdate the count without scheduling taps or asking for notification permission.
@@ -47,17 +69,29 @@ final class RestTimer: ObservableObject {
     log("watch_rest_cleared", [:])
   }
 
-  /// Schedule the tap at length: the notification for suspended, two haptics for in front.
-  func schedule() {
+  /// Schedule the tap at length: two haptics for in front, and, with permission, the notification for
+  /// suspended. `watch_rest` says which; `watch_rest_failed` says why the notification was refused.
+  func schedule(notify: Bool) {
     cancel()
-    log("watch_rest", ["seconds": length, "notified": true])
-    let content = UNMutableNotificationContent()
-    content.title = "Rest over"
-    let request = UNNotificationRequest(
-      identifier: Self.requestID, content: content,
-      trigger: UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(length), repeats: false))
-    UNUserNotificationCenter.current().add(request) { _ in }
     let seconds = length
+    if notify {
+      let content = UNMutableNotificationContent()
+      content.title = "Rest over"
+      let request = UNNotificationRequest(
+        identifier: Self.requestID, content: content,
+        trigger: UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(seconds), repeats: false))
+      UNUserNotificationCenter.current().add(request) { [weak self] error in
+        Task { @MainActor [weak self] in
+          if let error {
+            self?.log("watch_rest_failed", ["seconds": seconds, "message": "\(error)"])
+          } else {
+            self?.log("watch_rest", ["seconds": seconds, "notified": true])
+          }
+        }
+      }
+    } else {
+      log("watch_rest", ["seconds": seconds, "notified": false])
+    }
     tapTask = Task { [weak self] in
       try? await Task.sleep(for: .seconds(seconds))
       guard let self, !Task.isCancelled else { return }
@@ -73,27 +107,6 @@ final class RestTimer: ObservableObject {
     tapTask?.cancel()
     tapTask = nil
     UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.requestID])
-  }
-
-  /// Ask once, the first time a set ends (story 046: one prompt on the watch); without permission the count
-  /// still shows, the tap does not come.
-  private func requestAuthOnce() {
-    guard !authRequested else { return }
-    authRequested = true
-    let center = UNUserNotificationCenter.current()
-    center.getNotificationSettings { [weak self] settings in
-      Task { @MainActor [weak self] in
-        self?.log("watch_notification_auth", ["status": settings.authorizationStatus.rawValue])
-        guard settings.authorizationStatus == .notDetermined else { return }
-        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-          Task { @MainActor [weak self] in
-            self?.log(
-              "watch_notification_auth",
-              ["requested": true, "granted": granted, "error": error.map { "\($0)" } ?? ""])
-          }
-        }
-      }
-    }
   }
 }
 
