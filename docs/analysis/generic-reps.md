@@ -34,8 +34,8 @@ the known count. Bar for wiring it as the fallback: ±1 on at least three of the
 
 ## Results
 
-Host run 2026-09-13 (`just test` green, `swift test --filter TuningReports.testGenericRepCounter`; raw output in
-`/tmp/bell-lab/generic-reps-table.txt`). Rep intervals printed by the report are omitted here except where noted.
+Host run 2026-09-13 (`swift test --filter TuningReports.testGenericRepCounter`; the report prints the table
+below and the rep intervals, omitted here except where noted).
 
 | Fixture | Known | Generic | Signal | Period | r | Conf | Detector conf | Hit (±1) |
 |---|---|---|---|---|---|---|---|---|

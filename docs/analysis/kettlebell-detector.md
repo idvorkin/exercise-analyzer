@@ -82,7 +82,8 @@ What the numbers say (small model, first trial):
   and `--poses-from` adds bells to a fixture without touching its poses: the four sample fixtures now carry bells.
 - Mac, 4-rep clip: bell in play in 87 % of frames; the pass went from 60 to 40 fps with the detector (release
   build, Vision on the Mac's GPU/ANE). Simulator (CPU): pose 27 ms, detector 74 ms per frame, 9 fps for the pass.
-  Phone cost: pending the first `offline_pass` with the detector bundled. Commit 3b997e1.
+  Phone cost (IMG_4342, 3989 frames): 91 s at 43.7 fps with the detector at 12 ms a frame, memory flat at
+  73 MB, the bell seen in 2962 frames. Commit 3b997e1.
 
 ## 2026-09-12: other equipment (dumbbells, barbells, bench) with the same nano
 

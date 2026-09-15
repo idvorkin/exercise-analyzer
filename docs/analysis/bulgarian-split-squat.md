@@ -37,6 +37,5 @@ Reports: `TuningReports.testBulgarianPhoneSetUnderThresholds`, `testBulgarianTen
   and this note already listed BOTTOM as a phase). The machine now rests in `bottom` from the dip
   confirmation until the head rises a second `riseFraction` (pistol parity). Reps byte-identical pre/post on
   all three Bulgarian tracks (8/8/8); frames 31.16–31.19 read `bottom` in rep 7's dip; no `bottom` outside rep
-  spans. Evidence: `BulgarianBottomPhaseTests` over the archived track. Also note the brief's premise was
-  wrong: the log's `phase_pill` seeks to 30.72 already landed on rep 7's bottom peak (the "(descending)"
-  annotation was that frame's live phase, not the tapped pill) — the lookup worked, the phase was missing.
+  spans. Evidence: `BulgarianBottomPhaseTests` over the archived track. The pill's seek had always landed on
+  the bottom peak; it was the live phase under the playhead that never said `bottom`.

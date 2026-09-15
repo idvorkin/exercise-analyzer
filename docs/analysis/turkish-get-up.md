@@ -144,17 +144,12 @@ between ↓ Lunge and ↓ Elbow; the count and the other stages are unaffected.
 
 ### 2026-09-13: floor stage, both ends ([#48](https://github.com/idvorkin/exercise-analyzer/issues/48))
 
-Igor (voice): a get-up starts and ends on the floor — the gallery and the pills should show it, both ways up
-and down; pose first ("see where we're lying"), timing heuristic as fallback. The half-second signal tables
-above decide it without the fallback: in all four reps the stretch 2 s before the rep-start floor frame is
-flat (median uprightness at or below `lyingMax`), with the first raw rise 0.5–1.5 s later —
-2sides rep 1: floor 22.0 (flat −0.65), first movement 23.0; rep 2: floor 95.5 (flat −0.19), movement ~96.0;
-2min rep 1: floor 20.9 (flat −0.9), movement 22.0; rep 2: floor 88.9 (flat −0.9), movement 90.0. A 1.5 s lead
-would already stand in the movement on 2sides rep 2 (raw +0.11 at 96.0), so the lead is 2.0 s
-(`floorLeadSeconds`), anchored on the rep-start floor frame, taken from a window of flat-lying frames (an
-abandoned false start never leaves the floor, so the window survives it; a completed rep starts a new one).
-Floor ↓ is the completion frame, the first flat frame after the elbow — no rule needed. Lying flat now
-reports floor, so the Floor pill (in place of Lying — still six pills) lights while lying and the roll to
-the elbow takes over from it. Counts and every other stage byte-identical pre/post on both fixtures (2/2)
-and on all three archived get-up tracks; floor positions bracket their reps, and the lying rest between reps
-reports floor so the pill stays lit. Evidence: `GetUpStageTests` floor windows over both fixtures.
+Igor, by voice: a get-up starts and ends on the floor, and the gallery and the pills should show it both
+ways. The rule: Floor is the flattest lying frame 2.0 s (`floorLeadSeconds`) before the rep-start floor
+frame, taken from a window of flat-lying frames (an abandoned false start never leaves the floor, so the
+window survives it); Floor ↓ is the completion frame, the first flat frame after the elbow. Lying flat now
+reports floor, so the Floor pill replaces Lying (still six pills) and lights while lying until the roll to
+the elbow. Why 2.0 s: on all four fixture reps the 2 s before the floor frame are flat (median uprightness at
+or below `lyingMax`) and the first rise comes 0.5–1.5 s later; a 1.5 s lead already stands in the movement on
+one rep (2sides rep 2). Counts and every other stage are byte-identical before and after on both fixtures
+and on the three archived get-up tracks. Evidence: `GetUpStageTests` (floor windows over both fixtures).

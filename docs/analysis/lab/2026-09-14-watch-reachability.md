@@ -1,6 +1,6 @@
 # 2026-09-14 — watch reachability flapping: lab result and the #76 experiment
 
-## Result (from /tmp/bell-lab/logs/swing-*.jsonl, 81 sessions, read-only)
+## Result (the phone's session logs of 2026-09-12 and 13, 81 sessions)
 
 49 sessions show any `watch_reachable` (918 events, 291 down-edges, 248 complete stretches); 32 never see the
 watch. Stretches: median 4.2 s, p90 101 s, max 67 min (<1s: 67, 1–5s: 65, 5–30s: 59, 30s–2m: 35, >2m: 22);
