@@ -391,6 +391,12 @@ struct ContentView: View {
         Text("Detected: \(detection.exercise.definition.name) (\(detection.confidence)%)")
         Text(detection.reason)
       }
+      Divider()
+      // The bell detector's switch (story 034, #85): off by default because it halves the offline pass; the dot
+      // on the bell needs it on. Reopening a set analyzed without it runs the set through the detector.
+      Toggle(isOn: Binding(get: { session.bellDetectorOn }, set: { session.setBellDetector($0) })) {
+        Label("Bell detector (slower pass)", systemImage: "circle.circle")
+      }
     } label: {
       HStack(spacing: 3) {
         Text("reps · " + session.exercise.definition.name)

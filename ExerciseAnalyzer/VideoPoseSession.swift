@@ -71,6 +71,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var canSave = false
   /// Normalized image rect to zoom to for the "me view": stable over a replayed track, slowly adapting while live.
   @Published private(set) var personCrop: CGRect?
+  /// The bell detector's switch as the menu shows it (story 034, #85); ModelSet holds the truth.
+  @Published private(set) var bellDetectorOn = ModelSet.bellDetectorEnabled
   /// Which exercise the lifter chose (or Auto), and the exercise currently being analyzed.
   @Published private(set) var exerciseMode: ExerciseMode
   @Published private(set) var exercise: ExerciseKind = .kettlebellSwing
@@ -964,6 +966,14 @@ final class VideoPoseSession: NSObject, ObservableObject {
         "watch_last_set",
         ["reps": analyzed.reps.count, "exercise": chosen.rawValue, "seconds": clipSeconds])
     }
+  }
+
+  /// The bell detector switch from the exercise menu (story 034, #85). The set on screen keeps its analysis; the
+  /// next open of a set analyzed without the detector runs it through the detector (story 035), and the launch
+  /// refresh does the same for the rest.
+  func setBellDetector(_ on: Bool) {
+    models.setBellDetector(on)
+    bellDetectorOn = ModelSet.bellDetectorEnabled
   }
 
   /// Lifter picked an exercise (or Auto): persist it and re-analyze whatever is loaded, without re-running inference.

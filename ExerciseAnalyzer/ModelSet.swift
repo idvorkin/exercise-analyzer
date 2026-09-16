@@ -103,6 +103,22 @@ final class ModelSet {
 
   private var bellDetectorForced = false
 
+  /// The lifter's switch (story 034, #85): loads the detector now or drops it, and remembers the choice in the
+  /// `bellDetector` default so the next launch has it. Until 2026-09-16 the default had no control in the app,
+  /// so the dot never appeared on Igor's own launches. A detector an instrumented run forced stays until that
+  /// run ends. Sets analyzed without the detector re-run through it when reopened (story 035).
+  func setBellDetector(_ on: Bool) {
+    UserDefaults.standard.set(on, forKey: "bellDetector")
+    log.event("bell_detector", ["on": on])
+    if on {
+      if bellDetector == nil { loadBellDetector() }
+      bellDetectorForced = false
+    } else if bellDetector != nil, !bellDetectorForced {
+      bellDetector = nil
+      log.event("model_released", ["model": "yoloe-26n-kettlebell", "reason": "switch"])
+    }
+  }
+
   /// Drain the compute-plan summaries outstanding now, including any appended while waiting (a forced bell
   /// load appends one after ready): a plan must never overlap inference (#43).
   func waitForPlans() async {
