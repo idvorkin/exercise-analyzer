@@ -55,16 +55,30 @@ final class CrashReports: NSObject, MXMetricManagerSubscriber {
       for i in 0..<min(src.count, crashFolderPath.count - 64) { crashFolderPath[i] = src[i] }
     }
     for sig in [SIGSEGV, SIGBUS, SIGABRT, SIGILL, SIGTRAP, SIGFPE] { signal(sig, crashSignalHandler) }
+    // An Objective-C exception aborts through SIGABRT, and the signal backtrace above never says which one: the
+    // 2026-09-13 crash showed AVFCapture throwing inside stopRunning and nothing more. This handler runs first,
+    // on the throwing thread, and writes the name, the reason and the symbolized stack.
+    NSSetUncaughtExceptionHandler { exception in
+      let text = "exception \(exception.name.rawValue)\n\(exception.reason ?? "")\n"
+        + exception.callStackSymbols.joined(separator: "\n") + "\n"
+      try? text.write(
+        to: CrashReports.folder.appendingPathComponent("exception-\(Int(Date().timeIntervalSince1970)).txt"),
+        atomically: true, encoding: .utf8)
+    }
   }
 
-  /// Signal logs from earlier runs, announced once in this session's log and then renamed so they are not repeated.
+  /// Signal and exception logs from earlier runs, announced once in this session's log and then renamed so they
+  /// are not repeated. A renamed file keeps its `.txt` suffix, so the `.reported.` marker is what excludes it:
+  /// matching on the suffix alone re-reported the same 2026-09-13 signal at every launch, renaming it once more
+  /// each time (`signal-….reported.reported.….txt`).
   func reportSignalLogs(_ log: (String, [String: Any]) -> Void) {
     let files = (try? FileManager.default.contentsOfDirectory(atPath: Self.folder.path)) ?? []
-    for name in files where name.hasPrefix("signal-") && name.hasSuffix(".txt") {
+    for name in files.sorted()
+    where (name.hasPrefix("signal-") || name.hasPrefix("exception-")) && name.hasSuffix(".txt") && !name.contains(".reported.") {
       let url = Self.folder.appendingPathComponent(name)
       let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
       let top = text.split(separator: "\n").prefix(12).joined(separator: " | ")
-      log("crash_report", ["kind": "signal", "file": "crashes/\(name)", "top": top])
+      log("crash_report", ["kind": name.hasPrefix("signal-") ? "signal" : "exception", "file": "crashes/\(name)", "top": top])
       try? FileManager.default.moveItem(at: url, to: Self.folder.appendingPathComponent(name.replacingOccurrences(of: ".txt", with: ".reported.txt")))
     }
   }
