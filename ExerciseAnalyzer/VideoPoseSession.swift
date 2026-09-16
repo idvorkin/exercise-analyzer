@@ -476,6 +476,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
       "avg_infer_ms": summary.averageInferenceMs, "fps": fps,
       "bell_frames": summary.bellFrames, "bell_avg_infer_ms": summary.bellAverageInferenceMs,
       "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
+      // The read's clock against the asset's (#80): a read_end past clip_s means the reader gave media time and
+      // the frames were mapped through the edit list (segments), dropping the ones the edit hides.
+      "read_end_s": summary.timeline.readEnd, "clip_s": summary.timeline.duration,
+      "segments": summary.timeline.segments, "timeline_mapped": summary.timeline.mapped,
+      "frames_dropped": summary.timeline.dropped,
     ]
     if case .replay(let entry, let replayWhere, _) = job.kind {
       fields["where"] = replayWhere
@@ -651,6 +656,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
       // Only a model this build has and the set lacks means a re-run; a set made with more models than this build
       // runs (the detector off again) keeps what it has. Files from before the field were pose-only.
       let storedModels = recents.models(for: entry).isEmpty ? ["yolo26n-pose"] : recents.models(for: entry)
+      // A stored track that runs past its clip was read on the media clock of an edited clip (#80): its poses sit
+      // seconds ahead of the picture. Back to the video; the extraction maps the timeline now.
+      let clipSeconds = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? 0
+      if let trackEnd = pipeline.track.frames.last?.time,
+        StoredSetPlan.trackOverruns(clipDuration: clipSeconds, trackEnd: trackEnd)
+      {
+        log.event(
+          "recents_rerun",
+          ["id": entry.id, "reason": "track_past_clip", "track_end_s": trackEnd, "clip_s": clipSeconds, "frames": pipeline.track.frames.count])
+        await analyzeAndPlay(url: url, reason: StoredSetReason.rerunTimeline.rawValue, stored: pipeline.exercise)
+        return
+      }
       let fresh: ExerciseDetection?
       if case .auto = exerciseMode, !recents.isStale(entry) {
         fresh = ExerciseDetector.detect(frames: extractedFrames)

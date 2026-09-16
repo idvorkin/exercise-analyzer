@@ -27,6 +27,18 @@ enum OfflineAnalyzer {
     /// The bell detector's share (#18): frames it ran on and its mean time per frame; zero without a detector.
     var bellFrames = 0
     var bellAverageInferenceMs = 0.0
+    var timeline = Timeline()
+  }
+
+  /// How the read's clock compared with the asset's (#80): the last pts the reader gave, the asset's duration,
+  /// its edit-list segments, and whether the frames had to be mapped onto the asset's timeline (dropping the ones
+  /// an edit hides).
+  struct Timeline {
+    var readEnd = 0.0
+    var duration = 0.0
+    var segments = 0
+    var mapped = false
+    var dropped = 0
   }
 
   /// Captures the result `predict` delivers synchronously on the calling thread.
@@ -69,6 +81,10 @@ enum OfflineAnalyzer {
       throw OfflineError.noVideoTrack
     }
     let duration = try await asset.load(.duration).seconds
+    // The edit list (a Photos trim keeps the samples before the cut and maps around them) and one frame's worth of
+    // tolerance, for the timeline check after the read.
+    let segments = try await track.load(.segments)
+    let frameStep = 1 / max(1, Double((try? await track.load(.nominalFrameRate)) ?? 30))
     let composition = try await AVMutableVideoComposition.videoComposition(withPropertiesOf: asset)
 
     // Detached so the reader loop never blocks the main actor. A detached task does not inherit cancellation, so
@@ -170,10 +186,41 @@ enum OfflineAnalyzer {
       if reader.status == .failed {
         throw OfflineError.readerFailed(reader.error?.localizedDescription ?? "unknown")
       }
+      // The frames must sit on the player's clock. The reader hands out asset time for an edited clip on macOS 27
+      // (a passthrough trim from 2 s read back as 0…3.47 s of a 3.5 s asset, 2026-09-16), yet the pistol set of
+      // #80 came back 1221 frames over a 38.7 s clip, its poses two seconds ahead of the picture: a read that runs
+      // past the asset was stamped in the track's media time. It is mapped through the edit list here, and the
+      // frames the edit hides are dropped; a read inside the asset is left alone (an identity edit maps to itself).
+      var timeline = Timeline(readEnd: frames.last?.time ?? 0, duration: duration, segments: segments.count)
+      if let last = frames.last, duration > 0, last.time > duration + frameStep, !segments.isEmpty {
+        let mapped = frames.compactMap { frame -> FrameRecord? in
+          let media = CMTime(seconds: frame.time, preferredTimescale: 600)
+          guard let segment = segments.first(where: { !$0.isEmpty && $0.timeMapping.source.containsTime(media) })
+          else { return nil }
+          let mapping = segment.timeMapping
+          let rate = mapping.target.duration.seconds / max(mapping.source.duration.seconds, frameStep)
+          let time = mapping.target.start.seconds + (frame.time - mapping.source.start.seconds) * rate
+          return FrameRecord(
+            time: time, imageSize: frame.imageSize, pose: frame.pose, box: frame.box, analysis: frame.analysis,
+            bells: frame.bells)
+        }
+        timeline.mapped = true
+        timeline.dropped = frames.count - mapped.count
+        frames = mapped
+      }
+      // Whatever the clock, a frame the player can never reach is not kept: a stored track that runs past its
+      // clip is what sends a set back to its video on open (StoredSetPlan.trackOverruns), and a track that came
+      // back the same way would send it back at every open.
+      if duration > 0 {
+        let before = frames.count
+        frames.removeAll { $0.time > duration + frameStep }
+        timeline.dropped += before - frames.count
+      }
       let summary = Summary(
         frames: frames.count, elapsed: CACurrentMediaTime() - started,
         averageInferenceMs: frames.isEmpty ? 0 : inferenceTotal / Double(frames.count),
-        bellFrames: bellFrames, bellAverageInferenceMs: bellFrames == 0 ? 0 : bellTotal / Double(bellFrames))
+        bellFrames: bellFrames, bellAverageInferenceMs: bellFrames == 0 ? 0 : bellTotal / Double(bellFrames),
+        timeline: timeline)
       return (frames, summary)
     }
     return try await withTaskCancellationHandler {

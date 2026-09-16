@@ -18,6 +18,23 @@ private func detection(_ exercise: ExerciseKind, _ confidence: Int) -> ExerciseD
   ExerciseDetection(exercise: exercise, confidence: confidence, reason: "test", stats: [:])
 }
 
+/// open(recent:) sends a stored track back to its video when the track runs past the clip (#80): the pistol set
+/// of 2026-09-15 had 1221 frames to 40.66 s over a 38.68 s clip and its skeleton two seconds ahead of the lifter.
+final class TrackTimelineTests: XCTestCase {
+  func testTrackPastClipRerunsFromVideo() {
+    XCTAssertTrue(StoredSetPlan.trackOverruns(clipDuration: 38.68, trackEnd: 40.66))
+  }
+
+  func testTrailingFrameOrRoundedDurationIsNotAnOverrun() {
+    XCTAssertFalse(StoredSetPlan.trackOverruns(clipDuration: 38.68, trackEnd: 38.70))
+    XCTAssertFalse(StoredSetPlan.trackOverruns(clipDuration: 23.65, trackEnd: 23.63))
+  }
+
+  func testUnknownClipLengthDecidesNothing() {
+    XCTAssertFalse(StoredSetPlan.trackOverruns(clipDuration: 0, trackEnd: 40.66))
+  }
+}
+
 /// refreshStaleEntries (:218–234): stale or models-changed entries only; models-changed re-runs from the clip,
 /// otherwise the stored poses are replayed, re-detecting in Auto at >= 70.
 final class RefreshPlanTests: XCTestCase {

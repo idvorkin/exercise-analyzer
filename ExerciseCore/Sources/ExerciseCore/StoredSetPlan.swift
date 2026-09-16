@@ -17,6 +17,9 @@ public enum StoredSetReason: String, Equatable {
   case recentsRedetect = "recents_redetect"
   /// The set lacks a model this build runs; back to the video (story 035).
   case rerunModels = "rerun_models"
+  /// The stored track runs past its clip: it was read on the media clock of an edited clip and its poses sit
+  /// ahead of the picture (#80); back to the video, which maps the timeline now.
+  case rerunTimeline = "rerun_timeline"
 }
 
 public enum StoredSetDecision: Equatable {
@@ -58,6 +61,13 @@ public enum StoredSetPlan {
       return .replay(exercise: detection.exercise, reason: .recentsRedetect)
     }
     return .keep
+  }
+
+  /// A stored track is on the wrong clock when it runs past the clip it plays over (#80: 1221 frames to 40.7 s
+  /// over a 38.7 s pistol clip, the skeleton two seconds ahead of the lifter). Half a second of slack covers a
+  /// trailing frame or a rounded duration; an unknown clip length (0) decides nothing.
+  public static func trackOverruns(clipDuration: Double, trackEnd: Double, slack: Double = 0.5) -> Bool {
+    clipDuration > 0 && trackEnd > clipDuration + slack
   }
 
   /// Which exercise to analyze from extracted poses. A fixed mode is for what the lifter records next, not a
