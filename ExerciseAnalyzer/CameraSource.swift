@@ -86,10 +86,20 @@ final class CameraSource: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     }
   }
 
+  /// Stops on the capture queue and keeps the session and its preview layer alive until it has stopped. The
+  /// session's owner drops both right after calling this; released on the main thread while stopRunning is
+  /// still in flight, the layer's teardown reconfigures the session under it (an AVFCapture exception in
+  /// stopRunning, the 2026-09-13 crash) and the session's dealloc waits on the busy queue (a main-thread hang the
+  /// watchdog killed on 2026-09-14). Holding them here moves that last release behind the stop.
   func stop() {
-    queue.async { [session] in
+    queue.async { [session, previewLayer] in
       if session.isRunning { session.stopRunning() }
+      _ = previewLayer
     }
+  }
+
+  deinit {
+    stop()
   }
 
   func captureOutput(
