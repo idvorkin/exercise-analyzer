@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 012:
 
 - **Summary:** See a day's training as sets per exercise, not a list of files
-- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header is Igor's check
+- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header is Igor's check; the repeated-exercise row in [cdbc435](https://github.com/idvorkin/exercise-analyzer/commit/cdbc435), verified on the simulator (a Yesterday with two swing sets under a Today with four), on the phone since 2026-09-16
 
 #### Use Case:
 - **As a** lifter reviewing the week
@@ -22,7 +22,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I open Workouts
 - **Then:** today shows Kettlebell Swing with 3 sets and their total reps, Turkish Get-Up with 2 sets, and each set as a thumbnail with its reps, score and time; every other day is headed by its weekday, date and year ("Wednesday, Apr 10 ’24")
 
-- **Issues:** [#35](https://github.com/idvorkin/exercise-analyzer/issues/35)
+- **Scenario:** The same exercise on several days
+- **Given:** swings on Saturday and swings again today
+- **When:** I open Workouts and expand Saturday
+- **Then:** Saturday's swing row draws with every one of its sets, the same as today's; a day's header never counts sets its rows do not show
+
+- **Issues:** [#35](https://github.com/idvorkin/exercise-analyzer/issues/35); [#78](https://github.com/idvorkin/exercise-analyzer/issues/78), [#79](https://github.com/idvorkin/exercise-analyzer/issues/79) Saturday's four swing sets drew as a blank band under a header that counted them (the row's id was the exercise name, repeated across days)
 
 ---
 
@@ -148,7 +153,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I launch the app and leave it on the gallery
 - **Then:** those sets go through the models again from their clips one at a time in the background (`recents_rerun` and `offline_pass` with `where: refresh` in the log), each replacing its own entry, without my opening them; opening a set while that runs takes priority and the interrupted set waits for the next launch; a set whose clip is out of reach is refreshed from its stored poses, and that replay runs today's tracker over the stored sightings (the bell a set was saved with is never kept through a replay)
 
-- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#49](https://github.com/idvorkin/exercise-analyzer/issues/49)
+- **Scenario:** A stored track that runs past its clip
+- **Given:** a set whose stored track ends later than its clip plays (the pistol set of 2025-12-08: 1221 frames to 40.66 s over a 38.68 s clip, the skeleton two seconds ahead of the lifter)
+- **When:** I open it
+- **Then:** the set goes back to its video (`recents_rerun` with reason track_past_clip, then `analyzed` with reason rerun_timeline), the pass keeps only frames the player can reach and logs the read's clock against the clip's in `offline_pass` (read_end_s, clip_s, segments, timeline_mapped, frames_dropped), the skeleton sits on the lifter, and a second open runs nothing
+
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#49](https://github.com/idvorkin/exercise-analyzer/issues/49), [#80](https://github.com/idvorkin/exercise-analyzer/issues/80) the track past its clip ([95b5173](https://github.com/idvorkin/exercise-analyzer/commit/95b5173), host tests and the simulator's edit-list clip; the reopened pistol set on the phone is Igor's check)
 
 ---
 

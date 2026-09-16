@@ -49,7 +49,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 036:
 
 - **Summary:** A crash comes back with the logs (technical)
-- **Status:** implemented in [42b50ff](https://github.com/idvorkin/exercise-analyzer/commit/42b50ff); verified by build and by the first crash it caught (the Float16 tensor read, fixed in the same commit); the pruning in [#72](https://github.com/idvorkin/exercise-analyzer/issues/72) on the phone since 2026-09-13
+- **Status:** implemented in [42b50ff](https://github.com/idvorkin/exercise-analyzer/commit/42b50ff); verified by build and by the first crash it caught (the Float16 tensor read, fixed in the same commit); the pruning in [#72](https://github.com/idvorkin/exercise-analyzer/issues/72) on the phone since 2026-09-13; the exception file and the once-only announcement in [183db20](https://github.com/idvorkin/exercise-analyzer/commit/183db20), on the phone since 2026-09-16, verified by the next exception
 
 #### Use Case:
 - **As a** developer reading a session log that stops mid-work
@@ -62,12 +62,17 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** it is launched again and I run `just pull-logs`
 - **Then:** the new session's log has a `crash_report` event naming a JSON file under `crashes/` with the exception, signal and reason, the file is pulled with the logs, and `just symbolicate <file>` prints the app's frames as symbols
 
+- **Scenario:** The crash is an Objective-C exception and MetricKit has not delivered yet
+- **Given:** the app aborted on an exception (an AVFoundation call that threw)
+- **When:** it is launched again
+- **Then:** `crashes/` holds `exception-<epoch>.txt` with the exception's name, reason and stack beside the signal handler's `signal-<epoch>.txt`, the new session's log announces each once as `crash_report` (kind exception or signal, the file's first lines as `top`), and a later launch announces neither again
+
 - **Scenario:** Old session logs are pruned at launch
 - **Given:** session logs older than 30 days, one of them named by a report in bugs.jsonl
 - **When:** the app launches
 - **Then:** the new session's log carries `logs_pruned` (count, bytes freed, kept_for_reports) and the old logs are gone except the reported one
 
-- **Issues:** [#72](https://github.com/idvorkin/exercise-analyzer/issues/72) prune session logs older than 30 days
+- **Issues:** [#72](https://github.com/idvorkin/exercise-analyzer/issues/72) prune session logs older than 30 days; [#87](https://github.com/idvorkin/exercise-analyzer/issues/87) the same signal file announced at every launch, no exception reason
 
 ---
 

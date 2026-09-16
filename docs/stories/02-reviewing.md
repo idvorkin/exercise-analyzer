@@ -173,7 +173,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 034:
 
 - **Summary:** See the bell on the video, and its weight from its colour
-- **Status:** implemented, **off by default** (`SWING_BELLS=1` or the `bellDetector` default turns it on); the detector in [3b997e1](https://github.com/idvorkin/exercise-analyzer/commit/3b997e1), [ab4f1a5](https://github.com/idvorkin/exercise-analyzer/commit/ab4f1a5), [9552f70](https://github.com/idvorkin/exercise-analyzer/commit/9552f70), the tracker in [85ed8e5](https://github.com/idvorkin/exercise-analyzer/commit/85ed8e5), [be9c75d](https://github.com/idvorkin/exercise-analyzer/commit/be9c75d), [fd97209](https://github.com/idvorkin/exercise-analyzer/commit/fd97209), [a6a2cf5](https://github.com/idvorkin/exercise-analyzer/commit/a6a2cf5), [a9065a5](https://github.com/idvorkin/exercise-analyzer/commit/a9065a5), live bells in [f17bf11](https://github.com/idvorkin/exercise-analyzer/commit/f17bf11); verified on the host (`BellTests`, `TuningReports.testBellTrackerHeldPerFixture`), the Mac model rung and the phone; the numbers, by proxy and by eye, are in [docs/analysis/kettlebell-detector.md](../analysis/kettlebell-detector.md); the dot on the video with `SWING_BELLS=1` is Igor's check
+- **Status:** implemented, **off by default**; the "Bell detector (slower pass)" toggle in the exercise menu turns it on ([22162af](https://github.com/idvorkin/exercise-analyzer/commit/22162af), on the phone since 2026-09-16, Igor's check pending: the dot on a swing set reopened with the switch on), as do `SWING_BELLS=1` and the `bellDetector` default; the detector in [3b997e1](https://github.com/idvorkin/exercise-analyzer/commit/3b997e1), [ab4f1a5](https://github.com/idvorkin/exercise-analyzer/commit/ab4f1a5), [9552f70](https://github.com/idvorkin/exercise-analyzer/commit/9552f70), the tracker in [85ed8e5](https://github.com/idvorkin/exercise-analyzer/commit/85ed8e5), [be9c75d](https://github.com/idvorkin/exercise-analyzer/commit/be9c75d), [fd97209](https://github.com/idvorkin/exercise-analyzer/commit/fd97209), [a6a2cf5](https://github.com/idvorkin/exercise-analyzer/commit/a6a2cf5), [a9065a5](https://github.com/idvorkin/exercise-analyzer/commit/a9065a5), live bells in [f17bf11](https://github.com/idvorkin/exercise-analyzer/commit/f17bf11); verified on the host (`BellTests`, `TuningReports.testBellTrackerHeldPerFixture`), the Mac model rung and the phone; the numbers, by proxy and by eye, are in [docs/analysis/kettlebell-detector.md](../analysis/kettlebell-detector.md); the dot on the video with `SWING_BELLS=1` is Igor's check
 - **Why:** Igor, 2026-09-12: fun, made nothing better yet, halves the pass; so it stays off until it earns its keep.
 
 #### Use Case:
@@ -197,7 +197,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I record a swing set
 - **Then:** a dot in the bell's colour rides on the bell in the preview and the recording's HUD as I move; the set is still trimmed and analyzed by the offline pass afterwards as before, and with the switches off the recording is unchanged
 
-- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#69](https://github.com/idvorkin/exercise-analyzer/issues/69)
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#69](https://github.com/idvorkin/exercise-analyzer/issues/69), [#85](https://github.com/idvorkin/exercise-analyzer/issues/85) no bell on the overlay: the switch had no control in the app
 
 ---
 

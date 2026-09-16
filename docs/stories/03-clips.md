@@ -42,6 +42,8 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I pick a clip from Photos
 - **Then:** the clip is shown within a second and its analysis starts, with no copy created in the app's storage
 
+- **Issues:** [#80](https://github.com/idvorkin/exercise-analyzer/issues/80) a Photos clip's stored track ran two seconds past the clip and its skeleton ahead of the lifter; the set goes back to its video (story 035, [95b5173](https://github.com/idvorkin/exercise-analyzer/commit/95b5173))
+
 ---
 
 ### User Story 011:
@@ -101,3 +103,31 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** the analysis stops within a second, the clip stays open and paused with no reps, and nothing is added to Workouts
 
 - **Issues:** [#30](https://github.com/idvorkin/exercise-analyzer/issues/30), [#37](https://github.com/idvorkin/exercise-analyzer/issues/37) Cancel only landed after the whole pass
+
+---
+
+### User Story 049:
+
+- **Summary:** The trim keeps the reps and cuts the walk between them
+- **Status:** not implemented ([#83](https://github.com/idvorkin/exercise-analyzer/issues/83))
+- **Why:** Igor, 2026-09-16, after a swing set of ten each side with a pause on the wrist between them: "When we're in kettlebell mode, this is a special trim where I paused on my watch so I'll have 10 on the right and 10 on the left or vice versa. When you're doing the trim for the swings, cut that middle part when there are no sessions because it's really like two clips of swings trimmed together."
+
+#### Use Case:
+- **As a** lifter who does a set in two halves, one hand then the other, with a walk or a hand switch between
+- **I want to** have the saved clip keep the two runs of reps and lose the seconds between them
+- **so that** the set plays as swings, not as swings, a walk and more swings
+
+#### Acceptance Criteria:
+- **Scenario:** A set with a gap between two runs of reps
+- **Given:** a swing set whose reps come in two runs with more than a few seconds of no reps between them (the 2026-09-16 15:45 set: reps 1–10 at 5–20 s, reps 11–20 at 33–49 s, 12 s of walking between)
+- **When:** the set is trimmed after recording, or I trim it by hand
+- **Then:** the clip keeps each run with the same padding the trim gives a set today and drops the gap, the two runs are joined the way a paused recording's segments are joined (story 040), the rep numbers run on across the join, and the analysis is the stored poses replayed on the joined clip with no second pass
+
+- **Scenario:** A set with one run
+- **Given:** a set whose reps have no gap longer than the threshold
+- **When:** it is trimmed
+- **Then:** nothing changes from today's trim
+
+- **Notes:** The stored analysis (`analysis.json` per set, story 035) already keeps every pose, so a trim replays it rather than re-running the models; that is the "data file for what we processed" the same report asked for. The gap threshold and whether a hand-trim gets a control for it are open.
+
+- **Issues:** [#83](https://github.com/idvorkin/exercise-analyzer/issues/83)

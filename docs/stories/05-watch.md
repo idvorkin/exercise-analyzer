@@ -75,6 +75,8 @@ the first frame (story 001).
 - **Notes:** The idle page has two buttons: Record, which records from the camera's first frame, and Preview
   (story 047), which opens the camera without recording.
 
+- **Issues:** [#86](https://github.com/idvorkin/exercise-analyzer/issues/86) a Cancel from the wrist crashed the phone twice (the camera's teardown raced its own stop; fixed in [d4afadd](https://github.com/idvorkin/exercise-analyzer/commit/d4afadd), on the phone since 2026-09-16, Igor's check pending: Record or Preview from the watch, then Cancel)
+
 ---
 
 ### User Story 018:
@@ -414,14 +416,41 @@ the first frame (story 001).
 
 ---
 
-### Not stories, while 018 stands
+### User Story 048:
+
+- **Summary:** The whole gym session is one workout on the wrist, with heart rate and a clock, across every set
+- **Status:** not implemented ([#82](https://github.com/idvorkin/exercise-analyzer/issues/82)); design open, see the note below
+- **Why:** Igor, 2026-09-16, from the gym: "Let's figure out how to do this with the workout mode and this will be the workout. We need to think through keeping the workout alive across many analysis sessions. I'm doing multiple exercises and warming up and stuff but let's figure out how to make this workout and record the whole workout. Need to think about what my workout UI looks like on the watch. Should probably have heart rate on there and a timer. Those are probably the big ones before the control."
+
+#### Use Case:
+- **As a** lifter training for an hour with warm-ups, several exercises and rests between sets
+- **I want to** start one workout on the watch when I walk in, see my heart rate and the session clock on the wrist the whole time, and record and analyze as many sets as I like inside it
+- **so that** the watch records the workout the way it records a run, and the sets I film are the sets of that workout rather than loose clips
+
+#### Acceptance Criteria:
+- **Scenario:** A workout outlives its sets
+- **Given:** I started a workout on the watch before the first set
+- **When:** I record a set, review it on the phone, rest, record another, and pause the camera between them
+- **Then:** the watch shows the same workout throughout, with heart rate and the elapsed time above the recording controls, and it ends only when I end it, not when a set ends, a pass finishes or the phone app leaves the front
+
+- **Scenario:** Ending the workout
+- **Given:** a workout with sets in it
+- **When:** I end it on the watch
+- **Then:** the sets of the day in Workouts belong to it, and the workout is written to Health once with its duration and heart rate (or discarded, when I say so)
+
+- **Notes:** This needs an `HKWorkoutSession` on the watch, which Igor declined in #32 and asked for here. The open decisions before any code: whether the session starts by hand on the watch or with the first Record; what the wrist shows while the phone is reviewing a set (the picture page belongs to recording; the workout page needs the clock, the heart rate and the day's set count); how a pause on the wrist (040) relates to the workout's own pause; and what happens to the session when the phone app is killed or the watch loses the phone. The 2026-09-13 research on the cost of a workout session (permission prompt, a workout in Health per session, battery, chrome, the lifecycle) still holds and is below.
+
+- **Issues:** [#82](https://github.com/idvorkin/exercise-analyzer/issues/82); [#81](https://github.com/idvorkin/exercise-analyzer/issues/81) (reviewing a paused set on the phone without ending it) was Igor's first ask the same morning and is folded into this
+
+---
+
+### What a workout session costs
 
 Heart rate during a set, surviving wrist-down (#32) and launching the watch app from the phone all need an
 `HKWorkoutSession`: it is the only door Apple gives a phone to open a watch app, and the only way a watch app
-keeps running with the wrist down. Igor declined it in #32. What it would cost, from the 2026-09-13 research:
+keeps running with the wrist down. Igor declined it in #32 and asked for it on 2026-09-16 (story 048, #82).
+What it costs, from the 2026-09-13 research:
 a HealthKit permission prompt in front of a camera remote that today needs none, a workout written to Health
-for every set unless discarded, workout-app battery drain while the session runs, the "workout running" chrome,
-and a session lifecycle to get right across start, finish, cancel, disconnect and crash. What it would buy:
-no drops while recording, a watch app that opens itself when the phone records, and heart rate. The three come
-back together as one decision, "a workout session only while recording", if the face complication (043) is not
-enough.
+for every session unless discarded, workout-app battery drain while the session runs, the "workout running" chrome,
+and a session lifecycle to get right across start, finish, cancel, disconnect and crash. What it buys:
+no drops while recording, a watch app that opens itself when the phone records, and heart rate.
