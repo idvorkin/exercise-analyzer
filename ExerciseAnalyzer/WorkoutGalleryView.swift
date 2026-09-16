@@ -224,7 +224,10 @@ struct WorkoutDay: Identifiable {
 struct ExerciseSets: Identifiable {
   let kind: ExerciseKind
   let sets: [RecentEntry]
-  var id: String { kind.rawValue }
+  /// Unique across days: the exercise alone repeats on every day it was done, and the gallery's lazy stack drew
+  /// a later day's row with a repeated id as blank space (#78, #79: Saturday's four swing sets under a header
+  /// that counted them). The first set's id is unique to the day.
+  var id: String { kind.rawValue + "-" + (sets.first?.id ?? "") }
   var repCount: Int { sets.reduce(0) { $0 + $1.repCount } }
   var bestScore: Int? { sets.compactMap(\.bestScore).max() }
 }
