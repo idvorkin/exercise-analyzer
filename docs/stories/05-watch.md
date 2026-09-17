@@ -282,7 +282,7 @@ the first frame (story 001).
 - **Scenario:** The kettlebell on the face and in the app list
 - **Given:** the complication is on my face and the watch app is in the recents list
 - **When:** I look at either
-- **Then:** both show a kettlebell (a handle arc over a round body): the complication draws it in the face's tint in every family, and the app's icon is the same kettlebell on the phone icon's teal, not the system's bullseye placeholder ([#88](https://github.com/idvorkin/exercise-analyzer/issues/88), Igor: "maybe make it a kettlebell")
+- **Then:** both show a kettlebell (a handle arc over a round body): the complication draws it in the face's tint in every family, and the app's icon is the same kettlebell in iron on chalk white, so it stands out on a dark watch, not the system's bullseye placeholder ([#88](https://github.com/idvorkin/exercise-analyzer/issues/88), Igor: "maybe make it a kettlebell"; the first cut on the phone icon's teal was "too subtle")
 
 - **Notes:** The complication cannot talk to the phone: it reads a shared App Group container that the watch app
   writes on each status and reloads through WidgetKit. WidgetKit throttles reloads, so the count on the face is
