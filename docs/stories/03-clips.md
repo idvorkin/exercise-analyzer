@@ -82,7 +82,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** the main screen appears
 - **Then:** a centred panel offers Live, Workouts, Photos, Files and Report a problem as big rows; once something is loaded, the Open button brings up the same panel over the dimmed picture, and a tap outside or Cancel dismisses it
 
-- **Issues:** [#25](https://github.com/idvorkin/exercise-analyzer/issues/25)
+- **Scenario:** The panel is one thing
+- **Given:** the panel is up, on the first screen or from Open
+- **When:** I look at it
+- **Then:** everything behind it is dimmed (the idle HUD at launch, the picture under Open), the panel is near-opaque with a visible edge and a shadow, and nothing from the HUD draws over it
+
+- **Issues:** [#25](https://github.com/idvorkin/exercise-analyzer/issues/25); [#89](https://github.com/idvorkin/exercise-analyzer/issues/89) at launch the phase pills and the count drew over the panel's top edge (the panel sat under the HUD in the stack, and only Open dimmed the background)
 
 ---
 

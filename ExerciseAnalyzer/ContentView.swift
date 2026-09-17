@@ -85,9 +85,6 @@ struct ContentView: View {
         if session.source == .file, session.duration > 0 {
           edgeControls
         }
-        if (session.source == .none && session.activity == .idle) || showOpenDialog {
-          startPanel
-        }
         if case .working(let label, let progress) = session.activity, session.source != .camera {
           VStack(spacing: 8) {
             ProgressView(value: progress).frame(width: 160)
@@ -104,6 +101,12 @@ struct ContentView: View {
         hud
         if let run = session.instrumentedRun {
           instrumentedRunBanner(run)
+        }
+        // Above the HUD, not under it: at launch the phase pills and the count drew over the panel's top edge
+        // and the two read as one muddle (#89). The panel dims everything behind it on both the first screen
+        // and Open.
+        if (session.source == .none && session.activity == .idle) || showOpenDialog {
+          startPanel
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -577,10 +580,9 @@ struct ContentView: View {
   /// Nothing loaded: a centred panel with the four ways to start, big enough for the gym.
   private var startPanel: some View {
     ZStack {
-      if showOpenDialog {
-        // Over a loaded clip: dim the picture and let a tap outside dismiss.
-        Color.black.opacity(0.5).ignoresSafeArea().onTapGesture { showOpenDialog = false }
-      }
+      // Dim whatever is behind (the idle HUD at launch, the picture under Open); over a clip a tap outside
+      // dismisses. The panel itself is near-opaque with a clear edge and a shadow, so it is one thing (#89).
+      Color.black.opacity(0.55).ignoresSafeArea().onTapGesture { if showOpenDialog { showOpenDialog = false } }
       VStack(spacing: 10) {
         Text("Exercise Analyzer").font(.title2.bold()).foregroundStyle(.white).padding(.bottom, 4)
         startRow("Live", "camera.fill") { showOpenDialog = false; session.startCamera(position: session.cameraPosition) }
@@ -608,8 +610,9 @@ struct ContentView: View {
       }
       .padding(20)
       .frame(maxWidth: 320)
-      .background(.black.opacity(0.85), in: RoundedRectangle(cornerRadius: 20))
-      .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.15)))
+      .background(Color(white: 0.09), in: RoundedRectangle(cornerRadius: 20))
+      .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.4), lineWidth: 1.5))
+      .shadow(color: .black.opacity(0.7), radius: 28, y: 8)
     }
   }
 
