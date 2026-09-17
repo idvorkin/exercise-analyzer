@@ -8,9 +8,11 @@ struct WatchContentView: View {
   @Environment(\.scenePhase) private var scenePhase
   /// Ticks so a status that stops arriving turns stale on screen.
   @State private var now = Date()
+  @State private var confirmDiscard = false
   private let clock = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
   private var status: WatchStatus { phone.status }
+  private var workout: WorkoutController { phone.workout }
 
   var body: some View {
     Group {
@@ -28,62 +30,137 @@ struct WatchContentView: View {
     .onChange(of: scenePhase) { _, phase in phone.sceneActive(phase == .active) }
   }
 
-  /// Everything that is not a recording: the not-connected, backgrounded-phone and idle screens, unchanged.
+  /// Everything that is not a recording: the not-connected, backgrounded-phone and idle screens. A running
+  /// workout (048) heads every one of them with its clock and heart rate and ends them with End and Discard:
+  /// the workout is the wrist's, whatever the phone is doing.
   private var idlePages: some View {
-    ScrollView {
-      VStack(spacing: 8) {
-        if !phone.isLive {
-          Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
-          Text(phone.reachable ? "Waiting for the phone…" : "Not connected to the phone. It reconnects on its own; if it doesn't, open Exercise Analyzer on the phone.")
-            .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
-          if status.rolling {
-            Text("Last seen recording: \(status.reps) reps").font(.caption2).foregroundStyle(.tertiary)
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(spacing: 8) {
+          if workout.running { workoutHeader }
+          if !phone.isLive {
+            if !workout.running {
+              Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
+            }
+            Text(phone.reachable ? "Waiting for the phone…" : "Not connected to the phone. It reconnects on its own; if it doesn't, open Exercise Analyzer on the phone.")
+              .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
+            if status.rolling {
+              Text("Last seen recording: \(status.reps) reps").font(.caption2).foregroundStyle(.tertiary)
+            }
+            if let since = phone.receivedAt {
+              // Reconnects by itself (retries every 2 s); this just says how long it has been.
+              Text("Last heard \(Int(max(0, now.timeIntervalSince(since)))) s ago").font(.caption2).foregroundStyle(.tertiary)
+            }
+            startWorkoutButton
+            Button { phone.ping() } label: { Label("Retry", systemImage: "arrow.clockwise").frame(maxWidth: .infinity) }
+          } else if !status.phoneActive {
+            if !workout.running {
+              Image(systemName: "iphone.gen3").font(.largeTitle).foregroundStyle(.secondary)
+            }
+            Text("The phone app is in the background. Unlock the phone and open Exercise Analyzer; it stays awake while the watch is connected.")
+              .font(.caption2).multilineTextAlignment(.center).foregroundStyle(.secondary)
+            startWorkoutButton
+            Button { phone.send(.start) } label: {
+              Label("Send a reminder to the phone", systemImage: "bell").frame(maxWidth: .infinity)
+            }
+          } else {
+            if !workout.running {
+              Image(systemName: "figure.strengthtraining.traditional").font(.largeTitle).foregroundStyle(.secondary)
+              Text(phone.reachable ? "Phone ready" : "Open Exercise Analyzer on the phone")
+                .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
+            }
+            // The offline pass's final count (045): "Analyzing…" while it runs, then the last set's line. The
+            // next recording status carries neither and the line goes.
+            if status.phase == "analyzing" {
+              Text("Analyzing…").font(.caption).foregroundStyle(.secondary)
+            } else if let last = status.lastSet {
+              Text("Last set").font(.caption2).foregroundStyle(.secondary)
+              Text("\(last.reps) reps · \(last.exercise) · \(Self.duration(last.seconds))")
+                .font(.headline).monospacedDigit()
+            }
+            startWorkoutButton
+            Button { phone.send(.start) } label: {
+              Label("Record", systemImage: "record.circle").frame(maxWidth: .infinity)
+            }
+            .tint(.red)
+            .disabled(!phone.reachable)
+            // Framing first: the camera without the recorder, then Record from the picture (047, #73).
+            Button { phone.send(.viewfinder) } label: {
+              Label("Preview", systemImage: "camera.fill").frame(maxWidth: .infinity)
+            }
+            .disabled(!phone.reachable)
+            restStatus
+            restPicker
+            exercisePicker
           }
-          if let since = phone.receivedAt {
-            // Reconnects by itself (retries every 2 s); this just says how long it has been.
-            Text("Last heard \(Int(max(0, now.timeIntervalSince(since)))) s ago").font(.caption2).foregroundStyle(.tertiary)
+          if workout.running { workoutEndButtons.id("workout-end") }
+          if let error = phone.lastError ?? workout.lastError {
+            Text(error).font(.caption2).foregroundStyle(.red).multilineTextAlignment(.center)
           }
-          Button { phone.ping() } label: { Label("Retry", systemImage: "arrow.clockwise").frame(maxWidth: .infinity) }
-        } else if !status.phoneActive {
-          Image(systemName: "iphone.gen3").font(.largeTitle).foregroundStyle(.secondary)
-          Text("The phone app is in the background. Unlock the phone and open Exercise Analyzer; it stays awake while the watch is connected.")
-            .font(.caption2).multilineTextAlignment(.center).foregroundStyle(.secondary)
-          Button { phone.send(.start) } label: {
-            Label("Send a reminder to the phone", systemImage: "bell").frame(maxWidth: .infinity)
-          }
-        } else {
-          Image(systemName: "figure.strengthtraining.traditional").font(.largeTitle).foregroundStyle(.secondary)
-          Text(phone.reachable ? "Phone ready" : "Open Exercise Analyzer on the phone")
-            .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
-          // The offline pass's final count (045): "Analyzing…" while it runs, then the last set's line. The
-          // next recording status carries neither and the line goes.
-          if status.phase == "analyzing" {
-            Text("Analyzing…").font(.caption).foregroundStyle(.secondary)
-          } else if let last = status.lastSet {
-            Text("Last set").font(.caption2).foregroundStyle(.secondary)
-            Text("\(last.reps) reps · \(last.exercise) · \(Self.duration(last.seconds))")
-              .font(.headline).monospacedDigit()
-          }
-          Button { phone.send(.start) } label: {
-            Label("Record", systemImage: "record.circle").frame(maxWidth: .infinity)
-          }
-          .tint(.red)
-          .disabled(!phone.reachable)
-          // Framing first: the camera without the recorder, then Record from the picture (047, #73).
-          Button { phone.send(.viewfinder) } label: {
-            Label("Preview", systemImage: "camera.fill").frame(maxWidth: .infinity)
-          }
-          .disabled(!phone.reachable)
-          restStatus
-          restPicker
-          exercisePicker
         }
-        if let error = phone.lastError {
-          Text(error).font(.caption2).foregroundStyle(.red).multilineTextAlignment(.center)
-        }
+        .padding(.horizontal, 4)
       }
-      .padding(.horizontal, 4)
+      .onAppear {
+        // The screenshot rung's workoutEnd state: the same page, scrolled to its bottom.
+        guard phone.screenshotScrollsToEnd else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { proxy.scrollTo("workout-end", anchor: .bottom) }
+      }
     }
+  }
+
+  /// The workout page's head (048): the session clock ticking by itself, the heart rate, the sets so far.
+  private var workoutHeader: some View {
+    VStack(spacing: 2) {
+      Text(workout.phase == .ending ? "ENDING…" : "WORKOUT")
+        .font(.caption2.weight(.semibold)).kerning(1).foregroundStyle(.green)
+      if let startedAt = workout.startedAt {
+        Text(startedAt, style: .timer)
+          .font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit()
+      }
+      HStack(spacing: 4) {
+        Image(systemName: "heart.fill").font(.caption).foregroundStyle(.red)
+        Text(workout.heartRate.map(String.init) ?? "--")
+          .font(.title3.bold()).monospacedDigit()
+        Text("BPM").font(.caption2).foregroundStyle(.secondary)
+      }
+      .accessibilityLabel("Heart rate \(workout.heartRate.map(String.init) ?? "unknown")")
+      Text("\(workout.sets) set\(workout.sets == 1 ? "" : "s") · \(workout.reps) reps")
+        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+    }
+    .padding(.bottom, 4)
+  }
+
+  /// Start by hand, above Record (048): the warm-up is workout time. Gone once the workout runs.
+  @ViewBuilder private var startWorkoutButton: some View {
+    if !workout.running {
+      Button { phone.startWorkout() } label: {
+        Label(workout.phase == .starting ? "Starting…" : "Start workout", systemImage: "clock")
+          .frame(maxWidth: .infinity)
+      }
+      .tint(.green)
+      .disabled(workout.phase == .starting)
+    }
+  }
+
+  /// At the bottom of the page, under the pickers: End writes the workout to Health, Discard asks first.
+  private var workoutEndButtons: some View {
+    VStack(spacing: 8) {
+      Button { phone.endWorkout(discard: false) } label: {
+        Label("End workout", systemImage: "checkmark").frame(maxWidth: .infinity)
+      }
+      .tint(.green)
+      Button(role: .destructive) { confirmDiscard = true } label: {
+        Label("Discard", systemImage: "trash").frame(maxWidth: .infinity)
+      }
+      .confirmationDialog("Discard this workout?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+        Button("Discard", role: .destructive) { phone.endWorkout(discard: true) }
+      } message: {
+        Text("Nothing goes to Health. The sets you recorded stay in Workouts.")
+      }
+      Text("End writes one workout to Health").font(.caption2).foregroundStyle(.tertiary)
+    }
+    .disabled(workout.phase == .ending)
+    .padding(.top, 8)
   }
 
   /// A set fills the watch: the picture edge to edge with the count, the time and the controls over it, and a
@@ -143,6 +220,17 @@ struct WatchContentView: View {
               .padding(.horizontal, 8).padding(.vertical, 1)
               .background(.ultraThinMaterial, in: Capsule())
             Spacer()
+            // The workout's heart rate rides along on the picture page (048); no workout, no chip.
+            if workout.running, let heartRate = workout.heartRate {
+              HStack(spacing: 3) {
+                Image(systemName: "heart.fill").font(.system(size: 11)).foregroundStyle(.red)
+                Text("\(heartRate)").monospacedDigit()
+              }
+              .font(.system(size: 16, weight: .semibold, design: .rounded))
+              .padding(.horizontal, 8).padding(.vertical, 3)
+              .background(.ultraThinMaterial, in: Capsule())
+              .accessibilityLabel("Heart rate \(heartRate)")
+            }
             Text(elapsed).monospacedDigit()
               .font(.system(size: 16, weight: .semibold, design: .rounded))
               .padding(.horizontal, 8).padding(.vertical, 3)

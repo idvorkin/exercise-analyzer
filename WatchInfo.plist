@@ -6,6 +6,13 @@
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>com.idvorkin.exerciseanalyzer</string>
-
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Exercise Analyzer reads your heart rate during a workout started on the watch.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Exercise Analyzer saves each workout you end on the watch to Health, with its sets.</string>
 </dict>
 </plist>

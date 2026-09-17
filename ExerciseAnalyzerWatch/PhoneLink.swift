@@ -1,5 +1,6 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
+import Combine
 import ExerciseCore
 import Foundation
 import WatchConnectivity
@@ -25,12 +26,17 @@ final class PhoneLink: NSObject, ObservableObject {
   /// Rest since the last set ended; driven by recording transitions below, cleared on Record. Assigned right
   /// after `super.init` (its closure captures `self`), so it cannot be a `let`.
   private(set) var rest: RestTimer!
+  /// The workout on the wrist (story 048): its own HealthKit session, fed the set transitions heard here.
+  private(set) var workout: WorkoutController!
+  private var cancellables: Set<AnyCancellable> = []
 
   /// Status older than this is stale: the phone app may be gone without having sent an idle status.
   static let maxStatusAge: TimeInterval = 8
 
   /// Fixed screenshot state (WATCH_STATE at launch): the link presents it and never talks to WCSession.
   private var screenshot: WatchScreenshotState?
+  /// The screenshot rung wants the idle page scrolled to its End and Discard buttons.
+  var screenshotScrollsToEnd: Bool { screenshot == .workoutEnd }
 
   /// The phone is reachable and has reported within the last few seconds; only then are its status and the
   /// recording controls trustworthy (a stored application context can say "recording" long after the fact).
@@ -53,6 +59,9 @@ final class PhoneLink: NSObject, ObservableObject {
   override init() {
     super.init()
     rest = RestTimer { [weak self] type, fields in self?.logEvent(type, fields) }
+    workout = WorkoutController(log: { [weak self] type, fields in self?.logEvent(type, fields) }, screenshot: WatchScreenshotState.launch)
+    // The view observes the link; the workout's changes (heart rate, sets) redraw through it.
+    workout.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
     if let state = WatchScreenshotState.launch {
       screenshot = state
       let fixed = state.fixed
@@ -121,6 +130,22 @@ final class PhoneLink: NSObject, ObservableObject {
     }
   }
 
+  /// Start on the workout page (048): the wrist's own session, no phone needed.
+  func startWorkout() {
+    logEvent("command", ["command": "workout_start", "reachable": reachable, "live": isLive])
+    guard screenshot == nil else { return }
+    WKInterfaceDevice.current().play(.click)
+    workout.start()
+  }
+
+  /// End writes the workout to Health; Discard writes nothing. Either way the wrist goes back to idle.
+  func endWorkout(discard: Bool) {
+    logEvent("command", ["command": discard ? "workout_discard" : "workout_end", "reachable": reachable, "live": isLive])
+    guard screenshot == nil else { return }
+    WKInterfaceDevice.current().play(discard ? .failure : .success)
+    workout.end(discard: discard)
+  }
+
   private func apply(_ message: [String: Any]) {
     guard let data = message["status"] as? Data, let next = try? JSONDecoder().decode(WatchStatus.self, from: data)
     else { return }
@@ -146,6 +171,16 @@ final class PhoneLink: NSObject, ObservableObject {
       rest.setEnded()
     } else if next.rolling, !previous.rolling {
       rest.clear()
+    }
+    // The workout (048): a rolling recorder is an activity inside it, and the pass's final count is a set of
+    // it. `at` keeps a stored context's old last set (a relaunch) from counting: only sets analyzed after
+    // Start belong to the workout.
+    if next.rolling, !previous.rolling { workout.setBegan(exercise: next.exercise) }
+    if previous.rolling, !next.rolling { workout.setEnded() }
+    if let last = next.lastSet, last != previous.lastSet, let startedAt = workout.startedAt,
+      last.at >= startedAt.timeIntervalSince1970
+    {
+      workout.setAnalyzed(reps: last.reps)
     }
   }
 

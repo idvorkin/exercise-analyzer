@@ -4,6 +4,10 @@
 <dict>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Exercise Analyzer saves your trimmed swing clips to Photos.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Exercise Analyzer reads your heart rate during a workout started on the watch.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Exercise Analyzer saves each workout you end on the watch to Health, with its sets.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

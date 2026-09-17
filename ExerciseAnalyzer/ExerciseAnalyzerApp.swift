@@ -14,6 +14,7 @@ struct ExerciseAnalyzerApp: App {
     try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
     NotificationRouter.shared.install()
     CrashReports.shared.install()  // last launch's crash arrives here and lands in the session log
+    _ = WorkoutMirror.shared  // the watch's workout session arrives here, even on a background launch (048)
   }
 
   var body: some Scene {

@@ -13,9 +13,12 @@ lock-screen control (044) are not watch-app states and are not in the table.
 
 | State | Must show | Must offer | Stories |
 |---|---|---|---|
-| disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status had the recorder rolling | Retry | 018 |
-| background | phone-in-background art, the unlock-and-open instruction | "Send a reminder to the phone" (no Record: it would die silently) | 018 |
-| idle | "Phone ready", exercise picker, rest length picker, the rest count while resting, the last-set line (or "Analyzing…" while the pass runs) | Record (red), Preview (below it) | 017, 041, 045, 046, 047 |
+| disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status had the recorder rolling | Start workout (green), Retry | 018, 048 |
+| background | phone-in-background art, the unlock-and-open instruction | Start workout (green), "Send a reminder to the phone" (no Record: it would die silently) | 018, 048 |
+| idle | "Phone ready", exercise picker, rest length picker, the rest count while resting, the last-set line (or "Analyzing…" while the pass runs) | Start workout (green), Record (red), Preview (below it) | 017, 041, 045, 046, 047, 048 |
+| workout | WORKOUT in green over the session clock (counting up by itself), "♥ 128 BPM", "6 sets · 47 reps", then the last-set line, the rest count and the pickers as idle; no figure art, no Start workout | Record (red), Preview, the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048 |
+| workoutEnd | the bottom of the workout page: the exercise picker's tail, then "End writes one workout to Health" under the buttons | End workout (green), Discard (red, asks first) | 048 |
+| workoutRecording | as recording, with a "♥ 141" chip between the count and the time | as recording | 048 |
 | viewfinder (Preview) | the picture filling the face, a PREVIEW chip, the in-frame capsule | Record (red) · Camera · Cancel; no Pause, no Done | 047 |
 | live | the picture filling the face, small rep and time chips right under the clock line, the green "IN FRAME" capsule above the row; chips, capsule and buttons whole inside the face and covering as little of the picture as 40 pt targets allow | Pause · Camera · Done · Cancel along the bottom edge, translucent glass except Done (green); second page: Cancel, the watch-mode toggle | 016, 017, 042 |
 | recording | as live, with the count (6) and the time (0:42) and a red "FEET CUT OFF" capsule when cut off | as live | 016, 017, 042 |
@@ -419,7 +422,7 @@ the first frame (story 001).
 ### User Story 048:
 
 - **Summary:** The whole gym session is one workout on the wrist, with heart rate and a clock, across every set
-- **Status:** not implemented ([#82](https://github.com/idvorkin/exercise-analyzer/issues/82)); design open, see the note below
+- **Status:** implemented for [#82](https://github.com/idvorkin/exercise-analyzer/issues/82); verified by host tests (`WorkoutTests`), the watch simulator (`just watch-screens`: the workout, workoutEnd and workoutRecording states) and the phone simulator (a seeded workout on today's header); the wrist rung (Health permission, heart rate, the mirrored session on the phone, the workout in Health) is Igor's, not yet run: the device build needs the HealthKit capability on the App ID, and on 2026-09-16 Xcode had no Apple account signed in to add it ("No Accounts"), so the first `just run-device` after signing in regenerates the profiles
 - **Why:** Igor, 2026-09-16, from the gym: "Let's figure out how to do this with the workout mode and this will be the workout. We need to think through keeping the workout alive across many analysis sessions. I'm doing multiple exercises and warming up and stuff but let's figure out how to make this workout and record the whole workout. Need to think about what my workout UI looks like on the watch. Should probably have heart rate on there and a timer. Those are probably the big ones before the control."
 
 #### Use Case:
@@ -433,12 +436,22 @@ the first frame (story 001).
 - **When:** I record a set, review it on the phone, rest, record another, and pause the camera between them
 - **Then:** the watch shows the same workout throughout, with heart rate and the elapsed time above the recording controls, and it ends only when I end it, not when a set ends, a pass finishes or the phone app leaves the front
 
+- **Scenario:** Starting the workout
+- **Given:** the watch app open, on any of its idle pages (phone ready, phone in the background, or not connected)
+- **When:** I tap Start workout (the first time: Health asks once to share workouts and read heart rate)
+- **Then:** the page heads with WORKOUT, the clock counting from now, the heart rate as soon as the sensor reports it, and "0 sets · 0 reps"; Start workout is gone and Record and Preview sit below the head
+
+- **Scenario:** The phone shows the workout too
+- **Given:** a workout running on the wrist and the phone app open
+- **When:** I look at the phone
+- **Then:** a green strip under the count reads "Workout 42:10 · ♥ 128 · 6 sets" (the sets recorded since Start), and Workouts' Today header carries "Workout since 9:02 AM · ♥ 128 · on the watch"
+
 - **Scenario:** Ending the workout
 - **Given:** a workout with sets in it
-- **When:** I end it on the watch
-- **Then:** the sets of the day in Workouts belong to it, and the workout is written to Health once with its duration and heart rate (or discarded, when I say so)
+- **When:** I scroll to the bottom of the workout page and tap End workout
+- **Then:** the workout is written to Health once (functional strength training, its duration and heart rate, one activity per recorded set), the wrist returns to the idle page, and Workouts' day header reads "Workout 9:02 AM–10:00 AM · 58 min · ♥ 128 avg · 156 max · in Health"; Discard asks first and writes nothing anywhere, and the sets recorded inside it stay in Workouts either way
 
-- **Notes:** This needs an `HKWorkoutSession` on the watch, which Igor declined in #32 and asked for here. The open decisions before any code: whether the session starts by hand on the watch or with the first Record; what the wrist shows while the phone is reviewing a set (the picture page belongs to recording; the workout page needs the clock, the heart rate and the day's set count); how a pause on the wrist (040) relates to the workout's own pause; and what happens to the session when the phone app is killed or the watch loses the phone. The 2026-09-13 research on the cost of a workout session (permission prompt, a workout in Health per session, battery, chrome, the lifecycle) still holds and is below.
+- **Notes:** The four decisions, taken 2026-09-16 (design canvas "Workout on the Wrist"): the workout starts by hand on the watch, not with the first Record, so the warm-up counts; the workout page is what the wrist shows whenever the camera is not live, including while the phone reviews a set, and Done returns to it; Pause (040) freezes the camera only, the workout clock runs through rests like a run's; the watch carries the session on its own (that is what `HKWorkoutSession` buys), so a killed or unreachable phone ends nothing and the phone picks the mirrored session up again when it returns. The build: `WorkoutController` on the watch owns the `HKWorkoutSession` + `HKLiveWorkoutBuilder`, mirrors it to the phone (`startMirroringToCompanionDevice`) and sends `WorkoutWire` through the mirrored session; `WorkoutMirror` on the phone adopts the session (`workoutSessionMirroringStartHandler`, installed at launch so a background launch gets it too) and keeps ended workouts in `Documents/workouts.json` (`WorkoutIndex`). The wrist counts sets from the pass's final counts (045) that arrive after Start; the phone counts the sets recorded since Start from its own store, so the two can differ by a set still analyzing. The 2026-09-13 research on the cost of a workout session (permission prompt, a workout in Health per session, battery, chrome, the lifecycle) still holds and is below.
 
 - **Issues:** [#82](https://github.com/idvorkin/exercise-analyzer/issues/82); [#81](https://github.com/idvorkin/exercise-analyzer/issues/81) (reviewing a paused set on the phone without ending it) was Igor's first ask the same morning and is folded into this
 

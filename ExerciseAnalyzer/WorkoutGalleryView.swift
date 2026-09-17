@@ -9,6 +9,8 @@ import SwiftUI
 
 struct WorkoutGalleryView: View {
   @ObservedObject var store: RecentsStore
+  /// The workouts the watch ran (048): a day that had one carries its line under the header.
+  @ObservedObject var workouts: WorkoutMirror
   let onOpen: (RecentEntry) -> Void
   /// Opens a Photos video that has not been analyzed yet (identifier and creation date).
   var onImport: ((String, Date?) -> Void)? = nil
@@ -39,8 +41,11 @@ struct WorkoutGalleryView: View {
 
   /// Today's grouping, if today has any sets.
   private var todayDay: WorkoutDay? {
-    WorkoutDay.group(store.entries).first { Calendar.current.isDateInToday($0.date) }
+    days.first { Calendar.current.isDateInToday($0.date) }
   }
+
+  /// The days, from the sets and the workouts alike: a workout without a set on camera is still a day.
+  private var days: [WorkoutDay] { WorkoutDay.group(store.entries, workouts: workouts.index.workouts, live: workouts.live) }
 
   var body: some View {
     Group {
@@ -68,7 +73,7 @@ struct WorkoutGalleryView: View {
   private var galleryBody: some View {
     NavigationStack {
       Group {
-        if store.entries.isEmpty && suggestions.clips.isEmpty {
+        if days.isEmpty && suggestions.clips.isEmpty {
           ContentUnavailableView(
             "No workouts yet", systemImage: "figure.strengthtraining.traditional",
             description: Text("Record a set or open a video and it shows up here, grouped by day."))
@@ -96,7 +101,7 @@ struct WorkoutGalleryView: View {
                 .buttonStyle(.bordered)
                 .padding(.top, 8)
               }
-              ForEach(WorkoutDay.group(store.entries)) { day in
+              ForEach(days) { day in
                 Section {
                   if !collapsed.contains(day.date) {
                     ForEach(day.exercises) { exercise in
@@ -134,7 +139,7 @@ struct WorkoutGalleryView: View {
         if !collapseSeeded {
           collapseSeeded = true
           let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
-          collapsed = Set(WorkoutDay.group(store.entries).map(\.date).filter { $0 < weekAgo })
+          collapsed = Set(days.map(\.date).filter { $0 < weekAgo })
         }
         suggestions.onEvent = onEvent
         suggestions.refresh(known: knownPhotosIDs)
@@ -192,6 +197,9 @@ struct PhotosSuggestionsRow: View {
 struct WorkoutDay: Identifiable {
   let date: Date
   let exercises: [ExerciseSets]
+  /// The workouts the watch ran that day (048), in start order, and the one still running if it is today's.
+  var workouts: [StoredWorkout] = []
+  var live: WorkoutWire? = nil
   var id: Date { date }
 
   var setCount: Int { exercises.reduce(0) { $0 + $1.sets.count } }
@@ -205,18 +213,24 @@ struct WorkoutDay: Identifiable {
     return last.timeIntervalSince(first) + (lastEntry?.duration ?? 0)
   }
 
-  static func group(_ entries: [RecentEntry]) -> [WorkoutDay] {
+  static func group(_ entries: [RecentEntry], workouts: [StoredWorkout] = [], live: WorkoutWire? = nil) -> [WorkoutDay] {
     let calendar = Calendar.current
     let byDay = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.start) }
-    return byDay.keys.sorted(by: >).map { day in
-      let sets = byDay[day]!.sorted { $0.start < $1.start }
+    let workoutsByDay = Dictionary(grouping: workouts) { calendar.startOfDay(for: $0.start) }
+    var days = Set(byDay.keys).union(workoutsByDay.keys)
+    if let live { days.insert(calendar.startOfDay(for: live.startDate)) }
+    return days.sorted(by: >).map { day in
+      let sets = (byDay[day] ?? []).sorted { $0.start < $1.start }
       var order: [ExerciseKind] = []
       var groups: [ExerciseKind: [RecentEntry]] = [:]
       for set in sets {
         if groups[set.exerciseKind] == nil { order.append(set.exerciseKind) }
         groups[set.exerciseKind, default: []].append(set)
       }
-      return WorkoutDay(date: day, exercises: order.map { ExerciseSets(kind: $0, sets: groups[$0]!) })
+      let liveToday = live.flatMap { calendar.startOfDay(for: $0.startDate) == day ? $0 : nil }
+      return WorkoutDay(
+        date: day, exercises: order.map { ExerciseSets(kind: $0, sets: groups[$0]!) },
+        workouts: (workoutsByDay[day] ?? []).sorted { $0.start < $1.start }, live: liveToday)
     }
   }
 }
@@ -289,17 +303,27 @@ struct DayHeader: View {
     Button {
       onToggle?()
     } label: {
-      HStack(alignment: .firstTextBaseline) {
-        Image(systemName: "chevron.right")
-          .font(.caption.bold())
-          .rotationEffect(.degrees(collapsed ? 0 : 90))
-          .foregroundStyle(.secondary)
-        Text(title).font(.title3.bold())
-        if title == "Today" || title == "Yesterday" {
-          Text(dateLine).font(.subheadline).foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .firstTextBaseline) {
+          Image(systemName: "chevron.right")
+            .font(.caption.bold())
+            .rotationEffect(.degrees(collapsed ? 0 : 90))
+            .foregroundStyle(.secondary)
+          Text(title).font(.title3.bold())
+          if title == "Today" || title == "Yesterday" {
+            Text(dateLine).font(.subheadline).foregroundStyle(.secondary)
+          }
+          Spacer()
+          Text(summary).font(.subheadline).foregroundStyle(.secondary)
         }
-        Spacer()
-        Text(summary).font(.subheadline).foregroundStyle(.secondary)
+        // The day's workouts from the wrist (048): the hour, its heart rate, and that it is in Health.
+        ForEach(workoutLines, id: \.self) { line in
+          Label { Text(line).font(.subheadline).monospacedDigit() } icon: {
+            Image(systemName: "applewatch").font(.caption)
+          }
+          .foregroundStyle(.green)
+          .padding(.leading, 20)
+        }
       }
       .contentShape(Rectangle())
     }
@@ -314,6 +338,34 @@ struct DayHeader: View {
     var parts = ["\(day.setCount) set\(day.setCount == 1 ? "" : "s")", "\(day.repCount) reps"]
     if let span = day.span, span >= 60 { parts.append("\(Int(span / 60)) min") }
     return parts.joined(separator: " · ")
+  }
+
+  private static let clock: DateFormatter = {
+    let f = DateFormatter()
+    f.timeStyle = .short
+    f.dateStyle = .none
+    return f
+  }()
+
+  /// "Workout 9:02–10:00 · 58 min · ♥ 128 avg · 156 max · in Health", one per workout, then the running one.
+  private var workoutLines: [String] {
+    var lines = day.workouts.map { workout -> String in
+      var parts = [
+        "Workout \(Self.clock.string(from: workout.start))–\(Self.clock.string(from: workout.end))",
+        "\(Int(workout.duration / 60)) min",
+      ]
+      if let avg = workout.heartRateAverage { parts.append("♥ \(avg) avg") }
+      if let max = workout.heartRateMax { parts.append("\(max) max") }
+      parts.append("in Health")
+      return parts.joined(separator: " · ")
+    }
+    if let live = day.live {
+      var parts = ["Workout since \(Self.clock.string(from: live.startDate))"]
+      if let heartRate = live.heartRate { parts.append("♥ \(heartRate)") }
+      parts.append("on the watch")
+      lines.append(parts.joined(separator: " · "))
+    }
+    return lines
   }
 }
 

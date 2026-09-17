@@ -42,6 +42,8 @@ struct ContentView: View {
   @AppStorage("meView") private var meView = true
   @AppStorage("galleryHeight") private var galleryHeight = 170.0
   @State private var galleryDragStart: Double?
+  /// The watch's workout, mirrored (048): the HUD strip and the Workouts day line read it.
+  @ObservedObject private var workouts = WorkoutMirror.shared
 
   private var busy: Bool { session.activity != .idle && session.source != .camera }
 
@@ -173,7 +175,7 @@ struct ContentView: View {
       photoLibrary: .shared())
     .sheet(isPresented: $showRecents) {
       WorkoutGalleryView(
-        store: session.recents, onOpen: { session.open(recent: $0) },
+        store: session.recents, workouts: workouts, onOpen: { session.open(recent: $0) },
         onImport: { identifier, date in Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) } },
         onEvent: { session.log.event($0, $1) }, session: session, bugReport: $showWorkoutsBugReport,
         detent: $workoutsDetent)
@@ -274,6 +276,26 @@ struct ContentView: View {
           Image(systemName: overlayMode.symbol).font(.title3)
         }
         .accessibilityLabel(overlayMode.next.label)
+      }
+      // The workout running on the wrist (048), mirrored here: its clock, heart rate and the sets recorded
+      // inside it. One strip under the count, gone when the workout ends.
+      if let live = workouts.live {
+        let sets = workouts.setsInLiveWorkout(session.recents.entries).count
+        HStack(spacing: 6) {
+          Image(systemName: "applewatch").font(.caption2)
+          Text("Workout").font(.caption.bold())
+          Text(live.startDate, style: .timer).font(.caption.bold()).monospacedDigit()
+          Text("·").opacity(0.5)
+          Image(systemName: "heart.fill").font(.caption2).foregroundStyle(.red)
+          Text(live.heartRate.map(String.init) ?? "--").font(.caption.bold()).monospacedDigit()
+          Text("·").opacity(0.5)
+          Text("\(sets) set\(sets == 1 ? "" : "s")").font(.caption).monospacedDigit()
+          Spacer()
+        }
+        .foregroundStyle(.green)
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
+        .accessibilityLabel("Workout on the watch, \(sets) sets, heart rate \(live.heartRate.map(String.init) ?? "unknown")")
       }
       HStack(spacing: 5) {
         ForEach(definition.phases, id: \.id) { phase in

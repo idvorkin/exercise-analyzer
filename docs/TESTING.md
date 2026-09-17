@@ -177,7 +177,7 @@ Every watch change runs [`scripts/watch-screens.sh`](../scripts/watch-screens.sh
 after `just build-sim`): it finds the watch app inside the phone build, installs it on the watch simulator,
 and relaunches it once per state with `WATCH_STATE` naming a fixed status (`SIMCTL_CHILD_WATCH_STATE`, the
 same launch-hook pattern as rung 2) — no phone, no pairing, no taps. Each state sleeps 3 s for first render,
-then screenshots to `~/tmp/agent/sim/watch-<state>.png`. The eight shots are compared by eye against the
+then screenshots to `~/tmp/agent/sim/watch-<state>.png`. The eleven shots are compared by eye against the
 control inventory at the top of [`05-watch.md`](stories/05-watch.md); a missing button is a failed rung. This
 is the rung that would have caught #74 (the picture page gated on the phone being active): three watch changes
 shipped on green builds and nobody saw a watch screen.

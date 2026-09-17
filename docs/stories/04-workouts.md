@@ -27,6 +27,11 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I open Workouts and expand Saturday
 - **Then:** Saturday's swing row draws with every one of its sets, the same as today's; a day's header never counts sets its rows do not show
 
+- **Scenario:** A day that was a workout on the wrist
+- **Given:** a workout started and ended on the watch that day ([048](05-watch.md))
+- **When:** I open Workouts
+- **Then:** the day's header carries a green line per workout, "Workout 9:02 AM–10:00 AM · 58 min · ♥ 128 avg · 156 max · in Health", above its exercise rows; a day with a workout and no set on camera is still listed, with the line and no rows
+
 - **Issues:** [#35](https://github.com/idvorkin/exercise-analyzer/issues/35); [#78](https://github.com/idvorkin/exercise-analyzer/issues/78), [#79](https://github.com/idvorkin/exercise-analyzer/issues/79) Saturday's four swing sets drew as a blank band under a header that counted them (the row's id was the exercise name, repeated across days)
 
 ---

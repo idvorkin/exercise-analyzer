@@ -9,6 +9,18 @@ import SwiftUI
 
 enum WatchScreenshotState: String, CaseIterable {
   case disconnected, background, idle, live, recording, paused, done, viewfinder
+  /// A workout running on the wrist (story 048): the workout page, its End and Discard buttons (the page
+  /// scrolled to its bottom), and the recording page with the heart-rate chip.
+  case workout, workoutEnd, workoutRecording
+
+  /// The fixed workout the controller presents: 42:10 in, 128 bpm (141 while a set runs); nil for no workout.
+  var workout: (elapsed: TimeInterval, heartRate: Int)? {
+    switch self {
+    case .workout, .workoutEnd: return (2530, 128)
+    case .workoutRecording: return (2530, 141)
+    default: return nil
+    }
+  }
 
   /// The state named by WATCH_STATE, or nil for the live phone connection.
   static var launch: Self? {
@@ -64,6 +76,17 @@ enum WatchScreenshotState: String, CaseIterable {
         recording: true, frame: FrameStatus(personSeen: true, clippedEdges: [], coverage: 0.8), reps: 0,
         phase: "", elapsed: 0, camera: "back", exercise: "Kettlebell Swing")
       status.viewfinder = true
+      return (status, true, WatchPreviewFigure.image())
+    case .workout, .workoutEnd:
+      var status = WatchStatus.idle
+      status.lastSet = LastSet(
+        reps: 9, exercise: "Kettlebell Swing", seconds: 24, at: Date().timeIntervalSince1970 - 95)
+      return (status, true, nil)
+    case .workoutRecording:
+      let status = WatchStatus(
+        recording: true,
+        frame: FrameStatus(box: CGRect(x: 0.3, y: 0.2, width: 0.3, height: 0.8), pose: nil), reps: 6,
+        phase: "bottom", elapsed: 42, camera: "back", exercise: "Kettlebell Swing")
       return (status, true, WatchPreviewFigure.image())
     }
   }
