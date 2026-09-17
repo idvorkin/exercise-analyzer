@@ -89,7 +89,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 008:
 
 - **Summary:** Fill the screen with me, not the gym
-- **Status:** implemented in [cda8d1e](https://github.com/idvorkin/exercise-analyzer/commit/cda8d1e), [e4c86d9](https://github.com/idvorkin/exercise-analyzer/commit/e4c86d9); verified on the phone (HDR)
+- **Status:** implemented in [cda8d1e](https://github.com/idvorkin/exercise-analyzer/commit/cda8d1e), [e4c86d9](https://github.com/idvorkin/exercise-analyzer/commit/e4c86d9); verified on the phone (HDR); the skeleton-inside-reps crop of [#84](https://github.com/idvorkin/exercise-analyzer/issues/84) verified by host test on the 20-rep track, on the phone since 2026-09-16 (stored sets recut their stills on the version bump)
 
 #### Use Case:
 - **As a** small figure in a wide tripod shot
@@ -101,6 +101,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Given:** a clip is open in which I occupy under a third of the frame
 - **When:** I tap the person icon
 - **Then:** the video zooms to one steady region that keeps my whole body in view for every rep, HDR colours unchanged
+
+- **Scenario:** A walk in the middle of the set
+- **Given:** a 20-rep set done as two halves with a 4 s walk between them, me standing at the same spot for every rep
+- **When:** I tap the person icon
+- **Then:** the region is centred on my skeleton over the reps, not on the walk and not on the bell: the crop comes from the confident keypoints of the frames inside reps only, so during the walk I may leave the zoomed picture for a few seconds, and every rep's skeleton is in it
+
+- **Issues:** [#84](https://github.com/idvorkin/exercise-analyzer/issues/84) the 20-rep set of 2026-09-16 zoomed with the body in the left third and empty gym on the right: the crop was the detector's person box over the first-to-last-rep span, and on a swing that box runs out to the bell at the top (5–7 % of the frame past the hands) and the walk between the halves pushed it further; fixed by the skeleton-inside-reps rule (crop 5–63 % → 15–52 % of the frame), fixture `kettlebell-swing-20260916-F677269B` in `StableCropTests`
 
 ---
 

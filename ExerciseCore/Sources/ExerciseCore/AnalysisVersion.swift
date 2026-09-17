@@ -5,5 +5,6 @@
 //  sets too instead of leaving stale counts in the gallery.
 
 public enum AnalysisVersion {
-  public static let current = "2026-09-15.1"
+  // 2026-09-16.1: the me-view crop comes from the skeleton inside reps (#84); stored sets recut their stills.
+  public static let current = "2026-09-16.1"
 }

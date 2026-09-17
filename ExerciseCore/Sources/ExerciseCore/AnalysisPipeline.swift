@@ -84,13 +84,19 @@ public final class AnalysisPipeline: @unchecked Sendable {
   /// One crop covering the person through the set, so playback stays zoomed without following frame by frame.
   /// Only frames inside the rep span count (walking in and out of frame would otherwise widen it to the whole
   /// picture), and the edges are 5th/95th percentiles so a single mis-detection can't blow it up.
+  /// The me-view crop: the lifter's skeleton over the frames inside reps, the 5th/95th percentiles padded.
+  /// Only the reps' frames, not the span between the first and the last: a walk between two halves of a set
+  /// sat inside that span and pushed the crop's edge into empty gym while the lifter stood still for every
+  /// rep (#84). The skeleton's extent, not the detector's person box: on a swing the box runs out to the bell
+  /// at the top, 5–7 % of the frame past the hands, and with 1.4× padding that put the body a third of the way
+  /// into the picture. No confident keypoints in a frame: its box. No reps: every frame, as before.
   public var stableCrop: CGRect? {
     var frames = track.frames
-    if let first = reps.first, let last = reps.last {
-      let inSet = frames.filter { $0.time >= first.startTime - 0.5 && $0.time <= last.endTime + 0.5 }
-      if !inSet.isEmpty { frames = inSet }
+    let inReps = reps.flatMap { rep in
+      frames.filter { $0.time >= rep.startTime && $0.time <= rep.endTime }
     }
-    return PersonCrop.padded(robustUnion: frames.compactMap(\.box))
+    if !inReps.isEmpty { frames = inReps }
+    return PersonCrop.padded(robustUnion: frames.compactMap { PersonCrop.extent(of: $0) })
   }
 
   /// The span where reps happened, padded, clipped to `duration`. Nil when no rep was detected.
@@ -101,6 +107,21 @@ public final class AnalysisPipeline: @unchecked Sendable {
 }
 
 public enum PersonCrop {
+  /// Where the lifter is in a frame: the bounds of the confident keypoints (over 0.5), or the person box when
+  /// fewer than three are confident, or nil without either.
+  public static func extent(of frame: FrameRecord) -> CGRect? {
+    if let pose = frame.pose {
+      let points = zip(pose.xyn, pose.conf).filter { $0.1 > 0.5 }.map { $0.0 }
+      if points.count >= 3, let minX = points.map(\.x).min(), let maxX = points.map(\.x).max(),
+        let minY = points.map(\.y).min(), let maxY = points.map(\.y).max()
+      {
+        return CGRect(
+          x: CGFloat(minX), y: CGFloat(minY), width: CGFloat(maxX - minX), height: CGFloat(maxY - minY))
+      }
+    }
+    return frame.box
+  }
+
   /// Pads a union box 1.4× wide and 1.3× tall about its center (web app defaults) and clamps it to the image.
   public static func padded(union boxes: [CGRect]) -> CGRect? {
     guard let first = boxes.first else { return nil }
