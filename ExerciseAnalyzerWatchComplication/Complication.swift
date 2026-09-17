@@ -26,15 +26,14 @@ struct LaunchComplicationView: View {
   var body: some View {
     switch family {
     case .accessoryInline:
-      Label("Exercise Analyzer", systemImage: "figure.strengthtraining.traditional")
+      Label { Text("Exercise Analyzer") } icon: { KettlebellGlyph.image() }
     case .accessoryCorner:
-      Image(systemName: "figure.strengthtraining.traditional")
-        .font(.title3)
+      KettlebellGlyph(size: 24)
         .widgetLabel { Text("Analyzer") }
     default:
       ZStack {
         AccessoryWidgetBackground()
-        Image(systemName: "figure.strengthtraining.traditional").font(.title2)
+        KettlebellGlyph(size: 26)
       }
     }
   }
@@ -120,7 +119,7 @@ struct FaceComplicationView: View {
         }
       } else {
         HStack {
-          Image(systemName: "figure.strengthtraining.traditional")
+          KettlebellGlyph(size: 18)
           if let line = lastSetLine {
             Text(line)
           } else {
@@ -137,13 +136,12 @@ struct FaceComplicationView: View {
           if face.recording {
             Circle().fill(.red).frame(width: 6, height: 6)
           } else {
-            Image(systemName: "figure.strengthtraining.traditional").font(.caption2)
+            KettlebellGlyph(size: 12)
           }
         }
       }
     case .accessoryCorner:
-      Image(systemName: "figure.strengthtraining.traditional")
-        .font(.title3)
+      KettlebellGlyph(size: 24)
         .widgetLabel {
           if face.recording { Text("REC") } else { Text("Analyzer") }
         }
