@@ -62,7 +62,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I tap Save and confirm the deletion iOS asks about
 - **Then:** the trimmed clip (no overlay) is in Photos in place of the original, the Workouts entry points at it, and Undo trim still puts the original back into Photos and reopens it
 
-- **Issues:** [#34](https://github.com/idvorkin/exercise-analyzer/issues/34)
+- **Scenario:** The offer comes with the trim
+- **Given:** I opened a clip from Photos and the app trimmed it to its set
+- **When:** the trimmed clip starts playing
+- **Then:** a sheet asks "Replace the original in Photos?" with "Replace with the trimmed set" and "Keep both for now"; Replace is the same save as the button (iOS asks once to delete the original, Undo trim brings it back), Keep leaves the Save button for later; a recording or a file from Files gets no such offer, there is nothing of theirs in Photos to replace
+
+- **Issues:** [#34](https://github.com/idvorkin/exercise-analyzer/issues/34); [#90](https://github.com/idvorkin/exercise-analyzer/issues/90) Igor, from the gym: "When I've done a trim and download prompt me to erase the original" (the download being the fetch from Photos; the save-and-replace existed but only behind the Save button)
 
 ---
 

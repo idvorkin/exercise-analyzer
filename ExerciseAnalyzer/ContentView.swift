@@ -142,6 +142,22 @@ struct ContentView: View {
     } message: {
       Text("Nothing was saved to Photos. Delete the recording, or keep it to look at?")
     }
+    // A Photos clip was just trimmed to its set: offer the replace right away instead of leaving it to the
+    // Save button (#90). Replace is story 011's save: the trimmed clip goes in, iOS asks once to delete the
+    // original, Undo trim brings it back.
+    .confirmationDialog(
+      "Replace the original in Photos?", isPresented: $session.replaceOriginalPrompt, titleVisibility: .visible
+    ) {
+      Button("Replace with the trimmed set") {
+        session.log.event("ui", ["action": "replace_original", "choice": "replace"])
+        session.saveToPhotos()
+      }
+      Button("Keep both for now", role: .cancel) {
+        session.log.event("ui", ["action": "replace_original", "choice": "keep"])
+      }
+    } message: {
+      Text("The trimmed set goes into Photos and iOS asks once to delete the original. Undo trim brings it back. Save to Photos does the same later.")
+    }
     .onAppear(perform: loadFromEnvironment)
     .onChange(of: pickerItem) { _, item in
       guard let item else { return }

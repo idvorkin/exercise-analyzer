@@ -143,6 +143,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var recentBoxes: [(time: Double, box: CGRect)] = []
   private var currentFileURL: URL?
   private var trimmedURL: URL?
+  /// A Photos clip was just trimmed: the view offers to replace the original in Photos right away (#90).
+  @Published var replaceOriginalPrompt = false
   private var currentOrigin: Origin = .file
   private var currentEntryID: String?
   private var currentRecordedAt: Date?
@@ -2141,6 +2143,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
         rememberCurrent(clipURL: clip)
         activity = .idle
         play()
+        // The original is still in Photos: ask now whether to replace it (#90), the same save the button does.
+        if case .photos = currentOrigin, untrimmed != nil {
+          replaceOriginalPrompt = true
+          log.event("replace_prompt", ["clip": clip.lastPathComponent, "seconds": span.end - trimmed.start])
+        }
         // Test hook: SWING_UNDO_TRIM=1 undoes the trim a moment later (simulator runs can't tap the UI).
         if ProcessInfo.processInfo.environment["SWING_UNDO_TRIM"] == "1" {
           Task {
