@@ -250,7 +250,7 @@ the first frame (story 001).
 ### User Story 043:
 
 - **Summary:** The watch face shows the set
-- **Status:** implemented in [375e3aa](https://github.com/idvorkin/exercise-analyzer/commit/375e3aa), [0bde654](https://github.com/idvorkin/exercise-analyzer/commit/0bde654), [3255a38](https://github.com/idvorkin/exercise-analyzer/commit/3255a38); verified on the host (`FaceStateTests`) and by device signing; on the watch since 2026-09-14, Igor's check pending (add the complication to a face; its bundle id changed, so the old one is gone from the face)
+- **Status:** implemented in [375e3aa](https://github.com/idvorkin/exercise-analyzer/commit/375e3aa), [0bde654](https://github.com/idvorkin/exercise-analyzer/commit/0bde654), [3255a38](https://github.com/idvorkin/exercise-analyzer/commit/3255a38); verified on the host (`FaceStateTests`) and by device signing; on the watch since 2026-09-14, Igor's check pending (add the complication to a face; its bundle id changed, so the old one is gone from the face); the kettlebell icon and glyph of [#88](https://github.com/idvorkin/exercise-analyzer/issues/88) verified by the simulator build (the icon in the watch app's Assets.car) and installed on the watch 2026-09-16, Igor's look pending
 - **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and the complication was only a launcher.
 
 #### Use Case:
@@ -278,6 +278,11 @@ the first frame (story 001).
 - **Given:** the face shows the previous set's final
 - **When:** I record and cancel a set
 - **Then:** the face still shows the previous final, and starting the next set clears it
+
+- **Scenario:** The kettlebell on the face and in the app list
+- **Given:** the complication is on my face and the watch app is in the recents list
+- **When:** I look at either
+- **Then:** both show a kettlebell (a handle arc over a round body): the complication draws it in the face's tint in every family, and the app's icon is the same kettlebell on the phone icon's teal, not the system's bullseye placeholder ([#88](https://github.com/idvorkin/exercise-analyzer/issues/88), Igor: "maybe make it a kettlebell")
 
 - **Notes:** The complication cannot talk to the phone: it reads a shared App Group container that the watch app
   writes on each status and reloads through WidgetKit. WidgetKit throttles reloads, so the count on the face is
@@ -422,7 +427,7 @@ the first frame (story 001).
 ### User Story 048:
 
 - **Summary:** The whole gym session is one workout on the wrist, with heart rate and a clock, across every set
-- **Status:** implemented for [#82](https://github.com/idvorkin/exercise-analyzer/issues/82); verified by host tests (`WorkoutTests`), the watch simulator (`just watch-screens`: the workout, workoutEnd and workoutRecording states) and the phone simulator (a seeded workout on today's header); the wrist rung (Health permission, heart rate, the mirrored session on the phone, the workout in Health) is Igor's, not yet run: the device build needs the HealthKit capability on the App ID, and on 2026-09-16 Xcode had no Apple account signed in to add it ("No Accounts"), so the first `just run-device` after signing in regenerates the profiles
+- **Status:** implemented for [#82](https://github.com/idvorkin/exercise-analyzer/issues/82); verified by host tests (`WorkoutTests`), the watch simulator (`just watch-screens`: the workout, workoutEnd and workoutRecording states) and the phone simulator (a seeded workout on today's header); on the phone and the watch since 2026-09-16 (the HealthKit profiles came through once the phone was plugged in; a generic-destination build had said "No Accounts"); the wrist rung (Health permission, heart rate, the mirrored session on the phone, the workout in Health) is Igor's, read from the logs after his first workout
 - **Why:** Igor, 2026-09-16, from the gym: "Let's figure out how to do this with the workout mode and this will be the workout. We need to think through keeping the workout alive across many analysis sessions. I'm doing multiple exercises and warming up and stuff but let's figure out how to make this workout and record the whole workout. Need to think about what my workout UI looks like on the watch. Should probably have heart rate on there and a timer. Those are probably the big ones before the control."
 
 #### Use Case:
