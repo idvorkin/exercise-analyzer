@@ -15,23 +15,27 @@ final class WorkoutTimelineTests: XCTestCase {
   }
 
   /// 1000–2000 s workout: a set at 1100–1125, one at 1215–1240 (90 s rest), one at 1270–1295 (30 s rest), and
-  /// one outside the workout. Heart rate: 120 at rest, 144 at each set's end, peaking at 150 ten seconds
-  /// later (the heart lags the work), back to 120 a minute after the end.
+  /// one outside the workout. Heart rate: 130 as each set starts, 144 at its end, peaking at 150 ten seconds
+  /// later (the heart lags the work), down to 120 a minute after the end unless the next set started first.
   func testSetsRestsPeaksAndDrops() {
     let workout = StoredWorkout(start: date(1000), end: date(2000))
     let sets = [set("c", clipStart: 1270), set("a", clipStart: 1100), set("b", clipStart: 1215), set("outside", clipStart: 2500)]
     var samples: [HeartRateSeries.Sample] = []
-    for end in [1125.0, 1240, 1295] {
-      samples += [.init(at: end - 25, bpm: 120), .init(at: end - 12, bpm: 135), .init(at: end, bpm: 144), .init(at: end + 10, bpm: 150)]
-      samples += stride(from: 20.0, through: 60, by: 10).map { .init(at: end + $0, bpm: 150 - ($0 - 10) * 0.6) }
+    let ends = [1125.0, 1240, 1295]
+    for (index, end) in ends.enumerated() {
+      let nextStart = index + 1 < ends.count ? ends[index + 1] - 25 : .infinity
+      samples += [.init(at: end - 25, bpm: 130), .init(at: end - 12, bpm: 135), .init(at: end, bpm: 144), .init(at: end + 10, bpm: 150)]
+      samples += stride(from: 20.0, through: 60, by: 10).filter { end + $0 < nextStart }
+        .map { .init(at: end + $0, bpm: 150 - ($0 - 10) * 0.6) }
     }
     let timeline = WorkoutTimeline(workout: workout, sets: sets, heartRate: HeartRateSeries(samples: samples))
 
     XCTAssertEqual(timeline.rows.map(\.id), ["a", "b", "c"])
     XCTAssertEqual(timeline.rows.map(\.restAfter), [90, 30, nil])
     XCTAssertEqual(timeline.rows.map(\.peak), [150, 150, 150])
-    // b's rest was 30 s: the next set started inside the minute, so its drop is not a recovery number.
-    XCTAssertEqual(timeline.rows.map(\.drop), [30, nil, 30])
+    // b's rest was 30 s: the next set started inside the minute, so its drop is over the rest it got (150 → 130).
+    XCTAssertEqual(timeline.rows.map(\.drop), [30, 20, 30])
+    XCTAssertEqual(timeline.rows.map(\.dropOver), [60, 30, 60])
     XCTAssertEqual(timeline.workSeconds, 75)
     XCTAssertEqual(timeline.restSeconds, 120)
   }

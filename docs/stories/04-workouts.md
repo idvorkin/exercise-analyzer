@@ -250,7 +250,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** How fast the heart came down
 - **Given:** a set whose heart rate peaked at 150 ten seconds after its last rep and read 118 a minute after the set ended, with a rest of 2:15
 - **When:** I read its row
-- **Then:** it says "♥ 150 · −32" over "rest 2:15" (the unit is in the legend above the rows: with it in every row the line wrapped); a set whose rest was under a minute shows its peak and no drop, because the next set had started
+- **Then:** it says "♥ 150 · −32" over "rest 2:15" (the unit is in the legend above the rows: with it in every row the line wrapped)
+
+- **Scenario:** A rest shorter than a minute
+- **Given:** a set that peaked at 150 and whose next set started 30 s after it ended, with the heart at 130
+- **When:** I read its row
+- **Then:** it says "♥ 150 · −20/30s": the drop over the rest I got, with the rest's length beside it because it does not compare with a full minute's drop
 
 - **Scenario:** Back to the workout from one of its sets
 - **Given:** I opened a set from a workout's page
@@ -260,7 +265,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** A row names the rep and shows the set
 - **Given:** a workout of swings and pistols
 - **When:** I read its rows
-- **Then:** they say "10 swings" and "6 pistols" ("1 get-up", "8 split squats"), each with the set's own picture, and one line above the rows says what the red numbers are: peak, the drop in the 60 s after the set, the rest before the next
+- **Then:** they say "10 swings" and "6 pistols" ("1 get-up", "8 split squats"), each with the set's own picture, and one line above the rows says what the red numbers are: peak, the drop in the 60 s after the set (or in the rest when it was shorter), the rest before the next
 
 - **Scenario:** The header still folds the day
 - **Given:** a day with a workout line under its header
@@ -277,6 +282,6 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I open its page
 - **Then:** the sets still sit on the time axis with their rests, and the chart says there is no heart rate
 
-- **Notes:** Igor picked the page (95A) on the board of 2026-09-18 and asked to "keep full heart rate data so we can see time to drop as well": the whole workout's series, rests included, is read from Health (a minute before to three after) and kept in `Documents/workouts/<id>/heartrate.json`, re-read on every open and replaced when Health has more. The heart lags the work, so a set's peak is looked for up to 30 s past its end (or the next set's start), and the drop is that peak minus the reading 60 s after the set's end; "time to get back under X" is the other way to say it and is not built. A set is placed by `clipStartedAt` (story 051); sets from before it fall back to `recordedAt`, which for a set recorded in the app is the end of the recording, so they sit up to one set length late. The day and exercise grouping of 012 stays as it is. `WorkoutTimeline` in ExerciseCore does the arithmetic; the page only draws it.
+- **Notes:** Igor picked the page (95A) on the board of 2026-09-18 and asked to "keep full heart rate data so we can see time to drop as well": the whole workout's series, rests included, is read from Health (a minute before to three after) and kept in `Documents/workouts/<id>/heartrate.json`, re-read on every open and replaced when Health has more. The heart lags the work, so a set's peak is looked for up to 30 s past its end (or the next set's start), and the drop is that peak minus the reading 60 s after the set's end, or at the next set's start when the rest was shorter (Igor, 2026-09-18: "drop in 60 seconds or however much total rest I got"; he picked this over "time to get back under X", which is not built). A set is placed by `clipStartedAt` (story 051); sets from before it fall back to `recordedAt`, which for a set recorded in the app is the end of the recording, so they sit up to one set length late. The day and exercise grouping of 012 stays as it is. `WorkoutTimeline` in ExerciseCore does the arithmetic; the page only draws it.
 
 - **Issues:** [#95](https://github.com/idvorkin/exercise-analyzer/issues/95)

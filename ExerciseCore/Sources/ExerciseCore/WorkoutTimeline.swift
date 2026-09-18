@@ -1,7 +1,8 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 //  A workout as time (story 053): its sets in the order they were done, the rest after each, and what the heart
-//  did, peak in the set and how far it fell in the minute after. Platform-free: the page only draws it.
+//  did, peak in the set and how far it fell in the minute after (or in the rest, when shorter). Platform-free:
+//  the page only draws it.
 
 import Foundation
 
@@ -28,9 +29,11 @@ public struct WorkoutTimeline: Equatable {
     public let peak: Int?
     /// Seconds from this set's end to the next set's start; nil for the last set.
     public let restAfter: TimeInterval?
-    /// Beats the heart rate fell from that peak to 60 s after the set's end. Nil when the next set started
-    /// within those 60 s (the number would measure the next set, not the recovery) or when there is no reading.
+    /// Beats the heart rate fell from that peak to the end of `dropOver`. Nil when there is no reading, or no rest.
     public let drop: Int?
+    /// Seconds after the set's end the drop is measured over: 60, or the whole rest when the next set started
+    /// sooner (Igor, 2026-09-18: "drop in 60 seconds or however much total rest I got").
+    public let dropOver: TimeInterval
   }
 
   public static let dropSeconds = 60.0
@@ -48,14 +51,14 @@ public struct WorkoutTimeline: Equatable {
       let span = set.span
       let next = index + 1 < inside.count ? inside[index + 1].span.lowerBound : nil
       let rest = next.map { max(0, $0.timeIntervalSince(span.upperBound)) }
-      let recovering = rest.map { $0 >= Self.dropSeconds } ?? true
+      let dropOver = min(Self.dropSeconds, rest ?? Self.dropSeconds)
       let peakEnd = min(span.upperBound.addingTimeInterval(Self.peakLag), next ?? .distantFuture)
       let peak = heartRate?.peak(from: span.lowerBound, to: peakEnd)
-      let later = heartRate?.bpm(at: span.upperBound.addingTimeInterval(Self.dropSeconds))
+      let later = dropOver > 0 ? heartRate?.bpm(at: span.upperBound.addingTimeInterval(dropOver)) : nil
       return SetRow(
         id: set.id, start: span.lowerBound, end: span.upperBound, exercise: set.exerciseKind, reps: set.repCount,
         score: set.bestScore, peak: peak, restAfter: rest,
-        drop: recovering ? peak.flatMap { peak in later.map { peak - $0 } } : nil)
+        drop: peak.flatMap { peak in later.map { peak - $0 } }, dropOver: dropOver)
     }
     workSeconds = rows.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
     restSeconds = rows.compactMap(\.restAfter).reduce(0, +)

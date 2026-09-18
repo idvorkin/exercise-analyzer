@@ -40,7 +40,7 @@ struct WorkoutDetailView: View {
         totals(timeline)
         chart(timeline)
         if timeline.rows.contains(where: { $0.peak != nil }) {
-          Text("♥ peak · drop in the 60 s after the set · rest before the next")
+          Text("♥ peak · drop in the 60 s after the set, or in the rest when it was shorter (−20/30s) · rest before the next")
             .font(.caption).foregroundStyle(.secondary)
         }
         VStack(spacing: 8) {
@@ -173,8 +173,10 @@ private struct SetTimelineRow: View {
       VStack(alignment: .trailing, spacing: 2) {
         if let peak = row.peak {
           // "♥ 150 · −32": the peak the set produced and how far it fell in the minute after (the legend above
-          // the rows says so once; with the unit in every row the line wrapped).
-          Text("♥ \(peak)" + (row.drop.map { " · \($0 >= 0 ? "−" : "+")\(abs($0))" } ?? ""))
+          // the rows says so once; with the unit in every row the line wrapped). A shorter rest says its
+          // length, "−20/30s": that drop is not comparable with a full minute's.
+          let over = row.dropOver < WorkoutTimeline.dropSeconds ? "/\(Int(row.dropOver))s" : ""
+          Text("♥ \(peak)" + (row.drop.map { " · \($0 >= 0 ? "−" : "+")\(abs($0))\(over)" } ?? ""))
             .font(.subheadline.bold()).monospacedDigit().foregroundStyle(.red).lineLimit(1).fixedSize()
         }
         if let rest = row.restAfter {
