@@ -102,12 +102,6 @@ struct ContentView: View {
         if let run = session.instrumentedRun {
           instrumentedRunBanner(run)
         }
-        // Above the HUD, not under it: at launch the phase pills and the count drew over the panel's top edge
-        // and the two read as one muddle (#89). The panel dims everything behind it on both the first screen
-        // and Open.
-        if (session.source == .none && session.activity == .idle) || showOpenDialog {
-          startPanel
-        }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       if !session.reps.isEmpty && session.source != .camera {
@@ -125,6 +119,15 @@ struct ContentView: View {
         }
       }
       controls
+    }
+    // The main menu is modal: over the whole screen, the rep gallery and the transport bar included, all of it
+    // dimmed and out of reach until the menu is answered or dismissed (Igor, 2026-09-18: inside the picture's
+    // stack it covered the video only, and the gallery and the controls under it stayed bright and live). Above
+    // the HUD, not under it: at launch the phase pills and the count drew over the panel's top edge (#89).
+    .overlay {
+      if (session.source == .none && session.activity == .idle) || showOpenDialog {
+        startPanel
+      }
     }
     .background(Color(.systemBackground))
     .background(
@@ -840,6 +843,8 @@ struct ContentView: View {
     if env["SWING_SHOW_WORKOUTS"] == "1" { showRecents = true }
     if env["SWING_SHOW_GALLERY"] == "1" { showGallery = true }
     if env["SWING_WORKOUTS_COLLAPSED"] == "1" { workoutsDetent = WorkoutGalleryView.collapsedDetent }
+    // Test hook: the main menu over whatever loads (with SWING_OPEN_RECENT, over a set and its rep gallery).
+    if env["SWING_SHOW_MENU"] == "1" { showOpenDialog = true }
     if let wanted = env["SWING_OPEN_RECENT"], !wanted.isEmpty {
       // Test hook: reopen a Recents entry, the newest for "1" or the one with this id (a long clip for a memory run).
       let entry = wanted == "1" ? session.recents.entries.first : session.recents.entries.first { $0.id == wanted }

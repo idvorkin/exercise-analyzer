@@ -74,7 +74,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 025:
 
 - **Summary:** Start from a centred panel; Open as a sheet with big rows, most-used first
-- **Status:** implemented in [5fead59](https://github.com/idvorkin/exercise-analyzer/commit/5fead59), [387e252](https://github.com/idvorkin/exercise-analyzer/commit/387e252), [4059301](https://github.com/idvorkin/exercise-analyzer/commit/4059301); on the phone, Igor's check pending
+- **Status:** implemented in [5fead59](https://github.com/idvorkin/exercise-analyzer/commit/5fead59), [387e252](https://github.com/idvorkin/exercise-analyzer/commit/387e252), [4059301](https://github.com/idvorkin/exercise-analyzer/commit/4059301); on the phone, Igor's check pending; modal over the whole screen for [#96](https://github.com/idvorkin/exercise-analyzer/issues/96), verified on the simulator (`SWING_SHOW_MENU=1` over a reopened set)
 
 #### Use Case:
 - **As a** lifter opening a clip with sweaty hands
@@ -92,7 +92,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I look at it
 - **Then:** everything behind it is dimmed (the idle HUD at launch, the picture under Open), the panel is near-opaque with a visible edge and a shadow, and nothing from the HUD draws over it
 
-- **Issues:** [#25](https://github.com/idvorkin/exercise-analyzer/issues/25); [#89](https://github.com/idvorkin/exercise-analyzer/issues/89) at launch the phase pills and the count drew over the panel's top edge (the panel sat under the HUD in the stack, and only Open dimmed the background)
+- **Scenario:** The panel is modal over a loaded set
+- **Given:** a set is loaded, with its rep gallery and the transport bar under the picture
+- **When:** I tap Open
+- **Then:** the panel is centred on the whole screen, and the picture, the rep gallery and the transport bar are all dimmed and out of reach until I pick a row, tap outside or Cancel
+
+- **Issues:** [#25](https://github.com/idvorkin/exercise-analyzer/issues/25); [#96](https://github.com/idvorkin/exercise-analyzer/issues/96) the panel sat in the picture's stack, so the rep gallery and the controls stayed bright and live under it; [#89](https://github.com/idvorkin/exercise-analyzer/issues/89) at launch the phase pills and the count drew over the panel's top edge (the panel sat under the HUD in the stack, and only Open dimmed the background)
 
 ---
 
