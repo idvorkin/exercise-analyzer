@@ -261,3 +261,31 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** the set is paused and stays paused
 
 - **Issues:** [#59](https://github.com/idvorkin/exercise-analyzer/issues/59), [#60](https://github.com/idvorkin/exercise-analyzer/issues/60), [#63](https://github.com/idvorkin/exercise-analyzer/issues/63)
+
+---
+
+### User Story 051:
+
+- **Summary:** See my heart rate over the replay when the set was part of a workout
+- **Status:** not implemented ([#92](https://github.com/idvorkin/exercise-analyzer/issues/92))
+- **Why:** Igor, 2026-09-18: "Let's have heart rate overlay in exercise replay if I have it."
+
+#### Use Case:
+- **As a** lifter reviewing a set I recorded inside a workout on the wrist
+- **I want to** see what my heart was doing at the moment I am looking at
+- **so that** I read the effort of a set next to its form
+
+#### Acceptance Criteria:
+- **Scenario:** A set recorded inside a workout
+- **Given:** the set was recorded while a workout ran on the watch and Health holds heart-rate samples for its span
+- **When:** I play or scrub the set
+- **Then:** the HUD shows "♥ 141", the sample nearest the playhead, and it changes as the playhead moves
+
+- **Scenario:** A set with no heart rate
+- **Given:** the set was recorded outside a workout, or Health read was refused
+- **When:** I open it
+- **Then:** the HUD is exactly as today: no chip, no placeholder, no prompt
+
+- **Notes:** The phone keeps only a workout's average and max today (`StoredWorkout`), and the mirrored live value reaches it about once a minute (17 `workout_data` events in the 17-minute workout of 2026-09-18). The watch writes a sample to Health every few seconds during a workout, so the series is read from Health for the set's span (heart rate, read only, one prompt) and stored beside the set's `analysis.json`. Story 053 draws the same series across the workout. Open (board of 2026-09-18, 92A or 92B): the chip alone, or the chip and the set's curve above the scrubber.
+
+- **Issues:** [#92](https://github.com/idvorkin/exercise-analyzer/issues/92)

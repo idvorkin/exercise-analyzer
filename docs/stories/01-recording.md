@@ -85,7 +85,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 004:
 
 - **Summary:** Count the swings that are swings, not the walk-in, the setup or the bell park
-- **Status:** implemented in [6b74a93](https://github.com/idvorkin/exercise-analyzer/commit/6b74a93), [4344155](https://github.com/idvorkin/exercise-analyzer/commit/4344155), [f3e7955](https://github.com/idvorkin/exercise-analyzer/commit/f3e7955); verified on the host (walk-in, pick-up and low-camera fixtures)
+- **Status:** implemented in [6b74a93](https://github.com/idvorkin/exercise-analyzer/commit/6b74a93), [4344155](https://github.com/idvorkin/exercise-analyzer/commit/4344155), [f3e7955](https://github.com/idvorkin/exercise-analyzer/commit/f3e7955), [7beca0c](https://github.com/idvorkin/exercise-analyzer/commit/7beca0c); verified on the host (walk-in, pick-up, low-camera and recording-hole fixtures); the `capture_gap` event of 7beca0c not on the phone yet
 
 #### Use Case:
 - **As a** lifter who picks the bell up on camera and puts it down on camera
@@ -104,6 +104,8 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** the clip is analyzed as a kettlebell swing
 - **Then:** the count is seven: the swing after the hole starts at its own top and is counted
 - **and Then:** the session log has a `capture_gap` event saying how long the hole was and why frames were dropped
+
+- **Issues:** [#4](https://github.com/idvorkin/exercise-analyzer/issues/4), [#15](https://github.com/idvorkin/exercise-analyzer/issues/15), [#16](https://github.com/idvorkin/exercise-analyzer/issues/16); [#94](https://github.com/idvorkin/exercise-analyzer/issues/94) a 9-swing set counted 6: the recording lost 2.2 s to a main-thread hang (open: the hole itself)
 
 ---
 

@@ -462,6 +462,34 @@ the first frame (story 001).
 
 ---
 
+### User Story 050:
+
+- **Summary:** Rest time stays on the wrist in Preview and beside the workout clock
+- **Status:** not implemented ([#91](https://github.com/idvorkin/exercise-analyzer/issues/91))
+- **Why:** Igor, 2026-09-18, from the gym: "When in watch preview keep time since last rep on small. On watch. Include time since last rep not just total work out time."
+
+#### Use Case:
+- **As a** lifter framing the next set from the wrist, inside a workout
+- **I want to** keep seeing how long I have rested while the Preview is up, and see the rest next to the workout clock
+- **so that** I start the next set on my rest length instead of on the session total, which tells me nothing between sets
+
+#### Acceptance Criteria:
+- **Scenario:** Rest rides along in Preview
+- **Given:** a set ended 1:42 ago and the rest length is 90 s
+- **When:** I tap Preview on the wrist
+- **Then:** a small "REST 1:42" chip sits beside PREVIEW, counting, orange because it is past 90 s, and whole inside the face; Record clears it as it clears the rest count today (046)
+
+- **Scenario:** Rest on the workout page
+- **Given:** a workout is running and a set ended 1:42 ago
+- **When:** I look at the workout page
+- **Then:** the rest and the workout clock are both in the head, without scrolling
+
+- **Notes:** The rest is the timer of story 046, which starts at Done, a few seconds after the last rep; no second clock. Open (board of 2026-09-18, 91A or 91B): whether the rest becomes the large number between sets with the workout clock small beside the heart rate, or joins the heart-rate line small.
+
+- **Issues:** [#91](https://github.com/idvorkin/exercise-analyzer/issues/91)
+
+---
+
 ### What a workout session costs
 
 Heart rate during a set, surviving wrist-down (#32) and launching the watch app from the phone all need an

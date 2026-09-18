@@ -184,3 +184,54 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** it reads "swing · pistols" with an icon per exercise (a stick figure in the exercise's shape), in the order the sets were done, and nothing else; pulling the sheet up shows the full day as before
 
 - **Issues:** [#58](https://github.com/idvorkin/exercise-analyzer/issues/58)
+
+---
+
+### User Story 052:
+
+- **Summary:** Tell the From Photos strip which clips are not workouts, and see each clip's state
+- **Status:** not implemented ([#93](https://github.com/idvorkin/exercise-analyzer/issues/93))
+- **Why:** Igor, 2026-09-18, looking at the strip: "Maybe in the top strip we have different states like Analyzed / imported / ignored."
+
+#### Use Case:
+- **As a** lifter whose Photos library holds gym clips and everything else
+- **I want to** mark a suggested clip as not a workout, and see which clips are new, analyzed or ignored
+- **so that** the strip only offers work I have not done and never the same wrong clip twice
+
+#### Acceptance Criteria:
+- **Scenario:** Ignoring a clip
+- **Given:** the strip suggests a clip that is not a workout
+- **When:** I long-press it and choose "Not a workout clip"
+- **Then:** it leaves the suggestions and stays out across launches; it is listed under Ignored, where "Bring back" returns it
+
+- **Scenario:** The strip shows work to do
+- **Given:** Photos holds 3 new clips, 9 analyzed and 2 ignored
+- **When:** I open Workouts
+- **Then:** I see the 3 new clips first, and the counts of the other two states with one tap to each
+
+- **Notes:** Builds on 014 (suggestions, the Analyzed badge) and 032 (Hide analyzed). On 2026-09-18 the log's `photos_suggestions` read matched 31, shown 12, already analyzed 9. Open (board of 2026-09-18, 93A or 93B): three tabs in place of the Hide toggle, or one strip with three badges; and what "imported" means to Igor (read here as opened but never finished analyzing).
+
+- **Issues:** [#93](https://github.com/idvorkin/exercise-analyzer/issues/93)
+
+---
+
+### User Story 053:
+
+- **Summary:** See a whole workout on one page: the sets in time, the rests between them, the heart rate across them
+- **Status:** not implemented ([#95](https://github.com/idvorkin/exercise-analyzer/issues/95))
+- **Why:** Igor, 2026-09-18: "I probably have a workout view where I look at the whole workout together. That's probably an interesting view I need as well."
+
+#### Use Case:
+- **As a** lifter who just ended a workout of nine sets
+- **I want to** see the session as one picture, when each set fell, how long I rested, what my heart did
+- **so that** I can tell how the session went, not only how each set went
+
+#### Acceptance Criteria:
+- **Scenario:** Opening a workout
+- **Given:** today has an ended workout (8:43–9:00 AM, 9 sets, ♥ 129 avg, 153 max) on the day's green line
+- **When:** I tap the green line
+- **Then:** a page shows the heart rate from 8:43 to 9:00 with each set marked on the same time axis, and under it the sets in order with reps, score, peak heart rate and the rest that followed; tapping a set opens it
+
+- **Notes:** Needs the heart-rate series of story 051, read for the workout's span. The day and exercise grouping of 012 stays as it is. Open (board of 2026-09-18, 95A or 95B): a page behind the green line, or a small strip inline under it.
+
+- **Issues:** [#95](https://github.com/idvorkin/exercise-analyzer/issues/95)
