@@ -133,7 +133,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I tap Hide analyzed in the strip's header
 - **Then:** only the unanalyzed clip remains, the choice sticks across launches, and the trimmed set stays hidden because its new Photos identity is the one Workouts knows
 
-- **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41)
+- **Scenario:** The toggle became the New tab (story 052)
+- **Given:** the same three clips
+- **When:** I open Workouts
+- **Then:** the strip is on its New tab with the one unanalyzed clip, the two analyzed ones are under Analyzed, and there is no Hide analyzed button
+
+- **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41); [#93](https://github.com/idvorkin/exercise-analyzer/issues/93) replaced the toggle with tabs
 
 ---
 
@@ -190,7 +195,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 052:
 
 - **Summary:** Tell the From Photos strip which clips are not workouts, and see each clip's state
-- **Status:** not implemented ([#93](https://github.com/idvorkin/exercise-analyzer/issues/93))
+- **Status:** implemented for [#93](https://github.com/idvorkin/exercise-analyzer/issues/93); the sorting verified on the host (`PhotosClipStateTests`), the app by build only: the strip needs a Photos library, so the look and the long-press are Igor's check on the phone
 - **Why:** Igor, 2026-09-18, looking at the strip: "Maybe in the top strip we have different states like Analyzed / imported / ignored."
 
 #### Use Case:
@@ -207,9 +212,19 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** The strip shows work to do
 - **Given:** Photos holds 3 new clips, 9 analyzed and 2 ignored
 - **When:** I open Workouts
-- **Then:** I see the 3 new clips first, and the counts of the other two states with one tap to each
+- **Then:** the strip is on "New 3" with those clips, beside "Analyzed 9" and "Ignored 2", one tap each; the tab I leave it on sticks across launches
 
-- **Notes:** Builds on 014 (suggestions, the Analyzed badge) and 032 (Hide analyzed). On 2026-09-18 the log's `photos_suggestions` read matched 31, shown 12, already analyzed 9. Open (board of 2026-09-18, 93A or 93B): three tabs in place of the Hide toggle, or one strip with three badges; and what "imported" means to Igor (read here as opened but never finished analyzing).
+- **Scenario:** Ignored clips do not crowd out new ones
+- **Given:** the twelve newest set-sized videos in Photos are all ignored or analyzed and a new one sits behind them
+- **When:** I open Workouts
+- **Then:** the new clip is on the New tab: each tab keeps its own newest twelve of the 36 looked at
+
+- **Scenario:** Opening an ignored clip
+- **Given:** a clip under Ignored
+- **When:** I tap it
+- **Then:** it is analyzed like any other and moves to Analyzed: a clip that became a set is a set, whatever I said before
+
+- **Notes:** Builds on 014 (suggestions, the Analyzed badge) and replaces 032's Hide analyzed toggle. Igor picked 93A on the board of 2026-09-18 (tabs; 93B was one strip with three badges). On 2026-09-18 the log's `photos_suggestions` read matched 31, shown 12, already analyzed 9; the event now carries `new` and `ignored`, and `photos_ignore` logs each change. The ignored identifiers live in UserDefaults (`ignoredPhotosClips`). Open: what "imported" means to Igor; the board read it as a clip opened but never finished analyzing (a blue Opened badge), which is not built, because nothing records that today and the meaning is not confirmed.
 
 - **Issues:** [#93](https://github.com/idvorkin/exercise-analyzer/issues/93)
 

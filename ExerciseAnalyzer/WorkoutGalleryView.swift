@@ -156,10 +156,9 @@ struct WorkoutGalleryView: View {
 struct PhotosSuggestionsRow: View {
   @ObservedObject var suggestions: PhotosSuggestions
   let onImport: (PhotosSuggestions.Clip) -> Void
-  /// Igor's choice (#41): the strip can hide clips that are already sets, leaving only what is left to analyze.
-  @AppStorage("hideAnalyzedClips") private var hideAnalyzed = false
-
-  private var shown: [PhotosSuggestions.Clip] { suggestions.clips.filter { !hideAnalyzed || !$0.analyzed } }
+  /// Three tabs in place of the Hide analyzed toggle of #41 (story 052, #93): the strip opens on New, so it shows
+  /// work to do, and the other two answer "where did it go".
+  @AppStorage("photosStripTab") private var tab = PhotosClipState.new
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -170,24 +169,51 @@ struct PhotosSuggestionsRow: View {
           .background(Color.blue.opacity(0.15), in: Circle())
           .foregroundStyle(.blue)
         Text("From Photos").font(.headline)
-        Spacer(minLength: 8)
-        Text(suggestions.unanalyzedCount == 0 ? "all analyzed" : "\(suggestions.unanalyzedCount) not analyzed")
-          .font(.caption).foregroundStyle(.secondary)
-        if suggestions.clips.contains(where: \.analyzed) {
-          Button(hideAnalyzed ? "Show analyzed" : "Hide analyzed") { hideAnalyzed.toggle() }
-            .font(.caption).buttonStyle(.bordered).controlSize(.mini)
+      }
+      Picker("Clips", selection: $tab) {
+        ForEach(PhotosClipState.allCases, id: \.self) { state in
+          Text("\(Self.title(state)) \(suggestions.clips(in: state).count)").tag(state)
         }
+      }
+      .pickerStyle(.segmented)
+      let shown = suggestions.clips(in: tab)
+      if shown.isEmpty {
+        Text(Self.empty(tab)).font(.caption).foregroundStyle(.secondary).frame(height: 74)
       }
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
           ForEach(shown) { clip in
             PhotosClipCard(clip: clip, suggestions: suggestions)
               .onTapGesture { onImport(clip) }
+              .contextMenu {
+                // Ignoring is a couch action, so a long-press is enough; an analyzed clip is a set, not a suggestion.
+                if clip.state == .new {
+                  Button { suggestions.setIgnored(clip, true) } label: { Label("Not a workout clip", systemImage: "eye.slash") }
+                } else if clip.state == .ignored {
+                  Button { suggestions.setIgnored(clip, false) } label: { Label("Bring back", systemImage: "arrow.uturn.backward") }
+                }
+              }
           }
         }
       }
     }
     .padding(.top, 8)
+  }
+
+  private static func title(_ state: PhotosClipState) -> String {
+    switch state {
+    case .new: return "New"
+    case .analyzed: return "Analyzed"
+    case .ignored: return "Ignored"
+    }
+  }
+
+  private static func empty(_ state: PhotosClipState) -> String {
+    switch state {
+    case .new: return "No new clips in the last two weeks"
+    case .analyzed: return "No analyzed clips in the last two weeks"
+    case .ignored: return "Nothing ignored. Long-press a clip to say it is not a workout."
+    }
   }
 }
 

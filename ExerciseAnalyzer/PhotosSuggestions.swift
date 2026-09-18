@@ -1,10 +1,12 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 //  "From Photos" (issue #8): recent videos in the library that look like sets (10 s to 10 min), so the lifter does
-//  not have to hunt through the picker. Clips already in Workouts stay in the strip, dimmed and marked Analyzed,
-//  so it is clear they are not new sets to import (Igor). Read-only; nothing is copied until a clip is opened, and
-//  then it is opened in place like the picker does.
+//  not have to hunt through the picker. The strip has three tabs (story 052): New, Analyzed (clips already in
+//  Workouts, dimmed and marked, so it is clear they are not new sets to import) and Ignored (the lifter said "Not
+//  a workout clip"). Read-only; nothing is copied until a clip is opened, and then it is opened in place like
+//  the picker does.
 
+import ExerciseCore
 import Photos
 import SwiftUI
 
@@ -12,8 +14,10 @@ import SwiftUI
 final class PhotosSuggestions: ObservableObject {
   struct Clip: Identifiable {
     let asset: PHAsset
+    /// New, already a set in Workouts, or ignored by the lifter (story 052).
+    var state = PhotosClipState.new
     /// Already in Workouts: shown dimmed and marked, and a tap opens that set instead of importing again.
-    var analyzed = false
+    var analyzed: Bool { state == .analyzed }
     var id: String { asset.localIdentifier }
     var date: Date { asset.creationDate ?? Date.distantPast }
     var duration: Double { asset.duration }
@@ -28,8 +32,18 @@ final class PhotosSuggestions: ObservableObject {
   private var thumbnails: [String: UIImage] = [:]
   /// Photos identifiers already in Workouts, kept so a refresh after granting access marks them too.
   private var known: Set<String> = []
+  /// Photos identifiers the lifter marked "Not a workout clip" (052). Kept in UserDefaults: a few dozen strings.
+  private var ignored = Set(UserDefaults.standard.stringArray(forKey: "ignoredPhotosClips") ?? [])
 
-  var unanalyzedCount: Int { clips.filter { !$0.analyzed }.count }
+  func clips(in state: PhotosClipState) -> [Clip] { clips.filter { $0.state == state } }
+
+  /// "Not a workout clip" and "Bring back": the clip changes tab now and stays there across launches.
+  func setIgnored(_ clip: Clip, _ isIgnored: Bool) {
+    if isIgnored { ignored.insert(clip.id) } else { ignored.remove(clip.id) }
+    UserDefaults.standard.set(ignored.sorted(), forKey: "ignoredPhotosClips")
+    onEvent?("photos_ignore", ["ignored": isIgnored, "total_ignored": ignored.count])
+    refresh(known: known)
+  }
 
   static let lookBack: TimeInterval = 14 * 24 * 3600
   static let minDuration = 10.0
@@ -53,11 +67,17 @@ final class PhotosSuggestions: ObservableObject {
       Self.minDuration, Self.maxDuration)
     options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
     options.fetchLimit = Self.limit * 3
-    var found: [Clip] = []
+    var assets: [String: PHAsset] = [:]
+    var ids: [String] = []
     let matched = PHAsset.fetchAssets(with: options)
-    matched.enumerateObjects { asset, _, stop in
-      found.append(Clip(asset: asset, analyzed: known.contains(asset.localIdentifier)))
-      if found.count >= Self.limit { stop.pointee = true }
+    matched.enumerateObjects { asset, _, _ in
+      assets[asset.localIdentifier] = asset
+      ids.append(asset.localIdentifier)
+    }
+    // Each tab keeps its own newest `limit`, so ignored and analyzed clips cannot push new ones off the strip.
+    let tabs = PhotosClipState.tabs(ids: ids, known: known, ignored: ignored, limit: Self.limit)
+    let found = PhotosClipState.allCases.flatMap { state in
+      (tabs[state] ?? []).compactMap { id in assets[id].map { Clip(asset: $0, state: state) } }
     }
     clips = found
     let analyzed = found.filter(\.analyzed).count
@@ -67,7 +87,8 @@ final class PhotosSuggestions: ObservableObject {
       "photos_suggestions",
       [
         "status": status.rawValue, "videos_in_library": allVideos.count, "matched": matched.count,
-        "already_analyzed": analyzed, "shown": found.count, "newest_dates": newest,
+        "already_analyzed": analyzed, "ignored": clips(in: .ignored).count, "new": clips(in: .new).count,
+        "shown": found.count, "newest_dates": newest,
       ])
     imageManager.startCachingImages(
       for: found.map(\.asset), targetSize: Self.thumbnailSize, contentMode: .aspectFill, options: nil)
@@ -126,7 +147,7 @@ struct PhotosClipCard: View {
         }
         .frame(width: 104, height: 74)
         .clipped()
-        .opacity(clip.analyzed ? 0.4 : 1)
+        .opacity(clip.state == .new ? 1 : 0.4)
         Text(Self.duration(clip.duration))
           .font(.caption2.bold().monospacedDigit())
           .padding(.horizontal, 5).padding(.vertical, 2)
@@ -144,13 +165,20 @@ struct PhotosClipCard: View {
             .background(Color.green.opacity(0.85), in: Capsule())
             .foregroundStyle(.white)
             .padding(4)
+        } else if clip.state == .ignored {
+          Label("Ignored", systemImage: "eye.slash")
+            .font(.caption2.bold())
+            .padding(.horizontal, 5).padding(.vertical, 2)
+            .background(Color.gray.opacity(0.85), in: Capsule())
+            .foregroundStyle(.white)
+            .padding(4)
         }
       }
       Text(Self.timeFormatter.string(from: clip.date)).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
     }
     .onAppear { suggestions.thumbnail(for: clip) { image = $0 } }
     .accessibilityLabel(
-      "Video from \(Self.timeFormatter.string(from: clip.date)), \(Self.duration(clip.duration)), \(clip.analyzed ? "already analyzed" : "not analyzed")"
+      "Video from \(Self.timeFormatter.string(from: clip.date)), \(Self.duration(clip.duration)), \(clip.state == .analyzed ? "already analyzed" : clip.state == .ignored ? "ignored" : "not analyzed")"
     )
   }
 
