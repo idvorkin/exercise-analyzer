@@ -89,7 +89,7 @@ struct WatchContentView: View {
               Label("Preview", systemImage: "camera.fill").frame(maxWidth: .infinity)
             }
             .disabled(!phone.reachable)
-            restStatus
+            if !workout.running { restStatus }  // inside a workout the head carries the rest (050)
             restPicker
             exercisePicker
           }
@@ -109,19 +109,34 @@ struct WatchContentView: View {
   }
 
   /// The workout page's head (048): the session clock ticking by itself, the heart rate, the sets so far.
+  /// Between sets the head flips (050): the rest is the number acted on, so it is the large one, white until the
+  /// rest length and orange after, and the session clock goes small and green beside the heart rate.
   private var workoutHeader: some View {
-    VStack(spacing: 2) {
-      Text(workout.phase == .ending ? "ENDING…" : "WORKOUT")
-        .font(.caption2.weight(.semibold)).kerning(1).foregroundStyle(.green)
-      if let startedAt = workout.startedAt {
-        Text(startedAt, style: .timer)
+    let resting = workout.phase == .ending ? nil : phone.rest.restEnded
+    return VStack(spacing: 2) {
+      if let resting {
+        Text("REST · \(Self.duration(Double(phone.rest.length)))")
+          .font(.caption2.weight(.semibold)).kerning(1).foregroundStyle(.orange)
+        Text(resting, style: .timer)
           .font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit()
+          .foregroundStyle(restIsOver(resting) ? .orange : .primary)
+      } else {
+        Text(workout.phase == .ending ? "ENDING…" : "WORKOUT")
+          .font(.caption2.weight(.semibold)).kerning(1).foregroundStyle(.green)
+        if let startedAt = workout.startedAt {
+          Text(startedAt, style: .timer)
+            .font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit()
+        }
       }
       HStack(spacing: 4) {
         Image(systemName: "heart.fill").font(.caption).foregroundStyle(.red)
         Text(workout.heartRate.map(String.init) ?? "--")
           .font(.title3.bold()).monospacedDigit()
         Text("BPM").font(.caption2).foregroundStyle(.secondary)
+        if resting != nil, let startedAt = workout.startedAt {
+          Text("·").foregroundStyle(.secondary)
+          Text(startedAt, style: .timer).font(.title3.bold()).monospacedDigit().foregroundStyle(.green)
+        }
       }
       .accessibilityLabel("Heart rate \(workout.heartRate.map(String.init) ?? "unknown")")
       Text("\(workout.sets) set\(workout.sets == 1 ? "" : "s") · \(workout.reps) reps")
@@ -202,14 +217,22 @@ struct WatchContentView: View {
   private var recordingOverlays: some View {
       VStack(spacing: 6) {
         if status.viewfinder {
-          // Framing, not recording: one chip, no count, no time (047).
-          HStack {
-            Spacer()
+          // Framing, not recording: no count, no time (047); the rest keeps counting beside the chip (050).
+          HStack(spacing: 6) {
+            Spacer(minLength: 0)
             Text("PREVIEW")
               .font(.system(size: 15, weight: .semibold, design: .rounded))
               .padding(.horizontal, 8).padding(.vertical, 2)
               .background(.ultraThinMaterial, in: Capsule())
-            Spacer()
+            if let restEnded = phone.rest.restEnded {
+              (Text("REST ") + Text(restEnded, style: .timer))
+                .font(.system(size: 15, weight: .semibold, design: .rounded)).monospacedDigit()
+                .foregroundStyle(restIsOver(restEnded) ? .orange : .primary)
+                .lineLimit(1).fixedSize()
+                .padding(.horizontal, 8).padding(.vertical, 2)
+                .background(.ultraThinMaterial, in: Capsule())
+            }
+            Spacer(minLength: 0)
           }
           .padding(.horizontal, 8)
           .padding(.top, 2)
@@ -362,9 +385,13 @@ struct WatchContentView: View {
     if let restEnded = phone.rest.restEnded {
       (Text("Rest ") + Text(restEnded, style: .timer))
         .font(.headline).monospacedDigit()
-        .foregroundStyle(
-          Date().timeIntervalSince(restEnded) >= Double(phone.rest.length) ? .orange : .primary)
+        .foregroundStyle(restIsOver(restEnded) ? .orange : .primary)
     }
+  }
+
+  /// Past the rest length; read off the 2 s clock so the colour turns without a status arriving.
+  private func restIsOver(_ restEnded: Date) -> Bool {
+    now.timeIntervalSince(restEnded) >= Double(phone.rest.length)
   }
 
   /// Rest length between sets, a watch setting (story 046).

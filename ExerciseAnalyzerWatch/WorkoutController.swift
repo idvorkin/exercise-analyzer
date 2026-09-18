@@ -56,6 +56,7 @@ final class WorkoutController: NSObject, ObservableObject {
     heartRate = workout.heartRate
     heartRateAverage = 128
     heartRateMax = 156
+    guard screenshot != .workoutStart else { return }  // before the first set: 0 sets · 0 reps
     sets = 6
     reps = 47
   }

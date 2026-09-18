@@ -12,10 +12,13 @@ enum WatchScreenshotState: String, CaseIterable {
   /// A workout running on the wrist (story 048): the workout page, its End and Discard buttons (the page
   /// scrolled to its bottom), and the recording page with the heart-rate chip.
   case workout, workoutEnd, workoutRecording
+  /// A workout before its first set (050): the head is the session clock, as it was before the rest took it over.
+  case workoutStart
 
   /// The fixed workout the controller presents: 42:10 in, 128 bpm (141 while a set runs); nil for no workout.
   var workout: (elapsed: TimeInterval, heartRate: Int)? {
     switch self {
+    case .workoutStart: return (190, 96)
     case .workout, .workoutEnd: return (2530, 128)
     case .workoutRecording: return (2530, 141)
     default: return nil
@@ -82,6 +85,8 @@ enum WatchScreenshotState: String, CaseIterable {
       status.lastSet = LastSet(
         reps: 9, exercise: "Kettlebell Swing", seconds: 24, at: Date().timeIntervalSince1970 - 95)
       return (status, true, nil)
+    case .workoutStart:
+      return (.idle, true, nil)
     case .workoutRecording:
       let status = WatchStatus(
         recording: true,
@@ -91,8 +96,16 @@ enum WatchScreenshotState: String, CaseIterable {
     }
   }
 
-  /// The done state's rest started 35 s ago (story 046); every other state counts nothing.
-  var restEndedAt: Date? { self == .done ? Date().addingTimeInterval(-35) : nil }
+  /// The done state's rest started 35 s ago (story 046); the workout's with its last set, 95 s ago, and the
+  /// Preview's 102 s ago, both past a 90 s rest length and so orange (050); every other state counts nothing.
+  var restEndedAt: Date? {
+    switch self {
+    case .done: return Date().addingTimeInterval(-35)
+    case .workout, .workoutEnd: return Date().addingTimeInterval(-95)
+    case .viewfinder: return Date().addingTimeInterval(-102)
+    default: return nil
+    }
+  }
 }
 
 /// Stand-in camera picture: a dark gradient with a white lifter glyph, so the picture page never reads

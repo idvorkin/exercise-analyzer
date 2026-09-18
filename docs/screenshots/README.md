@@ -27,7 +27,7 @@ the control inventory in [../stories/05-watch.md](../stories/05-watch.md).
 
 | Idle | Preview |
 |---|---|
-| ![Watch idle: Phone ready with Record and Preview](watch-idle.png) | ![Watch preview: the picture with the in-frame capsule and Record, Camera, Cancel, nothing recorded yet](watch-preview.png) |
+| ![Watch idle: Phone ready with Record and Preview](watch-idle.png) | ![Watch preview: the picture with the PREVIEW chip, the rest still counting beside it, the in-frame capsule and Record, Camera, Cancel, nothing recorded yet](watch-preview.png) |
 
 | Live | Recording |
 |---|---|

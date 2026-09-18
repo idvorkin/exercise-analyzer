@@ -23,5 +23,5 @@ shoot() {  # state: relaunch with the fixed state, wait for first render, screen
   xcrun simctl io "$WATCH" screenshot "$shot" 2>/dev/null || true
   if [ -f "$shot" ]; then echo "ok    $1: $shot"; else echo "FAIL  $1: no screenshot"; fail=1; fi
 }
-for state in disconnected background idle live recording paused done viewfinder workout workoutEnd workoutRecording; do shoot "$state"; done
+for state in disconnected background idle live recording paused done viewfinder workoutStart workout workoutEnd workoutRecording; do shoot "$state"; done
 exit $fail

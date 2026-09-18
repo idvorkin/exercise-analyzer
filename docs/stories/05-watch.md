@@ -16,10 +16,11 @@ lock-screen control (044) are not watch-app states and are not in the table.
 | disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status had the recorder rolling | Start workout (green), Retry | 018, 048 |
 | background | phone-in-background art, the unlock-and-open instruction | Start workout (green), "Send a reminder to the phone" (no Record: it would die silently) | 018, 048 |
 | idle | "Phone ready", exercise picker, rest length picker, the rest count while resting, the last-set line (or "Analyzing…" while the pass runs) | Start workout (green), Record (red), Preview (below it) | 017, 041, 045, 046, 047, 048 |
-| workout | WORKOUT in green over the session clock (counting up by itself), "♥ 128 BPM", "6 sets · 47 reps", then the last-set line, the rest count and the pickers as idle; no figure art, no Start workout | Record (red), Preview, the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048 |
+| workoutStart | a workout before its first set: WORKOUT in green over the session clock (counting up by itself), "♥ 96 BPM", "0 sets · 0 reps"; no figure art, no Start workout | Record (red), Preview, the pickers; End workout and Discard below the pickers | 048 |
+| workout | between sets the head is the rest: "REST · 1:30" in orange over the rest count, large, white until the rest length and orange after; then "♥ 128 BPM · 42:13" with the session clock small and green, "6 sets · 47 reps", the last-set line and the pickers as idle; no second rest line | Record (red), Preview, the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048, 050 |
 | workoutEnd | the bottom of the workout page: the exercise picker's tail, then "End writes one workout to Health" under the buttons | End workout (green), Discard (red, asks first) | 048 |
 | workoutRecording | as recording, with a "♥ 141" chip between the count and the time | as recording | 048 |
-| viewfinder (Preview) | the picture filling the face, a PREVIEW chip, the in-frame capsule | Record (red) · Camera · Cancel; no Pause, no Done | 047 |
+| viewfinder (Preview) | the picture filling the face, a PREVIEW chip, beside it a "REST 1:45" chip while a rest is counting (orange past the rest length), both whole inside the face, the in-frame capsule | Record (red) · Camera · Cancel; no Pause, no Done | 047, 050 |
 | live | the picture filling the face, small rep and time chips right under the clock line, the green "IN FRAME" capsule above the row; chips, capsule and buttons whole inside the face and covering as little of the picture as 40 pt targets allow | Pause · Camera · Done · Cancel along the bottom edge, translucent glass except Done (green); second page: Cancel, the watch-mode toggle | 016, 017, 042 |
 | recording | as live, with the count (6) and the time (0:42) and a red "FEET CUT OFF" capsule when cut off | as live | 016, 017, 042 |
 | paused | "PAUSED · FEET CUT OFF" capsule, the count and the time frozen, the picture still refreshing | orange Resume · Camera · Done · Cancel; second page: Cancel | 040 |
@@ -465,7 +466,7 @@ the first frame (story 001).
 ### User Story 050:
 
 - **Summary:** Rest time stays on the wrist in Preview and beside the workout clock
-- **Status:** not implemented ([#91](https://github.com/idvorkin/exercise-analyzer/issues/91))
+- **Status:** implemented for [#91](https://github.com/idvorkin/exercise-analyzer/issues/91); verified on the watch simulator (`just watch-screens`: the viewfinder, workout and workoutStart states); the wrist rung is Igor's
 - **Why:** Igor, 2026-09-18, from the gym: "When in watch preview keep time since last rep on small. On watch. Include time since last rep not just total work out time."
 
 #### Use Case:
@@ -482,9 +483,14 @@ the first frame (story 001).
 - **Scenario:** Rest on the workout page
 - **Given:** a workout is running and a set ended 1:42 ago
 - **When:** I look at the workout page
-- **Then:** the rest and the workout clock are both in the head, without scrolling
+- **Then:** the head reads "REST · 1:30" over "1:42", large, orange because it is past the rest length (white before it), and under it "♥ 128 BPM · 42:13" with the workout clock small and green; there is no second rest line further down
 
-- **Notes:** The rest is the timer of story 046, which starts at Done, a few seconds after the last rep; no second clock. Open (board of 2026-09-18, 91A or 91B): whether the rest becomes the large number between sets with the workout clock small beside the heart rate, or joins the heart-rate line small.
+- **Scenario:** No rest, no flip
+- **Given:** a workout is running and no set has ended yet, or a set is recording, or the workout is ending
+- **When:** I look at the workout page
+- **Then:** the head is WORKOUT over the session clock, as in story 048
+
+- **Notes:** The rest is the timer of story 046, which starts at Done, a few seconds after the last rep; no second clock, and watch only. Igor picked 91B on the board of 2026-09-18 ("agreed"): between sets the rest is the number acted on, so it is the large one; 91A kept it small on the heart-rate line. Outside a workout the idle page keeps its "Rest 1:42" line under the buttons (046).
 
 - **Issues:** [#91](https://github.com/idvorkin/exercise-analyzer/issues/91)
 
