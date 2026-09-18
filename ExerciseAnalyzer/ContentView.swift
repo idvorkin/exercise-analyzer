@@ -19,6 +19,9 @@ struct ContentView: View {
   @State private var showRecents = false
   /// Workouts sheet height (#58): collapsed is the handle plus today's summary row; pull up for the full gallery.
   @State private var workoutsDetent: PresentationDetent = .large
+  /// The workout whose page is open in Workouts (053). It stays set while a set opened from that page is on
+  /// screen, so "‹ Workout" can go back to the page; Back on the page clears it.
+  @State private var openedWorkout: StoredWorkout?
   /// Middle-hold key stacks (stories 039, #60): up after a middle hold, staying up until a
   /// dismissing tap, a new clip, the clip's end, disappear or an inactive scene.
   @State private var stacksUp = false
@@ -175,6 +178,10 @@ struct ContentView: View {
         workoutsDetent = .large
       }
     }
+    // A new recording is not a set of the workout page that was open: "‹ Workout" goes with the camera (053).
+    .onChange(of: session.source) { _, source in
+      if source == .camera { openedWorkout = nil }
+    }
     .onChange(of: session.currentTime) { _, time in
       if isScrubbing && !session.isPlaying {
         // A seek from outside the slider landed while a drag looked live (gallery, pills, steps, or the
@@ -200,7 +207,7 @@ struct ContentView: View {
         store: session.recents, workouts: workouts, onOpen: { session.open(recent: $0) },
         onImport: { identifier, date in Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) } },
         onEvent: { session.log.event($0, $1) }, session: session, bugReport: $showWorkoutsBugReport,
-        detent: $workoutsDetent)
+        detent: $workoutsDetent, openedWorkout: $openedWorkout)
         .presentationDetents([WorkoutGalleryView.collapsedDetent, .large], selection: $workoutsDetent)
         .presentationDragIndicator(.visible)
     }
@@ -331,6 +338,25 @@ struct ContentView: View {
         .padding(.horizontal, 8).padding(.vertical, 4)
         .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
         .accessibilityLabel("Workout on the watch, \(sets) sets, heart rate \(live.heartRate.map(String.init) ?? "unknown")")
+      }
+      // A set opened from a workout's page (053): one tap back to that page, which is still pushed in Workouts.
+      if let workout = openedWorkout, session.source == .file {
+        Button {
+          session.log.event("ui", ["action": "back_to_workout"])
+          showRecents = true
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "chevron.left").font(.subheadline.bold())
+            Image(systemName: "applewatch").font(.caption)
+            Text("Workout \(workout.start.formatted(date: .omitted, time: .shortened))").font(.subheadline.bold())
+          }
+          .foregroundStyle(.green)
+          .padding(.horizontal, 12)
+          .frame(minHeight: 40)
+          .background(Color.black.opacity(0.45), in: Capsule())
+        }
+        .accessibilityLabel("Back to the workout")
+        .frame(maxWidth: .infinity, alignment: .leading)  // at the left edge with the phase pills, not over the lifter
       }
       HStack(spacing: 5) {
         ForEach(definition.phases, id: \.id) { phase in

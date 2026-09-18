@@ -13,6 +13,8 @@ struct WorkoutDetailView: View {
   let sets: [RecentEntry]
   @ObservedObject var workouts: WorkoutMirror
   let onOpen: (RecentEntry) -> Void
+  /// The set's picture, the same one its card in Workouts shows.
+  var thumbnail: (RecentEntry) -> UIImage? = { _ in nil }
   var onEvent: ((String, [String: Any]) -> Void)? = nil
 
   @State private var heartRate: HeartRateSeries?
@@ -37,12 +39,18 @@ struct WorkoutDetailView: View {
       VStack(alignment: .leading, spacing: 14) {
         totals(timeline)
         chart(timeline)
+        if timeline.rows.contains(where: { $0.peak != nil }) {
+          Text("♥ peak · drop in the 60 s after the set · rest before the next")
+            .font(.caption).foregroundStyle(.secondary)
+        }
         VStack(spacing: 8) {
           ForEach(Array(timeline.rows.enumerated()), id: \.element.id) { index, row in
             Button {
               if let entry = sets.first(where: { $0.id == row.id }) { onOpen(entry) }
             } label: {
-              SetTimelineRow(number: index + 1, row: row)
+              SetTimelineRow(
+                number: index + 1, row: row,
+                thumbnail: sets.first { $0.id == row.id }.flatMap { thumbnail($0) })
             }
             .buttonStyle(.plain)
           }
@@ -126,6 +134,7 @@ struct WorkoutDetailView: View {
 private struct SetTimelineRow: View {
   let number: Int
   let row: WorkoutTimeline.SetRow
+  let thumbnail: UIImage?
 
   private static let clock: DateFormatter = {
     let f = DateFormatter()
@@ -136,15 +145,22 @@ private struct SetTimelineRow: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      Image(systemName: row.exercise.symbol)
-        .font(.title3)
-        .frame(width: 40, height: 40)
-        .background(row.exercise.tint.opacity(0.2), in: Circle())
-        .foregroundStyle(row.exercise.tint)
+      // The set's own picture, a rep of the exercise that was done; the exercise's symbol when it has none.
+      Group {
+        if let thumbnail {
+          Image(uiImage: thumbnail).resizable().scaledToFill()
+        } else {
+          Image(systemName: row.exercise.symbol).font(.title3).foregroundStyle(row.exercise.tint)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(row.exercise.tint.opacity(0.2))
+        }
+      }
+      .frame(width: 52, height: 52)
+      .clipShape(RoundedRectangle(cornerRadius: 8))
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
           Text("\(row.reps)").font(.title2.bold()).monospacedDigit()
-          Text("reps").font(.subheadline).foregroundStyle(.secondary)
+          Text(row.exercise.repWord(row.reps)).font(.subheadline).foregroundStyle(.secondary)
           if let score = row.score {
             Text("\(score)").font(.caption.bold()).monospacedDigit()
               .padding(.horizontal, 6).padding(.vertical, 1)
@@ -156,9 +172,10 @@ private struct SetTimelineRow: View {
       Spacer(minLength: 8)
       VStack(alignment: .trailing, spacing: 2) {
         if let peak = row.peak {
-          // "♥ 144 · −32 in 60 s": the peak in the set and how far it fell in the first minute of rest.
-          Text("♥ \(peak)" + (row.drop.map { " · \($0 >= 0 ? "−" : "+")\(abs($0)) in 60 s" } ?? ""))
-            .font(.subheadline.bold()).monospacedDigit().foregroundStyle(.red)
+          // "♥ 150 · −32": the peak the set produced and how far it fell in the minute after (the legend above
+          // the rows says so once; with the unit in every row the line wrapped).
+          Text("♥ \(peak)" + (row.drop.map { " · \($0 >= 0 ? "−" : "+")\(abs($0))" } ?? ""))
+            .font(.subheadline.bold()).monospacedDigit().foregroundStyle(.red).lineLimit(1).fixedSize()
         }
         if let rest = row.restAfter {
           Text("rest \(WorkoutDetailView.minutes(rest))").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)

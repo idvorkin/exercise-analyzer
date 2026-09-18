@@ -20,13 +20,14 @@ struct WorkoutGalleryView: View {
   var bugReport: Binding<Bool> = .constant(false)
   /// Selected sheet height, owned by ContentView: collapsed shows only today's summary row (#58).
   @Binding var detent: PresentationDetent
+  /// The workout whose page is pushed (053), from a tap on its green line. Owned by ContentView: it stays set
+  /// while a set opened from the page is on screen, so reopening Workouts lands back on the page.
+  @Binding var openedWorkout: StoredWorkout?
   @Environment(\.dismiss) private var dismiss
   @StateObject private var suggestions = PhotosSuggestions()
   /// Days folded shut, by start-of-day time; days older than a week start folded, today and this week start open.
   @State private var collapsed: Set<Date> = []
   @State private var collapseSeeded = false
-  /// The workout whose page is pushed (053), from a tap on its green line.
-  @State private var openedWorkout: StoredWorkout?
 
   private static let dayKey: DateFormatter = {
     let f = DateFormatter()
@@ -136,9 +137,10 @@ struct WorkoutGalleryView: View {
         WorkoutDetailView(
           workout: workout, sets: store.entries, workouts: workouts,
           onOpen: { entry in
+            // `openedWorkout` stays set: the playback screen offers "‹ Workout" back to this page.
             dismiss()
             onOpen(entry)
-          }, onEvent: onEvent)
+          }, thumbnail: { store.thumbnailImage(for: $0) }, onEvent: onEvent)
       }
       .navigationTitle("Workouts")
       .navigationBarTitleDisplayMode(.inline)
@@ -157,7 +159,20 @@ struct WorkoutGalleryView: View {
         suggestions.onEvent = onEvent
         suggestions.refresh(known: knownPhotosIDs)
         // Test hook: open the newest workout's page (053); simulator runs can't tap the green line.
-        if ProcessInfo.processInfo.environment["SWING_OPEN_WORKOUT"] == "1" { openedWorkout = workouts.index.workouts.last }
+        // "set" goes on to open the workout's first set 2 s later, as a tap on its row would, for "‹ Workout".
+        if let hook = ProcessInfo.processInfo.environment["SWING_OPEN_WORKOUT"], let workout = workouts.index.workouts.last,
+          openedWorkout == nil
+        {
+          openedWorkout = workout
+          if hook == "set", let first = WorkoutTimeline(workout: workout, sets: store.entries, heartRate: nil).rows.first,
+            let entry = store.entry(id: first.id)
+          {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+              dismiss()
+              onOpen(entry)
+            }
+          }
+        }
         // Test hook: ask for Photos access on open so a simulator run can answer the system dialog.
         if ProcessInfo.processInfo.environment["SWING_PHOTOS_ACCESS"] == "1", suggestions.status == .notDetermined {
           suggestions.requestAccess()

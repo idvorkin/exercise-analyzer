@@ -250,7 +250,17 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** How fast the heart came down
 - **Given:** a set whose heart rate peaked at 150 ten seconds after its last rep and read 118 a minute after the set ended, with a rest of 2:15
 - **When:** I read its row
-- **Then:** it says "♥ 150 · −32 in 60 s · rest 2:15"; a set whose rest was under a minute shows its peak and no drop, because the next set had started
+- **Then:** it says "♥ 150 · −32" over "rest 2:15" (the unit is in the legend above the rows: with it in every row the line wrapped); a set whose rest was under a minute shows its peak and no drop, because the next set had started
+
+- **Scenario:** Back to the workout from one of its sets
+- **Given:** I opened a set from a workout's page
+- **When:** I tap "‹ Workout 8:43 AM" at the left of the playback screen, above the phase pills
+- **Then:** Workouts opens on that workout's page again, not on the day list; Back on the page, or starting the camera, takes the button away
+
+- **Scenario:** A row names the rep and shows the set
+- **Given:** a workout of swings and pistols
+- **When:** I read its rows
+- **Then:** they say "10 swings" and "6 pistols" ("1 get-up", "8 split squats"), each with the set's own picture, and one line above the rows says what the red numbers are: peak, the drop in the 60 s after the set, the rest before the next
 
 - **Scenario:** The header still folds the day
 - **Given:** a day with a workout line under its header

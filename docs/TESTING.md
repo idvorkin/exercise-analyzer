@@ -152,7 +152,8 @@ The simulator cannot be tapped from a script, so the app has **launch hooks** re
 | `SWING_SHOW_GALLERY=1` | open the rep gallery sheet on launch (gallery screenshots, #61) |
 | `SWING_WORKOUTS_COLLAPSED=1` | open Workouts collapsed to today's summary row (with `SWING_SHOW_WORKOUTS`) |
 | `SWING_HEART_RATE=1` | give the loaded clip a made-up heart rate (118 → 150 over 30 s, a reading every 5 s) so the HUD's ♥ chip shows; the simulator has no Health data (051) |
-| `SWING_OPEN_WORKOUT=1` | push the newest stored workout's page when Workouts opens (with `SWING_SHOW_WORKOUTS`, 053). The simulator has no Health: seed `Documents/workouts.json` with a workout that covers some stored sets and `Documents/workouts/<id>/heartrate.json` (`{"samples":[{"at": <seconds since 1970>, "bpm": 120}, …]}`) in the app's data container; index dates are seconds since 2001 |
+| `SWING_SHOW_MENU=1` | bring the main menu up on launch; with `SWING_OPEN_RECENT=1` it sits over a loaded set, its rep gallery and the transport bar (#96) |
+| `SWING_OPEN_WORKOUT=1` | push the newest stored workout's page when Workouts opens (with `SWING_SHOW_WORKOUTS`, 053); `=set` goes on to open the workout's first set 2 s later, as a tap on its row would, which puts "‹ Workout" on the playback screen. The simulator has no Health: seed `Documents/workouts.json` with a workout that covers some stored sets and `Documents/workouts/<id>/heartrate.json` (`{"samples":[{"at": <seconds since 1970>, "bpm": 120}, …]}`) in the app's data container; index dates are seconds since 2001 |
 | `SWING_PHOTOS_ACCESS=1` | ask for Photos access when the gallery opens (the simulator cannot be granted Photos access from the command line on iOS 26, so this dialog needs a hand) |
 
 Results are read from the **session log** (`Documents/logs/*.jsonl` in the app container), not the screen. The

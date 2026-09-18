@@ -14,6 +14,19 @@ extension ExerciseKind {
     case .bulgarianSplitSquat: return "Bulgarian"
     }
   }
+
+  /// What one rep of the exercise is called, for a count: "10 swings", "1 get-up" (053; Igor: "if I did swings,
+  /// I want to see a swings rep").
+  func repWord(_ count: Int) -> String {
+    let one: String
+    switch self {
+    case .kettlebellSwing: one = "swing"
+    case .pistolSquat: one = "pistol"
+    case .turkishGetUp: one = "get-up"
+    case .bulgarianSplitSquat: one = "split squat"
+    }
+    return count == 1 ? one : one + "s"
+  }
 }
 
 /// A stick-figure icon for an exercise, drawn in a 32-point box and scaled to `size`.
