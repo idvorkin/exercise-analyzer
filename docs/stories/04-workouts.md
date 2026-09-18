@@ -233,7 +233,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 053:
 
 - **Summary:** See a whole workout on one page: the sets in time, the rests between them, the heart rate across them
-- **Status:** not implemented ([#95](https://github.com/idvorkin/exercise-analyzer/issues/95))
+- **Status:** implemented for [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); the timeline verified on the host (`WorkoutTimelineTests`), the page on the simulator with a seeded workout and heart-rate series (`SWING_OPEN_WORKOUT=1`); the Health read and a real session's curve are the phone's, read from `workout_heart_rate` after a gym session inside a workout
 - **Why:** Igor, 2026-09-18: "I probably have a workout view where I look at the whole workout together. That's probably an interesting view I need as well."
 
 #### Use Case:
@@ -247,6 +247,26 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I tap the green line
 - **Then:** a page shows the heart rate from 8:43 to 9:00 with each set marked on the same time axis, and under it the sets in order with reps, score, peak heart rate and the rest that followed; tapping a set opens it
 
-- **Notes:** Needs the heart-rate series of story 051, read for the workout's span. The day and exercise grouping of 012 stays as it is. Open (board of 2026-09-18, 95A or 95B): a page behind the green line, or a small strip inline under it.
+- **Scenario:** How fast the heart came down
+- **Given:** a set whose heart rate peaked at 150 ten seconds after its last rep and read 118 a minute after the set ended, with a rest of 2:15
+- **When:** I read its row
+- **Then:** it says "♥ 150 · −32 in 60 s · rest 2:15"; a set whose rest was under a minute shows its peak and no drop, because the next set had started
+
+- **Scenario:** The header still folds the day
+- **Given:** a day with a workout line under its header
+- **When:** I tap the day's title
+- **Then:** the day folds as before; only the green line, which now ends in a chevron, opens the page
+
+- **Scenario:** A workout that is still running
+- **Given:** a workout running on the wrist
+- **When:** I tap "Workout since 8:43 AM · on the watch"
+- **Then:** the same page shows the workout up to now, and nothing is kept until it ends
+
+- **Scenario:** No heart rate
+- **Given:** a workout whose heart rate Health cannot give (read refused, samples not arrived)
+- **When:** I open its page
+- **Then:** the sets still sit on the time axis with their rests, and the chart says there is no heart rate
+
+- **Notes:** Igor picked the page (95A) on the board of 2026-09-18 and asked to "keep full heart rate data so we can see time to drop as well": the whole workout's series, rests included, is read from Health (a minute before to three after) and kept in `Documents/workouts/<id>/heartrate.json`, re-read on every open and replaced when Health has more. The heart lags the work, so a set's peak is looked for up to 30 s past its end (or the next set's start), and the drop is that peak minus the reading 60 s after the set's end; "time to get back under X" is the other way to say it and is not built. A set is placed by `clipStartedAt` (story 051); sets from before it fall back to `recordedAt`, which for a set recorded in the app is the end of the recording, so they sit up to one set length late. The day and exercise grouping of 012 stays as it is. `WorkoutTimeline` in ExerciseCore does the arithmetic; the page only draws it.
 
 - **Issues:** [#95](https://github.com/idvorkin/exercise-analyzer/issues/95)

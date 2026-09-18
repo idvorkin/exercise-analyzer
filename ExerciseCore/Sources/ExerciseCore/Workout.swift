@@ -38,7 +38,7 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
 }
 
 /// An ended workout as the phone keeps it: the span, the heart rate, and the Health record it became.
-public struct StoredWorkout: Codable, Equatable, Identifiable, Sendable {
+public struct StoredWorkout: Codable, Hashable, Identifiable, Sendable {
   public var id: String
   public var start: Date
   public var end: Date

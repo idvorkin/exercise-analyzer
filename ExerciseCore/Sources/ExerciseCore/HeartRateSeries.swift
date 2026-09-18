@@ -56,13 +56,6 @@ public struct HeartRateSeries: Codable, Equatable, Sendable {
     slice(from: start, to: end).samples.map(\.bpm).max().map { Int($0.rounded()) }
   }
 
-  /// How far the heart rate fell in the `seconds` after `date` (a set's end): the value at `date` minus the
-  /// value `seconds` later, nil when either moment has no reading. The recovery number of story 053.
-  public func drop(after date: Date, seconds: Double = 60) -> Int? {
-    guard let then = bpm(at: date), let later = bpm(at: date.addingTimeInterval(seconds)) else { return nil }
-    return then - later
-  }
-
   public func slice(from start: Date, to end: Date) -> HeartRateSeries {
     let range = start.timeIntervalSince1970...end.timeIntervalSince1970
     return HeartRateSeries(samples: samples.filter { range.contains($0.at) })

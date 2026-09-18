@@ -25,6 +25,8 @@ struct WorkoutGalleryView: View {
   /// Days folded shut, by start-of-day time; days older than a week start folded, today and this week start open.
   @State private var collapsed: Set<Date> = []
   @State private var collapseSeeded = false
+  /// The workout whose page is pushed (053), from a tap on its green line.
+  @State private var openedWorkout: StoredWorkout?
 
   private static let dayKey: DateFormatter = {
     let f = DateFormatter()
@@ -112,13 +114,16 @@ struct WorkoutGalleryView: View {
                     }
                   }
                 } header: {
-                  DayHeader(day: day, collapsed: collapsed.contains(day.date)) {
-                    let opening = collapsed.contains(day.date)
-                    onEvent?("workouts_day", ["day": Self.dayKey.string(from: day.date), "opened": opening])
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                      if opening { collapsed.remove(day.date) } else { collapsed.insert(day.date) }
-                    }
-                  }
+                  DayHeader(
+                    day: day, collapsed: collapsed.contains(day.date),
+                    onToggle: {
+                      let opening = collapsed.contains(day.date)
+                      onEvent?("workouts_day", ["day": Self.dayKey.string(from: day.date), "opened": opening])
+                      withAnimation(.easeInOut(duration: 0.2)) {
+                        if opening { collapsed.remove(day.date) } else { collapsed.insert(day.date) }
+                      }
+                    },
+                    onOpenWorkout: { openedWorkout = $0 })
                 }
               }
             }
@@ -126,6 +131,14 @@ struct WorkoutGalleryView: View {
             .padding(.bottom, 24)
           }
         }
+      }
+      .navigationDestination(item: $openedWorkout) { workout in
+        WorkoutDetailView(
+          workout: workout, sets: store.entries, workouts: workouts,
+          onOpen: { entry in
+            dismiss()
+            onOpen(entry)
+          }, onEvent: onEvent)
       }
       .navigationTitle("Workouts")
       .navigationBarTitleDisplayMode(.inline)
@@ -143,6 +156,8 @@ struct WorkoutGalleryView: View {
         }
         suggestions.onEvent = onEvent
         suggestions.refresh(known: knownPhotosIDs)
+        // Test hook: open the newest workout's page (053); simulator runs can't tap the green line.
+        if ProcessInfo.processInfo.environment["SWING_OPEN_WORKOUT"] == "1" { openedWorkout = workouts.index.workouts.last }
         // Test hook: ask for Photos access on open so a simulator run can answer the system dialog.
         if ProcessInfo.processInfo.environment["SWING_PHOTOS_ACCESS"] == "1", suggestions.status == .notDetermined {
           suggestions.requestAccess()
@@ -302,6 +317,8 @@ struct DayHeader: View {
   let day: WorkoutDay
   var collapsed = false
   var onToggle: (() -> Void)? = nil
+  /// A tap on a green workout line (053); nil where the header is only a label.
+  var onOpenWorkout: ((StoredWorkout) -> Void)? = nil
 
   private static let dayFormatter: DateFormatter = {
     let f = DateFormatter()
@@ -326,10 +343,10 @@ struct DayHeader: View {
   }
 
   var body: some View {
-    Button {
-      onToggle?()
-    } label: {
-      VStack(alignment: .leading, spacing: 4) {
+    VStack(alignment: .leading, spacing: 4) {
+      Button {
+        onToggle?()
+      } label: {
         HStack(alignment: .firstTextBaseline) {
           Image(systemName: "chevron.right")
             .font(.caption.bold())
@@ -342,20 +359,33 @@ struct DayHeader: View {
           Spacer()
           Text(summary).font(.subheadline).foregroundStyle(.secondary)
         }
-        // The day's workouts from the wrist (048): the hour, its heart rate, and that it is in Health.
-        ForEach(workoutLines, id: \.self) { line in
-          Label { Text(line).font(.subheadline).monospacedDigit() } icon: {
-            Image(systemName: "applewatch").font(.caption)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("\(title), \(summary), \(collapsed ? "collapsed" : "expanded")")
+      // The day's workouts from the wrist (048): the hour, its heart rate, and that it is in Health. Each line
+      // is its own target and opens the workout's page (053); the header above it still folds the day.
+      ForEach(workoutLines, id: \.workout.id) { line in
+        Button {
+          onOpenWorkout?(line.workout)
+        } label: {
+          HStack(spacing: 6) {
+            Label { Text(line.text).font(.subheadline).monospacedDigit().multilineTextAlignment(.leading) } icon: {
+              Image(systemName: "applewatch").font(.caption)
+            }
+            Spacer(minLength: 4)
+            if onOpenWorkout != nil { Image(systemName: "chevron.right").font(.caption.bold()) }
           }
           .foregroundStyle(.green)
           .padding(.leading, 20)
+          .frame(minHeight: 36)
+          .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the whole workout")
       }
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
     .foregroundStyle(.primary)
-    .accessibilityLabel("\(title), \(summary), \(collapsed ? "collapsed" : "expanded")")
     .padding(.vertical, 8)
     .background(Color(.systemBackground))
   }
@@ -374,8 +404,8 @@ struct DayHeader: View {
   }()
 
   /// "Workout 9:02–10:00 · 58 min · ♥ 128 avg · 156 max · in Health", one per workout, then the running one.
-  private var workoutLines: [String] {
-    var lines = day.workouts.map { workout -> String in
+  private var workoutLines: [(text: String, workout: StoredWorkout)] {
+    var lines = day.workouts.map { workout -> (text: String, workout: StoredWorkout) in
       var parts = [
         "Workout \(Self.clock.string(from: workout.start))–\(Self.clock.string(from: workout.end))",
         "\(Int(workout.duration / 60)) min",
@@ -383,13 +413,17 @@ struct DayHeader: View {
       if let avg = workout.heartRateAverage { parts.append("♥ \(avg) avg") }
       if let max = workout.heartRateMax { parts.append("\(max) max") }
       parts.append("in Health")
-      return parts.joined(separator: " · ")
+      return (parts.joined(separator: " · "), workout)
     }
     if let live = day.live {
       var parts = ["Workout since \(Self.clock.string(from: live.startDate))"]
       if let heartRate = live.heartRate { parts.append("♥ \(heartRate)") }
       parts.append("on the watch")
-      lines.append(parts.joined(separator: " · "))
+      // The running workout opens as a span up to now (053).
+      let soFar = StoredWorkout(
+        id: WorkoutMirror.liveID, start: live.startDate, end: Date(), heartRateAverage: live.heartRateAverage,
+        heartRateMax: live.heartRateMax, sets: live.sets, reps: live.reps)
+      lines.append((parts.joined(separator: " · "), soFar))
     }
     return lines
   }

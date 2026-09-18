@@ -32,10 +32,10 @@ final class HeartRateSeriesTests: XCTestCase {
     XCTAssertNil(gappy.bpm(at: date(30)))
   }
 
-  func testPeakAndTheDropAfterASet() {
+  func testPeakInASpan() {
     XCTAssertEqual(series.peak(from: date(100), to: date(125)), 145)
-    XCTAssertEqual(series.drop(after: date(125), seconds: 60), 40)  // 145 → 105
-    XCTAssertNil(series.drop(after: date(180), seconds: 60))  // the rest was not recorded that long
+    XCTAssertEqual(series.peak(from: date(150), to: date(185)), 128)  // 145 − 25 × 2/3, rounded
+    XCTAssertNil(series.peak(from: date(300), to: date(400)))
   }
 
   func testMedianIntervalAndRoundTrip() throws {

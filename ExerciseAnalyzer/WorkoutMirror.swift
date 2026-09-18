@@ -93,6 +93,27 @@ final class WorkoutMirror: NSObject, ObservableObject {
     }
   }
 
+  /// The whole workout's heart rate, rests included (053: Igor, "keep full heart rate data so we can see time
+  /// to drop"): what `Documents/workouts/<id>/` holds, then Health's answer for the workout and the three
+  /// minutes after it, kept when it is fuller. The running workout (id "live") is read but never kept.
+  func heartRate(for workout: StoredWorkout) async -> HeartRateSeries? {
+    let folder = root.appendingPathComponent("workouts", isDirectory: true).appendingPathComponent(workout.id, isDirectory: true)
+    let stored = HeartRateSeries.load(from: folder)
+    let read = await heartRate(from: workout.start.addingTimeInterval(-60), to: workout.end.addingTimeInterval(180))
+    onEvent?(
+      "workout_heart_rate",
+      ["samples": read?.samples.count ?? 0, "stored": stored?.samples.count ?? 0, "median_interval_s": read?.medianInterval ?? 0])
+    guard let read, read.samples.count > (stored?.samples.count ?? 0) else { return stored }
+    if workout.id != Self.liveID {
+      try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+      try? read.save(to: folder)
+    }
+    return read
+  }
+
+  /// The id the page of 053 gives the running workout, shown as a span up to now.
+  static let liveID = "live"
+
   private func ended(at date: Date) {
     guard let live else { return }
     defer {
