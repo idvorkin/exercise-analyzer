@@ -38,6 +38,10 @@ public struct SwingThresholds {
   /// A swing rep (top to top) takes about 1.2 s, a slow first hike about 2 s. Longer "reps" are the walk-in or
   /// the bell pick-up flowing into the first swing and are discarded (issue #15).
   public var maxRepDuration = 4.0
+  /// A hole in the track longer than this (the recording lost frames, #94) ends the rep in progress: half a
+  /// second is a whole bottom, so the phases either side of it do not belong to one swing. Counting starts
+  /// again at the next real top, and the hole costs only the swings inside it.
+  public var maxFrameGap = 0.5
 }
 
 public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
@@ -70,6 +74,9 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
   private var currentPhasePeak: RepPosition?
   private var releaseStartTime = 0.0
   private var repStartTime = 0.0
+  private var lastFrameTime: Double?
+  /// Set by a hole in the track: TOP does not start a rep until the lifter has been seen at a real top again.
+  private var awaitingTop = false
 
   private struct Angles {
     var arm = 0.0, spine = 0.0, hip = 0.0, knee = 0.0, wristHeight = 0.0
@@ -99,6 +106,8 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
     currentPhasePeak = nil
     releaseStartTime = 0
     repStartTime = 0
+    lastFrameTime = nil
+    awaitingTop = false
     metrics = RepMetrics()
   }
 
@@ -108,6 +117,19 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
     let a = Angles(
       arm: skeleton.armToVerticalAngle, spine: skeleton.spineAngle, hip: skeleton.hipAngle,
       knee: skeleton.kneeAngle, wristHeight: skeleton.wristHeight)
+
+    if let last = lastFrameTime, time - last > thresholds.maxFrameGap {
+      abandonRep()
+      wristHeightHistory = []
+      awaitingTop = true
+    }
+    lastFrameTime = time
+    if awaitingTop {
+      guard isAtTop(a) else {
+        return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: a.metrics, completedRep: nil)
+      }
+      awaitingTop = false
+    }
 
     wristHeightHistory.append(a.wristHeight)
     if wristHeightHistory.count > wristHeightWindowSize * 2 {
@@ -213,9 +235,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
   /// RELEASE → TOP (rep complete): standing upright with the arm near horizontal, confirmed either by
   /// the wrist height peaking or by the arm staying horizontal for a few frames.
   private func shouldTransitionToTop(_ a: Angles) -> Bool {
-    guard machine.canTransition, a.measured else { return false }
-    guard a.spine <= thresholds.topSpineMax, a.hip >= thresholds.topHipMin else { return false }
-    guard abs(a.arm) > thresholds.topArmMin else { return false }
+    guard machine.canTransition, isAtTop(a) else { return false }
 
     if wristHeightHistory.count >= 3 {
       let len = wristHeightHistory.count
@@ -229,6 +249,11 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
 
     // Fast swings can miss the exact peak; after a few horizontal frames call it the top anyway.
     return machine.framesInPhase >= machine.minFramesInPhase + 2
+  }
+
+  /// Standing tall with the arms raised: the pose of a lockout, whatever the wrists did before it.
+  private func isAtTop(_ a: Angles) -> Bool {
+    a.measured && a.spine <= thresholds.topSpineMax && a.hip >= thresholds.topHipMin && abs(a.arm) > thresholds.topArmMin
   }
 
   private func smoothedWristHeight(center: Int, radius: Int) -> Double {

@@ -29,6 +29,11 @@ struct Fixture {
     // IMG_4340 (issue #16): low, close camera; arms behind the body read ~80°, arms in front ~45°. Counted 0 before
     // the arm thresholds were relaxed; 10 is the analyzer's count, not yet confirmed by Igor.
     Fixture(name: "swing-lowcam-10reps", expectedExercise: .kettlebellSwing, expectedReps: 10, humanVerified: false),
+    // Issue #94 (2026-09-18, live set): the recording has no frames from 12.68 to 14.88 s (the app hung and the
+    // camera ran out of buffers). Tops at 4.97, 6.5, 8.0, 9.5, 11.0, 12.5, [14.0 in the hole], 15.55, 17.1, 18.65:
+    // 9 swings, 2 of them cut by the hole, so 7 can be counted. 6 were: the swing after the hole was timed from
+    // the top before it and discarded as longer than 4 s. Not yet confirmed by Igor.
+    Fixture(name: "swing-hole-7reps", expectedExercise: .kettlebellSwing, expectedReps: 7, humanVerified: false),
     Fixture(name: "pistol-6reps", expectedExercise: .pistolSquat, expectedReps: 6, humanVerified: false),
     // Head height drops 8 times at a steady ~4.2 s rhythm; the earlier front-knee analyzer counted 10.
     Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),

@@ -1714,6 +1714,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         Task { @MainActor in self?.cameraFrame(pixelBuffer: pixelBuffer, pts: pts) }
       }
+      camera.onGap = { [log] gap, dropped in
+        // Logged from the capture queue, so the event lands even while the main thread is the one hanging (#94).
+        log.event(
+          "capture_gap",
+          ["gap_s": gap, "dropped": dropped, "thermal": ProcessInfo.processInfo.thermalState.rawValue])
+      }
       self.camera = camera
       cameraPosition = position
       cameraZoom = 1

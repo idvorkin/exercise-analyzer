@@ -106,6 +106,26 @@ final class CameraSource: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
     from connection: AVCaptureConnection
   ) {
+    // A hole in the delivered frames is a hole in the recording and in the count (#94): say how long it was and
+    // why the capture dropped what it dropped (OutOfBuffers = the app sat on the pool, FrameWasLate = this queue).
+    let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
+    if let last = lastPts, pts - last > 0.25 { onGap?(pts - last, droppedSinceLastFrame) }
+    lastPts = pts
+    droppedSinceLastFrame = [:]
     onFrame?(sampleBuffer)
   }
+
+  func captureOutput(
+    _ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer,
+    from connection: AVCaptureConnection
+  ) {
+    let reason = CMGetAttachment(sampleBuffer, key: kCMSampleBufferAttachmentKey_DroppedFrameReason, attachmentModeOut: nil) as? String
+    droppedSinceLastFrame[reason ?? "unknown", default: 0] += 1
+  }
+
+  /// Called on the capture queue when delivered frames are more than 0.25 s apart: the gap in seconds and the
+  /// dropped frames in it, counted by the capture's reason.
+  var onGap: ((Double, [String: Int]) -> Void)?
+  private var lastPts: Double?
+  private var droppedSinceLastFrame: [String: Int] = [:]
 }

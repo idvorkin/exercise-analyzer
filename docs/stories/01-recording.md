@@ -99,6 +99,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** the clip is analyzed as a kettlebell swing
 - **Then:** the count is nine and the first rep's frames show a swing, not the walk-in
 
+- **Scenario:** A recording that lost two seconds of frames mid-set
+- **Given:** the clip has no frames from 12.7 to 14.9 s and nine swings, two of them cut by the hole
+- **When:** the clip is analyzed as a kettlebell swing
+- **Then:** the count is seven: the swing after the hole starts at its own top and is counted
+- **and Then:** the session log has a `capture_gap` event saying how long the hole was and why frames were dropped
+
 ---
 
 ### User Story 020:

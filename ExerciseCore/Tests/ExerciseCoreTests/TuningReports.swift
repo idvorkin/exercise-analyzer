@@ -71,6 +71,28 @@ extension TuningReports {
     }
   }
 
+  /// Every frame's swing signals and phase for one archived track, between two times:
+  /// `SWING_TRACK=kettlebell-swing-20260918-5C13D496 SWING_FROM=12 SWING_TO=17 swift test --filter testSwingSignals`.
+  func testSwingSignals() throws {
+    let env = ProcessInfo.processInfo.environment
+    guard let name = env["SWING_TRACK"] else { return }
+    let url = try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures/tracks"), "missing track \(name)")
+    let from = Double(env["SWING_FROM"] ?? "") ?? 0
+    let to = Double(env["SWING_TO"] ?? "") ?? .infinity
+    let pipeline = AnalysisPipeline.analyze(frames: try Fixture.frames(at: url), exercise: .kettlebellSwing)
+    print("\(name): \(pipeline.reps.count) reps")
+    for frame in pipeline.track.frames where frame.time >= from && frame.time <= to {
+      guard let a = frame.analysis else {
+        print(String(format: "  %6.2f  no pose", frame.time))
+        continue
+      }
+      let m = a.metrics
+      print(String(format: "  %6.2f  %-8@ rep %2d  arm %4.0f spine %4.0f hip %4.0f knee %4.0f wrist %5.0f%@",
+        frame.time, a.phase, a.repCount, m["arm"] ?? 0, m["spine"] ?? 0, m["hip"] ?? 0, m["knee"] ?? 0, m["wristHeight"] ?? 0,
+        a.completedRep != nil ? "  REP" : ""))
+    }
+  }
+
   /// Raw signals for a fixture at ~4 Hz, plus a naive rep count from smoothed knee-angle dips.
   func testBulgarianPhoneSignals() throws {
     let frames = try Fixture(name: "bulgarian-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 0, humanVerified: false).frames()

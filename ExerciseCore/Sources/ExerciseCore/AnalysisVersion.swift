@@ -5,6 +5,6 @@
 //  sets too instead of leaving stale counts in the gallery.
 
 public enum AnalysisVersion {
-  // 2026-09-16.1: the me-view crop comes from the skeleton inside reps (#84); stored sets recut their stills.
-  public static let current = "2026-09-16.1"
+  // 2026-09-18.1: a hole in the track ends the swing in progress and counting restarts at the next top (#94).
+  public static let current = "2026-09-18.1"
 }
