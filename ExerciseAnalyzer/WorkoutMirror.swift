@@ -70,6 +70,29 @@ final class WorkoutMirror: NSObject, ObservableObject {
     }
   }
 
+  /// Heart rate from Health between two moments (stories 051, 053), as the watch wrote it during the workout.
+  /// Health is only asked about time inside a workout this app knows of, running or ended: the read permission
+  /// was requested when that workout arrived, and a set recorded outside a workout never touches Health.
+  func heartRate(from start: Date, to end: Date) async -> HeartRateSeries? {
+    guard HKHealthStore.isHealthDataAvailable() else { return nil }
+    let inLive = live.map { end >= $0.startDate } ?? false
+    guard inLive || index.workouts.contains(where: { $0.start <= end && $0.end >= start }) else { return nil }
+    let type = HKQuantityType(.heartRate)
+    let query = HKSampleQueryDescriptor(
+      predicates: [.quantitySample(type: type, predicate: HKQuery.predicateForSamples(withStart: start, end: end))],
+      sortDescriptors: [SortDescriptor(\.startDate)])
+    do {
+      let bpm = HKUnit.count().unitDivided(by: .minute())
+      let samples = try await query.result(for: store).map {
+        HeartRateSeries.Sample(at: $0.startDate.timeIntervalSince1970, bpm: $0.quantity.doubleValue(for: bpm))
+      }
+      return HeartRateSeries(samples: samples)
+    } catch {
+      onEvent?("error", ["where": "heart_rate", "message": "\(error)"])
+      return nil
+    }
+  }
+
   private func ended(at date: Date) {
     guard let live else { return }
     defer {

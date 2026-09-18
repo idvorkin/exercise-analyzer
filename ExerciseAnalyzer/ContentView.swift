@@ -274,7 +274,20 @@ struct ContentView: View {
           }
         }
         Spacer()
-        Text(String(format: "%.0f fps", session.fps)).font(.caption2).monospacedDigit().opacity(0.7)
+        // The heart rate at the playhead (051): only for a set recorded inside a workout, nothing otherwise.
+        if let bpm = session.heartRateAtPlayhead {
+          HStack(spacing: 3) {
+            Image(systemName: "heart.fill").font(.caption2)
+            Text("\(bpm)").font(.subheadline.bold()).monospacedDigit()
+          }
+          .foregroundStyle(.red)
+          .padding(.horizontal, 7).padding(.vertical, 2)
+          .background(Color.red.opacity(0.18), in: Capsule())
+          .accessibilityLabel("Heart rate \(bpm)")
+        } else {
+          // The chip takes the fps readout's place: both would wrap the exercise name onto a second line.
+          Text(String(format: "%.0f fps", session.fps)).font(.caption2).monospacedDigit().opacity(0.7)
+        }
         if session.source == .camera {
           Button {
             session.setWatchMode(true, from: "phone")

@@ -267,7 +267,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 051:
 
 - **Summary:** See my heart rate over the replay when the set was part of a workout
-- **Status:** not implemented ([#92](https://github.com/idvorkin/exercise-analyzer/issues/92))
+- **Status:** implemented for [#92](https://github.com/idvorkin/exercise-analyzer/issues/92); the series math verified on the host (`HeartRateSeriesTests`), the chip on the simulator with a made-up series (`SWING_HEART_RATE=1`); the Health read, the alignment with the playhead and the real cadence are the phone's, read from the `heart_rate` event after a gym session inside a workout
 - **Why:** Igor, 2026-09-18: "Let's have heart rate overlay in exercise replay if I have it."
 
 #### Use Case:
@@ -286,6 +286,16 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I open it
 - **Then:** the HUD is exactly as today: no chip, no placeholder, no prompt
 
-- **Notes:** The phone keeps only a workout's average and max today (`StoredWorkout`), and the mirrored live value reaches it about once a minute (17 `workout_data` events in the 17-minute workout of 2026-09-18). The watch writes a sample to Health every few seconds during a workout, so the series is read from Health for the set's span (heart rate, read only, one prompt) and stored beside the set's `analysis.json`. Story 053 draws the same series across the workout. Open (board of 2026-09-18, 92A or 92B): the chip alone, or the chip and the set's curve above the scrubber.
+- **Scenario:** Between two readings
+- **Given:** Health has 138 at 0:10 of the set and 144 at 0:15
+- **When:** the playhead is at 0:12.5
+- **Then:** the chip reads 141, and it reads nothing where no sample is within 15 s (the sensor was not reading: a number there would be invented)
+
+- **Scenario:** A trimmed set keeps its alignment
+- **Given:** a recorded set whose trim cut the first 4 s
+- **When:** I play it
+- **Then:** the chip at 0:00 shows the heart rate of 4 s into the recording, and Undo trim moves it back
+
+- **Notes:** The phone keeps only a workout's average and max (`StoredWorkout`), and the mirrored live value reaches it about once a minute (17 `workout_data` events in the 17-minute workout of 2026-09-18), so the series is read from Health, where the watch's live workout builder writes it; the read permission is the one already asked when a workout first arrives (048), and Health is only asked about time inside a workout the app knows. The samples are kept raw with their own timestamps in the set's folder (`heartrate.json`, the set's span plus 30 s before and 2 min after, for the drop of 053) and the value at the playhead is read between the two around it. Igor asked for a value every second (board, 2026-09-18): the sensor reports every few seconds during a workout, so per-second rows would be the same readings repeated; the chip moves every second by reading between them, and `heart_rate` (samples, median_interval_s, newest_age_s) logs the real cadence and how late the watch's samples reach the phone, which decides whether the watch has to send the series itself. Lining up needs the wall-clock time of the clip's first frame, `RecentEntry.clipStartedAt`: only sets recorded in the app have it (`recordedAt` is when the recording ended), a trim moves it, and paused or rotated sets and imported clips have none yet, so no chip. Igor picked the chip (92A); the curve belongs to 053.
 
 - **Issues:** [#92](https://github.com/idvorkin/exercise-analyzer/issues/92)

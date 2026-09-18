@@ -37,11 +37,16 @@ public struct RecentEntry: Codable, Identifiable {
   public var analysisVersion: String? = nil
   /// The models that produced the stored track; nil until backfilled, [] for tracks from before models existed.
   public var models: [String]? = nil
+  /// Wall-clock time of the clip's first frame, for lining the playhead up with heart rate (story 051). Known only
+  /// for sets recorded in the app: `recordedAt` is when a recording ended (or a Photos asset's date), and a trim
+  /// moves the first frame, so neither can stand in for it. Nil for imported clips and sets from before #92.
+  public var clipStartedAt: Date? = nil
 
   public init(
     id: String, analyzedAt: Date, recordedAt: Date?, duration: Double, repCount: Int, bestScore: Int?,
     source: Source, thumbnail: String?, exercise: ExerciseKind?, originalName: String?,
-    originalBackup: String? = nil, analysisVersion: String? = nil, models: [String]? = nil
+    originalBackup: String? = nil, analysisVersion: String? = nil, models: [String]? = nil,
+    clipStartedAt: Date? = nil
   ) {
     self.id = id
     self.analyzedAt = analyzedAt
@@ -56,6 +61,7 @@ public struct RecentEntry: Codable, Identifiable {
     self.originalBackup = originalBackup
     self.analysisVersion = analysisVersion
     self.models = models
+    self.clipStartedAt = clipStartedAt
   }
 
   public var exerciseKind: ExerciseKind { exercise ?? .kettlebellSwing }

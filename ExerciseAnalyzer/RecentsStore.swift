@@ -37,7 +37,8 @@ final class RecentsStore: ObservableObject {
   /// Adds or replaces an entry, writing its analysis, rep images, and (for file sources) the clip itself.
   func save(
     id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,
-    clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil, models: [String] = []
+    clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil, models: [String] = [],
+    clipStartedAt: Date? = nil
   ) throws {
     // Re-analyzing a clip replaces its earlier entry instead of adding a second set to the workout.
     for old in entries where old.id != id && old.isSameClip(source: source, originalName: originalName, duration: duration) {
@@ -73,7 +74,7 @@ final class RecentsStore: ObservableObject {
       id: id, analyzedAt: Date(), recordedAt: recordedAt, duration: duration,
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
       source: source, thumbnail: thumbnailName, exercise: pipeline.exercise, originalName: originalName,
-      analysisVersion: AnalysisVersion.current, models: models)
+      analysisVersion: AnalysisVersion.current, models: models, clipStartedAt: clipStartedAt)
     entries.removeAll { $0.id == id }
     entries.insert(entry, at: 0)
     try persistIndex()

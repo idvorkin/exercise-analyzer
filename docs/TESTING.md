@@ -151,6 +151,7 @@ The simulator cannot be tapped from a script, so the app has **launch hooks** re
 | `SWING_SHOW_WORKOUTS=1` | open the workout gallery on launch (screenshots) |
 | `SWING_SHOW_GALLERY=1` | open the rep gallery sheet on launch (gallery screenshots, #61) |
 | `SWING_WORKOUTS_COLLAPSED=1` | open Workouts collapsed to today's summary row (with `SWING_SHOW_WORKOUTS`) |
+| `SWING_HEART_RATE=1` | give the loaded clip a made-up heart rate (118 → 150 over 30 s, a reading every 5 s) so the HUD's ♥ chip shows; the simulator has no Health data (051) |
 | `SWING_PHOTOS_ACCESS=1` | ask for Photos access when the gallery opens (the simulator cannot be granted Photos access from the command line on iOS 26, so this dialog needs a hand) |
 
 Results are read from the **session log** (`Documents/logs/*.jsonl` in the app container), not the screen. The

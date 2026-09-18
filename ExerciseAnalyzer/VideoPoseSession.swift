@@ -148,6 +148,62 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var currentOrigin: Origin = .file
   private var currentEntryID: String?
   private var currentRecordedAt: Date?
+  /// Wall-clock time of the current clip's first frame (`RecentEntry.clipStartedAt`), what lines the playhead up
+  /// with heart rate (051); nil for imported clips. A trim moves it, its undo moves it back.
+  private var currentClipStartedAt: Date? { didSet { loadHeartRate() } }
+  private var untrimmedClipStartedAt: Date?
+  /// When the recorder took its first frame of the set being recorded.
+  private var recordingStartedAt: Date?
+  /// Heart rate around the current clip, from Health (051); nil when the set was not inside a workout.
+  @Published private(set) var heartRate: HeartRateSeries?
+  /// "♥ 141" for the HUD: the reading at the playhead, nil when there is none within 15 s of it.
+  var heartRateAtPlayhead: Int? {
+    guard let start = currentClipStartedAt, source == .file else { return nil }
+    return heartRate?.bpm(at: start.addingTimeInterval(currentTime))
+  }
+  private var heartRateTask: Task<Void, Never>?
+
+  /// The clip's heart rate (051): the series kept in the set's folder shows at once, then Health is asked for
+  /// the set's span plus the two minutes after it (the rest, for the drop of 053), and a fuller answer replaces
+  /// and is kept. Asked on every open because the watch's samples reach the phone's Health when they reach it;
+  /// `heart_rate` logs how many came, how far apart, and how old the newest was.
+  private func loadHeartRate() {
+    heartRateTask?.cancel()
+    heartRate = nil
+    guard let start = currentClipStartedAt else { return }
+    #if targetEnvironment(simulator)
+      // The simulator has no Health data: SWING_HEART_RATE=1 makes up a climb, 118 → 150 over 30 s with a
+      // reading every 5 s, so the chip can be seen there.
+      if ProcessInfo.processInfo.environment["SWING_HEART_RATE"] == "1" {
+        heartRate = HeartRateSeries(
+          samples: stride(from: 0.0, through: 30, by: 5).map {
+            .init(at: start.timeIntervalSince1970 + $0, bpm: 118 + $0 * 32 / 30)
+          })
+        return
+      }
+    #endif
+    let id = currentEntryID
+    let folder = id.map { recents.folder(for: $0) }
+    let stored = folder.flatMap { HeartRateSeries.load(from: $0) }
+    heartRate = stored
+    let length = id.flatMap { recents.entry(id: $0)?.duration } ?? duration
+    heartRateTask = Task { [weak self] in
+      let read = await WorkoutMirror.shared.heartRate(
+        from: start.addingTimeInterval(-30), to: start.addingTimeInterval(length + 120))
+      guard let self, !Task.isCancelled, let read else { return }
+      self.log.event(
+        "heart_rate",
+        [
+          "samples": read.samples.count, "stored": stored?.samples.count ?? 0,
+          "median_interval_s": read.medianInterval ?? 0,
+          "newest_age_s": read.samples.last.map { Date().timeIntervalSince1970 - $0.at } ?? -1,
+        ])
+      guard read.samples.count > (stored?.samples.count ?? 0) else { return }
+      self.heartRate = read
+      if let folder { try? read.save(to: folder) }
+    }
+  }
+
   /// A queued load from before the models were ready: the latest tap wins, earlier ones cancel.
   private var loadRetry: Task<Void, Never>?
   private var debugFramesToLog = 0
@@ -333,7 +389,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
           id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
           pipeline: analyzed, clipURL: nil, thumbnail: galleryThumbnail(analyzed, kind: kind, entry: entry),
           originalName: entry.originalName,
-          models: recents.models(for: entry))  // poses replayed, not re-extracted: the model set is the stored one
+          models: recents.models(for: entry),  // poses replayed, not re-extracted: the model set is the stored one
+          clipStartedAt: entry.clipStartedAt)
         log.event(
           "recents_refreshed",
           ["id": entry.id, "was": "\(stored.exercise.rawValue) \(stored.reps.count)", "now": "\(kind.rawValue) \(analyzed.reps.count)"])
@@ -525,7 +582,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       try recents.save(
         id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
         pipeline: analyzed, clipURL: nil, thumbnail: galleryThumbnail(analyzed, kind: kind, entry: entry),
-        originalName: entry.originalName, models: models.names)
+        originalName: entry.originalName, models: models.names, clipStartedAt: entry.clipStartedAt)
       log.event(
         "recents_refreshed",
         ["id": entry.id, "where": replayWhere, "was": "\(exercise.rawValue) \(entry.repCount)",
@@ -566,6 +623,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
     currentOrigin = origin
     currentEntryID = nil
     currentRecordedAt = recordedAt
+    // ponytail: an imported clip has no trusted first-frame time (a Photos date is the asset's, and a clip this
+    // app saved to Photos carries its save time), so no heart rate. Upgrade: read the movie's creation metadata.
+    currentClipStartedAt = nil
+    #if targetEnvironment(simulator)
+      // Test hook: SWING_HEART_RATE=1 treats the loaded clip as recorded just now, so it gets a heart rate (051).
+      if ProcessInfo.processInfo.environment["SWING_HEART_RATE"] == "1" { currentClipStartedAt = Date() }
+    #endif
     canSave = true
     log.event("load", ["url": url.lastPathComponent, "source": "file"])
     Task { await analyzeAndPlay(url: url) }
@@ -646,6 +710,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       currentOrigin = entry.isInPhotos ? .photos(identifier: photosID(entry)) : .file
       currentEntryID = entry.id
       currentRecordedAt = entry.recordedAt
+      currentClipStartedAt = entry.clipStartedAt
       canSave = !entry.isInPhotos
       extractedFrames = pipeline.track.frames
       extractionComplete = true
@@ -756,8 +821,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
       try recents.save(
         id: id, source: source, recordedAt: currentRecordedAt ?? Date(), duration: duration,
         pipeline: pipeline, clipURL: clipURL, thumbnail: thumbnail,
-        originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil, models: models.names)
+        originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil, models: models.names,
+        clipStartedAt: currentClipStartedAt)
       currentEntryID = id
+      loadHeartRate()  // the set has a folder now, so a series read before the save can be kept
       log.event("recents_saved", ["id": id, "reps": pipeline.reps.count, "in_photos": source.isPhotos])
     } catch {
       log.event("error", ["where": "recents", "message": "\(error)"])
@@ -1744,7 +1811,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private func cameraFrame(pixelBuffer: CVPixelBuffer, pts: Double) {
     guard source == .camera else { return }
     // The viewfinder has no elapsed time: the first frame must not start its clock (047).
-    if !viewfinder, cameraFirstTime == nil { cameraFirstTime = pts }
+    if !viewfinder, cameraFirstTime == nil {
+      cameraFirstTime = pts
+      recordingStartedAt = Date()
+    }
     lastCameraPts = pts
     if !paused, let at = pausedAt {
       // First frame after a resume: cut the pause out of live time in camera time, not wall time (#67).
@@ -2029,6 +2099,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
       currentOrigin = .recording
       currentEntryID = nil
       currentRecordedAt = Date()
+      // ponytail: a paused or rotated set has wall-clock time missing between its segments, so clip time is
+      // not first frame + playhead any more and it gets no heart rate. Upgrade: keep each segment's start.
+      currentClipStartedAt = segments.count == 1 && pausedTotal == 0 ? recordingStartedAt : nil
       canSave = true
       await trim(url: clipURL, using: livePipeline, thenAnalyze: true)
     }
@@ -2052,6 +2125,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     guard let url = trimmedURL ?? currentFileURL, source == .file else { return }
     let current = pipeline
     untrimmed = Untrimmed(url: url, pipeline: current, frames: extractedFrames, origin: currentOrigin)
+    untrimmedClipStartedAt = currentClipStartedAt
     Task { await trim(url: url, using: current, thenAnalyze: false) }
   }
 
@@ -2094,6 +2168,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     trimmedURL = nil
     currentFileURL = before.url
     currentOrigin = before.origin
+    currentClipStartedAt = untrimmedClipStartedAt
     installPlayerItem(url: before.url, pipeline: before.pipeline, keepUndo: true)
     extractedFrames = before.frames
     extractionComplete = true
@@ -2129,6 +2204,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         ["elapsed_s": Date().timeIntervalSince(started), "passthrough": trimmed.passthrough, "aligned_start_s": trimmed.start])
       trimmedURL = clip
       canSave = true
+      currentClipStartedAt = currentClipStartedAt?.addingTimeInterval(trimmed.start)  // the first frame moved
       log.event(
         "trim",
         [
