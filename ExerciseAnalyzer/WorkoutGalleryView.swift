@@ -335,6 +335,7 @@ extension ExerciseKind {
     case .bulgarianSplitSquat: return "figure.step.training"
     case .turkishGetUp: return "figure.core.training"
     case .pullUp: return "figure.play"  // arms up and out: the nearest SF figure to a hang
+    case .splitSquat: return "figure.strengthtraining.functional"  // a lunge
     }
   }
 
@@ -345,6 +346,7 @@ extension ExerciseKind {
     case .bulgarianSplitSquat: return .purple
     case .turkishGetUp: return .green
     case .pullUp: return .blue
+    case .splitSquat: return .pink
     }
   }
 }

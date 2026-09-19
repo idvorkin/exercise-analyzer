@@ -9,6 +9,7 @@ exercise it was; Auto mode analyzes with the winner, and reopening a stored set 
 |---|---|---|
 | `lying_ratio`, `standing_ratio` | uprightness < 0.15 / > 0.85 over frames with a measured uprightness | get-up |
 | `hands_overhead_ratio` | both wrists (confidence over 0.3) more than a quarter of a torso length over the shoulder line, over all frames | pull-up |
+| `lunge_ratio` | feet over 0.8 leg lengths apart along the floor with the hips between 0.3 and 0.85 leg lengths up, over frames with both ankles confident | split squat |
 | `arm_cycles` | arm rises above 50° after being below 30° | swing |
 | `p95_asymmetry`, `high_asymmetry_ratio` | |left knee − right knee| over the last 400 measured frames, 95th percentile (one bad frame cannot decide) and the share over 35° | pistol vs split squat vs swing |
 | `elevated_ratio` | one ankle more than 0.2 leg lengths above the other, only when both ankles are confident (cut-off feet read as raised) | split squat |
@@ -18,11 +19,13 @@ exercise it was; Auto mode analyzes with the winner, and reopening a stored set 
 1. Fewer than 30 frames: no decision.
 2. **Turkish get-up**: on the floor in over 10 % of frames and standing in over 3 %.
 3. **Pull-up**: both hands held over the shoulders in over 40 % of frames. After the get-up on purpose (below).
-4. **Kettlebell swing**: at least 3 arm cycles with symmetric legs (p95 < 35°), or at least 10 cycles with p95 < 50°
+4. **Split squat**: in a lunge for over 15 % of frames, and one foot held above the other in under half of them
+   (that is the Bulgarian). Before the swing on purpose (below).
+5. **Kettlebell swing**: at least 3 arm cycles with symmetric legs (p95 < 35°), or at least 10 cycles with p95 < 50°
    and under 20 % of frames over 35° (walk-ins and diagonal cameras make legs read a little uneven).
-5. **Pistol squat**: p95 asymmetry over 80° with the feet level in over half the frames.
-6. **Bulgarian split squat**: one foot held above the other in over half the frames with p95 over 20°.
-7. Otherwise ambiguous (swing with low confidence).
+6. **Pistol squat**: p95 asymmetry over 80° with the feet level in over half the frames.
+7. **Bulgarian split squat**: one foot held above the other in over half the frames with p95 over 20°.
+8. Otherwise ambiguous (swing with low confidence).
 
 Every fixture must detect as its own exercise with confidence ≥ 60 (`DetectionTests`), swing detection must survive
 mirroring, and `DetectionReport.testDetectionMargins` prints how close each fixture sits to the boundaries.
@@ -36,3 +39,11 @@ mirroring, and `DetectionReport.testDetectionMargins` prints how close each fixt
   0.00 on every swing, pistol and split squat fixture, and 0.36 / 0.40 on the two get-ups (lying with the bell arm
   up, both hands are "over the shoulders" on screen). Asked first, the rule took tgu-phone-2sides for pull-ups
   at 40 %; asked after the get-up's floor rule, every fixture detects as itself. Threshold 0.4 (commit b56766b).
+- **2026-09-19**: the split squat rule (#112). The barbell on the back reads as 23 arm cycles, so the fixture was a
+  swing at 100 %; the rule goes before the swing's. `DetectionReport`, `lunge_ratio` with the feet over 0.8 apart:
+  splitsquat-barbell-phone 0.28, every swing and the pistol 0.00, get-ups 0.04–0.05, pull-ups 0.09–0.12 (decided
+  earlier by the hands), bulgarian-10reps 0.00, bulgarian-phone 0.20, which is why the rule also asks for a foot
+  held up in under half the frames (0.25 here, 0.75–0.90 on the Bulgarians). Tried and rejected: counting a lunge
+  from 0.6 apart, the analyzer's own width. The pistol's free leg out front then reads as a lunge in 21 % of its
+  frames and pistol-6reps detected as split squats; at 0.8 it reads 0.00. Known ceiling: a static split squat
+  never brings the feet together, so its rear heel is "held up" throughout and it reads as a Bulgarian.

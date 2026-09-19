@@ -10,8 +10,9 @@ evidence, so a threshold is never re-derived from scratch. One file per exercise
 | [pistol-squat.md](pistol-squat.md) | working leg from knee asymmetry; bottom from head height |
 | [bulgarian-split-squat.md](bulgarian-split-squat.md) | phases on head height scaled by leg length; the front knee only scores |
 | [turkish-get-up.md](turkish-get-up.md) | lying / rising / standing / lowering on uprightness; the 2026-09-12 staging study and the proposed stages |
+| [split-squat.md](split-squat.md) | both feet on the floor: phases on the hips' height in leg lengths, a bottom counts only with the feet split; why not the head |
 | [pull-up.md](pull-up.md) | hang / pulling / top / lowering on the shoulders' distance under the bar line; why the wrists cannot be trusted at the top |
-| [detector.md](detector.md) | which exercise a set is, from floor time, hands held overhead, arm cycles, knee asymmetry and foot elevation |
+| [detector.md](detector.md) | which exercise a set is, from floor time, hands held overhead, feet split with the hips low, arm cycles, knee asymmetry and foot elevation |
 | [kettlebell-detector.md](kettlebell-detector.md) | seeing the bell with a second model: the YOLO-World Core ML trial on the sample clips (#18) |
 | [optimization.md](optimization.md) | index of every precision and speed hypothesis, with its numbers (#18) |
 
@@ -39,6 +40,7 @@ evidence, so a threshold is never re-derived from scratch. One file per exercise
 | `hipAngle` | knee–hip–shoulder on the more confident side | ~180 standing, ~90 deep hinge |
 | `kneeAngle` / `kneeAngle(side)` | hip–knee–ankle | ~180 straight, ~90 deep squat; per-side for single-leg work |
 | `uprightness` | (ankle.y − shoulder.y) ÷ (shoulder–hip + hip–knee + knee–ankle), longest fully-measured side | ~1 standing, ~0 lying across the frame, negative when the head lies lower on screen than the feet; camera-orientation independent because it is normalized by limb length |
+| `stance` (`hipHeight`, `split`) | hips over the lower foot, and the feet's distance along the floor, both in leg lengths (hip→knee→ankle along the longer leg) | ~1.0 / 0.05 standing, 0.42–0.59 / 0.85–1.1 at the bottom of a lunge; nil unless both ankles are confident (0.5) |
 | `overheadArmSide` / `overheadArmAngle` | the wrist highest above its own shoulder; its angle from vertical | nil when no wrist is above a shoulder |
 | `earY`, `ankleY(side)`, `wristHeight` | head height, foot height, highest wrist over the shoulders | pixels; larger y is lower on screen |
 

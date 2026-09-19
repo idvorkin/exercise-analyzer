@@ -58,6 +58,11 @@ struct Fixture {
     Fixture(name: "pullup-phone-5reps", expectedExercise: .pullUp, expectedReps: 5, humanVerified: false),
     // The same clip through the simulator's CPU pose pass: the first analyzer counted 3 of the 5 there.
     Fixture(name: "pullup-sim-5reps", expectedExercise: .pullUp, expectedReps: 5, humanVerified: false),
+    // Igor's barbell split squats (2026-09-19, recents 952F2323, #112), side-on, the head behind the plate
+    // (ear confidence 0.01): he steps back into each one and stands feet together between them, legs
+    // alternating. The hips sink 0.45 leg lengths eight times (bottoms at 26.5, 31.8, 39.3, 45.0, 54.3, 60.0,
+    // 69.3, 75.2 s). Counted 0 as a swing and as a Bulgarian. Not yet confirmed by Igor.
+    Fixture(name: "splitsquat-barbell-phone", expectedExercise: .splitSquat, expectedReps: 8, humanVerified: false),
   ]
 
   func frames() throws -> [FrameRecord] {

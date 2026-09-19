@@ -15,7 +15,7 @@ final class ArchivedTracks: XCTestCase {
       let detection = ExerciseDetector.detect(frames: frames)
       let pipeline = AnalysisPipeline.analyze(frames: frames, exercise: detection.exercise)
       XCTAssertFalse(frames.isEmpty, url.lastPathComponent)
-      print(String(format: "%-48@ %-22@ %3d%%  %2d reps", url.lastPathComponent, detection.exercise.rawValue, detection.confidence, pipeline.reps.count))
+      print(String(format: "%-48@ %-22@ %3d%%  %2d reps  %@", url.lastPathComponent, detection.exercise.rawValue, detection.confidence, pipeline.reps.count, detection.reason))
     }
     print("archived tracks: \(urls.count)")
   }

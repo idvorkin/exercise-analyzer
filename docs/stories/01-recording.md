@@ -42,7 +42,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [8bc27b5](https://github.com/idvorkin/exercise-analyzer/commit/8bc27b5); verified on the host (fixtures for all four exercises) and the phone; pull-ups (054, [#108](https://github.com/idvorkin/exercise-analyzer/issues/108)) verified on the host and the simulator, on the phone since 2026-09-19, Igor's check pending
 
 #### Use Case:
-- **As a** lifter who moves between swings, pistols, split squats, get-ups and pull-ups in one session
+- **As a** lifter who moves between swings, pistols, split squats (bench or floor), get-ups and pull-ups in one session
 - **I want to** leave the exercise on Auto and have the app work out what I am doing
 - **so that** every set is analyzed with the right rules without me choosing each time
 
@@ -204,3 +204,36 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Notes:** Picked from the exercise menu and the watch's picker like the others ("pull-ups" and its own stick figure in Workouts). How the phases are read, and why the wrists are not trusted at the top: [docs/analysis/pull-up.md](../analysis/pull-up.md). Auto asks "were both hands held over the shoulders for over 40 % of the set" after the get-up's floor rule ([detector.md](../analysis/detector.md)). The set #108 was shaken on had been trimmed to nine seconds around a split squat that never happened, pull-ups cut away; recognising pull-ups stops that, since the trim follows the reps that were found.
 
 - **Issues:** [#108](https://github.com/idvorkin/exercise-analyzer/issues/108), [#109](https://github.com/idvorkin/exercise-analyzer/issues/109) (the same set, reported twice)
+
+---
+
+### User Story 055:
+
+- **Summary:** Count and score split squats with both feet on the floor
+- **Status:** implemented for [#112](https://github.com/idvorkin/exercise-analyzer/issues/112); verified on the host (`splitsquat-barbell-phone`: detected as split squats, 8 reps; `TuningReports.testSplitSquatTrace`) and the simulator (Igor's clip on Auto: Split Squat, 8 reps); on the phone pending, and the count of 8 is mine, not yet Igor's
+- **Why:** Igor, 2026-09-19, on a barbell set the app had read as swings with no reps: "This is a split squat. Let's add support for that."
+
+#### Use Case:
+- **As a** lifter who does split squats with a bar on his back
+- **I want to** have them recognised, counted and scored
+- **so that** the barbell work is in Workouts beside the kettlebell work
+
+#### Acceptance Criteria:
+- **Scenario:** A barbell set on Auto
+- **Given:** the exercise is on Auto and I filmed eight split squats from the side with the bar on my back, stepping back into each and standing feet together between them, legs alternating
+- **When:** the set is analyzed
+- **Then:** it reads "Split Squat" with 8 reps, although the plate hides my head the whole time and my arms on the bar look like swinging arms; bending for the bar and walking off count nothing
+
+- **Scenario:** Not a Bulgarian
+- **Given:** a set with my rear foot up on a bench
+- **When:** it is analyzed on Auto
+- **Then:** it is still a Bulgarian split squat, as before
+
+- **Scenario:** A squat is not a split squat
+- **Given:** the exercise set to Split Squat and a dip with my feet together
+- **When:** it is analyzed
+- **Then:** it counts nothing: a bottom counts only with the feet split (by rule; there is no fixture of a plain squat yet, so this one is not verified)
+
+- **Notes:** Igor picked a new exercise (112A) over loosening the Bulgarian's raised-foot rule, which exists to keep setup crouches from counting. The phases run on the hips' height in leg lengths, not the head, and the score is the Bulgarian's: [docs/analysis/split-squat.md](../analysis/split-squat.md). Known limit: a static split squat, feet never together, reads as a Bulgarian on Auto ([detector.md](../analysis/detector.md)); picking Split Squat from the menu reads it right.
+
+- **Issues:** [#112](https://github.com/idvorkin/exercise-analyzer/issues/112)

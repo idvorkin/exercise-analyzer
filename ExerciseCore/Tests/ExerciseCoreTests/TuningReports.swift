@@ -13,7 +13,8 @@ final class TuningReports: XCTestCase {
     let lines = pipeline.reps.map { rep -> String in
       let times = rep.positions.values.sorted { $0.time < $1.time }
       let phases = times.map { String(format: "%@ %.1f", $0.phase.prefix(3).description, $0.time) }.joined(separator: " ")
-      return String(format: "  #%d %3d  %@", rep.number, rep.quality.score, phases)
+      let lost = rep.quality.score < 100 ? "  " + rep.quality.feedback.joined(separator: "; ") : ""
+      return String(format: "  #%d %3d  %@%@", rep.number, rep.quality.score, phases, lost)
     }
     print("\(label): \(pipeline.reps.count) reps\n" + lines.joined(separator: "\n"))
   }
@@ -57,6 +58,36 @@ final class TuningReports: XCTestCase {
         print(String(format: "  letGoUnderBar %.2f: %d reps", under, analyzePullUp(frames, thresholds, printing: false).reps.count))
       }
     }
+  }
+
+  /// The split squat fixtures (#112): every transition with the hips' height, the reps, and the count under
+  /// other depths and stance widths.
+  func testSplitSquatTrace() throws {
+    for fixture in Fixture.all where fixture.expectedExercise == .splitSquat {
+      let frames = try fixture.frames()
+      report("\(fixture.name) defaults", analyzeSplitSquat(frames, SplitSquatThresholds(), printing: true))
+      for depth in [0.1, 0.15, 0.25, 0.35, 0.4, 0.45] {
+        var thresholds = SplitSquatThresholds()
+        thresholds.minDepth = depth
+        thresholds.descend = min(thresholds.descend, depth)
+        print(String(format: "  minDepth %.2f: %d reps", depth, analyzeSplitSquat(frames, thresholds, printing: false).reps.count))
+      }
+      for split in [0.0, 0.3, 0.6, 1.0, 1.4, 1.8] {
+        var thresholds = SplitSquatThresholds()
+        thresholds.minSplit = split
+        print(String(format: "  minSplit %.2f: %d reps", split, analyzeSplitSquat(frames, thresholds, printing: false).reps.count))
+      }
+    }
+  }
+
+  private func analyzeSplitSquat(_ frames: [FrameRecord], _ thresholds: SplitSquatThresholds, printing: Bool) -> AnalysisPipeline {
+    let analyzer = SplitSquatAnalyzer(thresholds: thresholds)
+    var transitions: [String] = []
+    analyzer.trace = { transitions.append($0) }
+    let pipeline = AnalysisPipeline(exercise: .splitSquat, analyzer: analyzer)
+    for frame in frames { pipeline.process(extracted: frame) { nil } }
+    if printing { print(transitions.map { "    " + $0 }.joined(separator: "\n")) }
+    return pipeline
   }
 
   private func analyzePullUp(_ frames: [FrameRecord], _ thresholds: PullUpThresholds, printing: Bool) -> AnalysisPipeline {

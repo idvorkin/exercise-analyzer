@@ -37,9 +37,13 @@ public final class ExerciseDetector {
   private var lyingFrames = 0
   private var standingFrames = 0
   private var handsOverheadFrames = 0
+  private var stanceFrames = 0
+  private var lungeFrames = 0
 
   public func reset() {
     handsOverheadFrames = 0
+    stanceFrames = 0
+    lungeFrames = 0
     frameCount = 0
     asymmetries = []
     maxAsymmetry = 0
@@ -70,6 +74,13 @@ public final class ExerciseDetector {
     {
       let torso = hypot((ls.x + rs.x) / 2 - (lh.x + rh.x) / 2, (ls.y + rs.y) / 2 - (lh.y + rh.y) / 2)
       if max(lw.y, rw.y) < (ls.y + rs.y) / 2 - torso * 0.25 { handsOverheadFrames += 1 }
+    }
+    // A split squat (#112): feet far apart along the floor with the hips sunk between them. A swing keeps the
+    // feet under the hips. 0.8 leg lengths apart, wider than the analyzer's 0.6: a pistol's free leg out front
+    // reads 0.6–0.8 "apart" in 21 % of its frames and never 0.8.
+    if let stance = skeleton.stance {
+      stanceFrames += 1
+      if stance.split > 0.8, stance.hipHeight < 0.85, stance.hipHeight > 0.3 { lungeFrames += 1 }
     }
     // A swing's arms cycle between hanging (<30°) and near horizontal (>50°) every rep. A pistol squat holds the
     // arms out for balance, so "arms horizontal" alone isn't enough; count the cycles.
@@ -117,8 +128,9 @@ public final class ExerciseDetector {
     let lyingRatio = uprightFrames > 0 ? Double(lyingFrames) / Double(uprightFrames) : 0
     let standingRatio = uprightFrames > 0 ? Double(standingFrames) / Double(uprightFrames) : 0
     let handsOverheadRatio = frameCount > 0 ? Double(handsOverheadFrames) / Double(frameCount) : 0
+    let lungeRatio = stanceFrames > 0 ? Double(lungeFrames) / Double(stanceFrames) : 0
     let stats: [String: Double] = [
-      "hands_overhead_ratio": handsOverheadRatio,
+      "hands_overhead_ratio": handsOverheadRatio, "lunge_ratio": lungeRatio,
       "lying_ratio": lyingRatio, "standing_ratio": standingRatio,
       "frames": Double(frameCount), "max_asymmetry": maxAsymmetry, "p95_asymmetry": p95, "avg_asymmetry": avg,
       "high_asymmetry_ratio": highRatio, "elevated_ratio": elevatedRatio, "elevation_frames": Double(measuredFrames),
@@ -143,6 +155,17 @@ public final class ExerciseDetector {
         exercise: .pullUp, confidence: min(100, 60 + Int(handsOverheadRatio * 40)),
         reason: String(format: "both hands held over the shoulders in %.0f%% of frames", handsOverheadRatio * 100),
         stats: stats)
+    }
+    // Before the swing: arms holding a bar on the back read as 23 "arm cycles" on the split squat fixture. In a
+    // lunge for over 15 % of the frames with both feet seen (0.28 there, 0.00 on every swing and pistol), and
+    // not with one foot held up throughout, which is the Bulgarian (0.75–0.90 of its frames, 0.25 here; the
+    // Bulgarian from the phone is in a lunge for 0.20).
+    // ponytail: a static split squat never brings the feet together, its rear heel stays up, and it will read
+    // as a Bulgarian; telling a toe from a bench needs the rear ankle's height in the lunge frames alone.
+    if lungeRatio > 0.15 && elevatedRatio < 0.5 {
+      return ExerciseDetection(
+        exercise: .splitSquat, confidence: min(100, 60 + Int(lungeRatio * 100)),
+        reason: String(format: "feet split with the hips low in %.0f%% of frames", lungeRatio * 100), stats: stats)
     }
     // Many arm cycles are a swing even when the legs read a little uneven (a walk-in, a diagonal camera).
     if (armCycles >= 3 && p95 < asymmetryThreshold) || (armCycles >= 10 && p95 < 50 && highRatio < 0.2) {

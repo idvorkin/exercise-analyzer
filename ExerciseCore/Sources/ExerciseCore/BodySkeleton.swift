@@ -193,6 +193,31 @@ public struct BodySkeleton {
   }
 }
 
+// MARK: - Split-stance signals
+
+extension BodySkeleton {
+  /// The legs for a split squat (#112), in leg lengths (hip→knee→ankle along the limbs, the longer measured
+  /// leg), so the camera's distance drops out: `hipHeight` is the hips over the lower foot (about 1 standing,
+  /// 0.42–0.59 at the bottom of a lunge), `split` how far apart the feet are along the floor (0.05 feet
+  /// together, 0.85–1.1 at the bottom of a lunge seen from the side). Nil unless both ankles are confidently seen: a guessed foot reads
+  /// as any stance at all.
+  public var stance: (hipHeight: Double, split: Double)? {
+    guard let leftAnkle = point(.leftAnkle, minConf: 0.5), let rightAnkle = point(.rightAnkle, minConf: 0.5),
+      let leftHip = point(.leftHip), let rightHip = point(.rightHip)
+    else { return nil }
+    let legs = [BodySide.left, .right].compactMap { side -> Double? in
+      guard let hip = point(side.hip), let knee = point(side.knee), let ankle = point(side.ankle) else { return nil }
+      return Self.distance(hip, knee) + Self.distance(knee, ankle)
+    }
+    guard let leg = legs.max(), leg > 0 else { return nil }
+    let hipY = Double(leftHip.y + rightHip.y) / 2
+    return (
+      hipHeight: (Double(max(leftAnkle.y, rightAnkle.y)) - hipY) / leg,
+      split: Double(abs(leftAnkle.x - rightAnkle.x)) / leg
+    )
+  }
+}
+
 // MARK: - Get-up signals
 
 extension BodySkeleton {
