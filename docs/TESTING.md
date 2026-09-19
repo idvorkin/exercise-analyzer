@@ -21,6 +21,7 @@ camera, a display, or a wrist goes higher.
 | Exercise detector | Host | `DetectionTests`: every fixture must detect as its own exercise with confidence ≥ 60 |
 | Skeleton geometry (angles, sides, uprightness) | Host | `SkeletonTests` with synthetic poses |
 | Crop / me-view, rep span for trimming | Host | `RepCountTests.testRepSpanAndStableCropCoverTheSet` |
+| Where the zoomed lifter sits in the picture (#98) | Host, then the simulator for the HUD around it | `ZoomTransformTests`; to see it, `ZoomPreviewReport` draws the zoomed picture at both gallery heights from a still, with the HUD's bands, in under a second: `cd ExerciseCore && ZOOM_PREVIEW_IMAGE=<set>/rep-1-top.jpg ZOOM_PREVIEW_CROP=0.43,0.21,0.50,0.60 ZOOM_PREVIEW_FRAME=1080x1920 ZOOM_PREVIEW_OUT=/tmp/zoom.png swift test --filter ZoomPreviewReport` (a stored set's rep stills are cut to its crop, so `ZOOM_PREVIEW_FRAME` places one in an empty frame; leave it out for a full-frame still) |
 | In-frame status, watch messages | Host | [`FrameStatusTests.swift`](../ExerciseCore/Tests/ExerciseCoreTests/FrameStatusTests.swift) |
 | Anything in `AnalysisPipeline` (re-analysis, shifting after a trim) | Host | `PoseTrackTests`, `RepCountTests` |
 | Offline pose pass, import, analysis wiring in the app | Simulator | `check <clip> <exercise> <reps>` in [`sim-smoke.sh`](../scripts/sim-smoke.sh) |

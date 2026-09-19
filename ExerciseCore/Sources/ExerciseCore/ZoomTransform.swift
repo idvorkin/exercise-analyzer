@@ -29,11 +29,11 @@ public struct ZoomTransform: Equatable {
       width: container.width * scale, height: container.height * scale)
   }
 
-  /// The share of the crop's height cut from its top. `PersonCrop` pads the skeleton 1.3× tall, 11.5 % of the crop
-  /// on each end, and the skull reaches about 5 % of the crop above the eyes, the highest keypoints: cutting 2 %
-  /// leaves about 4 % of air over the head (0.06 put the skull on the edge; Igor: "a bit of extra padding for my
-  /// head").
-  public static let headroom: CGFloat = 0.02
+  /// The share of the crop's height added over its top. `PersonCrop` pads the skeleton 1.3× tall, 11.5 % of the
+  /// crop on each end, and the skull reaches about 5 % of the crop above the eyes, the highest keypoints: with 3 %
+  /// more there is about 10 % of air over the head. Igor asked twice for more: cutting 6 % off the crop put the
+  /// skull on the edge, cutting 2 % left 4 % ("maybe a little bit more padding on top of the head").
+  public static let headAir: CGFloat = 0.03
 
   /// The lifter in the middle of the picture area. `crop` is the lifter's padded box, normalized in image space;
   /// nil is the zoom off, the whole frame where it always was (Igor: "when zoom off leave it as normal").
@@ -50,12 +50,11 @@ public struct ZoomTransform: Equatable {
     let video = CGRect(
       x: (container.width - imageSize.width * fit) / 2, y: (container.height - imageSize.height * fit) / 2,
       width: imageSize.width * fit, height: imageSize.height * fit)
-    // Head to feet: the crop less the padding above the head. A crop clamped at the frame's top has no padding
-    // there: the head is at the edge of the picture itself.
-    let above = crop.minY > 0 ? crop.height * headroom : 0
+    // Head to feet with air over the head, never past the frame's own top.
+    let air = min(crop.height * headAir, max(crop.minY, 0))
     let region = CGRect(
-      x: video.minX + crop.minX * video.width, y: video.minY + (crop.minY + above) * video.height,
-      width: crop.width * video.width, height: (crop.height - above) * video.height)
+      x: video.minX + crop.minX * video.width, y: video.minY + (crop.minY - air) * video.height,
+      width: crop.width * video.width, height: (crop.height + air) * video.height)
     guard region.width > 0, region.height > 0 else { return ZoomTransform() }
     let center = CGPoint(x: container.width / 2, y: container.height / 2)
     var zoom = ZoomTransform()

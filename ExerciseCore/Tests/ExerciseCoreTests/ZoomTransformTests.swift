@@ -12,13 +12,13 @@ final class ZoomTransformTests: XCTestCase {
   private let image = CGSize(width: 1080, height: 1920)
   private let angleText: CGFloat = 47
 
-  /// Where the lifter, head to feet (the crop less its padding above the head), lands on the screen under `zoom`.
+  /// Where the lifter, head to feet (the crop and the air over the head), lands on the screen under `zoom`.
   private func box(_ zoom: ZoomTransform, in container: CGSize) -> CGRect {
     let fit = min(container.width / image.width, container.height / image.height)
     let video = CGRect(
       x: (container.width - image.width * fit) / 2, y: (container.height - image.height * fit) / 2,
       width: image.width * fit, height: image.height * fit)
-    let head = crop.minY + crop.height * ZoomTransform.headroom
+    let head = crop.minY - crop.height * ZoomTransform.headAir
     let region = CGRect(
       x: video.minX + crop.minX * video.width, y: video.minY + head * video.height,
       width: crop.width * video.width, height: (crop.maxY - head) * video.height)
@@ -44,8 +44,8 @@ final class ZoomTransformTests: XCTestCase {
       XCTAssertGreaterThanOrEqual(b.minX, z.bars - 0.5, "the bars never cut into the lifter")
       XCTAssertLessThanOrEqual(b.maxX, 402 - z.bars + 0.5)
     }
-    // 328 pt free over 220 pt of lifter and air at 1× (was 1.67× over the whole 375 pt, head and feet under the HUD).
-    XCTAssertEqual(zoom(CGSize(width: 402, height: 375)).scale, 1.49, accuracy: 0.01)
+    // 328 pt free over 232 pt of lifter and air at 1× (was 1.67× over the whole 375 pt, head and feet under the HUD).
+    XCTAssertEqual(zoom(CGSize(width: 402, height: 375)).scale, 1.42, accuracy: 0.01)
   }
 
   func testZoomOffIsTheWholeFrameWhereItAlwaysWas() {
@@ -67,8 +67,8 @@ final class ZoomTransformTests: XCTestCase {
   }
 
   func testZoomedBarsAreEvenAboutTheLifter() {
-    // Gallery up: the video ends 100 pt right of the middle, so the picture is cut 100 pt left of it too.
+    // Gallery up: the video ends 95 pt right of the middle, so the picture is cut 95 pt left of it too.
     let z = zoom(CGSize(width: 402, height: 375))
-    XCTAssertEqual(z.bars, 101, accuracy: 2)
+    XCTAssertEqual(z.bars, 106, accuracy: 2)
   }
 }
