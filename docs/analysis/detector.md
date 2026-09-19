@@ -35,4 +35,4 @@ mirroring, and `DetectionReport.testDetectionMargins` prints how close each fixt
 - **2026-09-19**: the pull-up rule (#108). `DetectionReport`: `hands_overhead_ratio` is 0.72 on pullup-phone-5reps,
   0.00 on every swing, pistol and split squat fixture, and 0.36 / 0.40 on the two get-ups (lying with the bell arm
   up, both hands are "over the shoulders" on screen). Asked first, the rule took tgu-phone-2sides for pull-ups
-  at 40 %; asked after the get-up's floor rule, every fixture detects as itself. Threshold 0.4.
+  at 40 %; asked after the get-up's floor rule, every fixture detects as itself. Threshold 0.4 (commit b56766b).

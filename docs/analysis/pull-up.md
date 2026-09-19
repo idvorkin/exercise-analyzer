@@ -54,4 +54,5 @@ around the one "split squat" the wrong analyzer found, and the pull-ups were cut
   "on the bar" while the wrists were within 0.35 torso lengths of the line; at the tops of reps 3 and 5 the hidden
   left wrist was guessed at 340–344 px against a line of 308 (0.32–0.36 under), the grip read as lost and the rep
   was dropped. Replaced by the let-go rule above (far under the line, for 3 frames); `letGoUnderBar` from 0.2 to
-  1.2 counts 5 on both tracks, because the other wrist stays near the line. Both fixtures 5.
+  1.2 counts 5 on both tracks, because the other wrist stays near the line. Both fixtures 5 (commit b56766b, with
+  the analyzer).
