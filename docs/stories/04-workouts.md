@@ -233,7 +233,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 053:
 
 - **Summary:** See a whole workout on one page: the sets in time, the rests between them, the heart rate across them
-- **Status:** implemented for [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); the timeline verified on the host (`WorkoutTimelineTests`), the page on the simulator with a seeded workout and heart-rate series (`SWING_OPEN_WORKOUT=1`); the Health read and a real session's curve are the phone's, read from `workout_heart_rate` after a gym session inside a workout
+- **Status:** implemented for [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); the timeline verified on the host (`WorkoutTimelineTests`), the page on the simulator with a seeded workout and heart-rate series (`SWING_OPEN_WORKOUT=1`); the Health read confirmed on the phone 2026-09-18 (`workout_heart_rate`: 229 samples, one every 5 s, for the 8:43 workout); "‹ Workout" on any set of a stored workout for [#99](https://github.com/idvorkin/exercise-analyzer/issues/99), verified on the simulator (`SWING_OPEN_RECENT=<id> SWING_BACK_TO_WORKOUT=1`), on the phone pending
 - **Why:** Igor, 2026-09-18: "I probably have a workout view where I look at the whole workout together. That's probably an interesting view I need as well."
 
 #### Use Case:
@@ -260,7 +260,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** Back to the workout from one of its sets
 - **Given:** I opened a set from a workout's page
 - **When:** I tap "‹ Workout 8:43 AM" at the left of the playback screen, above the phase pills
-- **Then:** Workouts opens on that workout's page again, not on the day list; Back on the page, or starting the camera, takes the button away
+- **Then:** Workouts opens on that workout's page again, not on the day list; starting the camera takes the button away
+
+- **Scenario:** The button is there however the set was opened
+- **Given:** a set that was done inside a stored workout, opened from the day list, from the Photos strip, or reopened at launch
+- **When:** it is on the playback screen
+- **Then:** "‹ Workout 8:43 AM" is there all the same and opens that workout's page; a set done outside every workout has no button
 
 - **Scenario:** A row names the rep and shows the set
 - **Given:** a workout of swings and pistols
@@ -284,4 +289,4 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Notes:** Igor picked the page (95A) on the board of 2026-09-18 and asked to "keep full heart rate data so we can see time to drop as well": the whole workout's series, rests included, is read from Health (a minute before to three after) and kept in `Documents/workouts/<id>/heartrate.json`, re-read on every open and replaced when Health has more. The heart lags the work, so a set's peak is looked for up to 30 s past its end (or the next set's start), and the drop is that peak minus the reading 60 s after the set's end, or at the next set's start when the rest was shorter (Igor, 2026-09-18: "drop in 60 seconds or however much total rest I got"; he picked this over "time to get back under X", which is not built). A set is placed by `clipStartedAt` (story 051); sets from before it fall back to `recordedAt`, which for a set recorded in the app is the end of the recording, so they sit up to one set length late. The day and exercise grouping of 012 stays as it is. `WorkoutTimeline` in ExerciseCore does the arithmetic; the page only draws it.
 
-- **Issues:** [#95](https://github.com/idvorkin/exercise-analyzer/issues/95)
+- **Issues:** [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); [#99](https://github.com/idvorkin/exercise-analyzer/issues/99) Igor: "sometimes … I can get back to the workout, and sometimes I can't": the button existed only for a set opened from the workout's page

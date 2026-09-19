@@ -261,6 +261,22 @@ struct ContentView: View {
 
   // MARK: - HUD
 
+  /// The stored workout the set on screen was done in: the page it was opened from, else the workout its first
+  /// frame falls inside. Nil for the camera, a clip that is not a stored set, or a set outside every workout.
+  private var workoutOfLoadedSet: StoredWorkout? {
+    guard session.source == .file else { return nil }
+    if let openedWorkout { return openedWorkout }
+    guard let start = session.currentEntry?.span.lowerBound else { return nil }
+    return workouts.index.workouts.last { $0.contains(start) }
+  }
+
+  /// Workouts opens on the workout's page: `openedWorkout` is what the gallery's navigation pushes.
+  private func backToWorkout(_ workout: StoredWorkout) {
+    session.log.event("ui", ["action": "back_to_workout", "from_page": openedWorkout != nil])
+    openedWorkout = workout
+    showRecents = true
+  }
+
   private var hud: some View {
     let definition = session.exercise.definition
     let analysis = session.latestFrame?.analysis
@@ -339,11 +355,11 @@ struct ContentView: View {
         .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
         .accessibilityLabel("Workout on the watch, \(sets) sets, heart rate \(live.heartRate.map(String.init) ?? "unknown")")
       }
-      // A set opened from a workout's page (053): one tap back to that page, which is still pushed in Workouts.
-      if let workout = openedWorkout, session.source == .file {
+      // A set that belongs to a stored workout (053): one tap to that workout's page, however the set was opened
+      // (#99: only a set opened from the page had the button, so it came and went).
+      if let workout = workoutOfLoadedSet {
         Button {
-          session.log.event("ui", ["action": "back_to_workout"])
-          showRecents = true
+          backToWorkout(workout)
         } label: {
           HStack(spacing: 6) {
             Image(systemName: "chevron.left").font(.subheadline.bold())
@@ -876,6 +892,13 @@ struct ContentView: View {
       let entry = wanted == "1" ? session.recents.entries.first : session.recents.entries.first { $0.id == wanted }
       if let entry {
         session.open(recent: entry)
+        // Test hook: a set opened directly (not from a workout's page), then "‹ Workout" as a tap would (#99).
+        if env["SWING_BACK_TO_WORKOUT"] == "1" {
+          Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            if let workout = workoutOfLoadedSet { backToWorkout(workout) } else { session.log.event("ui", ["action": "back_to_workout_missing"]) }
+          }
+        }
         return
       }
     }

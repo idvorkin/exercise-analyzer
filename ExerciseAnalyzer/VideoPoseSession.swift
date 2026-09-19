@@ -147,6 +147,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published var replaceOriginalPrompt = false
   private var currentOrigin: Origin = .file
   private var currentEntryID: String?
+  /// The stored set on screen, if it is one: what tells the playback screen which workout it belongs to (#99).
+  var currentEntry: RecentEntry? { currentEntryID.flatMap { id in recents.entries.first { $0.id == id } } }
   private var currentRecordedAt: Date?
   /// Wall-clock time of the current clip's first frame (`RecentEntry.clipStartedAt`), what lines the playhead up
   /// with heart rate (051); nil for imported clips. A trim moves it, its undo moves it back.
