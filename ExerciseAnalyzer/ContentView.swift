@@ -64,12 +64,11 @@ struct ContentView: View {
     VStack(spacing: 0) {
       ZStack {
         Color.black
-        // The lifter in the middle of the picture (#98): zoomed, head at the top and feet above the angle text;
-        // the whole frame of a stored set is slid sideways. The camera's whole frame stays put: it is what the
-        // phone is aimed by.
+        // The lifter in the middle of the picture (#98): zoomed, head at the top and feet above the angle text.
+        // Zoom off is the whole frame where it always was.
         MeViewZoom(
-          crop: session.personCrop, imageSize: session.latestFrame?.imageSize, zoomed: meView,
-          centreWhole: session.source == .file, freeBottom: hudAngleLineTop
+          crop: meView ? session.personCrop : nil, imageSize: session.latestFrame?.imageSize,
+          freeBottom: hudAngleLineTop
         ) { zoom in
           ZStack {
             if session.source == .camera {
@@ -294,7 +293,9 @@ struct ContentView: View {
   private var hud: some View {
     let definition = session.exercise.definition
     let analysis = session.latestFrame?.analysis
-    return VStack {
+    // Tight lines (Igor: "less gap between the first line and the stages"): what the HUD does not cover is the
+    // lifter's.
+    return VStack(spacing: 2) {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
         // A set that belongs to a stored workout (053): one tap to that workout's page, however the set was
         // opened (#99). A sign at the head of the top line, so no line of its own lies over the lifter (#98).
@@ -307,19 +308,26 @@ struct ContentView: View {
               Image(systemName: "figure.strengthtraining.traditional").font(.title3)
             }
             .foregroundStyle(.green)
-            .frame(minHeight: 34)
+            .frame(minHeight: 28)
             .contentShape(Rectangle().inset(by: -8))
           }
           .accessibilityLabel("Back to the workout")
+          // Level with the count (Igor): the sign's middle on the digit's middle, half a cap height (12 pt of the
+          // 34 pt face) over the baseline the line is set on.
+          .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 12 }
         }
+        // The count's line box is cut to its cap height, so the header sits at the very top of the picture and
+        // the phase pills snug under it (Igor, #98).
         if session.viewfinder {
           // Framing, not recording: the count area names the state and no REC pill shows (047).
           Text("VIEWFINDER")
             .font(.system(size: 34, weight: .bold, design: .rounded))
+            .frame(height: 28)
         } else {
           Text("\(displayedRepCount)")
             .font(.system(size: 34, weight: .bold, design: .rounded))
             .monospacedDigit()
+            .frame(height: 28)
         }
         exerciseMenu
         if session.source == .camera, !session.viewfinder {
@@ -340,8 +348,9 @@ struct ContentView: View {
           .padding(.horizontal, 7).padding(.vertical, 2)
           .background(Color.red.opacity(0.18), in: Capsule())
           .accessibilityLabel("Heart rate \(bpm)")
-        } else {
-          // The chip takes the fps readout's place: both would wrap the exercise name onto a second line.
+        } else if session.source == .camera {
+          // The live pose model's frame rate. A stored set runs no live model, so it read "0 fps" there (Igor:
+          // "what does 0 fps mean?"). The chip takes its place: both would wrap the exercise name.
           Text(String(format: "%.0f fps", session.fps)).font(.caption2).monospacedDigit().opacity(0.7)
         }
         if session.source == .camera {
@@ -453,7 +462,7 @@ struct ContentView: View {
     }
     .foregroundStyle(.white)
     .shadow(color: .black.opacity(0.6), radius: 2, y: 1)
-    .padding(.horizontal, 12).padding(.vertical, 8)
+    .padding(.horizontal, 12).padding(.top, 2).padding(.bottom, 8)
     .background(
       VStack(spacing: 0) {
         LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .top, endPoint: .bottom)
@@ -943,8 +952,6 @@ struct ContentView: View {
 struct MeViewZoom<Content: View>: View {
   let crop: CGRect?
   let imageSize: CGSize?
-  var zoomed = true
-  var centreWhole = false
   /// The y where the HUD's bottom text begins; nil: the picture is free down to its bottom edge.
   var freeBottom: CGFloat?
   @ViewBuilder let content: (ZoomTransform) -> Content
@@ -953,8 +960,7 @@ struct MeViewZoom<Content: View>: View {
     GeometryReader { geo in
       let zoom = ZoomTransform.centring(
         crop: crop, imageSize: imageSize, container: geo.size,
-        bottomInset: freeBottom.map { max(geo.size.height - $0, 0) } ?? 0, zoomed: zoomed,
-        centreWhole: centreWhole)
+        bottomInset: freeBottom.map { max(geo.size.height - $0, 0) } ?? 0)
       ZStack {
         content(zoom)
         HStack(spacing: 0) {

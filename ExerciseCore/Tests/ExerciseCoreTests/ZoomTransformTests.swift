@@ -29,16 +29,14 @@ final class ZoomTransformTests: XCTestCase {
       width: region.width * zoom.scale, height: region.height * zoom.scale)
   }
 
-  private func zoom(_ container: CGSize, zoomed: Bool, centreWhole: Bool = true) -> ZoomTransform {
-    ZoomTransform.centring(
-      crop: crop, imageSize: image, container: container, bottomInset: angleText, zoomed: zoomed,
-      centreWhole: centreWhole)
+  private func zoom(_ container: CGSize) -> ZoomTransform {
+    ZoomTransform.centring(crop: crop, imageSize: image, container: container, bottomInset: angleText)
   }
 
   func testZoomedPutsTheHeadAtTheTopAndTheFeetAboveTheAngleText() {
     for height in [375.0, 650.0] {
       let container = CGSize(width: 402, height: height)
-      let z = zoom(container, zoomed: true)
+      let z = zoom(container)
       let b = box(z, in: container)
       XCTAssertEqual(b.minY, 0, accuracy: 0.5, "head at the top, area \(height)")
       XCTAssertEqual(b.midX, 201, accuracy: 0.5, "centred, area \(height)")
@@ -46,25 +44,15 @@ final class ZoomTransformTests: XCTestCase {
       XCTAssertGreaterThanOrEqual(b.minX, z.bars - 0.5, "the bars never cut into the lifter")
       XCTAssertLessThanOrEqual(b.maxX, 402 - z.bars + 0.5)
     }
-    // 328 pt free over a lifter 211 pt tall at 1× (was 1.67× over the whole 375 pt, head and feet under the HUD).
-    XCTAssertEqual(zoom(CGSize(width: 402, height: 375), zoomed: true).scale, 1.55, accuracy: 0.01)
+    // 328 pt free over 220 pt of lifter and air at 1× (was 1.67× over the whole 375 pt, head and feet under the HUD).
+    XCTAssertEqual(zoom(CGSize(width: 402, height: 375)).scale, 1.49, accuracy: 0.01)
   }
 
-  func testWholeFrameSlidesSidewaysOnly() {
-    let container = CGSize(width: 402, height: 375)
-    let z = zoom(container, zoomed: false)
-    XCTAssertEqual(z.scale, 1)
-    XCTAssertEqual(z.offset.height, 0)
-    XCTAssertEqual(box(z, in: container).midX, 201, accuracy: 0.5)
-    XCTAssertEqual(z.bars, 0, "a whole frame is not trimmed: cut to match its short side it is a sliver")
-  }
-
-  func testNothingMovesWithoutACropOrWhenTheWholeFrameIsNotCentred() {
-    let container = CGSize(width: 402, height: 375)
-    XCTAssertEqual(zoom(container, zoomed: false, centreWhole: false), ZoomTransform())
+  func testZoomOffIsTheWholeFrameWhereItAlwaysWas() {
+    // Igor, on the slid whole frame: "when zoom off leave it as normal", no centring.
     XCTAssertEqual(
       ZoomTransform.centring(
-        crop: nil, imageSize: image, container: container, bottomInset: angleText, zoomed: true, centreWhole: true),
+        crop: nil, imageSize: image, container: CGSize(width: 402, height: 375), bottomInset: angleText),
       ZoomTransform())
   }
 
@@ -73,14 +61,14 @@ final class ZoomTransformTests: XCTestCase {
     let container = CGSize(width: 402, height: 375)
     let z = ZoomTransform.centring(
       crop: CGRect(x: 0.39, y: 0, width: 0.285, height: 0.909), imageSize: image, container: container,
-      bottomInset: angleText, zoomed: true, centreWhole: true)
+      bottomInset: angleText)
     // The video's own top edge lands on the area's top: nothing of the head is cut.
     XCTAssertEqual(z.layerFrame(in: container).minY, 0, accuracy: 0.5)
   }
 
   func testZoomedBarsAreEvenAboutTheLifter() {
-    // Gallery up: the video ends 105 pt right of the middle, so the picture is cut 105 pt left of it too.
-    let z = zoom(CGSize(width: 402, height: 375), zoomed: true)
-    XCTAssertEqual(z.bars, 96, accuracy: 3)
+    // Gallery up: the video ends 100 pt right of the middle, so the picture is cut 100 pt left of it too.
+    let z = zoom(CGSize(width: 402, height: 375))
+    XCTAssertEqual(z.bars, 101, accuracy: 2)
   }
 }

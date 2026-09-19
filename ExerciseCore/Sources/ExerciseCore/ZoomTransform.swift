@@ -29,21 +29,22 @@ public struct ZoomTransform: Equatable {
       width: container.width * scale, height: container.height * scale)
   }
 
-  /// The share of the crop's height above the top of the head. `PersonCrop` pads the skeleton 1.3× tall, 11.5 % of
-  /// the crop on each end, and the skull reaches about 5 % of the crop above the eyes, the highest keypoints.
-  public static let headroom: CGFloat = 0.06
+  /// The share of the crop's height cut from its top. `PersonCrop` pads the skeleton 1.3× tall, 11.5 % of the crop
+  /// on each end, and the skull reaches about 5 % of the crop above the eyes, the highest keypoints: cutting 2 %
+  /// leaves about 4 % of air over the head (0.06 put the skull on the edge; Igor: "a bit of extra padding for my
+  /// head").
+  public static let headroom: CGFloat = 0.02
 
-  /// The lifter in the middle of the picture area. `crop` is the lifter's padded box, normalized in image space.
-  /// Zoomed: head at the area's top (the count and the phase pills may lie over it a little, Igor's pick), feet
-  /// above `bottomInset` (the angle text), centred left to right, black wherever the video ends and as much of it
-  /// on the other side (`bars`), so the picture is even about the lifter. Not zoomed: the whole frame at 1×, slid
-  /// sideways so the lifter is in the middle when `centreWhole`; untrimmed, a whole frame cut to match its short
-  /// side is a sliver.
+  /// The lifter in the middle of the picture area. `crop` is the lifter's padded box, normalized in image space;
+  /// nil is the zoom off, the whole frame where it always was (Igor: "when zoom off leave it as normal").
+  /// Head at the area's top (the count and the phase pills may lie over it a little, Igor's pick), feet above
+  /// `bottomInset` (the angle text), centred left to right, black wherever the video ends and as much of it on the
+  /// other side (`bars`), so the picture is even about the lifter.
   public static func centring(
-    crop: CGRect?, imageSize: CGSize?, container: CGSize, bottomInset: CGFloat, zoomed: Bool, centreWhole: Bool
+    crop: CGRect?, imageSize: CGSize?, container: CGSize, bottomInset: CGFloat
   ) -> ZoomTransform {
     guard let crop, let imageSize, imageSize.width > 0, imageSize.height > 0, container.width > 0,
-      container.height > 0, zoomed || centreWhole
+      container.height > 0
     else { return ZoomTransform() }
     let fit = min(container.width / imageSize.width, container.height / imageSize.height)
     let video = CGRect(
@@ -58,19 +59,15 @@ public struct ZoomTransform: Equatable {
     guard region.width > 0, region.height > 0 else { return ZoomTransform() }
     let center = CGPoint(x: container.width / 2, y: container.height / 2)
     var zoom = ZoomTransform()
-    if zoomed {
-      let freeHeight = max(container.height - bottomInset, 1)
-      zoom.scale = min(max(min(container.width / region.width, freeHeight / region.height), 0.5), 4)
-      // A point p lands at center + (p - center) * scale + offset: the head goes to the area's top.
-      zoom.offset.height = -center.y - (region.minY - center.y) * zoom.scale
-    }
+    let freeHeight = max(container.height - bottomInset, 1)
+    zoom.scale = min(max(min(container.width / region.width, freeHeight / region.height), 0.5), 4)
+    // A point p lands at center + (p - center) * scale + offset: the head goes to the area's top.
+    zoom.offset.height = -center.y - (region.minY - center.y) * zoom.scale
     zoom.offset.width = -(region.midX - center.x) * zoom.scale
-    if zoomed {
-      let left = max(center.x + (video.minX - center.x) * zoom.scale + zoom.offset.width, 0)
-      let right = min(center.x + (video.maxX - center.x) * zoom.scale + zoom.offset.width, container.width)
-      let bars = center.x - min(center.x - left, right - center.x)
-      zoom.bars = bars < 1 ? 0 : bars
-    }
+    let left = max(center.x + (video.minX - center.x) * zoom.scale + zoom.offset.width, 0)
+    let right = min(center.x + (video.maxX - center.x) * zoom.scale + zoom.offset.width, container.width)
+    let bars = center.x - min(center.x - left, right - center.x)
+    zoom.bars = bars < 1 ? 0 : bars
     return zoom
   }
 }
