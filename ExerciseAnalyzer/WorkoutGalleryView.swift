@@ -189,45 +189,66 @@ struct PhotosSuggestionsRow: View {
   /// Three tabs in place of the Hide analyzed toggle of #41 (story 052, #93): the strip opens on New, so it shows
   /// work to do, and the other two answer "where did it go".
   @AppStorage("photosStripTab") private var tab = PhotosClipState.new
+  /// One line until asked for (#103): Workouts opens on the workouts, and the line still says how many clips wait.
+  @AppStorage("photosStripExpanded") private var expanded = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 8) {
-        Image(systemName: "photo.on.rectangle")
-          .font(.subheadline.bold())
-          .frame(width: 28, height: 28)
-          .background(Color.blue.opacity(0.15), in: Circle())
-          .foregroundStyle(.blue)
-        Text("From Photos").font(.headline)
-      }
-      Picker("Clips", selection: $tab) {
-        ForEach(PhotosClipState.allCases, id: \.self) { state in
-          Text("\(Self.title(state)) \(suggestions.clips(in: state).count)").tag(state)
-        }
-      }
-      .pickerStyle(.segmented)
-      let shown = suggestions.clips(in: tab)
-      if shown.isEmpty {
-        Text(Self.empty(tab)).font(.caption).foregroundStyle(.secondary).frame(height: 74)
-      }
-      ScrollView(.horizontal, showsIndicators: false) {
+      Button {
+        withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+      } label: {
         HStack(spacing: 8) {
-          ForEach(shown) { clip in
-            PhotosClipCard(clip: clip, suggestions: suggestions)
-              .onTapGesture { onImport(clip) }
-              .contextMenu {
-                // Ignoring is a couch action, so a long-press is enough; an analyzed clip is a set, not a suggestion.
-                if clip.state == .new {
-                  Button { suggestions.setIgnored(clip, true) } label: { Label("Not a workout clip", systemImage: "eye.slash") }
-                } else if clip.state == .ignored {
-                  Button { suggestions.setIgnored(clip, false) } label: { Label("Bring back", systemImage: "arrow.uturn.backward") }
-                }
-              }
+          Image(systemName: "photo.on.rectangle")
+            .font(.subheadline.bold())
+            .frame(width: 28, height: 28)
+            .background(Color.blue.opacity(0.15), in: Circle())
+            .foregroundStyle(.blue)
+          Text("From Photos").font(.headline)
+          let new = suggestions.clips(in: .new).count
+          if !expanded, new > 0 {
+            Text("\(new) new").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
           }
+          Spacer()
+          Image(systemName: expanded ? "chevron.down" : "chevron.right")
+            .font(.subheadline.bold()).foregroundStyle(.secondary)
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(expanded ? "Hide the clips from Photos" : "Show the clips from Photos")
+      if expanded { strip }
+    }
+    .padding(.top, 8)
+  }
+
+  @ViewBuilder private var strip: some View {
+    Picker("Clips", selection: $tab) {
+      ForEach(PhotosClipState.allCases, id: \.self) { state in
+        Text("\(Self.title(state)) \(suggestions.clips(in: state).count)").tag(state)
+      }
+    }
+    .pickerStyle(.segmented)
+    let shown = suggestions.clips(in: tab)
+    if shown.isEmpty {
+      Text(Self.empty(tab)).font(.caption).foregroundStyle(.secondary).frame(height: 74)
+    }
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 8) {
+        ForEach(shown) { clip in
+          PhotosClipCard(clip: clip, suggestions: suggestions)
+            .onTapGesture { onImport(clip) }
+            .contextMenu {
+              // Ignoring is a couch action, so a long-press is enough; an analyzed clip is a set, not a suggestion.
+              if clip.state == .new {
+                Button { suggestions.setIgnored(clip, true) } label: { Label("Not a workout clip", systemImage: "eye.slash") }
+              } else if clip.state == .ignored {
+                Button { suggestions.setIgnored(clip, false) } label: { Label("Bring back", systemImage: "arrow.uturn.backward") }
+              }
+            }
         }
       }
     }
-    .padding(.top, 8)
   }
 
   private static func title(_ state: PhotosClipState) -> String {

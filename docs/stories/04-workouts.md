@@ -209,9 +209,14 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I long-press it and choose "Not a workout clip"
 - **Then:** it leaves the suggestions and stays out across launches; it is listed under Ignored, where "Bring back" returns it
 
+- **Scenario:** The strip is one line until I ask for it
+- **Given:** Photos holds 3 new clips
+- **When:** I open Workouts
+- **Then:** From Photos is one line, "From Photos · 3 new ›", and the workouts start right under it (Igor, 2026-09-19: "make the photos on the workout opener collapse by default"); a tap opens the strip, another closes it, and how I left it sticks across launches ([#103](https://github.com/idvorkin/exercise-analyzer/issues/103), by build only: the simulator cannot be given Photos access, the phone pending)
+
 - **Scenario:** The strip shows work to do
 - **Given:** Photos holds 3 new clips, 9 analyzed and 2 ignored
-- **When:** I open Workouts
+- **When:** I open Workouts and open the strip
 - **Then:** the strip is on "New 3" with those clips, beside "Analyzed 9" and "Ignored 2", one tap each; the tab I leave it on sticks across launches
 
 - **Scenario:** Ignored clips do not crowd out new ones
