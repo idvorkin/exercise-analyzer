@@ -56,6 +56,12 @@ public struct HeartRateSeries: Codable, Equatable, Sendable {
     slice(from: start, to: end).samples.map(\.bpm).max().map { Int($0.rounded()) }
   }
 
+  /// The mean of the readings from `start` to `end`, nil when there is none.
+  public func average(from start: Date, to end: Date) -> Int? {
+    let readings = slice(from: start, to: end).samples.map(\.bpm)
+    return readings.isEmpty ? nil : Int((readings.reduce(0, +) / Double(readings.count)).rounded())
+  }
+
   public func slice(from start: Date, to end: Date) -> HeartRateSeries {
     let range = start.timeIntervalSince1970...end.timeIntervalSince1970
     return HeartRateSeries(samples: samples.filter { range.contains($0.at) })

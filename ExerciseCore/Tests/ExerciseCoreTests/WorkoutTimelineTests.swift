@@ -33,6 +33,8 @@ final class WorkoutTimelineTests: XCTestCase {
     XCTAssertEqual(timeline.rows.map(\.id), ["a", "b", "c"])
     XCTAssertEqual(timeline.rows.map(\.restAfter), [90, 30, nil])
     XCTAssertEqual(timeline.rows.map(\.peak), [150, 150, 150])
+    // Set a's readings from its start to 30 s past its end: 130, 135, 144, 150, 144, 138.
+    XCTAssertEqual(timeline.rows[0].average, 140)
     // b's rest was 30 s: the next set started inside the minute, so its drop is over the rest it got (150 → 130).
     XCTAssertEqual(timeline.rows.map(\.drop), [30, 20, 30])
     XCTAssertEqual(timeline.rows.map(\.dropOver), [60, 30, 60])

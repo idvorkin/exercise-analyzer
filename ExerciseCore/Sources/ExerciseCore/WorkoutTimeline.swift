@@ -27,6 +27,8 @@ public struct WorkoutTimeline: Equatable {
     /// Highest heart rate the set produced: the heart lags the work, so the peak is looked for from the set's
     /// start to `peakLag` seconds past its end (or the next set's start, whichever comes first).
     public let peak: Int?
+    /// Mean heart rate over the same stretch the peak is looked for in (#100).
+    public let average: Int?
     /// Seconds from this set's end to the next set's start; nil for the last set.
     public let restAfter: TimeInterval?
     /// Beats the heart rate fell from that peak to the end of `dropOver`. Nil when there is no reading, or no rest.
@@ -57,7 +59,7 @@ public struct WorkoutTimeline: Equatable {
       let later = dropOver > 0 ? heartRate?.bpm(at: span.upperBound.addingTimeInterval(dropOver)) : nil
       return SetRow(
         id: set.id, start: span.lowerBound, end: span.upperBound, exercise: set.exerciseKind, reps: set.repCount,
-        score: set.bestScore, peak: peak, restAfter: rest,
+        score: set.bestScore, peak: peak, average: heartRate?.average(from: span.lowerBound, to: peakEnd), restAfter: rest,
         drop: peak.flatMap { peak in later.map { peak - $0 } }, dropOver: dropOver)
     }
     workSeconds = rows.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
