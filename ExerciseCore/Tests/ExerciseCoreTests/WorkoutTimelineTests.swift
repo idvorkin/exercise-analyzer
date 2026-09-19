@@ -50,6 +50,17 @@ final class WorkoutTimelineTests: XCTestCase {
     XCTAssertNil(timeline.rows[0].drop)
   }
 
+  /// #101: a tap on the chart opens the set under it, or the nearest one within a thumb's width of time.
+  func testATapOnTheChartPicksTheNearestSet() {
+    let timeline = WorkoutTimeline(
+      workout: StoredWorkout(start: date(1000), end: date(2000)),
+      sets: [set("a", clipStart: 1100), set("b", clipStart: 1215)], heartRate: nil)
+    XCTAssertEqual(timeline.row(near: date(1110), slop: 40)?.id, "a", "inside a's band")
+    XCTAssertEqual(timeline.row(near: date(1150), slop: 40)?.id, "a", "25 s past a, 65 s before b")
+    XCTAssertEqual(timeline.row(near: date(1190), slop: 40)?.id, "b")
+    XCTAssertNil(timeline.row(near: date(1500), slop: 40), "far from every set")
+  }
+
   /// A set from before #92 has no first-frame time: it is placed at `recordedAt`.
   func testAnOlderSetFallsBackToRecordedAt() {
     XCTAssertEqual(set("old", recorded: 1500).span, date(1500)...date(1525))

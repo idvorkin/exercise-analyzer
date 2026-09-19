@@ -257,6 +257,11 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I read its row
 - **Then:** it says "♥ 150 · −20/30s": the drop over the rest I got, with the rest's length beside it because it does not compare with a full minute's drop
 
+- **Scenario:** A tap on a set's bar opens the set
+- **Given:** the heart-rate chart with each set as a band behind the line
+- **When:** I tap a band, or within a thumb's width (24 pt) of one
+- **Then:** that set opens on the playback screen, as a tap on its row does (Igor, 2026-09-18: "if I click one of the vertical bars, let that open the video"); a tap far from every band does nothing
+
 - **Scenario:** Back to the workout from one of its sets
 - **Given:** I opened a set from a workout's page
 - **When:** I tap the green "‹" with the lifter sign at the head of the playback screen's top line, left of the rep count (Igor, 2026-09-18: "make the workout go into the top line, or give me a sign"; its own line above the phase pills lay over the zoomed lifter, #98)
@@ -289,4 +294,4 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Notes:** Igor picked the page (95A) on the board of 2026-09-18 and asked to "keep full heart rate data so we can see time to drop as well": the whole workout's series, rests included, is read from Health (a minute before to three after) and kept in `Documents/workouts/<id>/heartrate.json`, re-read on every open and replaced when Health has more. The heart lags the work, so a set's peak is looked for up to 30 s past its end (or the next set's start), and the drop is that peak minus the reading 60 s after the set's end, or at the next set's start when the rest was shorter (Igor, 2026-09-18: "drop in 60 seconds or however much total rest I got"; he picked this over "time to get back under X", which is not built). A set is placed by `clipStartedAt` (story 051); sets from before it fall back to `recordedAt`, which for a set recorded in the app is the end of the recording, so they sit up to one set length late. The day and exercise grouping of 012 stays as it is. `WorkoutTimeline` in ExerciseCore does the arithmetic; the page only draws it.
 
-- **Issues:** [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); [#99](https://github.com/idvorkin/exercise-analyzer/issues/99) Igor: "sometimes … I can get back to the workout, and sometimes I can't": the button existed only for a set opened from the workout's page
+- **Issues:** [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); [#101](https://github.com/idvorkin/exercise-analyzer/issues/101) a tap on a set's bar opens it (host `WorkoutTimelineTests`, simulator `SWING_WORKOUT_BAR_TAP=0.58` opened the middle seeded set, the phone pending); [#99](https://github.com/idvorkin/exercise-analyzer/issues/99) Igor: "sometimes … I can get back to the workout, and sometimes I can't": the button existed only for a set opened from the workout's page

@@ -115,6 +115,29 @@ struct WorkoutDetailView: View {
     .chartXScale(domain: workout.start...max(workout.end, workout.start.addingTimeInterval(60)))
     .chartYScale(domain: low...high)
     .chartYAxis(samples.isEmpty ? .hidden : .automatic)
+    // A tap on a set's band opens the set, like its row (#101). A band is a few points wide, so the tap takes
+    // the nearest set within 24 pt.
+    .chartOverlay { proxy in
+      GeometryReader { geo in
+        let plot = proxy.plotFrame.map { geo[$0] } ?? .zero
+        let open = { (x: CGFloat) in
+          let time: Date? = proxy.value(atX: x - plot.minX)
+          let domain = max(workout.end.timeIntervalSince(workout.start), 60)
+          let row = time.flatMap { timeline.row(near: $0, slop: 24 * domain / max(plot.width, 1)) }
+          onEvent?("ui", ["action": "workout_bar_tap", "hit": row != nil])
+          if let row, let entry = sets.first(where: { $0.id == row.id }) { onOpen(entry) }
+        }
+        Rectangle().fill(.clear).contentShape(Rectangle())
+          .onTapGesture { open($0.x) }
+          .task {
+            // Test hook (the simulator takes no taps): SWING_WORKOUT_BAR_TAP=0.4 taps 40 % across the plot.
+            guard let at = ProcessInfo.processInfo.environment["SWING_WORKOUT_BAR_TAP"].flatMap(Double.init)
+            else { return }
+            try? await Task.sleep(for: .seconds(3))
+            open(plot.minX + plot.width * at)
+          }
+      }
+    }
     .frame(height: 180)
     .overlay {
       if samples.isEmpty {

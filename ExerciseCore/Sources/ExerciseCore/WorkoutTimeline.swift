@@ -65,4 +65,13 @@ public struct WorkoutTimeline: Equatable {
     workSeconds = rows.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
     restSeconds = rows.compactMap(\.restAfter).reduce(0, +)
   }
+
+  /// The set a tap on the chart at `time` means (#101): the one the time falls in, else the nearest within `slop`
+  /// seconds (a set's band is a few points wide, a thumb is not), else none.
+  public func row(near time: Date, slop: TimeInterval) -> SetRow? {
+    func distance(_ row: SetRow) -> TimeInterval {
+      max(row.start.timeIntervalSince(time), time.timeIntervalSince(row.end), 0)
+    }
+    return rows.min { distance($0) < distance($1) }.flatMap { distance($0) <= slop ? $0 : nil }
+  }
 }
