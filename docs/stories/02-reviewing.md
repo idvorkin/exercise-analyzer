@@ -273,7 +273,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 051:
 
 - **Summary:** See my heart rate over the replay when the set was part of a workout
-- **Status:** implemented for [#92](https://github.com/idvorkin/exercise-analyzer/issues/92); the series math verified on the host (`HeartRateSeriesTests`), the chip on the simulator with a made-up series (`SWING_HEART_RATE=1`); the Health read, the alignment with the playhead and the real cadence are the phone's, read from the `heart_rate` event after a gym session inside a workout; the re-ask for a set just recorded ([#107](https://github.com/idvorkin/exercise-analyzer/issues/107)) verified on the host (`HeartRateSeriesTests`) and built for the simulator, on the phone pending (`heart_rate` with `attempt` > 1)
+- **Status:** implemented for [#92](https://github.com/idvorkin/exercise-analyzer/issues/92); the series math verified on the host (`HeartRateSeriesTests`), the chip on the simulator with a made-up series (`SWING_HEART_RATE=1`); the Health read, the alignment with the playhead and the real cadence are the phone's, read from the `heart_rate` event after a gym session inside a workout; the re-ask for a set just recorded ([#107](https://github.com/idvorkin/exercise-analyzer/issues/107)) in [713fa65](https://github.com/idvorkin/exercise-analyzer/commit/713fa65), verified on the host (`HeartRateSeriesTests`) and built for the simulator, on the phone since 2026-09-19, read from the log after the next set inside a workout (`heart_rate` with `attempt` > 1)
 - **Why:** Igor, 2026-09-18: "Let's have heart rate overlay in exercise replay if I have it."
 
 #### Use Case:

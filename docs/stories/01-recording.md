@@ -39,7 +39,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 002:
 
 - **Summary:** Auto-detect the exercise so a mixed session needs no menu taps
-- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [8bc27b5](https://github.com/idvorkin/exercise-analyzer/commit/8bc27b5); verified on the host (fixtures for all four exercises) and the phone; pull-ups (054, [#108](https://github.com/idvorkin/exercise-analyzer/issues/108)) verified on the host and the simulator, on the phone pending
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [8bc27b5](https://github.com/idvorkin/exercise-analyzer/commit/8bc27b5); verified on the host (fixtures for all four exercises) and the phone; pull-ups (054, [#108](https://github.com/idvorkin/exercise-analyzer/issues/108)) verified on the host and the simulator, on the phone since 2026-09-19, Igor's check pending
 
 #### Use Case:
 - **As a** lifter who moves between swings, pistols, split squats, get-ups and pull-ups in one session
@@ -177,7 +177,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 054:
 
 - **Summary:** Count and score pull-ups
-- **Status:** implemented for [#108](https://github.com/idvorkin/exercise-analyzer/issues/108); verified on the host (`pullup-phone-5reps` and `pullup-sim-5reps`: detected as pull-ups, 5 reps; `TuningReports.testPullUpTrace`) and the simulator (Igor's clip on Auto: Pull-Up, 5 reps, the pills and the rep gallery); on the phone pending, and the count of 5 is mine, not yet Igor's
+- **Status:** implemented for [#108](https://github.com/idvorkin/exercise-analyzer/issues/108); verified on the host (`pullup-phone-5reps` and `pullup-sim-5reps`: detected as pull-ups, 5 reps; `TuningReports.testPullUpTrace`) and the simulator (Igor's clip on Auto: Pull-Up, 5 reps, the pills and the rep gallery); on the phone since 2026-09-19 ([b56766b](https://github.com/idvorkin/exercise-analyzer/commit/b56766b), [fbb5459](https://github.com/idvorkin/exercise-analyzer/commit/fbb5459)), Igor's check pending, and the count of 5 is mine, not yet Igor's
 - **Why:** Igor, 2026-09-19, on a set the app had read as a Bulgarian split squat with no reps: "This is a pull up. Add support."
 
 #### Use Case:
