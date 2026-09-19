@@ -35,13 +35,19 @@ public struct ZoomTransform: Equatable {
   /// skull on the edge, cutting 2 % left 4 % ("maybe a little bit more padding on top of the head").
   public static let headAir: CGFloat = 0.03
 
+  /// How far under the header the eyes stay.
+  public static let eyeClearance: CGFloat = 4
+
   /// The lifter in the middle of the picture area. `crop` is the lifter's padded box, normalized in image space;
   /// nil is the zoom off, the whole frame where it always was (Igor: "when zoom off leave it as normal").
-  /// Head at the area's top (the count and the phase pills may lie over it a little, Igor's pick), feet above
-  /// `bottomInset` (the angle text), centred left to right, black wherever the video ends and as much of it on the
-  /// other side (`bars`), so the picture is even about the lifter.
+  /// Head at the area's top, feet above `bottomInset` (the angle text), centred left to right, black wherever the
+  /// video ends and as much of it on the other side (`bars`), so the picture is even about the lifter. The header
+  /// (`topInset`: the count line and the phase pills) may lie over the top of the head but not over the eyes:
+  /// when the head-at-the-top fit puts `eyeLine` (normalized y of the eyes standing tall; nil: taken from the
+  /// crop's padding) under the header, the lifter is fitted from the eyes, just below the header, to the feet.
   public static func centring(
-    crop: CGRect?, imageSize: CGSize?, container: CGSize, bottomInset: CGFloat
+    crop: CGRect?, eyeLine: CGFloat? = nil, imageSize: CGSize?, container: CGSize, topInset: CGFloat = 0,
+    bottomInset: CGFloat
   ) -> ZoomTransform {
     guard let crop, let imageSize, imageSize.width > 0, imageSize.height > 0, container.width > 0,
       container.height > 0
@@ -62,6 +68,14 @@ public struct ZoomTransform: Equatable {
     zoom.scale = min(max(min(container.width / region.width, freeHeight / region.height), 0.5), 4)
     // A point p lands at center + (p - center) * scale + offset: the head goes to the area's top.
     zoom.offset.height = -center.y - (region.minY - center.y) * zoom.scale
+    // The eyes: given, or where PersonCrop's padding (0.15 of the skeleton's height on a 1.3× box) says they are.
+    let eyes = video.minY + (eyeLine ?? crop.minY + crop.height * 0.15 / 1.3) * video.height
+    let eyesAt = topInset + eyeClearance
+    if topInset > 0, eyes < region.maxY, center.y + (eyes - center.y) * zoom.scale + zoom.offset.height < eyesAt {
+      let room = max(container.height - bottomInset - eyesAt, 1)
+      zoom.scale = min(max(min(container.width / region.width, room / (region.maxY - eyes)), 0.5), 4)
+      zoom.offset.height = eyesAt - center.y - (eyes - center.y) * zoom.scale
+    }
     zoom.offset.width = -(region.midX - center.x) * zoom.scale
     let left = max(center.x + (video.minX - center.x) * zoom.scale + zoom.offset.width, 0)
     let right = min(center.x + (video.maxX - center.x) * zoom.scale + zoom.offset.width, container.width)

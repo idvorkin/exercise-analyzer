@@ -60,7 +60,9 @@
       for (index, area) in areas.enumerated() {
         let container = CGSize(width: width, height: area.height)
         let origin = CGPoint(x: gap + (width + gap) * CGFloat(index), y: gap)
-        let zoom = ZoomTransform.centring(crop: crop, imageSize: frameSize, container: container, bottomInset: hudBottom)
+        let zoom = ZoomTransform.centring(
+          crop: crop, eyeLine: env["ZOOM_PREVIEW_EYES"].flatMap(Double.init).map { CGFloat($0) }, imageSize: frameSize,
+          container: container, topInset: hudTop, bottomInset: hudBottom)
         ctx.saveGState()
         ctx.translateBy(x: origin.x, y: origin.y)
         ctx.clip(to: CGRect(origin: .zero, size: container))
@@ -94,6 +96,10 @@
           CGRect(
             x: video.minX + crop.minX * video.width, y: video.minY + crop.minY * video.height,
             width: crop.width * video.width, height: crop.height * video.height), width: 1)
+        // The eye line the zoom keeps under the header.
+        let eyeLine = env["ZOOM_PREVIEW_EYES"].flatMap(Double.init).map { CGFloat($0) } ?? crop.minY + crop.height * 0.15 / 1.3
+        ctx.setStrokeColor(red: 1, green: 0.2, blue: 0.2, alpha: 1)
+        ctx.stroke(CGRect(x: 0, y: video.minY + eyeLine * video.height, width: container.width, height: 0), width: 1)
         ctx.restoreGState()
         print(
           String(

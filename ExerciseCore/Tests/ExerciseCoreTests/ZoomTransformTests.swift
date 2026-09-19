@@ -48,6 +48,33 @@ final class ZoomTransformTests: XCTestCase {
     XCTAssertEqual(zoom(CGSize(width: 402, height: 375)).scale, 1.42, accuracy: 0.01)
   }
 
+  /// The header (count line and pills, 58 pt) may lie over the top of the head, not over the eyes.
+  func testTheEyesStayUnderTheHeader() {
+    let eyes = crop.minY + crop.height * 0.15 / 1.3
+    func eyesOnScreen(_ z: ZoomTransform, _ container: CGSize) -> CGFloat {
+      let fit = container.height / image.height
+      let y = (container.height - image.height * fit) / 2 + eyes * image.height * fit
+      return container.height / 2 + (y - container.height / 2) * z.scale + z.offset.height
+    }
+    // Gallery up: head-at-the-top put the eyes at 47 pt, under the header; now they sit 4 pt below it, smaller.
+    let up = CGSize(width: 402, height: 375)
+    let z = ZoomTransform.centring(
+      crop: crop, imageSize: image, container: up, topInset: 58, bottomInset: angleText)
+    XCTAssertEqual(eyesOnScreen(z, up), 62, accuracy: 0.5)
+    XCTAssertEqual(z.scale, 1.34, accuracy: 0.01)
+    XCTAssertLessThanOrEqual(box(z, in: up).maxY, 375 - angleText + 0.5, "feet still above the angle text")
+    XCTAssertEqual(box(z, in: up).midX, 201, accuracy: 0.5)
+    // Gallery down: the eyes are clear at 85 pt already, nothing changes.
+    let down = CGSize(width: 402, height: 650)
+    XCTAssertEqual(
+      ZoomTransform.centring(crop: crop, imageSize: image, container: down, topInset: 58, bottomInset: angleText),
+      zoom(down))
+    // A given eye line wins over the one read from the crop's padding.
+    let given = ZoomTransform.centring(
+      crop: crop, eyeLine: 0.30, imageSize: image, container: up, topInset: 58, bottomInset: angleText)
+    XCTAssertGreaterThan(given.scale, z.scale, "eyes lower in the frame need less room under the header")
+  }
+
   func testZoomOffIsTheWholeFrameWhereItAlwaysWas() {
     // Igor, on the slid whole frame: "when zoom off leave it as normal", no centring.
     XCTAssertEqual(

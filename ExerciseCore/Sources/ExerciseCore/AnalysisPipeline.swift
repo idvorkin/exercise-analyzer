@@ -91,12 +91,22 @@ public final class AnalysisPipeline: @unchecked Sendable {
   /// at the top, 5–7 % of the frame past the hands, and with 1.4× padding that put the body a third of the way
   /// into the picture. No confident keypoints in a frame: its box. No reps: every frame, as before.
   public var stableCrop: CGRect? {
+    PersonCrop.padded(robustUnion: cropExtents)
+  }
+
+  /// Where the lifter's eyes are when he stands tall (normalized y): the top of the same skeleton extents, before
+  /// the padding. The zoom keeps this line clear of the HUD's header (#98).
+  public var stableEyeLine: CGFloat? {
+    PersonCrop.robustUnion(cropExtents)?.minY
+  }
+
+  private var cropExtents: [CGRect] {
     var frames = track.frames
     let inReps = reps.flatMap { rep in
       frames.filter { $0.time >= rep.startTime && $0.time <= rep.endTime }
     }
     if !inReps.isEmpty { frames = inReps }
-    return PersonCrop.padded(robustUnion: frames.compactMap { PersonCrop.extent(of: $0) })
+    return frames.compactMap { PersonCrop.extent(of: $0) }
   }
 
   /// The span where reps happened, padded, clipped to `duration`. Nil when no rep was detected.
@@ -130,7 +140,13 @@ public enum PersonCrop {
 
   /// Like `padded(union:)` but the box edges are the 5th/95th percentiles across frames, not the extremes.
   public static func padded(robustUnion boxes: [CGRect]) -> CGRect? {
-    guard boxes.count >= 10 else { return padded(union: boxes) }
+    robustUnion(boxes).map(padded(box:))
+  }
+
+  /// The boxes' union with 5th/95th percentile edges (the plain union under ten boxes), unpadded.
+  public static func robustUnion(_ boxes: [CGRect]) -> CGRect? {
+    guard let first = boxes.first else { return nil }
+    guard boxes.count >= 10 else { return boxes.dropFirst().reduce(first) { $0.union($1) } }
     func percentile(_ values: [CGFloat], _ p: Double) -> CGFloat {
       let sorted = values.sorted()
       return sorted[min(sorted.count - 1, Int(Double(sorted.count - 1) * p))]
@@ -139,7 +155,7 @@ public enum PersonCrop {
     let maxX = percentile(boxes.map(\.maxX), 0.95)
     let minY = percentile(boxes.map(\.minY), 0.05)
     let maxY = percentile(boxes.map(\.maxY), 0.95)
-    return padded(box: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY))
+    return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
   }
 
   /// The normalized crop as integral pixel coordinates in an image of `size`: me-view space, top-left

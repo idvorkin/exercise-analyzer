@@ -46,6 +46,9 @@ struct ContentView: View {
   @AppStorage("galleryHeight") private var galleryHeight = 170.0
   /// The y in the picture area where the HUD's angle text begins: the zoomed lifter's feet stay above it (#98).
   @State private var hudAngleLineTop: CGFloat?
+  /// The y in the picture area where the HUD's header (count line, phase pills) ends: the zoomed lifter's eyes stay
+  /// below it (#98).
+  @State private var hudHeaderBottom: CGFloat = 0
   @State private var galleryDragStart: Double?
   /// The watch's workout, mirrored (048): the HUD strip and the Workouts day line read it.
   @ObservedObject private var workouts = WorkoutMirror.shared
@@ -64,11 +67,11 @@ struct ContentView: View {
     VStack(spacing: 0) {
       ZStack {
         Color.black
-        // The lifter in the middle of the picture (#98): zoomed, head at the top and feet above the angle text.
-        // Zoom off is the whole frame where it always was.
+        // The lifter in the middle of the picture (#98): zoomed, head at the top with the eyes below the header,
+        // feet above the angle text. Zoom off is the whole frame where it always was.
         MeViewZoom(
-          crop: meView ? session.personCrop : nil, imageSize: session.latestFrame?.imageSize,
-          freeBottom: hudAngleLineTop
+          crop: meView ? session.personCrop : nil, eyeLine: session.personEyeLine,
+          imageSize: session.latestFrame?.imageSize, freeTop: hudHeaderBottom, freeBottom: hudAngleLineTop
         ) { zoom in
           ZStack {
             if session.source == .camera {
@@ -290,31 +293,43 @@ struct ContentView: View {
     showRecents = true
   }
 
+  /// The count's face, for its letter height: the top line's other pieces are sized and set against it.
+  private static let countFont: UIFont = {
+    let base = UIFont.systemFont(ofSize: 34, weight: .bold)
+    return base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: 34) } ?? base
+  }()
+
+  /// Where a text's letters begin in its own frame (its first baseline less the face's cap height): SwiftUI has
+  /// no alignment on letter tops, so the top line's `.top` guides are set to it.
+  private static func capTop(_ font: UIFont) -> (ViewDimensions) -> CGFloat {
+    { $0[.firstTextBaseline] - font.capHeight }
+  }
+
   private var hud: some View {
     let definition = session.exercise.definition
     let analysis = session.latestFrame?.analysis
     // Tight lines (Igor: "less gap between the first line and the stages"): what the HUD does not cover is the
     // lifter's.
     return VStack(spacing: 2) {
-      HStack(alignment: .firstTextBaseline, spacing: 8) {
+      // The top line is set on the letters' tops (Igor, #98): the count, "reps · …", REC, fps and the icons share
+      // one top edge, where a baseline line left the small text low beside the big digit.
+      HStack(alignment: .top, spacing: 8) {
         // A set that belongs to a stored workout (053): one tap to that workout's page, however the set was
-        // opened (#99). A sign at the head of the top line, so no line of its own lies over the lifter (#98).
+        // opened (#99). A sign at the head of the top line, so no line of its own lies over the lifter (#98),
+        // exactly as tall as the count's digit and level with it.
         if let workout = workoutOfLoadedSet {
           Button {
             backToWorkout(workout)
           } label: {
             HStack(spacing: 2) {
               Image(systemName: "chevron.left").font(.subheadline.bold())
-              Image(systemName: "figure.strengthtraining.traditional").font(.title3)
+              Image(systemName: "figure.strengthtraining.traditional")
+                .resizable().scaledToFit().frame(height: Self.countFont.capHeight)
             }
             .foregroundStyle(.green)
-            .frame(minHeight: 28)
-            .contentShape(Rectangle().inset(by: -8))
+            .contentShape(Rectangle().inset(by: -10))
           }
           .accessibilityLabel("Back to the workout")
-          // Level with the count (Igor): the sign's middle on the digit's middle, half a cap height (12 pt of the
-          // 34 pt face) over the baseline the line is set on.
-          .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 12 }
         }
         // The count's line box is cut to its cap height, so the header sits at the very top of the picture and
         // the phase pills snug under it (Igor, #98).
@@ -323,19 +338,25 @@ struct ContentView: View {
           Text("VIEWFINDER")
             .font(.system(size: 34, weight: .bold, design: .rounded))
             .frame(height: 28)
+            .alignmentGuide(.top, computeValue: Self.capTop(Self.countFont))
         } else {
           Text("\(displayedRepCount)")
             .font(.system(size: 34, weight: .bold, design: .rounded))
             .monospacedDigit()
             .frame(height: 28)
+            .alignmentGuide(.top, computeValue: Self.capTop(Self.countFont))
         }
         exerciseMenu
+          .alignmentGuide(.top, computeValue: Self.capTop(.preferredFont(forTextStyle: .subheadline)))
         if session.source == .camera, !session.viewfinder {
-          if session.paused {
-            Text("❚❚ PAUSED").font(.caption.bold()).foregroundStyle(.orange)
-          } else {
-            Text("● REC").font(.caption.bold()).foregroundStyle(.red)
+          Group {
+            if session.paused {
+              Text("❚❚ PAUSED").font(.caption.bold()).foregroundStyle(.orange)
+            } else {
+              Text("● REC").font(.caption.bold()).foregroundStyle(.red)
+            }
           }
+          .alignmentGuide(.top, computeValue: Self.capTop(.preferredFont(forTextStyle: .caption1)))
         }
         Spacer()
         // The heart rate at the playhead (051): only for a set recorded inside a workout, nothing otherwise.
@@ -348,10 +369,12 @@ struct ContentView: View {
           .padding(.horizontal, 7).padding(.vertical, 2)
           .background(Color.red.opacity(0.18), in: Capsule())
           .accessibilityLabel("Heart rate \(bpm)")
+          .alignmentGuide(.top, computeValue: Self.capTop(.preferredFont(forTextStyle: .subheadline)))
         } else if session.source == .camera {
           // The live pose model's frame rate. A stored set runs no live model, so it read "0 fps" there (Igor:
           // "what does 0 fps mean?"). The chip takes its place: both would wrap the exercise name.
           Text(String(format: "%.0f fps", session.fps)).font(.caption2).monospacedDigit().opacity(0.7)
+            .alignmentGuide(.top, computeValue: Self.capTop(.preferredFont(forTextStyle: .caption2)))
         }
         if session.source == .camera {
           Button {
@@ -414,6 +437,9 @@ struct ContentView: View {
         }
         Spacer()
       }
+      // Where the header ends in the picture area: it may lie over the top of the zoomed lifter's head, not over
+      // his eyes (#98).
+      .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named("hud")).maxY } action: { hudHeaderBottom = $0 }
 
       Spacer()
 
@@ -951,7 +977,10 @@ struct ContentView: View {
 /// scale/offset; the bars are black views laid over the picture, never a clip.
 struct MeViewZoom<Content: View>: View {
   let crop: CGRect?
+  var eyeLine: CGFloat?
   let imageSize: CGSize?
+  /// The y where the HUD's header ends: the eyes stay below it.
+  var freeTop: CGFloat = 0
   /// The y where the HUD's bottom text begins; nil: the picture is free down to its bottom edge.
   var freeBottom: CGFloat?
   @ViewBuilder let content: (ZoomTransform) -> Content
@@ -959,7 +988,7 @@ struct MeViewZoom<Content: View>: View {
   var body: some View {
     GeometryReader { geo in
       let zoom = ZoomTransform.centring(
-        crop: crop, imageSize: imageSize, container: geo.size,
+        crop: crop, eyeLine: eyeLine, imageSize: imageSize, container: geo.size, topInset: freeTop,
         bottomInset: freeBottom.map { max(geo.size.height - $0, 0) } ?? 0)
       ZStack {
         content(zoom)

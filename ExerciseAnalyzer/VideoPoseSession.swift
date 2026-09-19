@@ -71,6 +71,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var canSave = false
   /// Normalized image rect to zoom to for the "me view": stable over a replayed track, slowly adapting while live.
   @Published private(set) var personCrop: CGRect?
+  /// Where the lifter's eyes are in a replayed track (normalized y), so the zoom keeps them under the HUD's header
+  /// (#98); nil while live, where the crop comes from the person box and the zoom reads the eyes off its padding.
+  @Published private(set) var personEyeLine: CGFloat?
   /// The bell detector's switch as the menu shows it (story 034, #85); ModelSet holds the truth.
   @Published private(set) var bellDetectorOn = ModelSet.bellDetectorEnabled
   /// Which exercise the lifter chose (or Auto), and the exercise currently being analyzed.
@@ -1185,6 +1188,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     lastLoggedPhase = nil
     recentBoxes = []
     personCrop = pipeline.stableCrop
+    personEyeLine = pipeline.stableEyeLine
     if let crop = personCrop {
       log.event(
         "crop",
@@ -1625,6 +1629,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     if let box = frame.box { recentBoxes.append((frame.time, box)) }
     recentBoxes.removeAll { $0.time < frame.time - 4 }
     guard let target = PersonCrop.padded(union: recentBoxes.map(\.box)) else { return }
+    if personEyeLine != nil { personEyeLine = nil }  // a stored set's eyes are not this lifter's
     guard let current = personCrop else {
       personCrop = target
       return
