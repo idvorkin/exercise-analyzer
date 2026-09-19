@@ -416,8 +416,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   private func galleryThumbnail(_ analyzed: AnalysisPipeline, kind: ExerciseKind, entry: RecentEntry) -> UIImage? {
+    // The card cut from the whole frame (#110); a clip out of reach has none, and a rep's still stands in.
     let firstRep = analyzed.reps.first
-    return (kind.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
+    return (analyzed.cardImage
+      ?? kind.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
       ?? firstRep?.checkpoints.first?.image).map { UIImage(cgImage: $0) } ?? recents.thumbnailImage(for: entry)
   }
 
@@ -828,9 +830,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
     default:
       source = .file(name: "clip." + clipURL.pathExtension)
     }
+    // The card cut from the whole frame (#110). A stored set opened and saved again (a trim) has no new cut:
+    // its stored picture stays, and only a set with neither falls back to a rep's still.
     let firstRep = pipeline.reps.first
     let thumbnail =
-      (pipeline.exercise.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
+      pipeline.cardImage.map { UIImage(cgImage: $0) }
+      ?? recents.entry(id: id).flatMap { recents.thumbnailImage(for: $0) }
+      ?? (pipeline.exercise.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
         ?? firstRep?.checkpoints.first?.image).map { UIImage(cgImage: $0) }
     do {
       try recents.save(

@@ -59,6 +59,13 @@ extension AnalysisPipeline {
     let tolerance = CMTime(seconds: frameDuration / 2, preferredTimescale: 600)
     generator.requestedTimeToleranceBefore = tolerance
     generator.requestedTimeToleranceAfter = tolerance
+    // The set's card picture (#110), from the whole frame: the card's shape around the lifter, where the stills
+    // below are cut tall to the person and a landscape card showed only their middle.
+    if let shot = cardShot, let (frame, _) = try? await generator.image(at: CMTime(seconds: shot.time, preferredTimescale: 600)) {
+      let size = CGSize(width: frame.width, height: frame.height)
+      let cut = PersonCrop.card(around: shot.lifter, aspect: SetCard.aspect, imageSize: size)
+      cardImage = frame.cropping(to: PersonCrop.pixelRect(cut, in: size)) ?? frame
+    }
     let crop = stableCrop
     var updated: [RepRecord] = []
     for rep in reps {

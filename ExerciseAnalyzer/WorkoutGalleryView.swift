@@ -539,6 +539,10 @@ struct SetCard: View {
   let thumbnail: UIImage?
   let tint: Color
 
+  static let size = CGSize(width: 104, height: 74)
+  /// The shape the set's picture is cut to from the clip (#110).
+  static let aspect = size.width / size.height
+
   private static let timeFormatter: DateFormatter = {
     let f = DateFormatter()
     f.timeStyle = .short
@@ -555,7 +559,7 @@ struct SetCard: View {
             tint.opacity(0.25)
           }
         }
-        .frame(width: 104, height: 74)
+        .frame(width: Self.size.width, height: Self.size.height)
         .clipped()
         LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .center, endPoint: .bottom)
         HStack(alignment: .firstTextBaseline, spacing: 2) {
@@ -574,7 +578,7 @@ struct SetCard: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
       }
-      .frame(width: 104, height: 74)
+      .frame(width: Self.size.width, height: Self.size.height)
       .clipShape(RoundedRectangle(cornerRadius: 8))
       HStack(spacing: 3) {
         Text(Self.timeFormatter.string(from: entry.start))

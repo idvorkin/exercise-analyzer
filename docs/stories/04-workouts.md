@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 012:
 
 - **Summary:** See a day's training as sets per exercise, not a list of files
-- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header is Igor's check; the repeated-exercise row in [cdbc435](https://github.com/idvorkin/exercise-analyzer/commit/cdbc435), verified on the simulator (a Yesterday with two swing sets under a Today with four), on the phone since 2026-09-16
+- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header is Igor's check; the repeated-exercise row in [cdbc435](https://github.com/idvorkin/exercise-analyzer/commit/cdbc435), verified on the simulator (a Yesterday with two swing sets under a Today with four), on the phone since 2026-09-16; the card's picture for [#110](https://github.com/idvorkin/exercise-analyzer/issues/110) verified on the host (`PersonCropTests`) and the simulator (a 9-rep swing set and a 0-rep set, Workouts screenshot), on the phone pending
 
 #### Use Case:
 - **As a** lifter reviewing the week
@@ -32,7 +32,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I open Workouts
 - **Then:** the day's header carries a green line per workout, "Workout 9:02 AM–10:00 AM · 58 min · ♥ 128 avg · 156 max · in Health", above its exercise rows; a day with a workout and no set on camera is still listed, with the line and no rows
 
-- **Issues:** [#35](https://github.com/idvorkin/exercise-analyzer/issues/35); [#78](https://github.com/idvorkin/exercise-analyzer/issues/78), [#79](https://github.com/idvorkin/exercise-analyzer/issues/79) Saturday's four swing sets drew as a blank band under a header that counted them (the row's id was the exercise name, repeated across days)
+- **Scenario:** A set's picture shows the lift
+- **Given:** a set of swings filmed upright, and a set that counted no reps
+- **When:** I look at their cards
+- **Then:** the swing's card is cut from the whole frame in the card's own shape around me at the first rep's bottom, so I see myself head to feet with the bell, not the middle of a tall crop (a back with no hips or legs); when the frame is too narrow for all of me at that shape, the cut runs the full width from just over my head down. The set with no reps shows the middle moment somebody was on camera, not a blank card. Sets analyzed before this keep their picture until they are analyzed again
+
+- **Issues:** [#110](https://github.com/idvorkin/exercise-analyzer/issues/110) Igor asked for the workout page's previews to be more representative (the cards showed a hunched back; sets with no reps a blank); [#35](https://github.com/idvorkin/exercise-analyzer/issues/35); [#78](https://github.com/idvorkin/exercise-analyzer/issues/78), [#79](https://github.com/idvorkin/exercise-analyzer/issues/79) Saturday's four swing sets drew as a blank band under a header that counted them (the row's id was the exercise name, repeated across days)
 
 ---
 

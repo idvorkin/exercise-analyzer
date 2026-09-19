@@ -75,6 +75,7 @@ public final class AnalysisPipeline: @unchecked Sendable {
     let pipeline = AnalysisPipeline(exercise: exercise)
     pipeline.track.replaceAll(with: track.shifted(toStartAt: start, end: end).frames)
     pipeline.reps = reps.filter { $0.startTime >= start && $0.endTime <= end }.map { $0.shifted(by: -start) }
+    pipeline.cardImage = cardImage
     return pipeline
   }
 
@@ -98,6 +99,22 @@ public final class AnalysisPipeline: @unchecked Sendable {
   /// the padding. The zoom keeps this line clear of the HUD's header (#98).
   public var stableEyeLine: CGFloat? {
     PersonCrop.robustUnion(cropExtents)?.minY
+  }
+
+  /// The set's picture on its Workouts card (#110), cut by the app from the clip at `cardShot`. Not stored with
+  /// the analysis: Recents keeps it as the entry's thumbnail.
+  public var cardImage: CGImage?
+
+  /// The frame that stands for the set on its card and where the lifter is in it: the first rep's first gallery
+  /// position, or with no reps the middle one of the frames that saw a person (a set that counted nothing still
+  /// shows who did what). Nil when nobody was seen.
+  public var cardShot: (time: Double, lifter: CGRect)? {
+    let seen = track.frames.compactMap { frame in PersonCrop.extent(of: frame).map { (time: frame.time, lifter: $0) } }
+    guard !seen.isEmpty else { return nil }
+    let first = reps.first
+    guard let time = exercise.definition.galleryOrder.lazy.compactMap({ first?.positions[$0.id]?.time }).first
+    else { return seen[seen.count / 2] }
+    return seen.min { abs($0.time - time) < abs($1.time - time) }
   }
 
   private var cropExtents: [CGRect] {
@@ -166,6 +183,32 @@ public enum PersonCrop {
       x: (crop.minX * size.width).rounded(.down), y: (crop.minY * size.height).rounded(.down),
       width: (crop.width * size.width).rounded(.up), height: (crop.height * size.height).rounded(.up))
     return rect.intersection(CGRect(origin: .zero, size: size))
+  }
+
+  /// The Workouts card's cut of a frame (#110): a rectangle of the card's shape (`aspect`, width over height,
+  /// in pixels) around the lifter padded 1.3×, normalized like `lifter`. The card used to show the middle of a
+  /// tall person crop, a hunched back with no hips or legs. When the frame is too narrow for the whole lifter
+  /// at that shape (a portrait clip, a landscape card) the cut is the frame's full width from just over his
+  /// head down: head and trunk say more than trunk and thighs. Always inside the image.
+  public static func card(around lifter: CGRect, aspect: CGFloat, imageSize: CGSize) -> CGRect {
+    guard imageSize.width > 0, imageSize.height > 0, aspect > 0 else { return CGRect(x: 0, y: 0, width: 1, height: 1) }
+    let person = CGRect(
+      x: lifter.minX * imageSize.width, y: lifter.minY * imageSize.height,
+      width: lifter.width * imageSize.width, height: lifter.height * imageSize.height)
+    var width = max(person.width * 1.3, person.height * 1.3 * aspect)
+    var height = width / aspect
+    var top = person.midY - height / 2
+    if width > imageSize.width || height > imageSize.height {
+      let fit = min(imageSize.width / width, imageSize.height / height)
+      width *= fit
+      height *= fit
+      top = person.height > height ? person.minY - height * 0.08 : person.midY - height / 2
+    }
+    let x = min(max(0, person.midX - width / 2), imageSize.width - width)
+    let y = min(max(0, top), imageSize.height - height)
+    return CGRect(
+      x: x / imageSize.width, y: y / imageSize.height, width: width / imageSize.width,
+      height: height / imageSize.height)
   }
 
   private static func padded(box: CGRect) -> CGRect {
