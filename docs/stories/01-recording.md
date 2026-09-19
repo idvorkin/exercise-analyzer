@@ -39,10 +39,10 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 002:
 
 - **Summary:** Auto-detect the exercise so a mixed session needs no menu taps
-- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [8bc27b5](https://github.com/idvorkin/exercise-analyzer/commit/8bc27b5); verified on the host (fixtures for all four exercises) and the phone
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [8bc27b5](https://github.com/idvorkin/exercise-analyzer/commit/8bc27b5); verified on the host (fixtures for all four exercises) and the phone; pull-ups (054, [#108](https://github.com/idvorkin/exercise-analyzer/issues/108)) verified on the host and the simulator, on the phone pending
 
 #### Use Case:
-- **As a** lifter who moves between swings, pistols, split squats and get-ups in one session
+- **As a** lifter who moves between swings, pistols, split squats, get-ups and pull-ups in one session
 - **I want to** leave the exercise on Auto and have the app work out what I am doing
 - **so that** every set is analyzed with the right rules without me choosing each time
 
@@ -171,3 +171,36 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** the app asks "Delete recording or keep it?", Delete removes the file and its Workouts entry, and a clip from Photos is never deleted
 
 - **Issues:** [#31](https://github.com/idvorkin/exercise-analyzer/issues/31)
+
+---
+
+### User Story 054:
+
+- **Summary:** Count and score pull-ups
+- **Status:** implemented for [#108](https://github.com/idvorkin/exercise-analyzer/issues/108); verified on the host (`pullup-phone-5reps` and `pullup-sim-5reps`: detected as pull-ups, 5 reps; `TuningReports.testPullUpTrace`) and the simulator (Igor's clip on Auto: Pull-Up, 5 reps, the pills and the rep gallery); on the phone pending, and the count of 5 is mine, not yet Igor's
+- **Why:** Igor, 2026-09-19, on a set the app had read as a Bulgarian split squat with no reps: "This is a pull up. Add support."
+
+#### Use Case:
+- **As a** lifter who does pull-ups between the kettlebell sets
+- **I want to** have them recognised, counted and scored like everything else
+- **so that** the whole session is in Workouts, not only the sets with a bell
+
+#### Acceptance Criteria:
+- **Scenario:** A set of pull-ups on Auto
+- **Given:** the exercise is on Auto and I filmed five pull-ups from behind, feet on the rack's pegs, after fourteen seconds of getting set with my hands on the bar
+- **When:** the set is analyzed
+- **Then:** it reads "Pull-Up" with 5 reps; getting set and climbing down count nothing; the pills are Hang, Pulling, Top and Lowering, the HUD shows PULL (how much of the way to the bar) and ELBOW, and the rep gallery has the four positions per rep
+
+- **Scenario:** A pull that stops short
+- **Given:** a rep where my shoulders stop well under the bar
+- **When:** I look at its score
+- **Then:** it counts, scores 80 with "Pull higher - chin over the bar" (60 and "Half rep" when it stops further down), and loses 15 more when my arms never straightened in the hang
+
+- **Scenario:** Letting go from the top
+- **Given:** I reached the top of the last rep and dropped off the bar on the way down
+- **When:** the set is analyzed
+- **Then:** that rep counts
+
+- **Notes:** Picked from the exercise menu and the watch's picker like the others ("pull-ups" and its own stick figure in Workouts). How the phases are read, and why the wrists are not trusted at the top: [docs/analysis/pull-up.md](../analysis/pull-up.md). Auto asks "were both hands held over the shoulders for over 40 % of the set" after the get-up's floor rule ([detector.md](../analysis/detector.md)). The set #108 was shaken on had been trimmed to nine seconds around a split squat that never happened, pull-ups cut away; recognising pull-ups stops that, since the trim follows the reps that were found.
+
+- **Issues:** [#108](https://github.com/idvorkin/exercise-analyzer/issues/108), [#109](https://github.com/idvorkin/exercise-analyzer/issues/109) (the same set, reported twice)

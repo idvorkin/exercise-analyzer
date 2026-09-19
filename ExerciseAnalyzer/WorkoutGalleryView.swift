@@ -334,6 +334,7 @@ extension ExerciseKind {
     case .pistolSquat: return "figure.cross.training"
     case .bulgarianSplitSquat: return "figure.step.training"
     case .turkishGetUp: return "figure.core.training"
+    case .pullUp: return "figure.play"  // arms up and out: the nearest SF figure to a hang
     }
   }
 
@@ -343,6 +344,7 @@ extension ExerciseKind {
     case .pistolSquat: return .teal
     case .bulgarianSplitSquat: return .purple
     case .turkishGetUp: return .green
+    case .pullUp: return .blue
     }
   }
 }

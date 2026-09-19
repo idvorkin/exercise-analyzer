@@ -12,6 +12,7 @@ public enum ExerciseKind: String, Codable, CaseIterable, Identifiable {
   case pistolSquat = "pistol-squat"
   case bulgarianSplitSquat = "bulgarian-split-squat"
   case turkishGetUp = "turkish-get-up"
+  case pullUp = "pull-up"
 
   public var id: String { rawValue }
 
@@ -21,6 +22,7 @@ public enum ExerciseKind: String, Codable, CaseIterable, Identifiable {
     case .pistolSquat: return PistolSquatAnalyzer.definition
     case .bulgarianSplitSquat: return BulgarianSplitSquatAnalyzer.definition
     case .turkishGetUp: return TurkishGetUpAnalyzer.definition
+    case .pullUp: return PullUpAnalyzer.definition
     }
   }
 
@@ -30,6 +32,7 @@ public enum ExerciseKind: String, Codable, CaseIterable, Identifiable {
     case .pistolSquat: return PistolSquatAnalyzer()
     case .bulgarianSplitSquat: return BulgarianSplitSquatAnalyzer()
     case .turkishGetUp: return TurkishGetUpAnalyzer()
+    case .pullUp: return PullUpAnalyzer()
     }
   }
 }

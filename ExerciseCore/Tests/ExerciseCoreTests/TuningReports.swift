@@ -39,6 +39,36 @@ final class TuningReports: XCTestCase {
     report("bulgarian-10reps defaults", analyze(frames, BulgarianSplitSquatThresholds()))
   }
 
+  /// The pull-up fixtures (#108): every transition with the shoulders' distance under the bar, the reps, and the
+  /// count under other rises, to see how far the setup on the pegs sits from a rep.
+  func testPullUpTrace() throws {
+    for fixture in Fixture.all where fixture.expectedExercise == .pullUp {
+      let frames = try fixture.frames()
+      report("\(fixture.name) defaults", analyzePullUp(frames, PullUpThresholds(), printing: true))
+      for rise in [0.2, 0.3, 0.45, 0.6, 0.9, 1.1, 1.3] {
+        var thresholds = PullUpThresholds()
+        thresholds.minRise = rise
+        thresholds.startRise = min(thresholds.startRise, rise)
+        print(String(format: "  minRise %.2f: %d reps", rise, analyzePullUp(frames, thresholds, printing: false).reps.count))
+      }
+      for under in [0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1.2] {
+        var thresholds = PullUpThresholds()
+        thresholds.letGoUnderBar = under
+        print(String(format: "  letGoUnderBar %.2f: %d reps", under, analyzePullUp(frames, thresholds, printing: false).reps.count))
+      }
+    }
+  }
+
+  private func analyzePullUp(_ frames: [FrameRecord], _ thresholds: PullUpThresholds, printing: Bool) -> AnalysisPipeline {
+    let analyzer = PullUpAnalyzer(thresholds: thresholds)
+    var transitions: [String] = []
+    analyzer.trace = { transitions.append($0) }
+    let pipeline = AnalysisPipeline(exercise: .pullUp, analyzer: analyzer)
+    for frame in frames { pipeline.process(extracted: frame) { nil } }
+    if printing { print(transitions.map { "    " + $0 }.joined(separator: "\n")) }
+    return pipeline
+  }
+
   private func analyze(_ frames: [FrameRecord], _ thresholds: BulgarianSplitSquatThresholds) -> AnalysisPipeline {
     let analyzer = BulgarianSplitSquatAnalyzer(thresholds: thresholds)
     var transitions: [String] = []

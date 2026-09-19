@@ -52,6 +52,12 @@ struct Fixture {
     Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false),
     // Igor's second TGU clip (IMG_4343, issue #14): one get-up per side; a pose glitch at 14 s once counted as a rep.
     Fixture(name: "tgu-phone-2sides", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: true),
+    // Igor's pull-ups (2026-09-19, recents 3678371A, #108), filmed from behind, feet on the rack's pegs: 14 s of
+    // setup with the hands on the bar, then the shoulders reach the bar line five times (17.3, 21.6, 26.1, 30.4,
+    // 34.9 s), then he climbs down. Counted 0 as a Bulgarian split squat. Not yet confirmed by Igor.
+    Fixture(name: "pullup-phone-5reps", expectedExercise: .pullUp, expectedReps: 5, humanVerified: false),
+    // The same clip through the simulator's CPU pose pass: the first analyzer counted 3 of the 5 there.
+    Fixture(name: "pullup-sim-5reps", expectedExercise: .pullUp, expectedReps: 5, humanVerified: false),
   ]
 
   func frames() throws -> [FrameRecord] {

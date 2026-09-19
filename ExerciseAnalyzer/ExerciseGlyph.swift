@@ -12,6 +12,7 @@ extension ExerciseKind {
     case .pistolSquat: return "pistols"
     case .turkishGetUp: return "TGU"
     case .bulgarianSplitSquat: return "Bulgarian"
+    case .pullUp: return "pull-ups"
     }
   }
 
@@ -24,6 +25,7 @@ extension ExerciseKind {
     case .pistolSquat: one = "pistol"
     case .turkishGetUp: one = "get-up"
     case .bulgarianSplitSquat: one = "split squat"
+    case .pullUp: one = "pull-up"
     }
     return count == 1 ? one : one + "s"
   }
@@ -50,6 +52,7 @@ struct ExerciseGlyph: View {
     case .pistolSquat: pistol(&p)
     case .turkishGetUp: getUp(&p)
     case .bulgarianSplitSquat: bulgarian(&p)
+    case .pullUp: pullUp(&p)
     }
     return p
   }
@@ -101,6 +104,17 @@ struct ExerciseGlyph: View {
     p.addRect(CGRect(x: 22, y: 20.8, width: 8, height: 3.2))
     p.move(to: CGPoint(x: 13, y: 10)); p.addLine(to: CGPoint(x: 19, y: 12))
   }
+
+  /// A bar across the top, the chin over it, elbows bent out to the hands, legs hanging.
+  private func pullUp(_ p: inout Path) {
+    p.move(to: CGPoint(x: 3, y: 9)); p.addLine(to: CGPoint(x: 29, y: 9))
+    head(&p, x: 16, y: 5)
+    p.move(to: CGPoint(x: 16, y: 10)); p.addLine(to: CGPoint(x: 16, y: 20))
+    p.move(to: CGPoint(x: 16, y: 12)); p.addLine(to: CGPoint(x: 9, y: 15)); p.addLine(to: CGPoint(x: 8, y: 9))
+    p.move(to: CGPoint(x: 16, y: 12)); p.addLine(to: CGPoint(x: 23, y: 15)); p.addLine(to: CGPoint(x: 24, y: 9))
+    p.move(to: CGPoint(x: 16, y: 20)); p.addLine(to: CGPoint(x: 13, y: 29))
+    p.move(to: CGPoint(x: 16, y: 20)); p.addLine(to: CGPoint(x: 19, y: 29))
+  }
 }
 
 #Preview("swing") {
@@ -128,5 +142,12 @@ struct ExerciseGlyph: View {
   HStack(spacing: 6) {
     ExerciseGlyph(kind: .bulgarianSplitSquat)
     Text(ExerciseKind.bulgarianSplitSquat.shortWord).font(.headline)
+  }.padding()
+}
+
+#Preview("pull-ups") {
+  HStack(spacing: 6) {
+    ExerciseGlyph(kind: .pullUp)
+    Text(ExerciseKind.pullUp.shortWord).font(.headline)
   }.padding()
 }

@@ -2,7 +2,8 @@
 
 //  Picks the exercise from how the legs move (web app's ExerciseDetector, plus the split squat):
 //  symmetric knees → kettlebell swing; one knee far more bent than the other → pistol squat; moderate asymmetry
-//  with one foot held well above the other → Bulgarian split squat.
+//  with one foot held well above the other → Bulgarian split squat. Before the legs: both hands held over the
+//  shoulders → pull-up; time on the floor → get-up.
 
 import Foundation
 
@@ -35,8 +36,10 @@ public final class ExerciseDetector {
   private var uprightFrames = 0
   private var lyingFrames = 0
   private var standingFrames = 0
+  private var handsOverheadFrames = 0
 
   public func reset() {
+    handsOverheadFrames = 0
     frameCount = 0
     asymmetries = []
     maxAsymmetry = 0
@@ -57,6 +60,16 @@ public final class ExerciseDetector {
     if let upright = skeleton.uprightness {
       uprightFrames += 1
       if upright < 0.15 { lyingFrames += 1 } else if upright > 0.85 { standingFrames += 1 }
+    }
+    // A pull-up holds both hands over the shoulders (#108), by a quarter of a torso length or more. A swing's
+    // top never reads so; a get-up lying down does, which is why `result` asks about the floor first.
+    if let ls = skeleton.point(.leftShoulder), let rs = skeleton.point(.rightShoulder),
+      let lh = skeleton.point(.leftHip), let rh = skeleton.point(.rightHip),
+      let lw = skeleton.point(.leftWrist, minConf: BodySkeleton.reliableThreshold),
+      let rw = skeleton.point(.rightWrist, minConf: BodySkeleton.reliableThreshold)
+    {
+      let torso = hypot((ls.x + rs.x) / 2 - (lh.x + rh.x) / 2, (ls.y + rs.y) / 2 - (lh.y + rh.y) / 2)
+      if max(lw.y, rw.y) < (ls.y + rs.y) / 2 - torso * 0.25 { handsOverheadFrames += 1 }
     }
     // A swing's arms cycle between hanging (<30°) and near horizontal (>50°) every rep. A pistol squat holds the
     // arms out for balance, so "arms horizontal" alone isn't enough; count the cycles.
@@ -103,7 +116,9 @@ public final class ExerciseDetector {
     let armSwingRatio = frameCount > 0 ? Double(armSwingFrames) / Double(frameCount) : 0
     let lyingRatio = uprightFrames > 0 ? Double(lyingFrames) / Double(uprightFrames) : 0
     let standingRatio = uprightFrames > 0 ? Double(standingFrames) / Double(uprightFrames) : 0
+    let handsOverheadRatio = frameCount > 0 ? Double(handsOverheadFrames) / Double(frameCount) : 0
     let stats: [String: Double] = [
+      "hands_overhead_ratio": handsOverheadRatio,
       "lying_ratio": lyingRatio, "standing_ratio": standingRatio,
       "frames": Double(frameCount), "max_asymmetry": maxAsymmetry, "p95_asymmetry": p95, "avg_asymmetry": avg,
       "high_asymmetry_ratio": highRatio, "elevated_ratio": elevatedRatio, "elevation_frames": Double(measuredFrames),
@@ -118,6 +133,15 @@ public final class ExerciseDetector {
       return ExerciseDetection(
         exercise: .turkishGetUp, confidence: min(100, 70 + Int(lyingRatio * 100)),
         reason: String(format: "on the floor in %.0f%% of frames and standing in %.0f%%", lyingRatio * 100, standingRatio * 100),
+        stats: stats)
+    }
+    // After the get-up: lying with the bell arm up, "over the shoulders" on screen is true of both hands in
+    // 36–40 % of a get-up's frames (tgu-phone-2min, tgu-phone-2sides). The pull-up fixture reads 72 %, every
+    // swing and squat fixture 0 %.
+    if handsOverheadRatio > 0.4 {
+      return ExerciseDetection(
+        exercise: .pullUp, confidence: min(100, 60 + Int(handsOverheadRatio * 40)),
+        reason: String(format: "both hands held over the shoulders in %.0f%% of frames", handsOverheadRatio * 100),
         stats: stats)
     }
     // Many arm cycles are a swing even when the legs read a little uneven (a walk-in, a diagonal camera).

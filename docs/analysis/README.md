@@ -10,7 +10,8 @@ evidence, so a threshold is never re-derived from scratch. One file per exercise
 | [pistol-squat.md](pistol-squat.md) | working leg from knee asymmetry; bottom from head height |
 | [bulgarian-split-squat.md](bulgarian-split-squat.md) | phases on head height scaled by leg length; the front knee only scores |
 | [turkish-get-up.md](turkish-get-up.md) | lying / rising / standing / lowering on uprightness; the 2026-09-12 staging study and the proposed stages |
-| [detector.md](detector.md) | which exercise a set is, from floor time, arm cycles, knee asymmetry and foot elevation |
+| [pull-up.md](pull-up.md) | hang / pulling / top / lowering on the shoulders' distance under the bar line; why the wrists cannot be trusted at the top |
+| [detector.md](detector.md) | which exercise a set is, from floor time, hands held overhead, arm cycles, knee asymmetry and foot elevation |
 | [kettlebell-detector.md](kettlebell-detector.md) | seeing the bell with a second model: the YOLO-World Core ML trial on the sample clips (#18) |
 | [optimization.md](optimization.md) | index of every precision and speed hypothesis, with its numbers (#18) |
 
