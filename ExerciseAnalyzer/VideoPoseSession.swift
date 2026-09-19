@@ -192,20 +192,30 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let stored = folder.flatMap { HeartRateSeries.load(from: $0) }
     heartRate = stored
     let length = id.flatMap { recents.entry(id: $0)?.duration } ?? duration
+    let spanEnd = start.addingTimeInterval(length + 120)
     heartRateTask = Task { [weak self] in
-      let read = await WorkoutMirror.shared.heartRate(
-        from: start.addingTimeInterval(-30), to: start.addingTimeInterval(length + 120))
-      guard let self, !Task.isCancelled, let read else { return }
-      self.log.event(
-        "heart_rate",
-        [
-          "samples": read.samples.count, "stored": stored?.samples.count ?? 0,
-          "median_interval_s": read.medianInterval ?? 0,
-          "newest_age_s": read.samples.last.map { Date().timeIntervalSince1970 - $0.at } ?? -1,
-        ])
-      guard read.samples.count > (stored?.samples.count ?? 0) else { return }
-      self.heartRate = read
-      if let folder { try? read.save(to: folder) }
+      // Asked again every 20 s while the set is on screen and the series stops short of the span (#107): a set
+      // just recorded read 0 samples and showed no chip until it was opened a second time.
+      var attempt = 1
+      while true {
+        let read = await WorkoutMirror.shared.heartRate(from: start.addingTimeInterval(-30), to: spanEnd)
+        guard let self, !Task.isCancelled, let read else { return }
+        let kept = self.heartRate?.samples.count ?? 0
+        self.log.event(
+          "heart_rate",
+          [
+            "samples": read.samples.count, "stored": kept, "attempt": attempt,
+            "median_interval_s": read.medianInterval ?? 0,
+            "newest_age_s": read.samples.last.map { Date().timeIntervalSince1970 - $0.at } ?? -1,
+          ])
+        if read.samples.count > kept {
+          self.heartRate = read
+          if let folder { try? read.save(to: folder) }
+        }
+        guard read.isAwaitingSamples(until: spanEnd, now: Date()) else { return }
+        try? await Task.sleep(for: .seconds(20))
+        attempt += 1
+      }
     }
   }
 

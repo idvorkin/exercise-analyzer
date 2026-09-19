@@ -45,4 +45,15 @@ final class HeartRateSeriesTests: XCTestCase {
     try series.save(to: folder)
     XCTAssertEqual(HeartRateSeries.load(from: folder), series)
   }
+
+  /// #107: right after a set Health had nothing (the watch's samples came 28 to 160 s later), so it is asked
+  /// again until the series reaches the span's end; an old set is asked once.
+  func testHealthIsAskedAgainUntilTheSeriesReachesTheSpansEnd() {
+    let empty = HeartRateSeries(samples: [])
+    XCTAssertTrue(empty.isAwaitingSamples(until: date(185), now: date(130)))  // just recorded, nothing yet
+    XCTAssertTrue(series.slice(from: date(100), to: date(150)).isAwaitingSamples(until: date(185), now: date(200)))
+    XCTAssertFalse(series.isAwaitingSamples(until: date(185), now: date(200)))  // reached the end
+    XCTAssertFalse(series.isAwaitingSamples(until: date(195), now: date(200)))  // within a sample gap of it
+    XCTAssertFalse(empty.isAwaitingSamples(until: date(185), now: date(185 + 600)))  // an old set: what there is
+  }
 }

@@ -73,6 +73,18 @@ public struct HeartRateSeries: Codable, Equatable, Sendable {
     return gaps.isEmpty ? nil : gaps[gaps.count / 2]
   }
 
+  /// How long after a span's end Health is still asked for it: the watch's samples reached the phone 28 to 160 s
+  /// late on 2026-09-19 (#107), so ten minutes is generous; after that what Health has is what there is.
+  public static let lateSamplesWindow = 600.0
+
+  /// Whether Health should be asked again for the span ending at `spanEnd`: the samples stop short of it and it
+  /// ended recently enough that the watch may still be sending. An old set is asked once.
+  public func isAwaitingSamples(until spanEnd: Date, now: Date) -> Bool {
+    guard now.timeIntervalSince(spanEnd) < Self.lateSamplesWindow else { return false }
+    guard let newest = samples.last else { return true }
+    return newest.at < spanEnd.timeIntervalSince1970 - Self.maxGap
+  }
+
   public static func load(from folder: URL) -> HeartRateSeries? {
     guard let data = try? Data(contentsOf: folder.appendingPathComponent(fileName)) else { return nil }
     return try? JSONDecoder().decode(HeartRateSeries.self, from: data)
