@@ -161,7 +161,9 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
       if hangUnder != nil { trace?(String(format: "%.2fs off the bar", time)) }
       machine.transition(to: Self.hang)
       machine.currentRepPeaks = [:]
+      // The next grip learns its own bar line and its own scale: the lifter may come back nearer or further.
       barY = nil
+      torso = nil
       letGo()
       return result(completed)
     }
