@@ -305,3 +305,36 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Notes:** Igor picked the page (95A) on the board of 2026-09-18 and asked to "keep full heart rate data so we can see time to drop as well": the whole workout's series, rests included, is read from Health (a minute before to three after) and kept in `Documents/workouts/<id>/heartrate.json`, re-read on every open and replaced when Health has more. The heart lags the work, so a set's peak is looked for up to 30 s past its end (or the next set's start), and the drop is that peak minus the reading 60 s after the set's end, or at the next set's start when the rest was shorter (Igor, 2026-09-18: "drop in 60 seconds or however much total rest I got"; he picked this over "time to get back under X", which is not built). A set is placed by `clipStartedAt` (story 051); sets from before it fall back to `recordedAt`, which for a set recorded in the app is the end of the recording, so they sit up to one set length late. The day and exercise grouping of 012 stays as it is. `WorkoutTimeline` in ExerciseCore does the arithmetic; the page only draws it.
 
 - **Issues:** [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); [#101](https://github.com/idvorkin/exercise-analyzer/issues/101) a tap on a set's bar opens it (host `WorkoutTimelineTests`, simulator `SWING_WORKOUT_BAR_TAP=0.58` opened the middle seeded set, the phone pending); [#99](https://github.com/idvorkin/exercise-analyzer/issues/99) Igor: "sometimes … I can get back to the workout, and sometimes I can't": the button existed only for a set opened from the workout's page
+
+---
+
+### User Story 056:
+
+- **Summary:** Delete a set, and be told whether its video goes with it
+- **Status:** implemented for [#111](https://github.com/idvorkin/exercise-analyzer/issues/111); the wording verified on the host (`RecentsIndexTests`), the dialog and the delete on the simulator (`SWING_OPEN_RECENT=1 SWING_DELETE_SET=prompt` for the screenshot, `=confirm`: `set_deleted`, the folder and the index row gone, no other set touched); on the phone pending
+- **Why:** Igor, 2026-09-19, on a nine-second leftover clip: "I need to be able to delete a video. Program needs to be helped [handled] differently if it's on disk or not, if it's already not saved on disk. Say this would be the final delete or something"
+
+#### Use Case:
+- **As a** lifter with a false start or a leftover clip among my sets
+- **I want to** delete it from where I am looking at it, and know beforehand whether the video itself is gone after
+- **so that** Workouts holds only real sets and I never lose a video I thought was safe in Photos
+
+#### Acceptance Criteria:
+- **Scenario:** A set whose video is only in the app
+- **Given:** a stored set marked "kept in app" is on the playback screen
+- **When:** I tap the red trash in the bottom bar
+- **Then:** playback pauses and a dialog asks "Delete this set and its video?", says it is the only copy and that deleting is final, and offers "Delete for good" or keeping it; Delete for good removes the set, its video and its pictures, and the screen returns to the start
+
+- **Scenario:** A set whose video is in Photos
+- **Given:** a stored set whose video is in Photos
+- **When:** I tap the trash
+- **Then:** the dialog asks "Remove this set from Workouts?" and says the video stays in Photos (and, when an untrimmed original is kept for Undo trim, that it goes with the set); Remove takes the set out of Workouts and Photos is not touched
+
+- **Scenario:** From the Workouts list
+- **Given:** Workouts is open
+- **When:** I long-press a set and pick "Delete set and video…" or "Remove from Workouts…"
+- **Then:** the same dialog asks first; before this the long-press removed the set at once, the only copy of an in-app video with it
+
+- **Notes:** The words come from `SetDeletionPrompt` (ExerciseCore) by where the video lives (`RecentEntry.isInPhotos`). The session does the delete (`delete(set:from:)`), so a set that is on screen is let go of first and cannot be saved back; `set_deleted` logs id, in_photos, reps, on_screen and where (review, workouts). The "no reps found" offer after a recording (029) is unchanged.
+
+- **Issues:** [#111](https://github.com/idvorkin/exercise-analyzer/issues/111)

@@ -1023,6 +1023,29 @@ final class VideoPoseSession: NSObject, ObservableObject {
     try? FileManager.default.removeItem(at: url)
     if let trimmedURL { try? FileManager.default.removeItem(at: trimmedURL) }
     log.event("recording_deleted", ["url": url.lastPathComponent])
+    closeDeletedClip(status: "Recording deleted")
+  }
+
+  /// Deletes a stored set (#111): its Workouts entry and its folder, the in-app video with it; a video in Photos
+  /// is never touched. The view has asked first, in `SetDeletionPrompt`'s words. When the set is the one on
+  /// screen the player lets go of it, so nothing can save it back.
+  func delete(set entry: RecentEntry, from place: String) {
+    log.event(
+      "set_deleted",
+      ["id": entry.id, "in_photos": entry.isInPhotos, "reps": entry.repCount, "on_screen": entry.id == currentEntryID, "where": place])
+    if entry.id == currentEntryID {
+      pause()
+      player.replaceCurrentItem(with: nil)
+      // The scratch copies of a recording or a trim; the set's own clip goes with its folder.
+      if case .recording = currentOrigin, let url = currentFileURL { try? FileManager.default.removeItem(at: url) }
+      if let trimmedURL { try? FileManager.default.removeItem(at: trimmedURL) }
+      closeDeletedClip(status: entry.isInPhotos ? "Removed from Workouts" : "Set deleted")
+    }
+    recents.remove(id: entry.id)
+  }
+
+  private func closeDeletedClip(status: String) {
+    currentClipStartedAt = nil  // ends the heart-rate re-ask (#107): its folder is gone
     currentFileURL = nil
     trimmedURL = nil
     currentEntryID = nil
@@ -1033,7 +1056,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     analysisInterrupted = false
     latestFrame = nil
     duration = 0
-    statusMessage = "Recording deleted"
+    statusMessage = status
   }
 
   /// Picks the exercise (detects it in Auto), runs its analyzer over the extracted poses, and pulls rep stills

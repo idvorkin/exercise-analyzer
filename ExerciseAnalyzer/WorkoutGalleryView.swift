@@ -108,10 +108,15 @@ struct WorkoutGalleryView: View {
                 Section {
                   if !collapsed.contains(day.date) {
                     ForEach(day.exercises) { exercise in
-                      ExerciseSetsRow(group: exercise, store: store) { entry in
-                        dismiss()
-                        onOpen(entry)
-                      }
+                      ExerciseSetsRow(
+                        group: exercise, store: store,
+                        onOpen: { entry in
+                          dismiss()
+                          onOpen(entry)
+                        },
+                        onDelete: { entry in
+                          if let session { session.delete(set: entry, from: "workouts") } else { store.remove(id: entry.id) }
+                        })
                     }
                   }
                 } header: {
@@ -502,6 +507,9 @@ struct ExerciseSetsRow: View {
   let group: ExerciseSets
   @ObservedObject var store: RecentsStore
   let onOpen: (RecentEntry) -> Void
+  /// Deletes the set once the dialog is confirmed (#111); the session does it, so a set on screen is let go of.
+  let onDelete: (RecentEntry) -> Void
+  @State private var deleting: RecentEntry?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -522,18 +530,40 @@ struct ExerciseSetsRow: View {
               .onTapGesture { onOpen(entry) }
               .contextMenu {
                 Button("Open") { onOpen(entry) }
-                Button("Remove from workouts", role: .destructive) { store.remove(id: entry.id) }
+                // Asks first, and says whether the video goes too: this used to remove at once, the only copy
+                // of an in-app video with it (#111).
+                Button(entry.isInPhotos ? "Remove from Workouts…" : "Delete set and video…", role: .destructive) {
+                  deleting = entry
+                }
               }
           }
         }
       }
     }
+    .setDeletionDialog($deleting, onConfirm: onDelete)
   }
 
   private var totals: String {
     var parts = ["\(group.sets.count) set\(group.sets.count == 1 ? "" : "s")", "\(group.repCount) reps"]
     if let best = group.bestScore { parts.append("best \(best)") }
     return parts.joined(separator: " · ")
+  }
+}
+
+extension View {
+  /// "Delete?" for a set, in the words `SetDeletionPrompt` picks by where its video lives (#111): the review
+  /// screen's trash button and a card's long-press both ask through here, and nothing is deleted without it.
+  func setDeletionDialog(_ entry: Binding<RecentEntry?>, onConfirm: @escaping (RecentEntry) -> Void) -> some View {
+    let prompt = entry.wrappedValue.map(SetDeletionPrompt.init(for:))
+    return confirmationDialog(
+      prompt?.title ?? "", isPresented: Binding(get: { entry.wrappedValue != nil }, set: { if !$0 { entry.wrappedValue = nil } }),
+      titleVisibility: .visible, presenting: entry.wrappedValue
+    ) { set in
+      Button(prompt?.confirm ?? "Delete", role: .destructive) { onConfirm(set) }
+      Button("Keep it", role: .cancel) {}
+    } message: { _ in
+      Text(prompt?.message ?? "")
+    }
   }
 }
 

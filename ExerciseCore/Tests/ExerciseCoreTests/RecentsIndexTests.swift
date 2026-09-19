@@ -117,4 +117,22 @@ final class RecentsIndexTests: XCTestCase {
     XCTAssertFalse(file.isSameClip(source: .file(name: "other.mov"), originalName: "clip.mov", duration: 61))
     XCTAssertFalse(file.isSameClip(source: .file(name: "other.mov"), originalName: "renamed.mov", duration: 60))
   }
+
+  /// #111: deleting says whether the video goes too.
+  func testDeletingASetSaysWhetherTheVideoGoesToo() {
+    let inApp = SetDeletionPrompt(for: entry("a"))
+    XCTAssertTrue(inApp.isFinal)
+    XCTAssertEqual(inApp.confirm, "Delete for good")
+    XCTAssertTrue(inApp.message.contains("only copy"))
+
+    var photos = entry("b")
+    photos.source = .photos(identifier: "ABC")
+    let kept = SetDeletionPrompt(for: photos)
+    XCTAssertFalse(kept.isFinal)
+    XCTAssertEqual(kept.confirm, "Remove")
+    XCTAssertEqual(kept.message, "The video stays in Photos.")
+
+    photos.originalBackup = "original.mov"
+    XCTAssertTrue(SetDeletionPrompt(for: photos).message.contains("Undo trim"))
+  }
 }

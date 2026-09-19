@@ -92,6 +92,32 @@ public struct RecentEntry: Codable, Identifiable {
   }
 }
 
+/// What deleting a set says before it does it (#111; Igor asked for it to differ by whether the video is "on
+/// disk or not" and to "say this would be the final delete"). A set whose video is in Photos only leaves Workouts; a set
+/// whose video lives in its own folder takes the only copy with it, and the words say which.
+public struct SetDeletionPrompt: Equatable {
+  public let title: String
+  public let message: String
+  public let confirm: String
+  /// The video is gone for good after this.
+  public let isFinal: Bool
+
+  public init(for entry: RecentEntry) {
+    isFinal = !entry.isInPhotos
+    if isFinal {
+      title = "Delete this set and its video?"
+      message = "The video is only in this app: this is the only copy, and deleting it is final."
+      confirm = "Delete for good"
+    } else {
+      title = "Remove this set from Workouts?"
+      message =
+        "The video stays in Photos."
+        + (entry.originalBackup == nil ? "" : " The untrimmed original kept here for Undo trim goes with the set.")
+      confirm = "Remove"
+    }
+  }
+}
+
 public struct AnalysisSnapshot: Codable {
   public static let currentVersion = 2
   public var version: Int = AnalysisSnapshot.currentVersion

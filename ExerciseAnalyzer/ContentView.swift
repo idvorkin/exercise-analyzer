@@ -29,6 +29,8 @@ struct ContentView: View {
   @State private var middleRightLit: StepKey? = nil
   @State private var middlePulse = 0
   @State private var showOpenDialog = false
+  /// The set the trash button was tapped on, while its "delete?" dialog is up (#111).
+  @State private var deleting: RecentEntry?
   @Environment(\.openURL) private var openURL
   @State private var lastClockLog = Date.distantPast
   @State private var showBugReport = false
@@ -156,6 +158,7 @@ struct ContentView: View {
     } message: {
       Text("Nothing was saved to Photos. Delete the recording, or keep it to look at?")
     }
+    .setDeletionDialog($deleting) { session.delete(set: $0, from: "review") }
     // A Photos clip was just trimmed to its set: offer the replace right away instead of leaving it to the
     // Save button (#90). Replace is story 011's save: the trimmed clip goes in, iOS asks once to delete the
     // original, Undo trim brings it back.
@@ -896,6 +899,16 @@ struct ContentView: View {
             Label("Save to Photos", systemImage: "square.and.arrow.down")
           }
         }
+        // A stored set can be thrown away from where it is looked at (#111); the dialog says what goes with it.
+        if let entry = session.currentEntry {
+          Button(role: .destructive) {
+            session.pause()
+            deleting = entry
+          } label: {
+            Label("Delete set", systemImage: "trash")
+          }
+          .foregroundStyle(.red)
+        }
         Spacer()
         Button {
           session.startCamera(position: session.cameraPosition)
@@ -961,6 +974,15 @@ struct ContentView: View {
           Task { @MainActor in
             try? await Task.sleep(for: .seconds(4))
             if let workout = workoutOfLoadedSet { backToWorkout(workout) } else { session.log.event("ui", ["action": "back_to_workout_missing"]) }
+          }
+        }
+        // Test hook (#111): 4 s after the set opens, what a tap on the trash does ("prompt": the dialog is up
+        // for a screenshot) or what its red button does ("confirm": the set is deleted, `set_deleted` logs).
+        if let delete = env["SWING_DELETE_SET"] {
+          Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            guard let current = session.currentEntry else { return }
+            if delete == "confirm" { session.delete(set: current, from: "hook") } else { deleting = current }
           }
         }
         return
