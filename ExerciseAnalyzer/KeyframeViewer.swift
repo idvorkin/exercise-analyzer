@@ -3,6 +3,7 @@
 //  Full-screen keyframe viewer: the paused video at a rep checkpoint with the skeleton overlay, pinch-zoomable and
 //  pannable, with buttons to step between checkpoints and reps. Uses the player itself, so it is full resolution.
 
+import ExerciseCore
 import SwiftUI
 
 struct KeyframeViewer: View {

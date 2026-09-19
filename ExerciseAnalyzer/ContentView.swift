@@ -44,6 +44,8 @@ struct ContentView: View {
   private var overlayMode: OverlayMode { OverlayMode(rawValue: overlayModeRaw) ?? .both }
   @AppStorage("meView") private var meView = true
   @AppStorage("galleryHeight") private var galleryHeight = 170.0
+  /// The y in the picture area where the HUD's angle text begins: the zoomed lifter's feet stay above it (#98).
+  @State private var hudAngleLineTop: CGFloat?
   @State private var galleryDragStart: Double?
   /// The watch's workout, mirrored (048): the HUD strip and the Workouts day line read it.
   @ObservedObject private var workouts = WorkoutMirror.shared
@@ -62,8 +64,12 @@ struct ContentView: View {
     VStack(spacing: 0) {
       ZStack {
         Color.black
+        // The lifter in the middle of the picture (#98): zoomed, head at the top and feet above the angle text;
+        // the whole frame of a stored set is slid sideways. The camera's whole frame stays put: it is what the
+        // phone is aimed by.
         MeViewZoom(
-          crop: meView ? session.personCrop : nil, imageSize: session.latestFrame?.imageSize
+          crop: session.personCrop, imageSize: session.latestFrame?.imageSize, zoomed: meView,
+          centreWhole: session.source == .file, freeBottom: hudAngleLineTop
         ) { zoom in
           ZStack {
             if session.source == .camera {
@@ -290,6 +296,22 @@ struct ContentView: View {
     let analysis = session.latestFrame?.analysis
     return VStack {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
+        // A set that belongs to a stored workout (053): one tap to that workout's page, however the set was
+        // opened (#99). A sign at the head of the top line, so no line of its own lies over the lifter (#98).
+        if let workout = workoutOfLoadedSet {
+          Button {
+            backToWorkout(workout)
+          } label: {
+            HStack(spacing: 2) {
+              Image(systemName: "chevron.left").font(.subheadline.bold())
+              Image(systemName: "figure.strengthtraining.traditional").font(.title3)
+            }
+            .foregroundStyle(.green)
+            .frame(minHeight: 34)
+            .contentShape(Rectangle().inset(by: -8))
+          }
+          .accessibilityLabel("Back to the workout")
+        }
         if session.viewfinder {
           // Framing, not recording: the count area names the state and no REC pill shows (047).
           Text("VIEWFINDER")
@@ -363,34 +385,6 @@ struct ContentView: View {
         .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
         .accessibilityLabel("Workout on the watch, \(sets) sets, heart rate \(live.heartRate.map(String.init) ?? "unknown")")
       }
-      // A set that belongs to a stored workout (053): one tap to that workout's page, however the set was opened
-      // (#99: only a set opened from the page had the button, so it came and went).
-      if let workout = workoutOfLoadedSet {
-        // One slim line, all of it the button (Igor: "too much space used, just workout ... the single line"):
-        // "‹ Workout" and the set's heart rate as its row on the workout's page says it (#100).
-        Button {
-          backToWorkout(workout)
-        } label: {
-          HStack(spacing: 6) {
-            Image(systemName: "chevron.left").font(.caption.bold())
-            Text("Workout").font(.subheadline.bold())
-            if let stats = heartStats(in: workout), let peak = stats.peak {
-              let over = stats.dropOver < WorkoutTimeline.dropSeconds ? "/\(Int(stats.dropOver))s" : ""
-              let drop = stats.drop.map { " · \($0 >= 0 ? "−" : "+")\(abs($0))\(over)" } ?? ""
-              let average = stats.average.map { " · avg \($0)" } ?? ""
-              Text("♥ \(peak)\(drop)\(average)").font(.subheadline.bold()).monospacedDigit().foregroundStyle(.red)
-            }
-          }
-          .lineLimit(1)
-          .foregroundStyle(.green)
-          .padding(.horizontal, 10)
-          .frame(minHeight: 28)
-          .background(Color.black.opacity(0.45), in: Capsule())
-          .contentShape(Rectangle().inset(by: -6))  // the line is slim, the target is not
-        }
-        .accessibilityLabel("Back to the workout")
-        .frame(maxWidth: .infinity, alignment: .leading)  // at the left edge with the phase pills, not over the lifter
-      }
       HStack(spacing: 5) {
         ForEach(definition.phases, id: \.id) { phase in
           let active = phase.matches(analysis?.phase)
@@ -419,12 +413,27 @@ struct ContentView: View {
           .font(.caption.bold()).padding(.horizontal, 8).padding(.vertical, 3)
           .background(Color.red.opacity(0.75), in: Capsule())
       }
-      HStack(spacing: 14) {
-        ForEach(definition.hudMetrics, id: \.key) { m in
-          metric(m.label, analysis?.metrics[m.key], unit: m.unit)
+      VStack(alignment: .leading, spacing: 2) {
+        // The set's heart rate as its row on the workout's page says it (#100), a slim line over the angles: the
+        // zoomed lifter's feet stop above it, so it lies over nothing of him (#98). Four angles leave it no room
+        // on their own line.
+        if let workout = workoutOfLoadedSet, let stats = heartStats(in: workout), let peak = stats.peak {
+          let over = stats.dropOver < WorkoutTimeline.dropSeconds ? "/\(Int(stats.dropOver))s" : ""
+          let drop = stats.drop.map { " · \($0 >= 0 ? "−" : "+")\(abs($0))\(over)" } ?? ""
+          let average = stats.average.map { " · avg \($0)" } ?? ""
+          Text("♥ \(peak)\(drop)\(average)")
+            .font(.subheadline.bold()).monospacedDigit().foregroundStyle(.red).lineLimit(1)
+            .accessibilityLabel("Heart rate: peak \(peak)\(drop)\(average)")
         }
-        Spacer()
+        HStack(spacing: 14) {
+          ForEach(definition.hudMetrics, id: \.key) { m in
+            metric(m.label, analysis?.metrics[m.key], unit: m.unit)
+          }
+          Spacer()
+        }
       }
+      // Where the HUD's bottom text begins in the picture area: the zoomed lifter's feet stop above it (#98).
+      .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named("hud")).minY } action: { hudAngleLineTop = $0 }
       if session.analysisInterrupted, let message = session.statusMessage {
         // An interrupted pass offers its re-run right on the status line, big enough for the gym (#57).
         Button(action: { session.retryAnalysis() }) {
@@ -455,6 +464,7 @@ struct ContentView: View {
       }
       .allowsHitTesting(false)
     )
+    .coordinateSpace(name: "hud")
   }
 
   /// "Instrumented run · 2 of 8 · IMG_4342 · 612 frames · 61 fps": every stored set through the models with the
@@ -515,7 +525,9 @@ struct ContentView: View {
       }
     } label: {
       HStack(spacing: 3) {
-        Text("reps · " + session.exercise.definition.name)
+        // One line whatever else the top line holds (the workout sign, the ♥ chip): a wrap pushes the pills down
+        // over the lifter (#98).
+        Text("reps · " + session.exercise.definition.name).lineLimit(1).minimumScaleFactor(0.7)
         if session.exerciseMode == .auto {
           Image(systemName: "wand.and.stars").font(.caption2)
         }
@@ -924,64 +936,37 @@ struct ContentView: View {
   }
 }
 
-/// How much to enlarge the preview and where to shift it so the person fills the container.
-struct ZoomTransform: Equatable {
-  var scale: CGFloat = 1
-  var offset: CGSize = .zero
-
-  /// The frame a full-container layer should take to show this zoom (aspect-fit content inside it).
-  func layerFrame(in container: CGSize) -> CGRect {
-    CGRect(
-      x: container.width / 2 - container.width * scale / 2 + offset.width,
-      y: container.height / 2 - container.height * scale / 2 + offset.height,
-      width: container.width * scale, height: container.height * scale)
-  }
-}
-
-/// Computes the zoom that makes `crop` (a normalized rect in image space) fill the container and hands it to the
-/// content. Video layers apply it by resizing their frame (a transform on the view tree would strip HDR from
-/// AVPlayerLayer and wash the picture out); the vector overlay applies it as a scale/offset.
+/// Hands the content the zoom that puts the lifter (`crop`, a normalized rect in image space) in the middle of the
+/// picture area (#98, `ZoomTransform.centring`). Video layers apply it by resizing their frame (a transform on the
+/// view tree would strip HDR from AVPlayerLayer and wash the picture out); the vector overlay applies it as a
+/// scale/offset; the bars are black views laid over the picture, never a clip.
 struct MeViewZoom<Content: View>: View {
   let crop: CGRect?
   let imageSize: CGSize?
+  var zoomed = true
+  var centreWhole = false
+  /// The y where the HUD's bottom text begins; nil: the picture is free down to its bottom edge.
+  var freeBottom: CGFloat?
   @ViewBuilder let content: (ZoomTransform) -> Content
 
   var body: some View {
     GeometryReader { geo in
-      content(transform(container: geo.size))
-        .frame(width: geo.size.width, height: geo.size.height)
+      let zoom = ZoomTransform.centring(
+        crop: crop, imageSize: imageSize, container: geo.size,
+        bottomInset: freeBottom.map { max(geo.size.height - $0, 0) } ?? 0, zoomed: zoomed,
+        centreWhole: centreWhole)
+      ZStack {
+        content(zoom)
+        HStack(spacing: 0) {
+          Color.black.frame(width: zoom.bars)
+          Spacer(minLength: 0)
+          Color.black.frame(width: zoom.bars)
+        }
+        .allowsHitTesting(false)
+        .animation(.easeOut(duration: 0.3), value: zoom)
+      }
+      .frame(width: geo.size.width, height: geo.size.height)
     }
-  }
-
-  private func transform(container: CGSize) -> ZoomTransform {
-    guard let crop, let imageSize, imageSize.width > 0, container.width > 0 else {
-      return ZoomTransform()
-    }
-    let video = AVMakeRect(aspectRatio: imageSize, insideRect: CGRect(origin: .zero, size: container))
-    let region = CGRect(
-      x: video.minX + crop.minX * video.width, y: video.minY + crop.minY * video.height,
-      width: crop.width * video.width, height: crop.height * video.height)
-    guard region.width > 0, region.height > 0 else { return ZoomTransform() }
-    let scale = min(max(min(container.width / region.width, container.height / region.height), 1), 4)
-    let center = CGPoint(x: container.width / 2, y: container.height / 2)
-    var offset = CGSize(
-      width: (center.x - region.midX) * scale, height: (center.y - region.midY) * scale)
-    // Keep the scaled video covering the container where it can, so we don't pan into black.
-    let scaledLeft = center.x + (video.minX - center.x) * scale
-    let scaledRight = center.x + (video.maxX - center.x) * scale
-    if scaledRight - scaledLeft >= container.width {
-      offset.width = min(max(offset.width, container.width - scaledRight), -scaledLeft)
-    } else {
-      offset.width = 0
-    }
-    let scaledTop = center.y + (video.minY - center.y) * scale
-    let scaledBottom = center.y + (video.maxY - center.y) * scale
-    if scaledBottom - scaledTop >= container.height {
-      offset.height = min(max(offset.height, container.height - scaledBottom), -scaledTop)
-    } else {
-      offset.height = 0
-    }
-    return ZoomTransform(scale: scale, offset: offset)
   }
 }
 

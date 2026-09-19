@@ -259,13 +259,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Scenario:** Back to the workout from one of its sets
 - **Given:** I opened a set from a workout's page
-- **When:** I tap "‹ Workout" at the left of the playback screen, above the phase pills (one slim line, shared with the set's heart-rate numbers of 051)
+- **When:** I tap the green "‹" with the lifter sign at the head of the playback screen's top line, left of the rep count (Igor, 2026-09-18: "make the workout go into the top line, or give me a sign"; its own line above the phase pills lay over the zoomed lifter, #98)
 - **Then:** Workouts opens on that workout's page again, not on the day list; starting the camera takes the button away
 
 - **Scenario:** The button is there however the set was opened
 - **Given:** a set that was done inside a stored workout, opened from the day list, from the Photos strip, or reopened at launch
 - **When:** it is on the playback screen
-- **Then:** "‹ Workout" is there all the same and opens that workout's page; a set done outside every workout has no button
+- **Then:** the sign is there all the same and opens that workout's page; a set done outside every workout has no button
 
 - **Scenario:** A row names the rep and shows the set
 - **Given:** a workout of swings and pistols
