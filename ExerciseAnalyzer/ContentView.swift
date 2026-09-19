@@ -366,34 +366,29 @@ struct ContentView: View {
       // A set that belongs to a stored workout (053): one tap to that workout's page, however the set was opened
       // (#99: only a set opened from the page had the button, so it came and went).
       if let workout = workoutOfLoadedSet {
-        HStack(spacing: 8) {
-          Button {
-            backToWorkout(workout)
-          } label: {
-            HStack(spacing: 6) {
-              Image(systemName: "chevron.left").font(.subheadline.bold())
-              Image(systemName: "applewatch").font(.caption)
-              Text("Workout \(workout.start.formatted(date: .omitted, time: .shortened))").font(.subheadline.bold())
+        // One slim line, all of it the button (Igor: "too much space used, just workout ... the single line"):
+        // "‹ Workout" and the set's heart rate as its row on the workout's page says it (#100).
+        Button {
+          backToWorkout(workout)
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "chevron.left").font(.caption.bold())
+            Text("Workout").font(.subheadline.bold())
+            if let stats = heartStats(in: workout), let peak = stats.peak {
+              let over = stats.dropOver < WorkoutTimeline.dropSeconds ? "/\(Int(stats.dropOver))s" : ""
+              let drop = stats.drop.map { " · \($0 >= 0 ? "−" : "+")\(abs($0))\(over)" } ?? ""
+              let average = stats.average.map { " · avg \($0)" } ?? ""
+              Text("♥ \(peak)\(drop)\(average)").font(.subheadline.bold()).monospacedDigit().foregroundStyle(.red)
             }
-            .foregroundStyle(.green)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 40)
-            .background(Color.black.opacity(0.45), in: Capsule())
           }
-          .accessibilityLabel("Back to the workout")
-          // The set's heart rate as its row on the workout's page says it (#100): peak, the drop after, mean.
-          if let stats = heartStats(in: workout), let peak = stats.peak {
-            let over = stats.dropOver < WorkoutTimeline.dropSeconds ? "/\(Int(stats.dropOver))s" : ""
-            let drop = stats.drop.map { " · \($0 >= 0 ? "−" : "+")\(abs($0))\(over)" } ?? ""
-            let average = stats.average.map { " · avg \($0)" } ?? ""
-            Text("♥ \(peak)\(drop)\(average)")
-              .font(.subheadline.bold()).monospacedDigit().foregroundStyle(.red).lineLimit(1).minimumScaleFactor(0.7)
-              .padding(.horizontal, 10)
-              .frame(minHeight: 40)
-              .background(Color.black.opacity(0.45), in: Capsule())
-              .accessibilityLabel("Heart rate peak \(peak)\(stats.drop.map { ", dropped \($0)" } ?? "")\(stats.average.map { ", average \($0)" } ?? "")")
-          }
+          .lineLimit(1)
+          .foregroundStyle(.green)
+          .padding(.horizontal, 10)
+          .frame(minHeight: 28)
+          .background(Color.black.opacity(0.45), in: Capsule())
+          .contentShape(Rectangle().inset(by: -6))  // the line is slim, the target is not
         }
+        .accessibilityLabel("Back to the workout")
         .frame(maxWidth: .infinity, alignment: .leading)  // at the left edge with the phase pills, not over the lifter
       }
       HStack(spacing: 5) {
