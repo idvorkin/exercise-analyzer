@@ -21,6 +21,7 @@ lock-screen control (044) are not watch-app states and are not in the table.
 | workoutEnd | the bottom of the workout page: the exercise picker's tail, then "End writes one workout to Health" under the buttons | End workout (green), Discard (red, asks first) | 048 |
 | workoutRecording | as recording, with a "♥ 141" chip between the count and the time | as recording | 048 |
 | viewfinder (Preview) | the picture filling the face, a PREVIEW chip, beside it a "REST 1:45" chip while a rest is counting (orange past the rest length), both whole inside the face, the in-frame capsule | Record (red) · Camera · Cancel; no Pause, no Done | 047, 050 |
+| workoutViewfinder | as viewfinder, with a "♥ 128" chip on a line of its own under the PREVIEW and REST chips | as viewfinder | 047, 048 |
 | live | the picture filling the face, small rep and time chips right under the clock line, the green "IN FRAME" capsule above the row; chips, capsule and buttons whole inside the face and covering as little of the picture as 40 pt targets allow | Pause · Camera · Done · Cancel along the bottom edge, translucent glass except Done (green); second page: Cancel, the watch-mode toggle | 016, 017, 042 |
 | recording | as live, with the count (6) and the time (0:42) and a red "FEET CUT OFF" capsule when cut off | as live | 016, 017, 042 |
 | paused | "PAUSED · FEET CUT OFF" capsule, the count and the time frozen, the picture still refreshing | orange Resume · Camera · Done · Cancel; second page: Cancel | 040 |
@@ -381,7 +382,7 @@ the first frame (story 001).
 ### User Story 047:
 
 - **Summary:** Preview the shot from the wrist before recording
-- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), [b3defc0](https://github.com/idvorkin/exercise-analyzer/commit/b3defc0) and the review fixes of [2c9cc58](https://github.com/idvorkin/exercise-analyzer/commit/2c9cc58); verified on the host, the simulator (the eight watch states, the six checks) and by two code reviews; on the phone since 2026-09-14, the watch app of 2c9cc58 pending the tunnel, Igor's check pending
+- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), [b3defc0](https://github.com/idvorkin/exercise-analyzer/commit/b3defc0) and the review fixes of [2c9cc58](https://github.com/idvorkin/exercise-analyzer/commit/2c9cc58); verified on the host, the simulator (the eight watch states, the six checks) and by two code reviews; on the phone since 2026-09-14, the watch app of 2c9cc58 pending the tunnel, Igor's check pending; the heart-rate chip for [#106](https://github.com/idvorkin/exercise-analyzer/issues/106) verified on the watch simulator (`just watch-screens`: the workoutViewfinder state), on the wrist pending
 - **Why:** Igor, 2026-09-14: "Can I start with two different buttons for Record? Start Recording, Start Viewfinder. Normally, when I start on my watch, I don't know if I'm in frame or not. I walk away from my phone, set my phone up, and think I'm in frame. Then I walk to my watch, make sure I'm good, maybe adjust the camera a bit, and then I hit Start."
 
 #### Use Case:
@@ -415,13 +416,18 @@ the first frame (story 001).
 - **When:** I tap Record on the wrist
 - **Then:** no recorder is armed on a stopped camera; the phone posts its notification and the tap starts the set the moment the app is in front
 
+- **Scenario:** My heart rate while I frame the next set
+- **Given:** a workout is running on the wrist (048) and the sensor reads 128
+- **When:** I tap Preview
+- **Then:** a "♥ 128" chip sits under the PREVIEW and REST chips, the same chip the recording page carries, so the rest and the heart that say "go again" are both on the picture; outside a workout there is no chip
+
 - **Notes:** Wire: `WatchStatus.viewfinder` (`recording` stays "the camera is live"; `rolling` is
   `recording && !viewfinder`, the recorder is writing) and `WatchCommand.viewfinder`. On the phone,
   `beginRecording` creates the recorder without touching the camera; `camera_start` carries `viewfinder` and
   `record_start` carries the seconds spent framing. The Record notification carries the flag, so the tap
   route opens into the preview too. The phone's own Live still records from the first frame (story 001).
 
-- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73)
+- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73); [#106](https://github.com/idvorkin/exercise-analyzer/issues/106) Igor: "Heart rate on watch preview"
 
 ---
 

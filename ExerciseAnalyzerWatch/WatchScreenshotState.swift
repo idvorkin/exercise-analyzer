@@ -14,12 +14,14 @@ enum WatchScreenshotState: String, CaseIterable {
   case workout, workoutEnd, workoutRecording
   /// A workout before its first set (050): the head is the session clock, as it was before the rest took it over.
   case workoutStart
+  /// Framing the next set inside a workout (#106): the Preview with the heart-rate chip under its chips.
+  case workoutViewfinder
 
   /// The fixed workout the controller presents: 42:10 in, 128 bpm (141 while a set runs); nil for no workout.
   var workout: (elapsed: TimeInterval, heartRate: Int)? {
     switch self {
     case .workoutStart: return (190, 96)
-    case .workout, .workoutEnd: return (2530, 128)
+    case .workout, .workoutEnd, .workoutViewfinder: return (2530, 128)
     case .workoutRecording: return (2530, 141)
     default: return nil
     }
@@ -74,7 +76,7 @@ enum WatchScreenshotState: String, CaseIterable {
       status.lastSet = LastSet(
         reps: 9, exercise: "Kettlebell Swing", seconds: 48, at: Date().timeIntervalSince1970 - 35)
       return (status, true, nil)
-    case .viewfinder:
+    case .viewfinder, .workoutViewfinder:
       var status = WatchStatus(
         recording: true, frame: FrameStatus(personSeen: true, clippedEdges: [], coverage: 0.8), reps: 0,
         phase: "", elapsed: 0, camera: "back", exercise: "Kettlebell Swing")
@@ -102,7 +104,7 @@ enum WatchScreenshotState: String, CaseIterable {
     switch self {
     case .done: return Date().addingTimeInterval(-35)
     case .workout, .workoutEnd: return Date().addingTimeInterval(-95)
-    case .viewfinder: return Date().addingTimeInterval(-102)
+    case .viewfinder, .workoutViewfinder: return Date().addingTimeInterval(-102)
     default: return nil
     }
   }

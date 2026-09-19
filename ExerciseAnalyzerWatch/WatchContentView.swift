@@ -236,6 +236,9 @@ struct WatchContentView: View {
           }
           .padding(.horizontal, 8)
           .padding(.top, 2)
+          // The workout's heart rate while framing (#106): the rest and the heart are what say "go again". A
+          // line of its own, because PREVIEW, the rest and the heart do not fit one row even on the Ultra.
+          heartRateChip
         } else {
           HStack {
             Text("\(status.reps)")
@@ -243,17 +246,7 @@ struct WatchContentView: View {
               .padding(.horizontal, 8).padding(.vertical, 1)
               .background(.ultraThinMaterial, in: Capsule())
             Spacer()
-            // The workout's heart rate rides along on the picture page (048); no workout, no chip.
-            if workout.running, let heartRate = workout.heartRate {
-              HStack(spacing: 3) {
-                Image(systemName: "heart.fill").font(.system(size: 11)).foregroundStyle(.red)
-                Text("\(heartRate)").monospacedDigit()
-              }
-              .font(.system(size: 16, weight: .semibold, design: .rounded))
-              .padding(.horizontal, 8).padding(.vertical, 3)
-              .background(.ultraThinMaterial, in: Capsule())
-              .accessibilityLabel("Heart rate \(heartRate)")
-            }
+            heartRateChip
             Text(elapsed).monospacedDigit()
               .font(.system(size: 16, weight: .semibold, design: .rounded))
               .padding(.horizontal, 8).padding(.vertical, 3)
@@ -315,6 +308,20 @@ struct WatchContentView: View {
       // the outer buttons' lower corners stay outside a 60 pt corner radius. The phone rung is the truth for
       // the real bezel; the simulator raster has no corner mask.
       .ignoresSafeArea(edges: .bottom)
+  }
+
+  /// The workout's heart rate on the picture page, recording (048) or framing (#106); no workout, no chip.
+  @ViewBuilder private var heartRateChip: some View {
+    if workout.running, let heartRate = workout.heartRate {
+      HStack(spacing: 3) {
+        Image(systemName: "heart.fill").font(.system(size: 11)).foregroundStyle(.red)
+        Text("\(heartRate)").monospacedDigit()
+      }
+      .font(.system(size: 16, weight: .semibold, design: .rounded))
+      .padding(.horizontal, 8).padding(.vertical, 3)
+      .background(.ultraThinMaterial, in: Capsule())
+      .accessibilityLabel("Heart rate \(heartRate)")
+    }
   }
 
   /// The round camera-cycler both face rows share.
