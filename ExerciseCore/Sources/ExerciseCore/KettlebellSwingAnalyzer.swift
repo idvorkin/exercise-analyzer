@@ -18,10 +18,19 @@ import Foundation
 public struct SwingThresholds {
   public init() {}
   public var topSpineMax = 25.0  // spine must be more upright than this at the top
-  public var topHipMin = 150.0  // hip must be extended past this at the top
+  /// Hip must be extended past this at the top. A lockout reads 171° or more; standing up from parking the bell
+  /// and walking off, arms a little forward, reads 151–156° (#97). 160: every fixture keeps its count from 158
+  /// to 166.
+  public var topHipMin = 160.0
   /// Arm must be above this at the top. Low swings and a low, close camera (arms in front foreshortened) read
   /// 40–55°; the top is confirmed by the wrist-height peak, so this only has to exclude hanging arms (#16).
   public var topArmMin = 40.0
+  /// A one-arm swing with the upper arm on the ribs (the forearm lifts the bell) peaks at only 37–49° (#97), so
+  /// a top this low counts too, but only on a ballistic upswing: within `ballisticReleaseMax` of the arms
+  /// crossing vertical. Real swings get there in 0.10–0.27 s; a lifter who parked the bell and stands up with
+  /// the arms a little forward (33–37°) takes 0.57–0.9 s.
+  public var ballisticTopArmMin = 32.0
+  public var ballisticReleaseMax = 0.4
   /// CONNECT→BOTTOM uses |arm| < bottomArmMax + 15: anything short of horizontal. The spine and hip conditions
   /// already separate the bottom from the top; from a low camera the arms behind the body read up to 85° (#16).
   public var bottomArmMax = 75.0
@@ -160,7 +169,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
         releaseStartTime = time
       }
     default:  // release
-      if shouldTransitionToTop(a) {
+      if shouldTransitionToTop(a, time: time) {
         if time - repStartTime > thresholds.maxRepDuration {
           abandonRep()  // walk-in or pick-up that ended in a first lockout: not a swing
         } else {
@@ -234,8 +243,10 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
 
   /// RELEASE → TOP (rep complete): standing upright with the arm near horizontal, confirmed either by
   /// the wrist height peaking or by the arm staying horizontal for a few frames.
-  private func shouldTransitionToTop(_ a: Angles) -> Bool {
-    guard machine.canTransition, isAtTop(a) else { return false }
+  private func shouldTransitionToTop(_ a: Angles, time: Double) -> Bool {
+    let ballistic = time - releaseStartTime <= thresholds.ballisticReleaseMax
+    guard machine.canTransition, isAtTop(a, armMin: ballistic ? thresholds.ballisticTopArmMin : thresholds.topArmMin)
+    else { return false }
 
     if wristHeightHistory.count >= 3 {
       let len = wristHeightHistory.count
@@ -252,8 +263,9 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
   }
 
   /// Standing tall with the arms raised: the pose of a lockout, whatever the wrists did before it.
-  private func isAtTop(_ a: Angles) -> Bool {
-    a.measured && a.spine <= thresholds.topSpineMax && a.hip >= thresholds.topHipMin && abs(a.arm) > thresholds.topArmMin
+  private func isAtTop(_ a: Angles, armMin: Double? = nil) -> Bool {
+    a.measured && a.spine <= thresholds.topSpineMax && a.hip >= thresholds.topHipMin
+      && abs(a.arm) > (armMin ?? thresholds.topArmMin)
   }
 
   private func smoothedWristHeight(center: Int, radius: Int) -> Double {

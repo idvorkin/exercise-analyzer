@@ -105,7 +105,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** the count is seven: the swing after the hole starts at its own top and is counted
 - **and Then:** the session log has a `capture_gap` event saying how long the hole was and why frames were dropped
 
-- **Issues:** [#4](https://github.com/idvorkin/exercise-analyzer/issues/4), [#15](https://github.com/idvorkin/exercise-analyzer/issues/15), [#16](https://github.com/idvorkin/exercise-analyzer/issues/16); [#94](https://github.com/idvorkin/exercise-analyzer/issues/94) a 9-swing set counted 6: the recording lost 2.2 s to a main-thread hang (open: the hole itself)
+- **Scenario:** One-arm swings with the upper arm on the ribs
+- **Given:** a set of ten one-arm swings where my upper arm stays close to the body and the forearm lifts the bell to chest height, picked up off the floor after a few seconds of setup
+- **When:** the clip is analyzed as a kettlebell swing
+- **Then:** every swing after the first is counted (the first comes off the floor after the setup and is not counted, as with the pick-up clip), each rep's Top picture shows me standing with the bell up, not hinged, and parking the bell and walking to the phone is not a rep
+- **Built so far:** eight of the ten: the second swing is still lost, because standing up with the bell reads as Connect and the first top never starts a rep (open on #97)
+
+- **Issues:** [#4](https://github.com/idvorkin/exercise-analyzer/issues/4), [#15](https://github.com/idvorkin/exercise-analyzer/issues/15), [#16](https://github.com/idvorkin/exercise-analyzer/issues/16); [#94](https://github.com/idvorkin/exercise-analyzer/issues/94) a 9-swing set counted 6: the recording lost 2.2 s to a main-thread hang (open: the hole itself); [#97](https://github.com/idvorkin/exercise-analyzer/issues/97) a ten-swing one-arm set counted 5: the arm reads 37–49° at the top and the cut-off was 40 (host: swing-onearm-10reps 5 → 8 and the archived set 73014BDE 6 → 8, the other 33 fixtures and tracks unchanged; a low top counts only on a fast upswing and with the hips locked out, which keeps the bell park out; the second swing still open; on the phone pending)
 
 ---
 

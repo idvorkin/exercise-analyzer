@@ -10,7 +10,7 @@ BOTTOM, the first qualifying frame for CONNECT and RELEASE.
 
 | Phase | Meaning | Condition (degrees, `SwingThresholds`) |
 |---|---|---|
-| TOP | lockout: arms at peak height, standing tall | spine < 25 (`topSpineMax`), hip > 150 (`topHipMin`), arm > 40 (`topArmMin`); confirmed by the wrist-height peak |
+| TOP | lockout: arms at peak height, standing tall | spine < 25 (`topSpineMax`), hip > 160 (`topHipMin`), arm > 40 (`topArmMin`), or > 32 within 0.4 s of the release (`ballisticTopArmMin`, `ballisticReleaseMax`); confirmed by the wrist-height peak |
 | CONNECT | arms vertical against the body before the hinge | arm < 25 (`connectArmMax`), spine < 25 (`connectSpineMax`) |
 | BOTTOM | deepest hinge, arms behind the body | arm < 75 + 15 (`bottomArmMax`, anything short of horizontal), spine > 35 (`bottomSpineMin`), hip < 140 (`bottomHipMax`) |
 | RELEASE | arms leaving the body after the hip snap | arm < 25 (`releaseArmMax`), spine < 25 (`releaseSpineMax`) |
@@ -30,6 +30,12 @@ BOTTOM, the first qualifying frame for CONNECT and RELEASE.
 - **Arm thresholds are wide on purpose** (#16): a low, close camera reads arms behind the body at up to 85° and arms
   in front at 40–55°; the spine and hip conditions separate top from bottom, so the arm only has to exclude
   hanging arms.
+- **A low top counts only on a fast upswing** (`ballisticTopArmMin` 32 within `ballisticReleaseMax` 0.4 s, #97).
+  One-arm swings with the upper arm on the ribs peak at 37–49°; a lifter who parked the bell and stands up with
+  the arms a little forward reads 33–37° too, but gets there 0.57–0.9 s after the arms cross vertical, a swing in
+  0.10–0.27 s.
+- **The top is a lockout** (`topHipMin` 160, #97): real tops read hip ≥ 171°; standing up from the bell park and
+  walking off reads 151–156°.
 
 ## Quality
 
@@ -47,8 +53,11 @@ Scored per rep from the stored positions (lockout angles, hinge depth); mirrored
 | swing-walkin-9reps | 9 | yes | #15 (IMG_4337): the walk-in and pick-up (0.5–6.6 s) counted as rep 1 |
 | swing-lowcam-10reps | 10 | no | #16 (IMG_4340): low, close camera; counted 0 before the arm thresholds were relaxed |
 | swing-hole-7reps | 7 | no | #94: a live set whose recording lost 12.68–14.88 s; 9 swings, 2 cut by the hole |
+| swing-onearm-10reps | 8 | no | #97: ten one-arm swings with the upper arm on the ribs, arm peaks 37–49° at the top; counted 5. The first two are not countable yet (see Experiments); the bell park at the end must not be a rep |
 
-Reports: `TuningReports.testSwingRepTraces`, `SwingThresholdSweep.testSwingThresholdSweep`, and
+Reports: `TuningReports.testSwingTopArmSweep` (every swing fixture's and archived swing track's count per
+`ballisticTopArmMin`; `SWING_TOP_HIP`, `SWING_BALLISTIC`, `SWING_MAX_REP` rerun it under other thresholds),
+`TuningReports.testSwingRepTraces`, `SwingThresholdSweep.testSwingThresholdSweep`, and
 `TuningReports.testSwingSignals` (every frame's angles and phase for one archived track, `SWING_TRACK=<name>
 SWING_FROM=12 SWING_TO=17`).
 
@@ -66,5 +75,33 @@ SWING_FROM=12 SWING_TO=17`).
   the upswing at 15.14 for CONNECT, and finished that rep at 16.81: 4.6 s from its top, discarded by
   `maxRepDuration`. With `maxFrameGap` the rep in progress is dropped at the hole and the next one starts at the
   top at 15.54: 6 → 7, spans 1.10–1.43 s, the other swing fixtures unchanged. The two swings in the hole have no
-  poses and stay uncounted; the capture now logs `capture_gap` so the hole itself can be fixed from evidence. with many arm cycles and slightly uneven legs (walk-in, diagonal camera) fell to
+  poses and stay uncounted; the capture now logs `capture_gap` so the hole itself can be fixed from evidence
+  (commit 7beca0c).
+- **2026-09-12, detector**: swings with many arm cycles and slightly uneven legs (walk-in, diagonal camera) fell to
   "ambiguous"; see [detector.md](detector.md) (commit 8bc27b5).
+- **2026-09-18, swing-onearm-10reps (#97)**: a 24 s one-arm set counted 5; the video has ten tops (5.1, 6.6, 8.1,
+  9.7, 11.3, 12.8, 14.3, 15.9, 17.5, 19.1 s), bell at chest to head height. The upper arm stays on the ribs and the
+  forearm lifts the bell, so shoulder→elbow peaks at only 37–49° at the top, and on both sides alike: the model
+  puts the working wrist on the guard hand, so the two arms read the same. With `topArmMin` 40 the tops at 11.3 and
+  19.1 (peaks 39° and 37°) never left RELEASE, and the machine then ran one phase late (the hinge labelled TOP,
+  the real top labelled CONNECT), merging two swings into one 2.3 s rep. Lowering `topArmMin` alone
+  (40/38/36/34/32/30/28: this set 5/7/9/9/9/9/9, the seven other fixtures unchanged) looked clean on the
+  fixtures and was not: over the 28 archived swing tracks, 32 added a false last rep to three sets (F853A918
+  10 → 11, 96FEBD60 9 → 10, FD1FCA37 17 → 18) and one to this set. All four are Igor parking the bell, standing
+  up and walking to the phone with the arms a little forward, 33–37°, which overlaps the real tops (37–49°). Two
+  things tell them apart. Speed: a real upswing passes the cut-off 0.10–0.27 s after RELEASE, the three parks
+  0.57–0.9 s after, so the low cut-off applies only to a ballistic upswing (`ballisticTopArmMin` 32 within
+  `ballisticReleaseMax` 0.4 s; `topArmMin` stays 40). `testSwingTopArmSweep`, window 0.3/0.4/0.5/0.6 s at 32°:
+  this set 8/8/8/8, 73014BDE 6/8/8/8 (two real swings, 1.55 s rhythm), F853A918 10/10/10/11; at 28° F853A918 is
+  11 at every window. Hip: this set's park stands up fast (0.14 s) but with hip 151–156°, real tops read ≥ 171°;
+  `SWING_TOP_HIP` 150/160/166: this set 9/8/8, nothing else moves up to 166 (at 170 swing-lowcam loses a rep).
+  `topHipMin` 150 → 160. Result: this set 5 → 8 (spans 1.17–1.47 s), 73014BDE 6 → 8, the other 7 fixtures and
+  26 tracks unchanged. Also rejected: `maxRepDuration` 3 s (removes the parks, costs a first rep in eight sets).
+  The two swings still missing: the first comes off the floor after 4.7 s of setup and is dropped by
+  `maxRepDuration`, as in swing-pickup-10reps; the second goes with it, because standing up with the bell reads
+  as CONNECT and the first top (5.1 s) is never a TOP, so no rep starts there. Rejected: abandoning a rep whose
+  BOTTOM lasts over 1–2.5 s (removes the park, but swing-pickup 9 → 8 at every value and swing-lowcam 10 → 8–9:
+  a held hike is a long bottom too); CONNECT → TOP when the pose is a top (recovers the second swing, 9 real
+  reps, but swing-lowcam 10 → 3 and swing-pickup 9 → 10: foreshortened arms bounce across the cut-off). A
+  shoulder→wrist angle would separate a top from hanging arms better, but the wrist here is mislabelled, so it
+  was not tried. Not yet confirmed by Igor.

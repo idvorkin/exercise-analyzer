@@ -34,6 +34,15 @@ struct Fixture {
     // 9 swings, 2 of them cut by the hole, so 7 can be counted. 6 were: the swing after the hole was timed from
     // the top before it and discarded as longer than 4 s. Not yet confirmed by Igor.
     Fixture(name: "swing-hole-7reps", expectedExercise: .kettlebellSwing, expectedReps: 7, humanVerified: false),
+    // Igor's one-arm set (2026-09-18, recents 3B9EC34D, #97): "it says I only have five reps". Ten tops in the
+    // video (5.1, 6.6, 8.1, 9.7, 11.3, 12.8, 14.3, 15.9, 17.5, 19.1 s), bell at chest to head height. The upper
+    // arm stays on the ribs and the forearm lifts the bell, so shoulder→elbow reads 33–49° at the top, on both
+    // sides (the model puts the working wrist on the guard hand). 5 were counted with `topArmMin` 40. 8 now:
+    // the first swing comes off the floor after 4.7 s of setup and is discarded as longer than 4 s (as in
+    // swing-pickup-10reps), and the second is lost with it, because standing up with the bell reads as CONNECT
+    // and the first top (5.1 s) is never a TOP, so no rep starts there. Parking the bell and walking off (hip
+    // 151–156°, arms 33–56°) is not a ninth rep. Not yet confirmed by Igor.
+    Fixture(name: "swing-onearm-10reps", expectedExercise: .kettlebellSwing, expectedReps: 8, humanVerified: false),
     Fixture(name: "pistol-6reps", expectedExercise: .pistolSquat, expectedReps: 6, humanVerified: false),
     // Head height drops 8 times at a steady ~4.2 s rhythm; the earlier front-knee analyzer counted 10.
     Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),

@@ -93,6 +93,40 @@ extension TuningReports {
     }
   }
 
+  /// Every swing fixture's count under a range of `ballisticTopArmMin` (#97): the cut-off that decides whether
+  /// a standing frame right after the release is a top (40 = `topArmMin`, the rule before #97).
+  /// `swift test --filter testSwingTopArmSweep`; `SWING_TOP_HIP=166` runs the same table under another
+  /// `topHipMin`, `SWING_MAX_REP=3` under another `maxRepDuration`, `SWING_BALLISTIC=0.6` under another
+  /// `ballisticReleaseMax`. The archived phone tracks follow the fixtures (no known answer: watch for a count
+  /// that moves).
+  func testSwingTopArmSweep() throws {
+    let env = ProcessInfo.processInfo.environment
+    let topHip = Double(env["SWING_TOP_HIP"] ?? ""), maxRep = Double(env["SWING_MAX_REP"] ?? "")
+    let ballistic = Double(env["SWING_BALLISTIC"] ?? "")
+    let values = [40.0, 38, 36, 34, 32, 30, 28]
+    func row(_ name: String, _ want: String, _ frames: [FrameRecord]) {
+      let counts = values.map { value -> Int in
+        var thresholds = SwingThresholds()
+        thresholds.ballisticTopArmMin = value
+        if let topHip { thresholds.topHipMin = topHip }
+        if let maxRep { thresholds.maxRepDuration = maxRep }
+        if let ballistic { thresholds.ballisticReleaseMax = ballistic }
+        let pipeline = AnalysisPipeline(exercise: .kettlebellSwing, analyzer: KettlebellSwingAnalyzer(thresholds: thresholds))
+        for frame in frames { pipeline.process(extracted: frame) { nil } }
+        return pipeline.reps.count
+      }
+      print(name.padding(toLength: 40, withPad: " ", startingAt: 0) + want.padding(toLength: 6, withPad: " ", startingAt: 0)
+        + counts.map { String(format: "%3d", $0) }.joined(separator: " "))
+    }
+    print("fixture".padding(toLength: 40, withPad: " ", startingAt: 0) + "want  " + values.map { String(format: "%3.0f", $0) }.joined(separator: " "))
+    for fixture in Fixture.all where fixture.expectedExercise == .kettlebellSwing {
+      row(fixture.name, "\(fixture.expectedReps)", try fixture.frames())
+    }
+    let tracks = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? [])
+      .filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+    for url in tracks { row(url.deletingPathExtension().lastPathComponent, "-", try Fixture.frames(at: url)) }
+  }
+
   /// Raw signals for a fixture at ~4 Hz, plus a naive rep count from smoothed knee-angle dips.
   func testBulgarianPhoneSignals() throws {
     let frames = try Fixture(name: "bulgarian-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 0, humanVerified: false).frames()
