@@ -1,76 +1,120 @@
 # Exercise Analyzer
 
-An iPhone and Apple Watch app that watches you lift. Point the phone at yourself, or hand it a clip, and it
-counts your reps and scores your form for kettlebell swings, pistol squats, Bulgarian split squats and Turkish
-get-ups. The pose model runs on the phone; nothing leaves it.
+**Focus on the lift. See every rep. Understand the whole workout.**
 
-| The phone: the HUD over the video, the rep gallery below | The wrist: framing the shot before you record |
+Exercise Analyzer turns your iPhone into a training partner that counts reps, breaks down your form, and
+puts your sets, rest, and heart rate in one picture. Set the phone on a tripod and run the session from your
+Apple Watch, or open a video you've already filmed.
+
+**Six exercises · Form scores for every rep · Watch control · Apple Health · On-device analysis**
+
+| See your form and effort | See your workout and recovery | Time your rest from your wrist |
+|---|---|---|
+| ![Swing replay: skeleton, joint angles, heart rate at the playhead and rep gallery](docs/screenshots/replay-heart-rate.png) | ![Workout detail: heart-rate curve, set markers, rep counts, rest durations and heart-rate drops](docs/screenshots/workout-heart-rate.png) | ![Watch workout: rest timer, live heart rate, session clock and last set](docs/screenshots/watch-rest-heart-rate.png) |
+
+*The workout timeline shows a real nine-set session. Replay and watch images are simulator captures with demo heart-rate data.*
+
+[Explore the screenshot gallery →](docs/screenshots/README.md)
+
+## From the first rep to the last rest
+
+1. **Set up once.** Prop up your phone, check the camera preview on your watch, and switch lenses from where
+   you'll lift. The framing indicator tells you whether you're fully in view.
+2. **Lift.** Start recording from your wrist. See reps as you go, pause for an interruption, and tap Done
+   when you finish. The app trims around the set and analyzes every frame for the final count and scores.
+3. **Review and recover.** Find the rep you want to inspect, check your form, and glance at your rest timer
+   before the next set. Start a workout on the watch to track heart rate and the whole session in Apple Health.
+
+Your playlist keeps playing through recording and replay.
+
+## See what happened in every rep
+
+Was that last squat shallower? Did your lockout change as you tired? Put the same moment of every rep side
+by side in the gallery, then tap a thumbnail to jump straight to it in the video.
+
+- **Scores with reasons.** Each rep gets a 0–100 form score and feedback about what to work on.
+- **Your movement, made visible.** A skeleton overlay, joint angles, and highlighted phases follow the video.
+  Zoom to yourself to make the details easier to see.
+- **Go straight to the moment.** Step by rep, phase, or frame with large controls. Hold the picture to bring
+  navigation under your thumbs.
+- **Effort alongside form.** For recordings with heart-rate data from a tracked workout, replay shows your
+  heart rate at the playhead, plus the set's peak, average, and drop during rest.
+
+## Six exercises, each with its own analysis
+
+| Exercise | What you can inspect |
 |---|---|
-| ![Swing analysis: rep count, phase pills and joint angles over the video, rep gallery below](docs/screenshots/swing-analysis.png) | ![Watch preview: the camera picture with the in-frame capsule and Record, Camera, Cancel](docs/screenshots/watch-preview.png) |
+| Kettlebell swing | Hinge depth, knee bend, and the top of each swing |
+| Pistol squat | Depth, torso lean, and the extended leg |
+| Bulgarian split squat | Front-leg depth, back-knee position, and torso lean |
+| Split squat | Floor-based split squats, including barbell sets |
+| Turkish get-up | The journey from floor to standing and back, step by step and by arm |
+| Pull-up | Hang, pull, top, and lowering, with feedback on height and arm extension |
 
-Every screen, phone and watch: [the gallery](docs/screenshots/README.md).
+Leave the exercise on **Auto**, or choose it yourself. Switching exercises re-reads the saved poses without
+rescanning the video.
 
-## What it does
+## Your session, on your wrist
 
-The user stories are the spec. Each one says what the feature does, how it is verified, and which commit
-built it, so the list below is short on purpose.
+Keep the phone on the tripod. **Preview, Record, Pause, Resume, and Done** are all on the watch, along with
+camera switching and a tap when you drift out of frame.
 
-- **Record a set.** Live camera with the rep count, the phase and the joint angles drawn over you as you go.
-  Done trims the clip to where the reps were and runs a second, slower pass over every frame. That pass is
-  the truth: the count, the scores, and the gallery come from it. [Recording](docs/stories/01-recording.md)
-- **Look at it afterwards.** Scrub the clip with the skeleton on it, step by rep, by position, or by frame,
-  and open a gallery of stills cut to you, one row per rep. Hold the middle of the picture and both sets of
-  keys appear under your thumbs. [Reviewing](docs/stories/02-reviewing.md)
-- **Bring your own clip.** Import from Photos or Files, trim it, save the trimmed version back.
-  [Clips](docs/stories/03-clips.md)
-- **See the day.** A sheet of the day's sets, collapsed to a line of stick figures or open to the full
-  gallery, with recents that point back at Photos. [Workouts](docs/stories/04-workouts.md)
-- **Run it from the watch.** The whole session from the wrist, phone on a tripod. See below.
-  [From the wrist](docs/stories/05-watch.md)
-- **Tell us what broke.** Shake the phone and a report goes out with the clip, the playhead and the log
-  attached. [Feedback](docs/stories/06-feedback.md)
+Start one workout for your entire gym visit: warm-up, sets, and rests. Heart rate and elapsed time stay on
+your wrist across recordings. Between sets, the rest timer takes the spotlight; it stays visible while you
+frame your next shot, with a notification when your chosen rest time is up if notifications are enabled.
+End the workout to save it to Apple Health as functional strength training.
 
-## From the wrist
+<img src="docs/screenshots/watch-preview-heart-rate.png" alt="Watch camera preview with rest timer, heart rate, in-frame indicator and recording controls" width="280">
 
-This is how I actually use it. The phone goes on a tripod or a rack, I walk to where I lift, and the watch
-does the rest. **Preview** shows me the camera picture on my wrist, tells me if my feet are cut off, and lets
-me flip to the wide lens without walking back. **Record** starts the set from that moment. The count and the
-time sit on the picture, Pause freezes them, Done ends the set, and the wrist taps me when I drift out of
-frame. When the set is over the watch shows the final count and starts counting my rest. Lower the wrist and
-the watch face keeps showing the set.
+*Frame the next set while keeping your rest time and heart rate in sight.*
 
-The watch never pretends the phone is there when it is not: lose the connection and it says so, with the last
-count it heard. There is no workout session and no heart rate on purpose; the watch is a remote control, not
-a fitness tracker.
+## The whole workout in one view
 
-Every watch screen and what it must show and offer, plus the stories behind each control, are in
-[docs/stories/05-watch.md](docs/stories/05-watch.md).
+See your heart-rate curve with every recorded set marked along the timeline. Tap a set's band to open its
+video, then return to the workout. Each set's row brings together reps, form score, peak heart rate, rest
+duration, and how far your heart rate fell afterwards.
+
+Browse training by day and exercise, with thumbnails of the lift and totals at a glance. As the analysis
+improves, stored sets refresh automatically.
+
+## Your videos belong in your library
+
+Open clips from **Photos or Files**, including sets you filmed before installing the app. Photos suggestions
+separate **New, Analyzed, and Ignored** clips so you can pick up where you left off.
+
+Trim around the reps without re-encoding, preserve HDR, and save clean footage without the skeleton burned
+in. Replace the original in Photos when you're ready, with Undo trim available. When removing a set, the
+app tells you whether its video stays in Photos or whether you're deleting the only copy kept in the app.
+
+Pose analysis runs on your iPhone using Core ML. Your footage doesn't need to be uploaded for analysis.
 
 ## How it works
 
-A YOLO pose model finds seventeen keypoints in every frame. Per-exercise analyzers turn joint angles into
-phases, phases into reps, and reps into scores, each with thresholds that were tuned against real clips and
-the fixtures that prove them. The live pass feeds the HUD; the offline pass over the recorded clip decides.
+A YOLO pose model finds seventeen keypoints in every frame. Exercise-specific analyzers turn movement into
+phases, reps, and scores, with rules tested against real recorded pose tracks. The live pass feeds the HUD;
+the full pass over the recorded clip produces the final results.
 
+- Feature details, implementation status, and verification: [user stories](docs/stories/README.md)
 - How poses become reps and scores, one file per exercise: [docs/analysis/](docs/analysis/README.md)
 - What the offline pass costs and how it is measured: [performance](docs/analysis/performance.md), and every
   precision and speed hypothesis we tried, with its numbers: [optimization](docs/analysis/optimization.md)
-- The kettlebell detector, off by default until it earns its keep: [kettlebell-detector](docs/analysis/kettlebell-detector.md)
+- Optional kettlebell tracking, off by default: [kettlebell-detector](docs/analysis/kettlebell-detector.md)
 - Where the code is going and why: [docs/architecture/](docs/architecture/)
 
 ## Build and test
 
 ```bash
-just model        # fetch the pose model into the app (gitignored)
-just test         # host tests on real pose tracks, about a second
-just build-sim    # simulator build
-just test-sim     # the app end to end on the simulator, judged from its log
+just model          # fetch the pose model into the app (gitignored)
+just test           # host tests on real pose tracks, about a second
+just build-sim      # simulator build
+just test-sim       # the app end to end on the simulator, judged from its log
 just watch-screens  # every watch screen from a fixed state, for your eyes
-just run-device   # your iPhone, with the watch app installed alongside
+just run-device     # build, install, and launch on your iPhone
 ```
 
 The test ladder, the fixtures, the simulator hooks and which change is verified where:
 [docs/TESTING.md](docs/TESTING.md).
+Watch installation and device setup: [device tooling](docs/DEBUGGING.md#device-tooling).
 
 ## Debugging
 
