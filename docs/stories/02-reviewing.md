@@ -248,6 +248,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I keep holding it
 - **Then:** it fires again every half second for Rep and Position and every tenth of a second for Frame until I lift or slide off; sliding to another key, on either stack (a drag straight across the picture reaches the other side), fires that key at once and restarts its cadence; a thumb resting on the border between two keys keeps the key it arrived on; sliding off the stack in any direction lets go of the key; lifting fires nothing more and leaves the stacks up
 
+- **Scenario:** Controls keep the picture visible
+- **Given:** the seek stacks are up over a set
+- **When:** I look through an idle or active key
+- **Then:** I can still see the lifter behind it: idle cards use 25% black and active cards use 55% accent colour, with shadowed white labels
+
+- **Issues:** [#114](https://github.com/idvorkin/exercise-analyzer/issues/114) seek cards hid too much of the picture; the split-squat checkpoint part is tracked in #118
+
 - **Scenario:** Tapping a key while the stacks are up
 - **Given:** both stacks are up from an earlier hold
 - **When:** I tap the forward Rep key

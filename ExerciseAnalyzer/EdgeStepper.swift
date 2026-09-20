@@ -221,8 +221,9 @@ struct KeyStackView: View {
           if side == .next { Image(systemName: "chevron.right") }
         }
         .font(.headline)
+        .shadow(color: .black.opacity(0.8), radius: 2, y: 1)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(lit == key ? Color.accentColor : Color.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 14))
+        .background(lit == key ? Color.accentColor.opacity(0.55) : Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 14))
         .foregroundStyle(.white)
         .scaleEffect(lit == key ? litScale : 1)
       }

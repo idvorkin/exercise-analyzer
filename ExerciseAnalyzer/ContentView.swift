@@ -966,6 +966,12 @@ struct ContentView: View {
     if env["SWING_WORKOUTS_COLLAPSED"] == "1" { workoutsDetent = WorkoutGalleryView.collapsedDetent }
     // Test hook: the main menu over whatever loads (with SWING_OPEN_RECENT, over a set and its rep gallery).
     if env["SWING_SHOW_MENU"] == "1" { showOpenDialog = true }
+    if env["SWING_SHOW_SEEK_CONTROLS"] == "1" {
+      Task { @MainActor in
+        try? await Task.sleep(for: .seconds(4))
+        stacksUp = true
+      }
+    }
     if let wanted = env["SWING_OPEN_RECENT"], !wanted.isEmpty {
       // Test hook: reopen a Recents entry, the newest for "1" or the one with this id (a long clip for a memory run).
       let entry = wanted == "1" ? session.recents.entries.first : session.recents.entries.first { $0.id == wanted }
