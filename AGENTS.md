@@ -34,6 +34,16 @@ carry only what was decided.
 - **Wrong rep count = fixture first.** Export the set's pose track from the phone's `Documents/recents/<id>/analysis.json`
   into `ExerciseCore/Tests/ExerciseCoreTests/Fixtures/`, make `swift test` fail, then fix. Never tune by reinstalling.
   Mark fixtures `humanVerified` only when Igor confirmed the count.
+- **Video frames go to a cheaper vision helper first** (Igor, 2026-09-20). Always delegate frame inspection
+  during video investigations to an available lower-cost vision model, in a fresh context with just the paths,
+  timestamps and question. The main agent works from its concise text descriptions, not batches of images.
+  This authorizes a read-only frame-description subagent; use the worktree rules below. Sample coarsely first,
+  then inspect short sequences around disputed events; cache the descriptions and reuse them. Preserve timestamps,
+  evidence paths, occlusions and uncertainty. A still does not establish a completed rep, and a model's count
+  never makes a fixture `humanVerified`. Ask the helper for more evidence when unclear; inspect individual frames
+  in the main agent only when specifically needed to resolve a remaining ambiguity or requested by Igor.
+  The workflow is shared with Claude through `CLAUDE.md`; model selection is specific to each agent's tooling.
+  See [the frame-description workflow](docs/DEBUGGING.md#video-frame-descriptions).
 - **Instrument before theorizing.** For any phone-only symptom add a log event, deploy, `just pull-logs`, then fix
   from evidence. Never ship a second guessed fix ([DEBUGGING.md](docs/DEBUGGING.md) lists the events).
 - **Run the bug monitor while Igor is on the phone**: arm a `Monitor` on `scripts/bugs-monitor.sh` (persistent).

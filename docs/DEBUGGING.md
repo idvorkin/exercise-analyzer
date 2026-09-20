@@ -101,6 +101,43 @@ A phone-only symptom in the offline pass is reproduced on the Mac with `posetrac
 - **AirDrop** the clip from the phone; it lands in `~/Downloads`.
 - **Recents pose track** (`just pull-tracks`) when only the analysis is in question, not decoding or the models.
 
+## Video frame descriptions
+
+For video investigations, have a cheaper vision helper inspect the images and return text to the main agent.
+Igor requested this on 2026-09-20 to reduce expensive image context. `CLAUDE.md` imports `AGENTS.md`, so the
+same workflow applies to Codex and Claude.
+
+1. Locate the exact source clip and pose track. Record the clip identity, duration and timestamp convention;
+   filenames alone can collide in Photos. Extract local frames with timestamps in their filenames. Start with
+   a small overview and add neighboring frames around candidate reps, setup, reracking and suspected mistakes.
+2. Delegate a bounded batch to an available lower-cost model that accepts images. Give it a fresh context:
+   frame paths, timestamps and the specific observation needed. Do not fork the main conversation's image
+   history or have the main agent open the batch first. Keep the helper read-only in an isolated worktree.
+   With the Codex tools available in this project, `gpt-5.6-luna`, `fork_turns="none"` and low reasoning are the
+   starting choice for descriptions. Claude should select its own available cheaper vision model; OpenAI model
+   IDs are not Claude configuration. If image input is unsupported, report that and select a compatible helper.
+3. Request only observable facts: posture and movement across the supplied sequence, equipment, body parts
+   outside the frame or hidden, confidence and remaining uncertainty. Return **text only**, with the timestamp
+   and source path for every observation. Do not return images or base64 to the main agent. Distinguish a
+   visible lunge position from evidence of a complete down-and-up rep; do not guess a count from sparse stills.
+4. Cache the report under `~/tmp/agent/notes/`, keyed by source clip identity/content hash, frame timestamps,
+   extraction settings, model and prompt version. Reuse matching observations instead of repeatedly sending
+   the same frames. A changed crop, source, question or model may require a new observation.
+5. The main agent compares those descriptions with the pose trace and failing fixture. If the evidence is
+   unclear, send a denser local sequence or clearer frame to the helper first. Main-agent image inspection is
+   limited to particular unresolved ambiguities or Igor's explicit request. Human count confirmation still
+   belongs to Igor; use Lavish for that review and do not mark model-only counts `humanVerified`.
+
+Suggested handoff (one row per frame or sequence):
+
+| Time / interval | Source frames | Visible action and equipment | Occlusion / uncertainty | Confidence |
+|---|---|---|---|---|
+| 48.2 s | `frame-048.200.png` | Deep split-lunge position beneath a loaded barbell | Plate hides head and torso; still alone cannot prove a full rep | High for posture, unknown for completion |
+
+Separate model choice is supported by the [official subagent documentation](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+This avoids importing bulk frame images into the main agent's context; it does not establish that helper
+inference is free or that an account has a particular allowance.
+
 ## Instruments from the command line
 
 `just trace-device` attaches Instruments to the running app on the phone for 90 s with the Allocations template
