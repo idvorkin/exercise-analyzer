@@ -34,7 +34,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 006:
 
 - **Summary:** Line up the same moment of every rep to compare form
-- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone; the me-view stills of [#61](https://github.com/idvorkin/exercise-analyzer/issues/61) on the phone since 2026-09-13; eye-toggle fix [c30e384](https://github.com/idvorkin/exercise-analyzer/commit/c30e384) verified by simulator screenshots with the skeleton off and on (2026-09-20); phone installation pending because the device is unavailable
+- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone; the me-view stills of [#61](https://github.com/idvorkin/exercise-analyzer/issues/61) on the phone since 2026-09-13; eye-toggle fix [c30e384](https://github.com/idvorkin/exercise-analyzer/commit/c30e384) verified by simulator screenshots with the skeleton off and on (2026-09-20); installed and launched on the phone 2026-09-20; Igor's visual check pending
 
 #### Use Case:
 - **As a** lifter looking for the rep where form slipped
@@ -64,7 +64,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 007:
 
 - **Summary:** Step by frame and by position with targets big enough for the gym
-- **Status:** implemented in [564a753](https://github.com/idvorkin/exercise-analyzer/commit/564a753); verified by simulator screenshot; the fixes for [#54](https://github.com/idvorkin/exercise-analyzer/issues/54) and [#56](https://github.com/idvorkin/exercise-analyzer/issues/56) on the phone since 2026-09-13; the scrubber follow-up [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) is Igor's check; Position labels [06c95d9](https://github.com/idvorkin/exercise-analyzer/commit/06c95d9) verified by simulator screenshot (2026-09-20); phone installation pending because the device is unavailable
+- **Status:** implemented in [564a753](https://github.com/idvorkin/exercise-analyzer/commit/564a753); verified by simulator screenshot; the fixes for [#54](https://github.com/idvorkin/exercise-analyzer/issues/54) and [#56](https://github.com/idvorkin/exercise-analyzer/issues/56) on the phone since 2026-09-13; the scrubber follow-up [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) is Igor's check; Position labels [06c95d9](https://github.com/idvorkin/exercise-analyzer/commit/06c95d9) verified by simulator screenshot (2026-09-20); installed and launched on the phone 2026-09-20; Igor's visual check pending
 
 #### Use Case:
 - **As a** lifter holding a phone with chalky hands
@@ -152,7 +152,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 030:
 
 - **Summary:** Move through a set from the edges of the picture, no chrome needed
-- **Status:** implemented in [04b1922](https://github.com/idvorkin/exercise-analyzer/commit/04b1922), [53e7a04](https://github.com/idvorkin/exercise-analyzer/commit/53e7a04); on the phone, Igor's check pending (gestures); unified holds [49046c0](https://github.com/idvorkin/exercise-analyzer/commit/49046c0) verified on the host (six PlaybackTouchTests) and by simulator build/screenshot; phone installation and touch feel pending
+- **Status:** implemented in [04b1922](https://github.com/idvorkin/exercise-analyzer/commit/04b1922), [53e7a04](https://github.com/idvorkin/exercise-analyzer/commit/53e7a04); on the phone, Igor's check pending (gestures); unified holds [49046c0](https://github.com/idvorkin/exercise-analyzer/commit/49046c0) verified on the host (six PlaybackTouchTests) and by simulator build/screenshot; installed and launched on the phone 2026-09-20; Igor's touch check pending
 
 #### Use Case:
 - **As a** lifter scrubbing a rep with a thumb on each edge of the phone
@@ -224,7 +224,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 039:
 
 - **Summary:** Hold anywhere on the picture to get both edges' keys at once, and hold a key to repeat it
-- **Status:** implemented in [1fcdc3c](https://github.com/idvorkin/exercise-analyzer/commit/1fcdc3c), [b96aec3](https://github.com/idvorkin/exercise-analyzer/commit/b96aec3) and the cadence and cross-drag of [#63](https://github.com/idvorkin/exercise-analyzer/issues/63); on the phone since 2026-09-13, Igor's check pending (gestures); lighter cards [8799878](https://github.com/idvorkin/exercise-analyzer/commit/8799878) and unified holds [49046c0](https://github.com/idvorkin/exercise-analyzer/commit/49046c0) verified by simulator screenshots and six host PlaybackTouchTests (2026-09-20); signed phone build passes, installation and touch feel pending while the iPhone is unavailable
+- **Status:** implemented in [1fcdc3c](https://github.com/idvorkin/exercise-analyzer/commit/1fcdc3c), [b96aec3](https://github.com/idvorkin/exercise-analyzer/commit/b96aec3) and the cadence and cross-drag of [#63](https://github.com/idvorkin/exercise-analyzer/issues/63); on the phone since 2026-09-13, Igor's check pending (gestures); lighter cards [8799878](https://github.com/idvorkin/exercise-analyzer/commit/8799878) and unified holds [49046c0](https://github.com/idvorkin/exercise-analyzer/commit/49046c0) verified by simulator screenshots and six host PlaybackTouchTests (2026-09-20); signed phone build passes; installed and launched on the phone 2026-09-20, Igor's touch check pending
 - **Why:** Igor, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds."
 
 #### Use Case:
