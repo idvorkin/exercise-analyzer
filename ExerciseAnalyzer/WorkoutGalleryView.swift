@@ -333,17 +333,6 @@ extension RecentEntry {
 }
 
 extension ExerciseKind {
-  var symbol: String {
-    switch self {
-    case .kettlebellSwing: return "figure.strengthtraining.traditional"
-    case .pistolSquat: return "figure.cross.training"
-    case .bulgarianSplitSquat: return "figure.step.training"
-    case .turkishGetUp: return "figure.core.training"
-    case .pullUp: return "figure.play"  // arms up and out: the nearest SF figure to a hang
-    case .splitSquat: return "figure.strengthtraining.functional"  // a lunge
-    }
-  }
-
   var tint: Color {
     switch self {
     case .kettlebellSwing: return .orange
@@ -514,8 +503,7 @@ struct ExerciseSetsRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
-        Image(systemName: group.kind.symbol)
-          .font(.subheadline.bold())
+        ExerciseGlyph(kind: group.kind, size: 21)
           .frame(width: 28, height: 28)
           .background(group.kind.tint.opacity(0.18), in: Circle())
           .foregroundStyle(group.kind.tint)
@@ -590,7 +578,9 @@ struct SetCard: View {
           if let thumbnail {
             Image(uiImage: thumbnail).resizable().scaledToFill()
           } else {
-            tint.opacity(0.25)
+            ExerciseGlyph(kind: entry.exerciseKind, size: 32)
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .background(tint.opacity(0.25))
           }
         }
         .frame(width: Self.size.width, height: Self.size.height)

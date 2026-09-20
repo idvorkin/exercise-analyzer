@@ -37,6 +37,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I look at their cards
 - **Then:** the swing's card is cut from the whole frame in the card's own shape around me at the first rep's bottom, so I see myself head to feet with the bell, not the middle of a tall crop (a back with no hips or legs); when the frame is too narrow for all of me at that shape, the cut runs the full width from just over my head down. The set with no reps shows the middle moment somebody was on camera, not a blank card. Sets analyzed before this keep their picture until they are analyzed again
 
+- **Scenario:** Recognizable exercise drawings
+- **Given:** any of the six supported exercises appears in Workouts
+- **When:** I look at its header or a card with no thumbnail
+- **Then:** I see the approved A figure in that exercise's color: standing swing with the bell out front, compact pistol, rear-foot bench for Bulgarian, overhead bell for get-up, narrow-grip pull-up, or overhead-barbell split squat; subtle arrows show swing and pull-up motion; available set photos stay visible
+- **Issues:** [#120](https://github.com/idvorkin/exercise-analyzer/issues/120), approved in Lavish on 2026-09-20
+
 - **Issues:** [#110](https://github.com/idvorkin/exercise-analyzer/issues/110) Igor asked for the workout page's previews to be more representative (the cards showed a hunched back; sets with no reps a blank); [#35](https://github.com/idvorkin/exercise-analyzer/issues/35); [#78](https://github.com/idvorkin/exercise-analyzer/issues/78), [#79](https://github.com/idvorkin/exercise-analyzer/issues/79) Saturday's four swing sets drew as a blank band under a header that counted them (the row's id was the exercise name, repeated across days)
 
 ---
@@ -193,7 +199,9 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I look at the collapsed sheet
 - **Then:** it reads "swing · pistols" with an icon per exercise (a stick figure in the exercise's shape), in the order the sets were done, and nothing else; pulling the sheet up shows the full day as before
 
-- **Issues:** [#58](https://github.com/idvorkin/exercise-analyzer/issues/58)
+- **and Then:** each icon uses the same colored A drawing as the expanded exercise header, including the compact proportions and swing/pull-up motion cues approved in Lavish
+
+- **Issues:** [#58](https://github.com/idvorkin/exercise-analyzer/issues/58), [#120](https://github.com/idvorkin/exercise-analyzer/issues/120)
 
 ---
 
@@ -286,6 +294,8 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Given:** a workout of swings and pistols
 - **When:** I read its rows
 - **Then:** they say "10 swings" and "6 pistols" ("1 get-up", "8 split squats"), each with the set's own picture, and one line above the rows says what the red numbers are: peak, the drop in the 60 s after the set (or in the rest when it was shorter), the rest before the next
+
+- **and Then:** when a set has no picture, its row uses the same colored A exercise drawing as Workouts, with the exercise text still readable and accessible ([#120](https://github.com/idvorkin/exercise-analyzer/issues/120))
 
 - **Scenario:** The header still folds the day
 - **Given:** a day with a workout line under its header

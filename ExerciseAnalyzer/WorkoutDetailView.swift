@@ -173,7 +173,7 @@ private struct SetTimelineRow: View {
         if let thumbnail {
           Image(uiImage: thumbnail).resizable().scaledToFill()
         } else {
-          Image(systemName: row.exercise.symbol).font(.title3).foregroundStyle(row.exercise.tint)
+          ExerciseGlyph(kind: row.exercise, size: 24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(row.exercise.tint.opacity(0.2))
         }
