@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 012:
 
 - **Summary:** See a day's training as sets per exercise, not a list of files
-- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header is Igor's check; the repeated-exercise row in [cdbc435](https://github.com/idvorkin/exercise-analyzer/commit/cdbc435), verified on the simulator (a Yesterday with two swing sets under a Today with four), on the phone since 2026-09-16; the card's picture for [#110](https://github.com/idvorkin/exercise-analyzer/issues/110) verified on the host (`PersonCropTests`) and the simulator (a 9-rep swing set and a 0-rep set, Workouts screenshot) in [c460df5](https://github.com/idvorkin/exercise-analyzer/commit/c460df5), on the phone since 2026-09-19, Igor's check pending
+- **Status:** implemented in [bf074c8](https://github.com/idvorkin/exercise-analyzer/commit/bf074c8), [8747d9b](https://github.com/idvorkin/exercise-analyzer/commit/8747d9b), [f8633a8](https://github.com/idvorkin/exercise-analyzer/commit/f8633a8); verified by simulator screenshot; the year on the header is Igor's check; the repeated-exercise row in [cdbc435](https://github.com/idvorkin/exercise-analyzer/commit/cdbc435), verified on the simulator (a Yesterday with two swing sets under a Today with four), on the phone since 2026-09-16; the card's picture for [#110](https://github.com/idvorkin/exercise-analyzer/issues/110) verified on the host (`PersonCropTests`) and the simulator (a 9-rep swing set and a 0-rep set, Workouts screenshot) in [c460df5](https://github.com/idvorkin/exercise-analyzer/commit/c460df5), on the phone since 2026-09-19, Igor's check pending; approved A icons in [d6a139f](https://github.com/idvorkin/exercise-analyzer/commit/d6a139f) verified on the simulator (all six workout-detail fallbacks in light/dark, expanded headers with real photos, collapsed summary) and by signed phone build; installed 2026-09-20, launch blocked by the phone lock; collapse persistence and independent wrist-workout folding requested in [#121](https://github.com/idvorkin/exercise-analyzer/issues/121), planned
 
 #### Use Case:
 - **As a** lifter reviewing the week
@@ -42,6 +42,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I look at its header or a card with no thumbnail
 - **Then:** I see the approved A figure in that exercise's color: standing swing with the bell out front, compact pistol, rear-foot bench for Bulgarian, overhead bell for get-up, narrow-grip pull-up, or overhead-barbell split squat; subtle arrows show swing and pull-up motion; available set photos stay visible
 - **Issues:** [#120](https://github.com/idvorkin/exercise-analyzer/issues/120), approved in Lavish on 2026-09-20
+
+- **Scenario:** Returning to my folded workout list
+- **Given:** I collapsed a day or a workout recorded on the wrist
+- **When:** I close and reopen Workouts or relaunch the app
+- **Then:** those sections keep my choices; a wrist workout can fold independently without preventing me from opening its detail page
+- **Issues:** [#121](https://github.com/idvorkin/exercise-analyzer/issues/121), requested from the phone 2026-09-20; not implemented yet
 
 - **Issues:** [#110](https://github.com/idvorkin/exercise-analyzer/issues/110) Igor asked for the workout page's previews to be more representative (the cards showed a hunched back; sets with no reps a blank); [#35](https://github.com/idvorkin/exercise-analyzer/issues/35); [#78](https://github.com/idvorkin/exercise-analyzer/issues/78), [#79](https://github.com/idvorkin/exercise-analyzer/issues/79) Saturday's four swing sets drew as a blank band under a header that counted them (the row's id was the exercise name, repeated across days)
 
@@ -186,7 +192,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 038:
 
 - **Summary:** See what I did today at a glance when the Workouts sheet is collapsed
-- **Status:** implemented in [52ecac2](https://github.com/idvorkin/exercise-analyzer/commit/52ecac2); verified by simulator screenshot ([docs/screenshots/workouts-collapsed.png](../screenshots/workouts-collapsed.png)); on the phone since 2026-09-13, Igor's check pending
+- **Status:** implemented in [52ecac2](https://github.com/idvorkin/exercise-analyzer/commit/52ecac2); verified by simulator screenshot ([docs/screenshots/workouts-collapsed.png](../screenshots/workouts-collapsed.png)); on the phone since 2026-09-13, Igor's check pending; approved A icons in [d6a139f](https://github.com/idvorkin/exercise-analyzer/commit/d6a139f) verified on the simulator (all six workout-detail fallbacks in light/dark, expanded headers with real photos, collapsed summary) and by signed phone build; installed 2026-09-20, launch blocked by the phone lock
 
 #### Use Case:
 - **As a** lifter between sets with the Workouts sheet pulled down
@@ -251,7 +257,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 053:
 
 - **Summary:** See a whole workout on one page: the sets in time, the rests between them, the heart rate across them
-- **Status:** implemented for [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); the timeline verified on the host (`WorkoutTimelineTests`), the page on the simulator with a seeded workout and heart-rate series (`SWING_OPEN_WORKOUT=1`); the Health read confirmed on the phone 2026-09-18 (`workout_heart_rate`: 229 samples, one every 5 s, for the 8:43 workout); "‹ Workout" on any set of a stored workout for [#99](https://github.com/idvorkin/exercise-analyzer/issues/99), verified on the simulator (`SWING_OPEN_RECENT=<id> SWING_BACK_TO_WORKOUT=1`), on the phone pending
+- **Status:** implemented for [#95](https://github.com/idvorkin/exercise-analyzer/issues/95); the timeline verified on the host (`WorkoutTimelineTests`), the page on the simulator with a seeded workout and heart-rate series (`SWING_OPEN_WORKOUT=1`); the Health read confirmed on the phone 2026-09-18 (`workout_heart_rate`: 229 samples, one every 5 s, for the 8:43 workout); "‹ Workout" on any set of a stored workout for [#99](https://github.com/idvorkin/exercise-analyzer/issues/99), verified on the simulator (`SWING_OPEN_RECENT=<id> SWING_BACK_TO_WORKOUT=1`), on the phone pending; approved A icons in [d6a139f](https://github.com/idvorkin/exercise-analyzer/commit/d6a139f) verified on the simulator (all six workout-detail fallbacks in light/dark, expanded headers with real photos, collapsed summary) and by signed phone build; installed 2026-09-20, launch blocked by the phone lock
 - **Why:** Igor, 2026-09-18: "I probably have a workout view where I look at the whole workout together. That's probably an interesting view I need as well."
 
 #### Use Case:
