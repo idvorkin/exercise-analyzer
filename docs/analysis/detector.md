@@ -34,7 +34,7 @@ mirroring, and `DetectionReport.testDetectionMargins` prints how close each fixt
 
 ## Experiments
 
-- **2026-09-20, splitsquat-256C9B06-phone, #119**: 161 wide-lunge observations / 2316 stance frames = **6.95%**,
+- **2026-09-20, splitsquat-256C9B06-phone, #119, [9b31923](https://github.com/idvorkin/exercise-analyzer/commit/9b31923)**: 161 wide-lunge observations / 2316 stance frames = **6.95%**,
   but 161 / 531 lowered poses = **30.32%**. Old decision **Swing 97%**, now **Split Squat 90%**. The existing
   barbell fixture has **99.4%** wide/lowered; every swing and pistol fixture **0%**; get-ups **14.7–15.2%**.
   Bulgarians retain their elevated-foot gate, pull-ups their earlier overhead rule. Added 30-observation

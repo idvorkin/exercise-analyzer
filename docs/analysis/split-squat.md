@@ -55,7 +55,7 @@ Report: `TuningReports.testSplitSquatTrace`.
 
 ## Experiments
 
-- **2026-09-20, splitsquat-256C9B06-phone, #119**: stored as **29 pistols**, Auto said Swing 97%, and the old
+- **2026-09-20, splitsquat-256C9B06-phone, #119, [9b31923](https://github.com/idvorkin/exercise-analyzer/commit/9b31923)**: stored as **29 pistols**, Auto said Swing 97%, and the old
   Split Squat analyzer found **6**. Frame review of the original cached video found ten lunges near **32.5,
   37.3, 42.5, 48.2, 53.8, 59.7, 64.5, 72, 78, 87 s**. Holding the upright leg scale fixes false returns during
   occlusion. The last rep's visible split is **0.53–0.55** just before descent; requiring 0.6 at the lowest pose
