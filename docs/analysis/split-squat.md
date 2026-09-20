@@ -48,7 +48,7 @@ Report: `TuningReports.testSplitSquatTrace`.
 
 ## Experiments
 
-- **2026-09-20, splitsquat-barbell-phone, #118**: all eight Standing checkpoints failed a host regression
+- **2026-09-20, splitsquat-barbell-phone, #118, [93c65dc](https://github.com/idvorkin/exercise-analyzer/commit/93c65dc)**: all eight Standing checkpoints failed a host regression
   before the fix: hips **0.960–0.976** leg lengths versus the full tops **0.997–1.010**. The old rule selected
   the last sample within 0.04 of standing. Keeping the peak pose changes their times from
   **23.90, 29.47, 37.17, 42.57, 52.00, 57.20, 66.87, 72.47 s** to
