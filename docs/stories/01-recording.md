@@ -210,7 +210,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 055:
 
 - **Summary:** Count and score split squats with both feet on the floor
-- **Status:** implemented for [#112](https://github.com/idvorkin/exercise-analyzer/issues/112); verified on the host (`splitsquat-barbell-phone`: detected as split squats, 8 reps; `TuningReports.testSplitSquatTrace`) and the simulator (Igor's clip on Auto: Split Squat, 8 reps); on the phone pending, and the count of 8 is mine, not yet Igor's
+- **Status:** implemented for [#112](https://github.com/idvorkin/exercise-analyzer/issues/112); verified on the host (`splitsquat-barbell-phone`: detected as split squats, 8 reps; `TuningReports.testSplitSquatTrace`) and the simulator (Igor's clip on Auto: Split Squat, 8 reps); a static split after standing tall (6d617d8 counted 0 of 3) fixed in 836f200 on the host with a stick figure (`SplitSquatAnalyzerTests`), no recorded set of that shape yet; installed on the phone 2026-09-19 (6d617d8, 836f200), Igor's check pending, and the count of 8 is mine, not yet Igor's
 - **Why:** Igor, 2026-09-19, on a barbell set the app had read as swings with no reps: "This is a split squat. Let's add support for that."
 
 #### Use Case:
