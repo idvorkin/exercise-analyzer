@@ -82,4 +82,24 @@ final class SplitSquatAnalyzerTests: XCTestCase {
     }
     XCTAssertEqual(reps(through: keys), 3)
   }
+
+  func testPhoneStandingCheckpointsAreAtTheTop() throws {
+    let fixture = try XCTUnwrap(Fixture.all.first { $0.name == "splitsquat-barbell-phone" })
+    let frames = try fixture.frames()
+    let pipeline = AnalysisPipeline.analyze(frames: frames, exercise: .splitSquat)
+    XCTAssertEqual(pipeline.reps.count, 8)
+    var previousBottom = 20.0 // after the bar pickup, before the first descent
+    for rep in pipeline.reps {
+      let top = try XCTUnwrap(rep.positions["standing"])
+      let bottom = try XCTUnwrap(rep.positions["bottom"])
+      let highest = try XCTUnwrap(frames.filter { $0.time > previousBottom && $0.time < bottom.time }
+        .compactMap { frame -> (time: Double, height: Double)? in
+          guard let pose = frame.pose, let stance = BodySkeleton(pose: pose).stance else { return nil }
+          return (frame.time, stance.hipHeight)
+        }.max { $0.height < $1.height })
+      let height = try XCTUnwrap(BodySkeleton(pose: top.pose).stance).hipHeight
+      XCTAssertEqual(height, highest.height, accuracy: 0.005, "rep \(rep.number): checkpoint \(top.time), full top \(highest.time)")
+      previousBottom = bottom.time
+    }
+  }
 }

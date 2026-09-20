@@ -61,6 +61,8 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
   private let machine = PhaseStateMachine(initialPhase: SplitSquatAnalyzer.standing)
   /// The highest the hips have stood since the last rep ended.
   private var standingHeight: Double?
+  /// Keep the actual upright pose, not the last frame within a descent tolerance of it (#118).
+  private var standingCandidate: Sample?
   private var bottomCandidate: Sample?
   private var bottomImage: CGImage?
   private var framesRisingAfterBottom = 0
@@ -82,6 +84,7 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
   public func reset() {
     machine.resetState(to: Self.standing)
     standingHeight = nil
+    standingCandidate = nil
     history = []
     startOver()
   }
@@ -119,9 +122,10 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
     switch machine.phase {
     case Self.standing:
       standingHeight = max(standingHeight ?? height, height)
+      if height >= (standingCandidate?.hipHeight ?? -.infinity) { standingCandidate = sample }
       if machine.canTransition, let top = standingHeight, height < top - thresholds.descend {
         trace?(String(format: "%.2fs descending: hips %.2f < top %.2f − %.2f", time, height, top, thresholds.descend))
-        let start = history.last { $0.hipHeight >= top - thresholds.returnSlack / 2 } ?? sample
+        let start = standingCandidate ?? sample
         repStartTime = start.time
         machine.storePeak(
           RepPosition(phase: Self.standing, time: start.time, pose: start.pose, metrics: start.metrics, score: start.hipHeight, image: nil))
@@ -154,6 +158,7 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
         machine.transition(to: Self.standing)
         machine.currentRepPeaks = [:]
         standingHeight = height
+        standingCandidate = sample
       }
     case Self.bottom:
       if machine.canTransition, let low = bottomCandidate, height > low.hipHeight + thresholds.rise * 2 {
@@ -184,6 +189,7 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
         completedRep = machine.completeRep(quality: quality())
         machine.transition(to: Self.standing)
         standingHeight = back ? height : end.hipHeight
+        standingCandidate = end
       }
     }
     // The knees at the working end of the rep: 0 is an unmeasured joint, never a deep one.

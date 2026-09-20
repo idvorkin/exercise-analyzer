@@ -27,6 +27,10 @@ measured along the longer leg, so the camera's distance drops out). About 1.0 st
 - **The front leg** is the one whose ankle is lower on screen (its foot is flat; the rear one is up on its toes,
   about 0.3 leg lengths higher). The knees only score; left and right are not named, because the model's labels
   flip in side views.
+- **Standing checkpoint** retains the highest hip pose since the previous rep ended (or a non-rep dip was
+  abandoned), including the ascent peak when a static split tops out. It does not use the last frame within
+  the return tolerance: that frame can already be descending. This changes the gallery position, not the
+  transition thresholds or count.
 
 ## Score
 
@@ -43,6 +47,15 @@ sink), SPINE.
 Report: `TuningReports.testSplitSquatTrace`.
 
 ## Experiments
+
+- **2026-09-20, splitsquat-barbell-phone, #118**: all eight Standing checkpoints failed a host regression
+  before the fix: hips **0.960–0.976** leg lengths versus the full tops **0.997–1.010**. The old rule selected
+  the last sample within 0.04 of standing. Keeping the peak pose changes their times from
+  **23.90, 29.47, 37.17, 42.57, 52.00, 57.20, 66.87, 72.47 s** to
+  **20.13, 29.37, 33.43, 42.33, 48.03, 56.53, 62.40, 72.17 s**. All eight assertions now pass; the count
+  stays **8**, and both synthetic static-split and lunge cases stay **3**. Evidence:
+  `SplitSquatAnalyzerTests.testPhoneStandingCheckpointsAreAtTheTop` and
+  `TuningReports.testSplitSquatStandingCheckpoints`. Analysis version `2026-09-20.1` refreshes stored sets.
 
 - **2026-09-19, splitsquat-barbell-phone** (the first analyzer). The reps sink 0.41–0.59 with the feet 0.85–1.11
   apart at the bottom; the two dips that are not reps (bending out of frame for the bar at 13 s, walking off at

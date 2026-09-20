@@ -236,4 +236,9 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Notes:** Igor picked a new exercise (112A) over loosening the Bulgarian's raised-foot rule, which exists to keep setup crouches from counting. The phases run on the hips' height in leg lengths, not the head, and the score is the Bulgarian's: [docs/analysis/split-squat.md](../analysis/split-squat.md). Known limit: a static split squat, feet never together, reads as a Bulgarian on Auto ([detector.md](../analysis/detector.md)); picking Split Squat from the menu reads it right.
 
-- **Issues:** [#112](https://github.com/idvorkin/exercise-analyzer/issues/112)
+- **Scenario:** Standing means fully at the top
+- **Given:** a split-squat rep has been analyzed
+- **When:** I tap its Standing position in the gallery
+- **Then:** I see the highest standing pose before that descent, rather than a frame already sinking or still coming up; the next rep uses its own standing peak
+
+- **Issues:** [#112](https://github.com/idvorkin/exercise-analyzer/issues/112), [#118](https://github.com/idvorkin/exercise-analyzer/issues/118) (checkpoint report split from #114)

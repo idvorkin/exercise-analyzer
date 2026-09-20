@@ -80,6 +80,17 @@ final class TuningReports: XCTestCase {
     }
   }
 
+  func testSplitSquatStandingCheckpoints() throws {
+    let fixture = try XCTUnwrap(Fixture.all.first { $0.name == "splitsquat-barbell-phone" })
+    let frames = try fixture.frames()
+    let pipeline = AnalysisPipeline.analyze(frames: frames, exercise: .splitSquat)
+    for rep in pipeline.reps {
+      let top = try XCTUnwrap(rep.positions["standing"])
+      let stance = try XCTUnwrap(BodySkeleton(pose: top.pose).stance)
+      print(String(format: "rep %d standing %.2f s hips %.4f bottom %.2f s", rep.number, top.time, stance.hipHeight, rep.positions["bottom"]!.time))
+    }
+  }
+
   private func analyzeSplitSquat(_ frames: [FrameRecord], _ thresholds: SplitSquatThresholds, printing: Bool) -> AnalysisPipeline {
     let analyzer = SplitSquatAnalyzer(thresholds: thresholds)
     var transitions: [String] = []
