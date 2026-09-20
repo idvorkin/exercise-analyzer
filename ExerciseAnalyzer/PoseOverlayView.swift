@@ -82,9 +82,10 @@ struct PoseOverlayView: View {
   }
 }
 
-/// A rep-position thumbnail: the captured frame with its skeleton drawn on.
+/// A rep-position thumbnail: the captured frame, sharing the main picture's skeleton setting.
 struct PoseThumbnail: View {
   let position: RepPosition?
+  @AppStorage("overlayMode") private var overlayModeRaw = OverlayMode.both.rawValue
 
   var body: some View {
     GeometryReader { geo in
@@ -92,11 +93,13 @@ struct PoseThumbnail: View {
         Color(.tertiarySystemFill)
         if let position, let image = position.image {
           Image(decorative: image, scale: 1).resizable().scaledToFit()
-          Canvas { context, size in
-            let rect = AVMakeRect(
-              aspectRatio: CGSize(width: image.width, height: image.height),
-              insideRect: CGRect(origin: .zero, size: size))
-            PoseDrawing.draw(context, pose: position.pose, in: rect, lineWidth: 1)
+          if overlayModeRaw != OverlayMode.video.rawValue {
+            Canvas { context, size in
+              let rect = AVMakeRect(
+                aspectRatio: CGSize(width: image.width, height: image.height),
+                insideRect: CGRect(origin: .zero, size: size))
+              PoseDrawing.draw(context, pose: position.pose, in: rect, lineWidth: 1)
+            }
           }
         } else {
           Image(systemName: "figure.strengthtraining.traditional")

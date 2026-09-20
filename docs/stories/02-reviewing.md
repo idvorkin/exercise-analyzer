@@ -52,7 +52,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I look at the rep gallery
 - **Then:** each still is the me-view crop with the skeleton remapped into it; the whole frame stays when no person was found
 
-- **Issues:** [#61](https://github.com/idvorkin/exercise-analyzer/issues/61)
+- **Scenario:** The eye toggle also controls gallery skeletons
+- **Given:** a set is open with its rep gallery
+- **When:** I switch between video only and video with skeleton using the eye button
+- **Then:** the inline gallery, expanded gallery and comparison thumbnails immediately show the same skeleton setting as the main picture, while keeping their video stills
+
+- **Issues:** [#61](https://github.com/idvorkin/exercise-analyzer/issues/61), [#113](https://github.com/idvorkin/exercise-analyzer/issues/113)
 
 ---
 
