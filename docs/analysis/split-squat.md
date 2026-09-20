@@ -20,6 +20,10 @@ measured along the longer leg, so the camera's distance drops out). About 1.0 st
   hips sank at least `minDepth` (0.25) **with the feet at least `minSplit` (0.6) leg lengths apart along the
   floor**: a squat with the feet together, or a bend to the floor, is not a rep. Back within `returnSlack` (0.08)
   of standing completes the rep, or abandons a dip that had no such bottom.
+- **A rep also ends where the hips top out**, when that is under the standing height: they came up at least
+  `minDepth` off the bottom and have been `rise` under that top for 3 frames. The top becomes the standing height.
+  This is the static split squat: the lifter stood tall (1.0) before stepping into the split and from then on only
+  comes back to the split stance (about 0.9).
 - **The front leg** is the one whose ankle is lower on screen (its foot is flat; the rear one is up on its toes,
   about 0.3 leg lengths higher). The knees only score; left and right are not named, because the model's labels
   flip in side views.
@@ -45,6 +49,13 @@ Report: `TuningReports.testSplitSquatTrace`.
   81 s) sink 0.10–0.14 with the feet 0.15–0.33 apart. `minDepth` from 0.10 to 0.40 counts 8 (0.45 counts 4);
   `minSplit` from 0 to 0.6 counts 8 (1.0 counts 3). Scores 100 except reps 4 and 8 at 90 ("Good depth, a little lower": the front knee stayed just over 85°). The
   simulator's own pose pass of the clip: split squat 88 %, 8 reps.
+- **2026-09-19, the code review's static split** (no recorded set yet, so a stick figure:
+  `SplitSquatAnalyzerTests`). Stand tall feet together (1.0), step into the split (0.89), three dips to 0.45 that
+  come back to 0.89. The first analyzer counted **0 of 3**: ASCENDING's only exit was `height > top − 0.08` = 0.92,
+  the standing height is only relearned in STANDING, and the machine sat in ASCENDING for the rest of the clip.
+  With "topped out" it counts 3; lunges from standing still 3; `splitsquat-barbell-phone` still 8, every rep
+  ending "standing again" (the new exit never fires on it). A real static set should replace the stick figure
+  when Igor records one.
 - **2026-09-19, an archived set**: `tracks/pistol-squat-20260913-96ED6CFB` (stored as 23 "pistols" in 70 s) now
   detects as split squats, 10 reps. Its track agrees: both ankles on the floor at the bottom (y 722 and 759 of
   1280), hips to 0.55, feet 1.0 apart, feet together between reps. Not a fixture: nobody has watched it.

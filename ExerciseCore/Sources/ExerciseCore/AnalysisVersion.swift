@@ -10,5 +10,7 @@ public enum AnalysisVersion {
   // ribs), and needs the hip past 160° (was 150°: standing up from the bell park is not a top) (#97).
   // 2026-09-19.1: pull-ups, and the detector asks about hands held over the shoulders (#108).
   // 2026-09-19.2: split squats, and the detector asks about feet split with the hips low (#112).
-  public static let current = "2026-09-19.2"
+  // 2026-09-19.3: a split squat rep also ends when the hips top out under the standing height (a static split
+  // after standing tall) (#112).
+  public static let current = "2026-09-19.3"
 }

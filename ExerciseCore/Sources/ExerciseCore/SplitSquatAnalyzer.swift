@@ -64,6 +64,9 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
   private var bottomCandidate: Sample?
   private var bottomImage: CGImage?
   private var framesRisingAfterBottom = 0
+  /// The highest the hips have come on the way up, and the frames since spent `rise` under it.
+  private var ascentPeak: Sample?
+  private var framesSinkingAfterAscent = 0
   private var history: [Sample] = []
   private var repStartTime = 0.0
   private var minFrontKnee = 180.0
@@ -87,6 +90,8 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
     bottomCandidate = nil
     bottomImage = nil
     framesRisingAfterBottom = 0
+    ascentPeak = nil
+    framesSinkingAfterAscent = 0
     minFrontKnee = 180
     minRearKnee = 180
     maxSpine = 0
@@ -154,15 +159,31 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
       if machine.canTransition, let low = bottomCandidate, height > low.hipHeight + thresholds.rise * 2 {
         machine.transition(to: Self.ascending)
       }
-    default:  // ascending: back near the standing height completes the rep
-      if machine.canTransition, let top = standingHeight, height > top - thresholds.returnSlack {
-        trace?(String(format: "%.2fs rep %d done: hips %.2f > top %.2f − %.2f", time, machine.repCount + 1, height, top, thresholds.returnSlack))
-        if let low = bottomCandidate {
-          storeHalfway(phase: Self.ascending, from: low.time, to: time, target: (top + low.hipHeight) / 2)
-        }
+    default:
+      // Ascending: back near the standing height completes the rep. So does topping out lower than that: a
+      // static split squat starts from standing tall (1.0) and then only ever comes back to its split stance
+      // (about 0.9), and without this it sat in ascending for the rest of the set (the 2026-09-19 review). Once
+      // the hips have come up `minDepth` off the bottom and sink again, the rep ended at that top, and that top
+      // is the standing height from here on.
+      guard machine.canTransition, let top = standingHeight, let low = bottomCandidate else { break }
+      if height > (ascentPeak?.hipHeight ?? -.infinity) {
+        ascentPeak = sample
+        framesSinkingAfterAscent = 0
+      } else if let peak = ascentPeak, height < peak.hipHeight - thresholds.rise {
+        framesSinkingAfterAscent += 1
+      }
+      let back = height > top - thresholds.returnSlack
+      let toppedOut =
+        framesSinkingAfterAscent >= 3 && (ascentPeak?.hipHeight ?? 0) - low.hipHeight >= thresholds.minDepth
+      if back || toppedOut {
+        let end = back ? sample : (ascentPeak ?? sample)
+        trace?(String(
+          format: "%.2fs rep %d done: %@, hips %.2f, top %.2f", time, machine.repCount + 1,
+          back ? "standing again" : "topped out", end.hipHeight, top))
+        storeHalfway(phase: Self.ascending, from: low.time, to: end.time, target: (end.hipHeight + low.hipHeight) / 2)
         completedRep = machine.completeRep(quality: quality())
         machine.transition(to: Self.standing)
-        standingHeight = height
+        standingHeight = back ? height : end.hipHeight
       }
     }
     // The knees at the working end of the rep: 0 is an unmeasured joint, never a deep one.
