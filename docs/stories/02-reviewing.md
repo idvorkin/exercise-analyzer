@@ -163,9 +163,9 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** Jumping to the next rep from the right edge
 - **Given:** a set is open and paused
 - **When:** I press and hold the right edge, slide to the top key and let go
-- **Then:** three keys (Rep, Frame, Position) appeared stacked on the right edge while I held, the top one lit as I slid onto it, and the playhead moved to the next rep; a quick tap on the same edge would have stepped one frame instead
+- **Then:** both stacks (Rep, Frame, Position) appear and stay up, exactly as for a middle hold in story 039; the key under my finger fires on arrival and repeats while held, release adds no seek, and I can slide across to the other stack; a quick tap with the stacks down steps one frame instead
 
-- **Issues:** [#33](https://github.com/idvorkin/exercise-analyzer/issues/33)
+- **Issues:** [#33](https://github.com/idvorkin/exercise-analyzer/issues/33), [#116](https://github.com/idvorkin/exercise-analyzer/issues/116)
 
 ---
 
@@ -223,7 +223,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 ### User Story 039:
 
-- **Summary:** Hold the middle of the picture to get both edges' keys at once, and hold a key to repeat it
+- **Summary:** Hold anywhere on the picture to get both edges' keys at once, and hold a key to repeat it
 - **Status:** implemented in [1fcdc3c](https://github.com/idvorkin/exercise-analyzer/commit/1fcdc3c), [b96aec3](https://github.com/idvorkin/exercise-analyzer/commit/b96aec3) and the cadence and cross-drag of [#63](https://github.com/idvorkin/exercise-analyzer/issues/63); on the phone since 2026-09-13, Igor's check pending (gestures)
 - **Why:** Igor, 2026-09-13: "press and hold in middle gives both left and right so I can finger over, and when on one of them if I hold while on a button it presses every 2 seconds."
 
@@ -236,7 +236,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** Holding the middle brings up both stacks, which stay up
 - **Given:** a set is open and paused
 - **When:** I press the middle of the picture (between the edge zones of story 030, clear of the HUD rows), hold still for 0.3 s, and lift without sliding onto a key
-- **Then:** the left stack (steps back) and the right stack (steps forward) appear at the edges as in story 030 with no key lit, lifting leaves them on screen, and nothing fires (no `ui` press, no `seek` in the log); a hold that starts on an edge still behaves as story 030 (release fires, no repeat)
+- **Then:** the left stack (steps back) and the right stack (steps forward) appear at the edges as in story 030 with no key lit, lifting leaves them on screen, and nothing fires (no `ui` press, no `seek` in the log); a hold that starts on either edge shows the same stacks and fires the key under the finger on arrival, with the same repeat and cross-drag behavior (#116)
 
 - **Scenario:** Sliding onto a key fires it on arrival
 - **Given:** both stacks are up from a middle hold

@@ -627,36 +627,16 @@ struct ContentView: View {
   /// arrival and repeats while held (stories 039, #60).
   private var edgeControls: some View {
     GeometryReader { geo in
-      let width = geo.size.width * 0.24
       let inset = geo.size.height * 0.16
       ZStack {
-        // No spacing: the middle hold's fire region starts exactly where the 24 % edge zones end.
-        HStack(spacing: 0) {
-          EdgeStepper(
-            side: .previous, onTap: { chromeAction { session.stepFrame(-1) } },
-            onKey: { key in
-              chromeAction {
-                switch key {
-                case .rep: session.seekToRep(offset: -1)
-                case .frame: session.stepFrame(-1)
-                case .position: session.seekToCheckpoint(offset: -1)
-                }
-              }
-            },
-            stacksUp: stacksUp,
-            upClock: { session.currentTime },
-            onUpFire: { key, repeatIndex, atEnd in
-              middlePulse += 1
-              fireHold(side: .previous, key: key, repeatIndex: repeatIndex, atEnd: atEnd)
-            },
-            onUpLit: { middleLeftLit = $0 }
-          )
-          .frame(width: width)
-          MiddleHold(
+          PlaybackHold(
             onFire: { side, key, repeatIndex, atEnd in
               fireHold(side: side, key: key, repeatIndex: repeatIndex, atEnd: atEnd)
             },
-            onTap: { if session.source == .file { session.togglePlayback() } },
+            onTap: { side in
+              if let side { chromeAction { session.stepFrame(side == .next ? 1 : -1) } }
+              else if session.source == .file { session.togglePlayback() }
+            },
             onDismiss: {
               session.log.event("ui", ["action": "hold", "key": "none"])
               stacksUp = false
@@ -665,27 +645,6 @@ struct ContentView: View {
             stacksUp: $stacksUp,
             leftLit: $middleLeftLit, rightLit: $middleRightLit, pulse: $middlePulse
           )
-          EdgeStepper(
-            side: .next, onTap: { chromeAction { session.stepFrame(1) } },
-            onKey: { key in
-              chromeAction {
-                switch key {
-                case .rep: session.seekToRep(offset: 1)
-                case .frame: session.stepFrame(1)
-                case .position: session.seekToCheckpoint(offset: 1)
-                }
-              }
-            },
-            stacksUp: stacksUp,
-            upClock: { session.currentTime },
-            onUpFire: { key, repeatIndex, atEnd in
-              middlePulse += 1
-              fireHold(side: .next, key: key, repeatIndex: repeatIndex, atEnd: atEnd)
-            },
-            onUpLit: { middleRightLit = $0 }
-          )
-          .frame(width: width)
-        }
         if stacksUp {
           MiddleStacks(leftLit: $middleLeftLit, rightLit: $middleRightLit, pulse: middlePulse)
             .allowsHitTesting(false)
