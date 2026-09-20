@@ -825,9 +825,9 @@ struct ContentView: View {
 
   private var playbackControls: some View {
     Group {
-      // Frame and phase steps get big, captioned targets; reps are navigated from the gallery (issue #11).
+      // Frame and position steps get big, captioned targets; reps are navigated from the gallery (issue #11).
       HStack(spacing: 6) {
-        navButton("chevron.left.2", "phase", "Previous checkpoint") { chromeAction { session.seekToCheckpoint(offset: -1) } }
+        navButton("chevron.left.2", "position", "Previous position") { chromeAction { session.seekToCheckpoint(offset: -1) } }
         navButton("chevron.left", "frame", "Previous frame") { chromeAction { session.stepFrame(-1) } }
         Button(action: session.togglePlayback) {
           Image(systemName: session.isPlaying ? "pause.fill" : "play.fill")
@@ -836,7 +836,7 @@ struct ContentView: View {
         }
         .disabled(session.duration == 0)
         navButton("chevron.right", "frame", "Next frame") { chromeAction { session.stepFrame(1) } }
-        navButton("chevron.right.2", "phase", "Next checkpoint") { chromeAction { session.seekToCheckpoint(offset: 1) } }
+        navButton("chevron.right.2", "position", "Next position") { chromeAction { session.seekToCheckpoint(offset: 1) } }
       }
       .frame(maxWidth: .infinity)
 
@@ -1144,4 +1144,3 @@ enum OverlayMode: String, CaseIterable {
   /// Names what the button will switch to.
   var label: String { self == .both ? "Show video and skeleton" : "Show video only" }
 }
-

@@ -58,19 +58,21 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 ### User Story 007:
 
-- **Summary:** Step by frame and by phase with targets big enough for the gym
+- **Summary:** Step by frame and by position with targets big enough for the gym
 - **Status:** implemented in [564a753](https://github.com/idvorkin/exercise-analyzer/commit/564a753); verified by simulator screenshot; the fixes for [#54](https://github.com/idvorkin/exercise-analyzer/issues/54) and [#56](https://github.com/idvorkin/exercise-analyzer/issues/56) on the phone since 2026-09-13; the scrubber follow-up [#6](https://github.com/idvorkin/exercise-analyzer/issues/6) is Igor's check
 
 #### Use Case:
 - **As a** lifter holding a phone with chalky hands
-- **I want to** step to the next frame or the next phase with large captioned buttons
+- **I want to** step to the next frame or the next position with large captioned buttons
 - **so that** I hit the control I meant on the first try
 
 #### Acceptance Criteria:
-- **Scenario:** Stepping to the next phase
+- **Scenario:** Stepping to the next position
 - **Given:** a set is open and paused at the top of rep 3
-- **When:** I tap the "phase" button on the right
-- **Then:** the playhead lands on rep 3's connect checkpoint and the scrubber moves with it
+- **When:** I tap the "position" button on the right (VoiceOver: "Next position")
+- **Then:** the playhead lands on rep 3's connect checkpoint and the scrubber moves with it; the left button also reads "position" (VoiceOver: "Previous position")
+
+- **Issues:** [#115](https://github.com/idvorkin/exercise-analyzer/issues/115) use Position consistently in playback and hold controls
 
 - **Scenario:** Stepping a rep keeps the phase
 - **Given:** a set is open and paused at the bottom of rep 3
