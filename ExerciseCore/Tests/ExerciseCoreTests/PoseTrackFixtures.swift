@@ -63,6 +63,10 @@ struct Fixture {
     // alternating. The hips sink 0.45 leg lengths eight times (bottoms at 26.5, 31.8, 39.3, 45.0, 54.3, 60.0,
     // 69.3, 75.2 s). Counted 0 as a swing and as a Bulgarian. Not yet confirmed by Igor.
     Fixture(name: "splitsquat-barbell-phone", expectedExercise: .splitSquat, expectedReps: 8, humanVerified: false),
+    // #119, IMG_4362.MOV, recents 256C9B06: stored as 29 pistols, Auto called it a swing. Original video
+    // reviewed frame by frame: ten lunges between 30 and 89 s; camera setup, unracking and reracking are not
+    // reps. Rear leg leaves the frame. Igor confirmed the exercise, but has not confirmed the count.
+    Fixture(name: "splitsquat-256C9B06-phone", expectedExercise: .splitSquat, expectedReps: 10, humanVerified: false),
   ]
 
   func frames() throws -> [FrameRecord] {

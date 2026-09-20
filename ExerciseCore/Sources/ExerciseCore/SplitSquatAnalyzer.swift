@@ -3,9 +3,9 @@
 //  Split squat (#112): both feet on the floor, one ahead of the other, the hips sink between them. A static
 //  split squat and a lunge stepped into from standing read the same here.
 //  Phases: STANDING → DESCENDING → BOTTOM → ASCENDING → STANDING (rep complete), driven by the hips' height
-//  over the lower foot in leg lengths (`BodySkeleton.stance`). Not the head, as the Bulgarian does: with a bar on
+//  over the lower foot, with leg scale held from standing through each dip. Not the head, as the Bulgarian does: with a bar on
 //  the back the plate hides it from the side (ear confidence 0.01 on the fixture). A dip counts only with the
-//  feet split at its bottom, so a squat or a bend to the floor is not a rep. The knees only score.
+//  feet split during the dip or its approach, so a squat or a bend to the floor is not a rep. The knees only score.
 //  Notes and the numbers behind the thresholds: docs/analysis/split-squat.md.
 
 import CoreGraphics
@@ -19,9 +19,9 @@ public struct SplitSquatThresholds {
   public var rise = 0.04
   /// A bottom counts only when the hips sank this far: the fixture's reps sink 0.41–0.59, its shuffles 0.10–0.14.
   public var minDepth = 0.25
-  /// And only with the feet this far apart at the bottom (leg lengths along the floor): 0.85–1.11 on the
-  /// fixture's reps, 0.33 on its one shuffle, under 0.1 standing feet together.
-  public var minSplit = 0.6
+  /// Feet must be this far apart in three observations during the dip or its last 0.5 s of approach.
+  /// The rear foot leaves the frame in #119: visible width reaches 0.53–0.55 before the final descent.
+  public var minSplit = 0.5
   /// Back within this of the standing height completes the rep (or abandons a dip that was not one).
   public var returnSlack = 0.08
 }
@@ -53,6 +53,7 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
     let pose: Pose
     let time: Double
     let hipHeight: Double
+    let uprightness: Double
     let split: Double
     let metrics: [String: Double]
   }
@@ -61,6 +62,11 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
   private let machine = PhaseStateMachine(initialPhase: SplitSquatAnalyzer.standing)
   /// The highest the hips have stood since the last rep ended.
   private var standingHeight: Double?
+  /// Pixel scale measured at the upright checkpoint, held through the dip. Re-estimating bent/occluded
+  /// limbs every frame can make the hips appear to stand up while the lifter is still at the bottom (#119).
+  private var legLength = 1.0
+  private var splitFrames = 0
+  private var descentTime = 0.0
   /// Keep the actual upright pose, not the last frame within a descent tolerance of it (#118).
   private var standingCandidate: Sample?
   private var bottomCandidate: Sample?
@@ -84,6 +90,7 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
   public func reset() {
     machine.resetState(to: Self.standing)
     standingHeight = nil
+    legLength = 1
     standingCandidate = nil
     history = []
     startOver()
@@ -93,6 +100,7 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
     bottomCandidate = nil
     bottomImage = nil
     framesRisingAfterBottom = 0
+    splitFrames = 0
     ascentPeak = nil
     framesSinkingAfterAscent = 0
     minFrontKnee = 180
@@ -111,30 +119,47 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
     guard let stance = skeleton.stance else {
       return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil)
     }
-    let height = stance.hipHeight
-    if let top = standingHeight { m["depth"] = max(0, min(100, (top - height) / 0.5 * 100)) }
-    let sample = Sample(pose: pose, time: time, hipHeight: height, split: stance.split, metrics: m)
+    guard let leftHip = skeleton.point(.leftHip), let rightHip = skeleton.point(.rightHip),
+      let leftAnkle = skeleton.point(.leftAnkle, minConf: 0.5), let rightAnkle = skeleton.point(.rightAnkle, minConf: 0.5)
+    else { return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil) }
+    let height = Double(max(leftAnkle.y, rightAnkle.y) - (leftHip.y + rightHip.y) / 2)
+    if let top = standingHeight { m["depth"] = max(0, min(100, (top - height) / (0.5 * legLength) * 100)) }
+    let sample = Sample(pose: pose, time: time, hipHeight: height, uprightness: stance.hipHeight, split: stance.split, metrics: m)
     history.append(sample)
     if history.count > 240 { history.removeFirst() }
     machine.framesInPhase += 1
+    if machine.phase != Self.standing, time - descentTime > 8 {
+      // Camera setup and a lost person cannot be joined to a later lunge.
+      machine.transition(to: Self.standing)
+      machine.currentRepPeaks = [:]
+      standingHeight = nil
+      standingCandidate = nil
+      startOver()
+    }
 
     var completedRep: RepRecord?
     switch machine.phase {
     case Self.standing:
+      if height >= (standingHeight ?? -.infinity), stance.hipHeight > 0 {
+        legLength = height / stance.hipHeight
+      }
       standingHeight = max(standingHeight ?? height, height)
-      if height >= (standingCandidate?.hipHeight ?? -.infinity) { standingCandidate = sample }
-      if machine.canTransition, let top = standingHeight, height < top - thresholds.descend {
-        trace?(String(format: "%.2fs descending: hips %.2f < top %.2f − %.2f", time, height, top, thresholds.descend))
+      if stance.hipHeight >= (standingCandidate?.uprightness ?? -.infinity) { standingCandidate = sample }
+      if machine.canTransition, let top = standingHeight, height < top - thresholds.descend * legLength {
+        trace?(String(format: "%.2fs descending: hips %.2f < top %.2f − %.2f", time, height / legLength, top / legLength, thresholds.descend))
         let start = standingCandidate ?? sample
         repStartTime = start.time
+        descentTime = time
         machine.storePeak(
           RepPosition(phase: Self.standing, time: start.time, pose: start.pose, metrics: start.metrics, score: start.hipHeight, image: nil))
         machine.transition(to: Self.descending)
         startOver()
+        splitFrames = history.filter { $0.time >= time - 0.5 && $0.split >= thresholds.minSplit }.count
       }
     case Self.descending:
       guard let top = standingHeight else { break }
-      if let candidate = bottomCandidate, height > candidate.hipHeight + thresholds.rise {
+      if stance.split >= thresholds.minSplit { splitFrames += 1 }
+      if let candidate = bottomCandidate, height > candidate.hipHeight + thresholds.rise * legLength {
         framesRisingAfterBottom += 1
       } else {
         framesRisingAfterBottom = 0
@@ -145,46 +170,48 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
         framesRisingAfterBottom = 0
       }
       if machine.canTransition, let low = bottomCandidate, framesRisingAfterBottom >= 3,
-        top - low.hipHeight >= thresholds.minDepth, low.split >= thresholds.minSplit
+        top - low.hipHeight >= thresholds.minDepth * legLength, splitFrames >= 3
       {
-        trace?(String(format: "%.2fs bottom: hips %.2f at %.2fs, sank %.2f, feet %.2f apart", time, low.hipHeight, low.time, top - low.hipHeight, low.split))
+        trace?(String(format: "%.2fs bottom: hips %.2f at %.2fs, sank %.2f, feet %.2f apart, %d split observations", time, low.hipHeight / legLength, low.time, (top - low.hipHeight) / legLength, low.split, splitFrames))
         machine.storePeak(
           RepPosition(phase: Self.bottom, time: low.time, pose: low.pose, metrics: low.metrics, score: -low.hipHeight, image: bottomImage))
         storeHalfway(phase: Self.descending, from: repStartTime, to: low.time, target: (top + low.hipHeight) / 2)
         machine.transition(to: Self.bottom)
-      } else if machine.canTransition, height > top - thresholds.returnSlack {
+      } else if machine.canTransition, height > top - thresholds.returnSlack * legLength {
         // Standing again without a bottom that counts: a shuffle, a squat with the feet together, a bend.
-        trace?(String(format: "%.2fs abandoned: sank %.2f, feet %.2f apart", time, top - (bottomCandidate?.hipHeight ?? height), bottomCandidate?.split ?? 0))
+        trace?(String(format: "%.2fs abandoned: sank %.2f, feet %.2f apart", time, (top - (bottomCandidate?.hipHeight ?? height)) / legLength, bottomCandidate?.split ?? 0))
         machine.transition(to: Self.standing)
         machine.currentRepPeaks = [:]
         standingHeight = height
-        standingCandidate = sample
+        if stance.hipHeight >= (standingCandidate?.uprightness ?? -.infinity) { standingCandidate = sample }
       }
     case Self.bottom:
-      if machine.canTransition, let low = bottomCandidate, height > low.hipHeight + thresholds.rise * 2 {
+      if machine.canTransition, let low = bottomCandidate, height > low.hipHeight + thresholds.rise * 2 * legLength {
         machine.transition(to: Self.ascending)
       }
     default:
       // Ascending: back near the standing height completes the rep. So does topping out lower than that: a
       // static split squat starts from standing tall (1.0) and then only ever comes back to its split stance
       // (about 0.9), and without this it sat in ascending for the rest of the set (the 2026-09-19 review). Once
-      // the hips have come up `minDepth` off the bottom and sink again, the rep ended at that top, and that top
+      // the hips recover at least 80% of their descent and sink for six frames, the rep ended at that top, and that top
       // is the standing height from here on.
       guard machine.canTransition, let top = standingHeight, let low = bottomCandidate else { break }
       if height > (ascentPeak?.hipHeight ?? -.infinity) {
         ascentPeak = sample
         framesSinkingAfterAscent = 0
-      } else if let peak = ascentPeak, height < peak.hipHeight - thresholds.rise {
+      } else if let peak = ascentPeak, height < peak.hipHeight - thresholds.rise * legLength {
         framesSinkingAfterAscent += 1
+      } else {
+        framesSinkingAfterAscent = 0
       }
-      let back = height > top - thresholds.returnSlack
+      let back = height > top - thresholds.returnSlack * legLength
       let toppedOut =
-        framesSinkingAfterAscent >= 3 && (ascentPeak?.hipHeight ?? 0) - low.hipHeight >= thresholds.minDepth
+        framesSinkingAfterAscent >= 6 && (ascentPeak?.hipHeight ?? 0) - low.hipHeight >= max(thresholds.minDepth * legLength, (top - low.hipHeight) * 0.8)
       if back || toppedOut {
         let end = back ? sample : (ascentPeak ?? sample)
         trace?(String(
           format: "%.2fs rep %d done: %@, hips %.2f, top %.2f", time, machine.repCount + 1,
-          back ? "standing again" : "topped out", end.hipHeight, top))
+          back ? "standing again" : "topped out", end.hipHeight / legLength, top / legLength))
         storeHalfway(phase: Self.ascending, from: low.time, to: end.time, target: (end.hipHeight + low.hipHeight) / 2)
         completedRep = machine.completeRep(quality: quality())
         machine.transition(to: Self.standing)

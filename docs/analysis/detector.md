@@ -10,6 +10,7 @@ exercise it was; Auto mode analyzes with the winner, and reopening a stored set 
 | `lying_ratio`, `standing_ratio` | uprightness < 0.15 / > 0.85 over frames with a measured uprightness | get-up |
 | `hands_overhead_ratio` | both wrists (confidence over 0.3) more than a quarter of a torso length over the shoulder line, over all frames | pull-up |
 | `lunge_ratio` | feet over 0.8 leg lengths apart along the floor with the hips between 0.3 and 0.85 leg lengths up, over frames with both ankles confident | split squat |
+| `lunge_low_ratio`, `lunge_frames` | the same wide-lunge observations over lowered poses only, plus their count | split squats with long standing/setup footage |
 | `arm_cycles` | arm rises above 50° after being below 30° | swing |
 | `p95_asymmetry`, `high_asymmetry_ratio` | |left knee − right knee| over the last 400 measured frames, 95th percentile (one bad frame cannot decide) and the share over 35° | pistol vs split squat vs swing |
 | `elevated_ratio` | one ankle more than 0.2 leg lengths above the other, only when both ankles are confident (cut-off feet read as raised) | split squat |
@@ -19,7 +20,8 @@ exercise it was; Auto mode analyzes with the winner, and reopening a stored set 
 1. Fewer than 30 frames: no decision.
 2. **Turkish get-up**: on the floor in over 10 % of frames and standing in over 3 %.
 3. **Pull-up**: both hands held over the shoulders in over 40 % of frames. After the get-up on purpose (below).
-4. **Split squat**: in a lunge for over 15 % of frames, and one foot held above the other in under half of them
+4. **Split squat**: in a lunge for over 15 % of frames, **or at least 30 wide-lunge observations comprising
+   over 25 % of lowered poses**, and one foot held above the other in under half of them
    (that is the Bulgarian). Before the swing on purpose (below).
 5. **Kettlebell swing**: at least 3 arm cycles with symmetric legs (p95 < 35°), or at least 10 cycles with p95 < 50°
    and under 20 % of frames over 35° (walk-ins and diagonal cameras make legs read a little uneven).
@@ -31,6 +33,13 @@ Every fixture must detect as its own exercise with confidence ≥ 60 (`Detection
 mirroring, and `DetectionReport.testDetectionMargins` prints how close each fixture sits to the boundaries.
 
 ## Experiments
+
+- **2026-09-20, splitsquat-256C9B06-phone, #119**: 161 wide-lunge observations / 2316 stance frames = **6.95%**,
+  but 161 / 531 lowered poses = **30.32%**. Old decision **Swing 97%**, now **Split Squat 90%**. The existing
+  barbell fixture has **99.4%** wide/lowered; every swing and pistol fixture **0%**; get-ups **14.7–15.2%**.
+  Bulgarians retain their elevated-foot gate, pull-ups their earlier overhead rule. Added 30-observation
+  minimum guards against sparse setup guesses. Evidence: `TuningReports.testSplitSquatDetectionWithSetup`,
+  `SplitSquatReportTests`, and all-fixture detection tests. Version `2026-09-20.2`.
 
 - **2026-09-12**: swings with many arm cycles and pistols with moderate asymmetry fell to "ambiguous"; the cycle
   count and the percentile rules above replaced raw maxima (commit 8bc27b5).

@@ -53,6 +53,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I open the clip
 - **Then:** the HUD shows "Turkish Get-Up" with 2 reps, one labelled left arm and one right arm
 
+- **Scenario:** A split-squat clip includes a long setup
+- **Given:** I spend time setting the camera down and unracking before alternating lunges
+- **When:** I analyze it on Auto
+- **Then:** the actual lunge poses identify Split Squat despite the surrounding standing footage
+- **Issues:** [#119](https://github.com/idvorkin/exercise-analyzer/issues/119)
+
 ---
 
 ### User Story 003:
@@ -241,4 +247,9 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I tap its Standing position in the gallery
 - **Then:** I see the highest standing pose before that descent, rather than a frame already sinking or still coming up; the next rep uses its own standing peak
 
-- **Issues:** [#112](https://github.com/idvorkin/exercise-analyzer/issues/112), [#118](https://github.com/idvorkin/exercise-analyzer/issues/118) (checkpoint report split from #114)
+- **Scenario:** Setup and occlusion do not create extra reps
+- **Given:** IMG_4362.MOV includes camera setup, unracking, alternating lunges with the rear leg occasionally outside the frame, and reracking
+- **When:** it is analyzed as Split Squat
+- **Then:** only complete lunges count; setup and reracking count nothing, and a noisy partial rise does not split one lunge into two
+
+- **Issues:** [#112](https://github.com/idvorkin/exercise-analyzer/issues/112), [#118](https://github.com/idvorkin/exercise-analyzer/issues/118) (checkpoint report split from #114), [#119](https://github.com/idvorkin/exercise-analyzer/issues/119) (29 stored pistol reps included setup and duplicates)

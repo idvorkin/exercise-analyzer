@@ -9,6 +9,17 @@ import XCTest
 @testable import ExerciseCore
 
 final class TuningReports: XCTestCase {
+  /// #119: wide lunges as a share of lowered poses survive long standing/setup footage.
+  func testSplitSquatDetectionWithSetup() throws {
+    for fixture in Fixture.all {
+      let frames = try fixture.frames()
+      let detection = ExerciseDetector.detect(frames: frames)
+      print(String(format: "%@: %@ %d%%; lunge/all %.3f, lunge/lowered %.3f, wide frames %.0f", fixture.name,
+        detection.exercise.rawValue, detection.confidence, detection.stats["lunge_ratio"] ?? 0,
+        detection.stats["lunge_low_ratio"] ?? 0, detection.stats["lunge_frames"] ?? 0))
+    }
+  }
+
   private func report(_ label: String, _ pipeline: AnalysisPipeline) {
     let lines = pipeline.reps.map { rep -> String in
       let times = rep.positions.values.sorted { $0.time < $1.time }

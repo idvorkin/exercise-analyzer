@@ -13,5 +13,7 @@ public enum AnalysisVersion {
   // 2026-09-19.3: a split squat rep also ends when the hips top out under the standing height (a static split
   // after standing tall) (#112).
   // 2026-09-20.1: split-squat Standing checkpoints retain the fully upright pose (#118).
-  public static let current = "2026-09-20.1"
+  // 2026-09-20.2: split-squat detection survives long setup; stable upright scale and split-stance evidence
+  // preserve occluded lunges without counting setup or doubling a noisy ascent (#119).
+  public static let current = "2026-09-20.2"
 }

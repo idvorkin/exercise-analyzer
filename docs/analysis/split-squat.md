@@ -9,21 +9,27 @@ back the setup crouches that rule was written against.
 ## Phases
 
 STANDING → DESCENDING → BOTTOM → ASCENDING → STANDING (rep complete), driven by **the hips' height over the lower
-foot, in leg lengths** (`BodySkeleton.stance.hipHeight`: hip midpoint to the lower ankle, over hip→knee→ankle
-measured along the longer leg, so the camera's distance drops out). About 1.0 standing, 0.42–0.59 at the bottom.
+foot, in leg lengths**. Measure hip midpoint to the lower ankle in pixels and hold the upright leg length
+through the dip. Re-estimating a bent, occluded leg on every frame can turn a real bottom into an apparent
+standing pose (#119). The gallery's Standing checkpoint still uses the most upright measured pose.
 
 - **Not the head**, which the Bulgarian uses: with a bar on the back the plate hides the head from the side. Ear
   confidence on the fixture is 0.01 through every rep.
 - **Both ankles must be confidently seen** (0.5), or there is no stance and the frame decides nothing.
 - **Descend** when the hips sink `descend` (0.12) under the standing height (the highest since the last rep).
   **Bottom** is the lowest point, confirmed after a rise of `rise` (0.04) for 3 frames, and it counts only when the
-  hips sank at least `minDepth` (0.25) **with the feet at least `minSplit` (0.6) leg lengths apart along the
-  floor**: a squat with the feet together, or a bend to the floor, is not a rep. Back within `returnSlack` (0.08)
+  hips sank at least `minDepth` (0.25) **with the feet at least `minSplit` (0.5) leg lengths apart along the
+  floor in three observations during the dip or its last 0.5 s of approach**. This keeps evidence of the rear
+  foot before it leaves the frame. A squat with the feet together, or a bend to the floor, is not a rep.
+  Back within `returnSlack` (0.08)
   of standing completes the rep, or abandons a dip that had no such bottom.
 - **A rep also ends where the hips top out**, when that is under the standing height: they came up at least
-  `minDepth` off the bottom and have been `rise` under that top for 3 frames. The top becomes the standing height.
+  `minDepth` off the bottom, recovered at least 80% of their descent, and have been `rise` under that top for
+  6 consecutive frames. The top becomes the standing height. The recovery requirement keeps a noisy bottom
+  from splitting one lunge into two.
   This is the static split squat: the lifter stood tall (1.0) before stepping into the split and from then on only
   comes back to the split stance (about 0.9).
+- An unfinished dip expires after 8 s from descent: camera setup or losing the person cannot join a later rep.
 - **The front leg** is the one whose ankle is lower on screen (its foot is flat; the rear one is up on its toes,
   about 0.3 leg lengths higher). The knees only score; left and right are not named, because the model's labels
   flip in side views.
@@ -43,10 +49,23 @@ sink), SPINE.
 | Fixture | Reps | Verified | Why |
 |---|---|---|---|
 | splitsquat-barbell-phone | 8 | no | Igor, 2026-09-19 (recents 952F2323), barbell on the back, side-on: eight dips in pairs, legs alternating, feet together between them; bottoms at 26.5, 31.8, 39.3, 45.0, 54.3, 60.0, 69.3, 75.2 s. Counted 0 as a swing and as a Bulgarian |
+| splitsquat-256C9B06-phone | 10 | no | #119, IMG_4362.MOV, 102.7 s. Original video inspected: camera setup/unrack before 30 s, ten alternating lunges, rerack after 90 s. Rear leg leaves the frame. Igor confirmed exercise, not count |
 
 Report: `TuningReports.testSplitSquatTrace`.
 
 ## Experiments
+
+- **2026-09-20, splitsquat-256C9B06-phone, #119**: stored as **29 pistols**, Auto said Swing 97%, and the old
+  Split Squat analyzer found **6**. Frame review of the original cached video found ten lunges near **32.5,
+  37.3, 42.5, 48.2, 53.8, 59.7, 64.5, 72, 78, 87 s**. Holding the upright leg scale fixes false returns during
+  occlusion. The last rep's visible split is **0.53–0.55** just before descent; requiring 0.6 at the lowest pose
+  misses it. Three split observations at 0.5, including the last half-second of approach, retain it. Setup
+  has only one observation above 0.5. First experiment: fixed scale alone joined camera setup to the first
+  lunge and doubled the seventh; an 8 s timeout and 80% recovery before a lower top remove those errors.
+  Final result: **10**, no reps in isolated **0–29 s / 90–103 s** segments, each selected bottom within 1 s of
+  its visible lunge. Original fixture stays **8**, static and stepping synthetic sets stay **3**, all eight
+  upright checkpoints retained. Evidence: `SplitSquatReportTests`, `TuningReports.testSplitSquatTrace`;
+  version `2026-09-20.2`. Exact gallery bottom frames remain limited by the occluded pose estimates.
 
 - **2026-09-20, splitsquat-barbell-phone, #118, [93c65dc](https://github.com/idvorkin/exercise-analyzer/commit/93c65dc)**: all eight Standing checkpoints failed a host regression
   before the fix: hips **0.960–0.976** leg lengths versus the full tops **0.997–1.010**. The old rule selected
