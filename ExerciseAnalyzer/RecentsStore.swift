@@ -40,6 +40,9 @@ final class RecentsStore: ObservableObject {
     clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil, models: [String] = [],
     clipStartedAt: Date? = nil
   ) throws {
+    // A pass that was under way when its set was deleted must not bring it back (#111, the 2026-09-19 review):
+    // the launch refresh and a re-run save by id minutes after they started.
+    guard !removedIDs.contains(id) else { throw RemovedSetError(id: id) }
     // Re-analyzing a clip replaces its earlier entry instead of adding a second set to the workout.
     for old in entries where old.id != id && old.isSameClip(source: source, originalName: originalName, duration: duration) {
       remove(id: old.id)
@@ -80,7 +83,16 @@ final class RecentsStore: ObservableObject {
     try persistIndex()
   }
 
+  /// Ids removed since launch: `save` refuses them. In memory only, a relaunch has no pass under way.
+  private var removedIDs: Set<String> = []
+
+  struct RemovedSetError: Error, CustomStringConvertible {
+    let id: String
+    var description: String { "set \(id) was deleted while this pass ran; not saved" }
+  }
+
   func remove(id: String) {
+    removedIDs.insert(id)
     entries.removeAll { $0.id == id }
     try? FileManager.default.removeItem(at: folder(for: id))
     try? persistIndex()

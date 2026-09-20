@@ -409,6 +409,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
         log.event(
           "recents_refreshed",
           ["id": entry.id, "was": "\(stored.exercise.rawValue) \(stored.reps.count)", "now": "\(kind.rawValue) \(analyzed.reps.count)"])
+      } catch let removed as RecentsStore.RemovedSetError {
+        log.event("remember_skipped", ["reason": "set deleted", "where": "recents_refresh", "id": removed.id])
       } catch {
         log.event("error", ["where": "recents_refresh", "message": "\(error)"])
       }
@@ -606,6 +608,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
          "now": "\(kind.rawValue) \(analyzed.reps.count)", "models": models.names])
       let fps = summary.elapsed > 0 ? Double(summary.frames) / summary.elapsed : 0
       return RepOutcome(reps: analyzed.reps.count, fps: fps)
+    } catch let removed as RecentsStore.RemovedSetError {
+      log.event("remember_skipped", ["reason": "set deleted", "where": "recents_rerun_\(replayWhere)", "id": removed.id])
+      return nil
     } catch {
       log.event("error", ["where": "recents_rerun_\(replayWhere)", "id": entry.id, "message": "\(error)"])
       return nil
@@ -822,6 +827,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Writes the current clip and analysis into Recents (new entry, or updates the open one after a trim).
   private func rememberCurrent(clipURL: URL) {
+    // The clip was deleted while its pass ran (#111): with no entry id left, saving would store it again as a
+    // new set.
+    guard !clipDeleted else {
+      log.event("remember_skipped", ["reason": "clip deleted"])
+      return
+    }
     let id = currentEntryID ?? UUID().uuidString
     let source: RecentEntry.Source
     switch currentOrigin {
@@ -1044,7 +1055,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
     recents.remove(id: entry.id)
   }
 
+  /// The clip on screen was deleted: whatever pass is still running for it must not save it. Cleared when the
+  /// next clip is installed.
+  private var clipDeleted = false
+
   private func closeDeletedClip(status: String) {
+    clipDeleted = true
+    if currentJob?.isUserPass == true { currentTask?.cancel() }
     currentClipStartedAt = nil  // ends the heart-rate re-ask (#107): its folder is gone
     currentFileURL = nil
     trimmedURL = nil
@@ -1143,6 +1160,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   private func installPlayerItem(url: URL, pipeline: AnalysisPipeline, keepUndo: Bool = false) {
     pause()
+    clipDeleted = false
     if !keepUndo {
       // Any other clip coming in ends the trim's undo (#27); a stashed original stays with its set in Workouts.
       untrimmed = nil
@@ -2245,6 +2263,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
         Task { @MainActor in self?.activity = .working("Trimming", progress: progress) }
       }
       let clip = trimmed.url
+      // The set was deleted while it was being trimmed (#111): the trimmed file is nobody's.
+      guard !clipDeleted else {
+        try? FileManager.default.removeItem(at: clip)
+        activity = .idle
+        return
+      }
       log.event(
         "trim_done",
         ["elapsed_s": Date().timeIntervalSince(started), "passthrough": trimmed.passthrough, "aligned_start_s": trimmed.start])

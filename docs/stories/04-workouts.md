@@ -311,7 +311,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 056:
 
 - **Summary:** Delete a set, and be told whether its video goes with it
-- **Status:** implemented for [#111](https://github.com/idvorkin/exercise-analyzer/issues/111); the wording verified on the host (`RecentsIndexTests`), the dialog and the delete on the simulator (`SWING_OPEN_RECENT=1 SWING_DELETE_SET=prompt` for the screenshot, `=confirm`: `set_deleted`, the folder and the index row gone, no other set touched); on the phone pending
+- **Status:** implemented for [#111](https://github.com/idvorkin/exercise-analyzer/issues/111); the wording verified on the host (`RecentsIndexTests`), the dialog and the delete on the simulator (`SWING_OPEN_RECENT=1 SWING_DELETE_SET=prompt` for the screenshot, `=confirm`: `set_deleted`, the folder and the index row gone, no other set touched; deleted 4 s into a stale set's re-analysis, the pass ended 13 s later, the session logged `remember_skipped` and the store refused the refresh's save, and the set stayed gone; that refusal was logged as an `error` in that run and is a `remember_skipped` since, a wording not seen in a run yet); on the phone pending
 - **Why:** Igor, 2026-09-19, on a nine-second leftover clip: "I need to be able to delete a video. Program needs to be helped [handled] differently if it's on disk or not, if it's already not saved on disk. Say this would be the final delete or something"
 
 #### Use Case:
@@ -335,6 +335,11 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I long-press a set and pick "Delete set and video…" or "Remove from Workouts…"
 - **Then:** the same dialog asks first; before this the long-press removed the set at once, the only copy of an in-app video with it
 
-- **Notes:** The words come from `SetDeletionPrompt` (ExerciseCore) by where the video lives (`RecentEntry.isInPhotos`). The session does the delete (`delete(set:from:)`), so a set that is on screen is let go of first and cannot be saved back; `set_deleted` logs id, in_photos, reps, on_screen and where (review, workouts). The "no reps found" offer after a recording (029) is unchanged.
+- **Scenario:** A set deleted while the app is still working on it
+- **Given:** a stored set is being re-analyzed (a new build's refresh, a re-run, a trim under way)
+- **When:** I delete it
+- **Then:** it stays deleted: the pass that finishes afterwards is not saved, and the trash on the playback screen waits until a pass I started is done
+
+- **Notes:** The words come from `SetDeletionPrompt` (ExerciseCore) by where the video lives (`RecentEntry.isInPhotos`). The session does the delete (`delete(set:from:)`), so a set that is on screen is let go of first and cannot be saved back; `set_deleted` logs id, in_photos, reps, on_screen and where (review, workouts). The code review of 59309e7 found a deleted set could come back: a pass saves by id, or under a fresh id once the screen's entry is gone, seconds after it started. So `RecentsStore.save` refuses an id removed since launch, the session remembers nothing for a clip it deleted until the next clip is loaded, and a trim that finishes after the delete throws its file away; each logs `remember_skipped`. The "no reps found" offer after a recording (029) is unchanged.
 
 - **Issues:** [#111](https://github.com/idvorkin/exercise-analyzer/issues/111)

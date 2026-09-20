@@ -908,6 +908,8 @@ struct ContentView: View {
             Label("Delete set", systemImage: "trash")
           }
           .foregroundStyle(.red)
+          // Not under a pass or a trim: they end by saving the set (the session guards that too).
+          .disabled(session.activity != .idle)
         }
         Spacer()
         Button {
