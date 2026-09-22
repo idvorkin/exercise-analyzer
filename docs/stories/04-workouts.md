@@ -49,7 +49,11 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** those sections keep my choices; a wrist workout can fold independently without preventing me from opening its detail page
 - **Issues:** [#121](https://github.com/idvorkin/exercise-analyzer/issues/121), requested from the phone 2026-09-20; not implemented yet
 
-- **Issues:** [#110](https://github.com/idvorkin/exercise-analyzer/issues/110) Igor asked for the workout page's previews to be more representative (the cards showed a hunched back; sets with no reps a blank); [#35](https://github.com/idvorkin/exercise-analyzer/issues/35); [#78](https://github.com/idvorkin/exercise-analyzer/issues/78), [#79](https://github.com/idvorkin/exercise-analyzer/issues/79) Saturday's four swing sets drew as a blank band under a header that counted them (the row's id was the exercise name, repeated across days)
+- **Scenario:** A folded day says what was done
+- **Given:** a day of eight swing sets of eight and five get-up sets of two, folded shut
+- **When:** I read its header
+- **Then:** beside the title it says "8×8 [swing] · 5×2 [get-up]", the count of sets by the reps of each with the exercise's drawing in place of its word, "4×8–10" when the sets differed; opened, the header reads "13 sets · 74 reps · 45 min" as before and the rows carry the rest; VoiceOver says "8 by 8 swings, 5 by 2 get-ups" (Igor, 2026-09-22: "when I have a collapsed workout, maybe let's show an icon like 8x8 swings, 3xTGUs … Use the icons for that", [#129](https://github.com/idvorkin/exercise-analyzer/issues/129))
+- **Issues:** [#110](https://github.com/idvorkin/exercise-analyzer/issues/110) Igor asked for the workout page's previews to be more representative (the cards showed a hunched back; sets with no reps a blank); [#35](https://github.com/idvorkin/exercise-analyzer/issues/35); [#78](https://github.com/idvorkin/exercise-analyzer/issues/78), [#79](https://github.com/idvorkin/exercise-analyzer/issues/79) Saturday's four swing sets drew as a blank band under a header that counted them (the row's id was the exercise name, repeated across days); [#129](https://github.com/idvorkin/exercise-analyzer/issues/129) the folded day's chips (simulator screenshot with `SWING_WORKOUTS_FOLDED=1`, on the phone pending)
 
 ---
 

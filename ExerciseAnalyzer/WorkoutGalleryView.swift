@@ -163,6 +163,8 @@ struct WorkoutGalleryView: View {
           collapseSeeded = true
           let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
           collapsed = Set(days.map(\.date).filter { $0 < weekAgo })
+          // Test hook: every day folded, for a screenshot of the folded headers (#129; the simulator cannot scroll).
+          if ProcessInfo.processInfo.environment["SWING_WORKOUTS_FOLDED"] == "1" { collapsed = Set(days.map(\.date)) }
         }
         suggestions.onEvent = onEvent
         suggestions.refresh(known: knownPhotosIDs)
@@ -337,6 +339,14 @@ struct ExerciseSets: Identifiable {
   var id: String { kind.rawValue + "-" + (sets.first?.id ?? "") }
   var repCount: Int { sets.reduce(0) { $0 + $1.repCount } }
   var bestScore: Int? { sets.compactMap(\.bestScore).max() }
+  /// The reps of a set, "8" when every set had eight, "8–10" when they differed (#129).
+  var repsPerSet: String {
+    let counts = sets.map(\.repCount)
+    guard let low = counts.min(), let high = counts.max() else { return "0" }
+    return low == high ? "\(low)" : "\(low)–\(high)"
+  }
+  /// "8×8", "5×2", "4×8–10": sets × reps, the folded day's word for the exercise (#129).
+  var setsByReps: String { "\(sets.count)×\(repsPerSet)" }
 }
 
 extension RecentEntry {
@@ -402,12 +412,26 @@ struct DayHeader: View {
             Text(dateLine).font(.subheadline).foregroundStyle(.secondary)
           }
           Spacer()
-          Text(summary).font(.subheadline).foregroundStyle(.secondary)
+          if collapsed {
+            // A folded day says what was done (#129; Igor: "show an icon like 8x8 swings, 3xTGUs"): sets ×
+            // reps per exercise with its drawing, "8×8 [swing] · 5×2 [get-up]", a range when the sets differ.
+            HStack(spacing: 6) {
+              ForEach(day.exercises) { exercise in
+                HStack(spacing: 3) {
+                  Text(exercise.setsByReps).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+                  ExerciseGlyph(kind: exercise.kind, size: 18)
+                }
+              }
+            }
+            .lineLimit(1)
+          } else {
+            Text(summary).font(.subheadline).foregroundStyle(.secondary)
+          }
         }
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .accessibilityLabel("\(title), \(summary), \(collapsed ? "collapsed" : "expanded")")
+      .accessibilityLabel("\(title), \(collapsed ? spokenExercises : summary), \(collapsed ? "collapsed" : "expanded")")
       // The day's workouts from the wrist (048): the hour, its heart rate, and that it is in Health. Each line
       // is its own target and opens the workout's page (053); the header above it still folds the day.
       ForEach(workoutLines, id: \.workout.id) { line in
@@ -439,6 +463,11 @@ struct DayHeader: View {
     var parts = ["\(day.setCount) set\(day.setCount == 1 ? "" : "s")", "\(day.repCount) reps"]
     if let span = day.span, span >= 60 { parts.append("\(Int(span / 60)) min") }
     return parts.joined(separator: " · ")
+  }
+
+  /// "8 by 8 swings, 5 by 2 get-ups": the folded line for VoiceOver.
+  private var spokenExercises: String {
+    day.exercises.map { "\($0.sets.count) by \($0.repsPerSet) \($0.kind.repWord(2))" }.joined(separator: ", ")
   }
 
   private static let clock: DateFormatter = {
