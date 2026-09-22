@@ -18,8 +18,19 @@ struct WorkoutDetailView: View {
   var onEvent: ((String, [String: Any]) -> Void)? = nil
 
   @State private var heartRate: HeartRateSeries?
+  /// The chart's window in seconds (#125): the whole workout until a pinch narrows it, never under a minute.
+  /// A 45-minute workout on a phone-wide plot draws a 25 s set as a 3 pt band; zoomed, the bands are bands.
+  @State private var windowSeconds: Double?
+  /// The window when the pinch began; each tick scales from it, not from the last tick.
+  @State private var pinchBase: Double?
+  /// The moment at the plot's leading edge: pan is the chart's own scroll, zoom keeps the pinch point still.
+  @State private var scrollStart = Date.distantPast
 
   private var timeline: WorkoutTimeline { WorkoutTimeline(workout: workout, sets: sets, heartRate: heartRate) }
+
+  /// The plot spans the workout, a minute at least (a workout just started is not a zero-width axis).
+  private var wholeSeconds: Double { max(workout.end.timeIntervalSince(workout.start), 60) }
+  private var visibleSeconds: Double { min(max(windowSeconds ?? wholeSeconds, 60), wholeSeconds) }
 
   private static let clock: DateFormatter = {
     let f = DateFormatter()
@@ -65,6 +76,7 @@ struct WorkoutDetailView: View {
     .navigationTitle("Workout · \(Self.day.string(from: workout.start))")
     .navigationBarTitleDisplayMode(.inline)
     .task {
+      if scrollStart == .distantPast { scrollStart = workout.start }
       heartRate = await workouts.heartRate(for: workout)
       onEvent?(
         "workout_page",
@@ -112,29 +124,60 @@ struct WorkoutDetailView: View {
           .interpolationMethod(.monotone)
       }
     }
-    .chartXScale(domain: workout.start...max(workout.end, workout.start.addingTimeInterval(60)))
+    .chartXScale(domain: workout.start...workout.start.addingTimeInterval(wholeSeconds))
     .chartYScale(domain: low...high)
     .chartYAxis(samples.isEmpty ? .hidden : .automatic)
+    // Pinch to zoom, drag to pan (#125; Igor: "I need to be able to zoom, have it be nice and smooth and
+    // usable"). The pan is the chart's own horizontal scroll; the pinch narrows the window it shows.
+    .chartScrollableAxes(.horizontal)
+    .chartXVisibleDomain(length: visibleSeconds)
+    .chartScrollPosition(x: $scrollStart)
     // A tap on a set's band opens the set, like its row (#101). A band is a few points wide, so the tap takes
-    // the nearest set within 24 pt.
+    // the nearest set within 24 pt; zoomed in, the plot is wider and 24 pt is fewer seconds, as the bands are.
+    // The overlay is the whole scrollable plot (three screens wide at 3×), not the window: a touch lands in
+    // plot coordinates whatever the scroll, and the proxy reads the moment straight off it.
     .chartOverlay { proxy in
       GeometryReader { geo in
         let plot = proxy.plotFrame.map { geo[$0] } ?? .zero
+        let moment = { (x: CGFloat) -> Date? in proxy.value(atX: x - plot.minX) }
         let open = { (x: CGFloat) in
-          let time: Date? = proxy.value(atX: x - plot.minX)
-          let domain = max(workout.end.timeIntervalSince(workout.start), 60)
-          let row = time.flatMap { timeline.row(near: $0, slop: 24 * domain / max(plot.width, 1)) }
-          onEvent?("ui", ["action": "workout_bar_tap", "hit": row != nil])
+          let row = moment(x).flatMap { timeline.row(near: $0, slop: 24 * wholeSeconds / max(plot.width, 1)) }
+          onEvent?("ui", ["action": "workout_bar_tap", "hit": row != nil, "window_s": Int(visibleSeconds)])
           if let row, let entry = sets.first(where: { $0.id == row.id }) { onOpen(entry) }
         }
         Rectangle().fill(.clear).contentShape(Rectangle())
           .onTapGesture { open($0.x) }
+          .simultaneousGesture(
+            MagnifyGesture()
+              .onChanged { value in
+                let base = pinchBase ?? visibleSeconds
+                pinchBase = base
+                // The moment under the fingers when the pinch began stays under them.
+                guard let anchor = moment(value.startAnchor.x * geo.size.width) else { return }
+                zoom(to: base / max(value.magnification, 0.01), around: anchor)
+              }
+              .onEnded { _ in
+                pinchBase = nil
+                onEvent?("ui", ["action": "workout_zoom", "window_s": Int(visibleSeconds), "whole_s": Int(wholeSeconds)])
+              }
+          )
           .task {
-            // Test hook (the simulator takes no taps): SWING_WORKOUT_BAR_TAP=0.4 taps 40 % across the plot.
-            guard let at = ProcessInfo.processInfo.environment["SWING_WORKOUT_BAR_TAP"].flatMap(Double.init)
-            else { return }
-            try? await Task.sleep(for: .seconds(3))
-            open(plot.minX + plot.width * at)
+            // Test hooks (the simulator takes no taps or pinches): SWING_WORKOUT_ZOOM=3 narrows the window to a
+            // third of the workout around the moment 80 % through it, 2 s after the page opens;
+            // SWING_WORKOUT_BAR_TAP=0.4 then taps 40 % across the window on screen.
+            let env = ProcessInfo.processInfo.environment
+            if let factor = env["SWING_WORKOUT_ZOOM"].flatMap(Double.init), factor > 1 {
+              try? await Task.sleep(for: .seconds(2))
+              zoom(to: wholeSeconds / factor, around: workout.start.addingTimeInterval(wholeSeconds * 0.8))
+              onEvent?(
+                "ui",
+                ["action": "workout_zoom", "window_s": Int(visibleSeconds), "whole_s": Int(wholeSeconds),
+                 "start_s": Int(scrollStart.timeIntervalSince(workout.start)), "hook": true])
+            }
+            guard let at = env["SWING_WORKOUT_BAR_TAP"].flatMap(Double.init) else { return }
+            try? await Task.sleep(for: .seconds(1))
+            let seconds = max(scrollStart.timeIntervalSince(workout.start), 0) + visibleSeconds * at
+            open(plot.minX + plot.width * seconds / wholeSeconds)
           }
       }
     }
@@ -145,6 +188,18 @@ struct WorkoutDetailView: View {
       }
     }
     .accessibilityLabel("Heart rate across the workout with \(timeline.rows.count) sets marked")
+  }
+
+  /// Narrows or widens the window to `seconds` (a minute to the whole workout) with `moment` kept where it is
+  /// on screen; widened to the whole workout the chart is home again, nothing to pan.
+  private func zoom(to seconds: Double, around moment: Date) {
+    let before = visibleSeconds
+    let start = scrollStart == .distantPast ? workout.start : scrollStart
+    let share = min(max(moment.timeIntervalSince(start) / before, 0), 1)
+    windowSeconds = min(max(seconds, 60), wholeSeconds)
+    let after = visibleSeconds
+    let latest = workout.start.addingTimeInterval(wholeSeconds - after)
+    scrollStart = min(max(moment.addingTimeInterval(-after * share), workout.start), latest)
   }
 
   static func minutes(_ seconds: TimeInterval) -> String {
