@@ -33,6 +33,29 @@ final class PhoneLink: NSObject, ObservableObject {
   /// Status older than this is stale: the phone app may be gone without having sent an idle status.
   static let maxStatusAge: TimeInterval = 8
 
+  /// The link, measured (#122): one small message a second to the phone while this app is in front or a
+  /// workout keeps it running, answered by the phone, so a drop is a gap in the phone's log with a time on it.
+  /// WatchConnectivity publishes no rate limit for `sendMessage`; the floor is the round trip (~100–300 ms over
+  /// Bluetooth), the cost is both radios and both apps awake per message, so once a second, not faster, until
+  /// the pattern asks for more. A beat is skipped, not sent, while the phone reads as unreachable.
+  static let heartbeatInterval: TimeInterval = 1
+  private var heartbeatTimer: Timer?
+  private var heartbeat = HeartbeatStats()
+  private var heartbeatFailedLogged = false
+
+  /// A minute of beats, summarized to the phone's log as `watch_heartbeat_minute` (a line per beat from here
+  /// would be a queued transfer each; the phone logs the beats it gets itself).
+  private struct HeartbeatStats {
+    var seq = 0
+    var sent = 0
+    var replied = 0
+    var failed = 0
+    var skipped = 0
+    var rttTotalMs = 0
+    var rttMaxMs = 0
+    var since = Date()
+  }
+
   /// Fixed screenshot state (WATCH_STATE at launch): the link presents it and never talks to WCSession.
   private var screenshot: WatchScreenshotState?
   /// The screenshot rung wants the idle page scrolled to its End and Discard buttons.
@@ -75,6 +98,9 @@ final class PhoneLink: NSObject, ObservableObject {
     guard WCSession.isSupported() else { return }
     WCSession.default.delegate = self
     WCSession.default.activate()
+    heartbeatTimer = Timer.scheduledTimer(withTimeInterval: Self.heartbeatInterval, repeats: true) { [weak self] _ in
+      Task { @MainActor in self?.beat() }
+    }
   }
 
   /// Called from the view's scene phase: tells the phone whether to stream previews, and pings on wake.
@@ -83,7 +109,60 @@ final class PhoneLink: NSObject, ObservableObject {
     logEvent("scene", ["active": active])
     inFront = active
     sendScene(active)
-    if active { ping() }
+    if active { ping() } else { flushHeartbeat() }
+  }
+
+  /// One heartbeat (#122): counted always, sent only to a phone that reads as reachable, answered or failed.
+  private func beat() {
+    guard inFront || workout.running else { return }
+    if Date().timeIntervalSince(heartbeat.since) >= 60 { flushHeartbeat() }
+    heartbeat.seq += 1
+    let seq = heartbeat.seq
+    let session = WCSession.default
+    guard session.activationState == .activated, session.isReachable else {
+      heartbeat.skipped += 1
+      return
+    }
+    heartbeat.sent += 1
+    let sentAt = Date()
+    session.sendMessage(
+      [
+        "command": WatchCommand.heartbeat.rawValue, "seq": seq, "sent": sentAt.timeIntervalSince1970, "front": inFront,
+        "workout": workout.running,
+      ],
+      replyHandler: { [weak self] _ in
+        Task { @MainActor in
+          guard let self else { return }
+          let rtt = Int(Date().timeIntervalSince(sentAt) * 1000)
+          self.heartbeat.replied += 1
+          self.heartbeat.rttTotalMs += rtt
+          self.heartbeat.rttMaxMs = max(self.heartbeat.rttMaxMs, rtt)
+          self.heartbeatFailedLogged = false
+        }
+      }
+    ) { [weak self] error in
+      Task { @MainActor in
+        guard let self else { return }
+        self.heartbeat.failed += 1
+        guard !self.heartbeatFailedLogged else { return }  // once per spell, like the phone's send failures
+        self.heartbeatFailedLogged = true
+        self.logEvent("heartbeat_failed", ["seq": seq, "message": error.localizedDescription])
+      }
+    }
+  }
+
+  /// The minute's tally to the phone's log, then a fresh minute.
+  private func flushHeartbeat() {
+    let s = heartbeat
+    guard s.sent + s.skipped > 0 else { return }
+    logEvent(
+      "heartbeat_minute",
+      [
+        "seq": s.seq, "sent": s.sent, "replied": s.replied, "failed": s.failed, "skipped": s.skipped,
+        "rtt_avg_ms": s.replied > 0 ? s.rttTotalMs / s.replied : -1, "rtt_max_ms": s.rttMaxMs,
+        "seconds": Int(Date().timeIntervalSince(s.since)), "front": inFront, "workout": workout.running,
+      ])
+    heartbeat = HeartbeatStats(seq: s.seq)
   }
 
   /// Tells the phone whether the watch app is in front, the message its preview gate keys on. Its failure is

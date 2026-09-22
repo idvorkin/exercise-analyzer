@@ -100,12 +100,20 @@ the first frame (story 001).
 - **When:** the phone app has not reported for 8 s
 - **Then:** the watch shows the not-reachable screen with how long since it last heard and the last rep count, and retries every 2 s until the phone reports again
 
+- **Scenario:** The link is measured, so a drop has a time and a pattern
+- **Given:** the watch app in front, or a workout keeping it running wrist-down
+- **When:** the gym hour goes by
+- **Then:** the watch sends the phone one small message a second and the phone logs each with the gap since the last and the beats that never came (`watch_heartbeat`: seq, gap_ms, missed, front, workout, reachable); once a minute the watch adds its own tally (`watch_heartbeat_minute`: sent, replied, failed, skipped, the round trip's average and worst); a beat to a phone the watch reads as unreachable is counted and skipped, not sent, and a beat that fails is logged once per spell. Nothing on either screen changes (Igor, 2026-09-21: "log the communication channel from the watch to the phone … see if we have a drop so we can see if there's some kind of pattern, because losing the watch is terrible", [#122](https://github.com/idvorkin/exercise-analyzer/issues/122)); implemented for #122, verified on the host (`swift build` of both targets) and the watch simulator (`just watch-screens` unchanged), the beats themselves read from the phone's log after the next gym session
+
 - **Notes:** With the wrist down the watch app is suspended and the status stops; that is the price of having no
   workout session ([#32](https://github.com/idvorkin/exercise-analyzer/issues/32), see the end of this file). The
   state arrives through the application context on wake, and the face complication (043) is the screen that
-  stays right meanwhile.
+  stays right meanwhile. The heartbeat's rate is `PhoneLink.heartbeatInterval` (1 s): WatchConnectivity
+  publishes no rate limit for `sendMessage`, the floor is the round trip (~100–300 ms over Bluetooth), the cost
+  is both radios and both apps awake per message; faster is a one-line change once the 1 s pattern asks for it.
+  How to read a session: [DEBUGGING.md](../DEBUGGING.md#the-session-log), `docs/analysis/lab/2026-09-22-watch-heartbeat.md`.
 
-- **Issues:** [#32](https://github.com/idvorkin/exercise-analyzer/issues/32)
+- **Issues:** [#32](https://github.com/idvorkin/exercise-analyzer/issues/32); [#122](https://github.com/idvorkin/exercise-analyzer/issues/122) the heartbeat, after [#76](https://github.com/idvorkin/exercise-analyzer/issues/76)'s reachability edges alone could not say what the link did between them
 
 ---
 

@@ -23,6 +23,9 @@ final class WatchBridge: NSObject, ObservableObject {
   private let minInterval = 0.3
   /// The watch app is in front (it says so on scene changes); previews are only worth sending then.
   @Published private(set) var watchActive = false
+  /// The last heartbeat from the wrist (#122): the next one logs its gap and how many beats never arrived.
+  private var lastHeartbeatAt = Date.distantPast
+  private var lastHeartbeatSeq = 0
 
   override init() {
     super.init()
@@ -57,6 +60,34 @@ final class WatchBridge: NSObject, ObservableObject {
 
   nonisolated private func handle(_ message: [String: Any]) {
     guard let raw = message["command"] as? String, let command = WatchCommand(rawValue: raw) else { return }
+    if command == .heartbeat {
+      // The link, measured (#122; Igor: "log the communication channel from the watch to the phone … see if we
+      // have a drop so we can see if there's some kind of pattern"): one line per beat, with the gap since the
+      // last and the beats that never came, against the phone's own view of reachability.
+      let seq = message["seq"] as? Int ?? 0
+      let fields: [String: Any] = [
+        "seq": seq, "watch_t": message["sent"] as? Double ?? 0, "front": message["front"] as? Bool ?? false,
+        "workout": message["workout"] as? Bool ?? false, "reachable": WCSession.default.isReachable,
+      ]
+      Task { @MainActor in
+        let now = Date()
+        let gap = self.lastHeartbeatAt == .distantPast ? -1 : Int(now.timeIntervalSince(self.lastHeartbeatAt) * 1000)
+        let missed = self.lastHeartbeatSeq == 0 ? 0 : max(seq - self.lastHeartbeatSeq - 1, 0)
+        self.lastHeartbeatAt = now
+        self.lastHeartbeatSeq = seq
+        // A beat from an app in front is as good as a tap for the preview gate (#76, #38).
+        if fields["front"] as? Bool == true, !self.watchActive {
+          self.watchActive = true
+          self.onEvent?("watch_scene", ["active": true, "from": command.rawValue])
+        }
+        var logged = fields
+        logged["gap_ms"] = gap
+        logged["missed"] = missed
+        logged["watch_active"] = self.watchActive
+        self.onEvent?("watch_heartbeat", logged)
+      }
+      return
+    }
     if command == .watchActive || command == .watchInactive {
       Task { @MainActor in
         let active = command == .watchActive

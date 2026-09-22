@@ -1677,7 +1677,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     case .status: pushWatchStatus(force: true)
     case .zoom: cycleCameraLevel()
     case .watchMode: setWatchMode(!watchMode, from: "watch")
-    case .exercise, .watchActive, .watchInactive: break  // handled in the bridge
+    case .exercise, .watchActive, .watchInactive, .heartbeat: break  // handled in the bridge
     }
   }
 

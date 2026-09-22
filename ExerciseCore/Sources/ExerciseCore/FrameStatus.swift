@@ -166,4 +166,7 @@ public enum WatchCommand: String, Codable, CaseIterable, Sendable {
   case watchMode
   /// The watch app came to the front / left it: the phone streams previews only while it is active.
   case watchActive, watchInactive
+  /// One a second from the wrist while its app is in front or a workout runs (#122): the phone logs each
+  /// with its gap, so a dropped link is a hole in the log with a time on it. Carries seq, sent, front, workout.
+  case heartbeat
 }
