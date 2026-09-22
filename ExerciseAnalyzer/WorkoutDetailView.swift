@@ -183,7 +183,11 @@ private struct SetTimelineRow: View {
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
           Text("\(row.reps)").font(.title2.bold()).monospacedDigit()
-          Text(row.exercise.repWord(row.reps)).font(.subheadline).foregroundStyle(.secondary)
+          // The exercise as its drawing, not its word (#127; Igor: "show icons not words for exercise"): the
+          // colored A figure says swing or get-up faster than "swings" does at arm's length. The word stays
+          // for VoiceOver.
+          ExerciseGlyph(kind: row.exercise, size: 22)
+            .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }
           if let score = row.score {
             Text("\(score)").font(.caption.bold()).monospacedDigit()
               .padding(.horizontal, 6).padding(.vertical, 1)
@@ -192,6 +196,10 @@ private struct SetTimelineRow: View {
         }
         Text("Set \(number) · \(Self.clock.string(from: row.start))").font(.caption).foregroundStyle(.secondary)
       }
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel(
+        "\(row.reps) \(row.exercise.repWord(row.reps))" + (row.score.map { ", score \($0)" } ?? "")
+          + ", set \(number) at \(Self.clock.string(from: row.start))")
       Spacer(minLength: 8)
       VStack(alignment: .trailing, spacing: 2) {
         if let peak = row.peak {
