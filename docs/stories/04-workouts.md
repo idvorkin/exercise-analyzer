@@ -374,3 +374,31 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Notes:** The words come from `SetDeletionPrompt` (ExerciseCore) by where the video lives (`RecentEntry.isInPhotos`). The session does the delete (`delete(set:from:)`), so a set that is on screen is let go of first and cannot be saved back; `set_deleted` logs id, in_photos, reps, on_screen and where (review, workouts). The code review of 59309e7 found a deleted set could come back: a pass saves by id, or under a fresh id once the screen's entry is gone, seconds after it started. So `RecentsStore.save` refuses an id removed since launch, the session remembers nothing for a clip it deleted until the next clip is loaded, and a trim that finishes after the delete throws its file away; each logs `remember_skipped`. The "no reps found" offer after a recording (029) is unchanged.
 
 - **Issues:** [#111](https://github.com/idvorkin/exercise-analyzer/issues/111)
+
+---
+
+### User Story 057:
+
+- **Summary:** Watch a run of back-to-back sets as one video, each rest a two-second card
+- **Status:** not implemented ([#124](https://github.com/idvorkin/exercise-analyzer/issues/124)); the plan and its trade-off are on the issue, waiting for Igor's pick
+- **Why:** Igor, 2026-09-21, on the workout page after five get-up sets in a row: "I think I also want a feature to be able to merge all of the Turkish get-ups that are back-to-back like that into a single video and maybe have an interstitial saying how long I rested and how much my heart rate dropped in there. For like 2 seconds in the joint video, and then keep the metadata so I can still click and jump to the right rep"
+
+#### Use Case:
+- **As a** lifter who did five get-up sets one after another
+- **I want to** watch them as a single video with each rest told in two seconds, and still jump to any rep
+- **so that** the block reads as it was done, not as five clips, and a rest's length and my heart's recovery sit where they happened
+
+#### Acceptance Criteria:
+- **Scenario:** Playing a run of sets as one
+- **Given:** a workout whose page shows sets 10–14 as get-ups back to back (rests 3:22, 2:52, 3:22, 4:09)
+- **When:** I ask for the run as one video from the workout page
+- **Then:** the five sets play in order, and between each pair a two-second card says "rest 3:22 · ♥ 160 → 132" (the rest before the next set and the drop from the set's peak to the next set's start, as the row already says); the count and the rep gallery run across all five, and a tap on a rep seeks to that set's rep
+
+- **Scenario:** Keeping it
+- **Given:** the joined run on screen
+- **When:** I save it
+- **Then:** one video goes to Photos with the cards in it; the five sets stay five sets in Workouts, each with its own analysis
+
+- **Notes:** A run is consecutive sets of one exercise in one workout with no other exercise between them; the card's numbers are the workout page's (053: peak, drop over the rest, the rest before the next). Two builds are possible and the issue weighs them: a queue player with generated card items (no file, instant, the gallery maps rep → item + time) or a composition export (a real file for Photos, the cards drawn into it, minutes of encoding for a run of get-ups).
+
+- **Issues:** [#124](https://github.com/idvorkin/exercise-analyzer/issues/124)
