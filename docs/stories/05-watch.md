@@ -87,7 +87,7 @@ the first frame (story 001).
 ### User Story 018:
 
 - **Summary:** The watch never lies about the phone
-- **Status:** implemented in [c5c2d13](https://github.com/idvorkin/exercise-analyzer/commit/c5c2d13), [6199d9d](https://github.com/idvorkin/exercise-analyzer/commit/6199d9d), [b6c5d43](https://github.com/idvorkin/exercise-analyzer/commit/b6c5d43); verified on phone + watch
+- **Status:** implemented in [c5c2d13](https://github.com/idvorkin/exercise-analyzer/commit/c5c2d13), [6199d9d](https://github.com/idvorkin/exercise-analyzer/commit/6199d9d), [b6c5d43](https://github.com/idvorkin/exercise-analyzer/commit/b6c5d43); verified on phone + watch; the heartbeat of [#122](https://github.com/idvorkin/exercise-analyzer/issues/122) in [0fed44b](https://github.com/idvorkin/exercise-analyzer/commit/0fed44b), verified on the host and the watch simulator, on the phone and the watch since 2026-09-22, read from the logs after the next gym session inside a workout
 
 #### Use Case:
 - **As a** lifter glancing at the watch
@@ -103,7 +103,7 @@ the first frame (story 001).
 - **Scenario:** The link is measured, so a drop has a time and a pattern
 - **Given:** the watch app in front, or a workout keeping it running wrist-down
 - **When:** the gym hour goes by
-- **Then:** the watch sends the phone one small message a second and the phone logs each with the gap since the last and the beats that never came (`watch_heartbeat`: seq, gap_ms, missed, front, workout, reachable); once a minute the watch adds its own tally (`watch_heartbeat_minute`: sent, replied, failed, skipped, the round trip's average and worst); a beat to a phone the watch reads as unreachable is counted and skipped, not sent, and a beat that fails is logged once per spell. Nothing on either screen changes (Igor, 2026-09-21: "log the communication channel from the watch to the phone … see if we have a drop so we can see if there's some kind of pattern, because losing the watch is terrible", [#122](https://github.com/idvorkin/exercise-analyzer/issues/122)); implemented for #122, verified on the host (`swift build` of both targets) and the watch simulator (`just watch-screens` unchanged), the beats themselves read from the phone's log after the next gym session
+- **Then:** the watch sends the phone one small message a second and the phone logs each with the gap since the last and the beats that never came (`watch_heartbeat`: seq, gap_ms, missed, front, workout, reachable); once a minute the watch adds its own tally (`watch_heartbeat_minute`: sent, replied, failed, skipped, the round trip's average and worst); a beat to a phone the watch reads as unreachable is counted and skipped, not sent, and a beat that fails is logged once per spell. Nothing on either screen changes (Igor, 2026-09-21: "log the communication channel from the watch to the phone … see if we have a drop so we can see if there's some kind of pattern, because losing the watch is terrible", [#122](https://github.com/idvorkin/exercise-analyzer/issues/122))
 
 - **Notes:** With the wrist down the watch app is suspended and the status stops; that is the price of having no
   workout session ([#32](https://github.com/idvorkin/exercise-analyzer/issues/32), see the end of this file). The
