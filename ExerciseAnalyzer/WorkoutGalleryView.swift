@@ -440,7 +440,9 @@ struct DayHeader: View {
         } label: {
           HStack(spacing: 6) {
             Label { Text(line.text).font(.subheadline).monospacedDigit().multilineTextAlignment(.leading) } icon: {
-              Image(systemName: "applewatch").font(.caption)
+              // The workout's sign, the same lifter the playback screen's "‹" wears, not a watch (#130; Igor:
+              // "don't show watch … whatever we use for workout").
+              Image(systemName: "figure.strengthtraining.traditional").font(.caption)
             }
             Spacer(minLength: 4)
             if onOpenWorkout != nil { Image(systemName: "chevron.right").font(.caption.bold()) }
