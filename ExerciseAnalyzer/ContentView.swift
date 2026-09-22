@@ -273,11 +273,13 @@ struct ContentView: View {
   // MARK: - HUD
 
   /// The stored workout the set on screen was done in: the page it was opened from, else the workout its first
-  /// frame falls inside. Nil for the camera, a clip that is not a stored set, or a set outside every workout.
+  /// frame falls inside, the running one included (#123). Nil for the camera, a clip that is not a stored set,
+  /// or a set outside every workout.
   private var workoutOfLoadedSet: StoredWorkout? {
     guard session.source == .file else { return nil }
     if let openedWorkout { return openedWorkout }
     guard let start = session.currentEntry?.span.lowerBound else { return nil }
+    if let live = workouts.liveWorkout, live.contains(start) { return live }
     return workouts.index.workouts.last { $0.contains(start) }
   }
 
@@ -911,6 +913,7 @@ struct ContentView: View {
 
   private func loadFromEnvironment() {
     let env = ProcessInfo.processInfo.environment
+    workouts.seedLiveFromEnvironment()  // SWING_LIVE_WORKOUT=<minutes>: a running workout without a watch (#123)
     if let note = env["SWING_BUG"], !note.isEmpty {
       // Test hook: file a report 8 s after launch (after the clip is up), screenshot and frame included.
       Task {

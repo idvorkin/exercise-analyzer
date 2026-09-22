@@ -114,6 +114,25 @@ final class WorkoutMirror: NSObject, ObservableObject {
   /// The id the page of 053 gives the running workout, shown as a span up to now.
   static let liveID = "live"
 
+  /// The running workout as a span up to now (053, #123): what its page and "‹" open, never kept.
+  var liveWorkout: StoredWorkout? { live.map(Self.soFar) }
+
+  static func soFar(_ live: WorkoutWire) -> StoredWorkout {
+    StoredWorkout(
+      id: liveID, start: live.startDate, end: Date(), heartRateAverage: live.heartRateAverage,
+      heartRateMax: live.heartRateMax, sets: live.sets, reps: live.reps)
+  }
+
+  /// Test hook (#123): the simulator has no watch, so SWING_LIVE_WORKOUT=<minutes> pretends a workout began
+  /// that many minutes ago; the phone never starts a workout itself.
+  func seedLiveFromEnvironment() {
+    guard let minutes = ProcessInfo.processInfo.environment["SWING_LIVE_WORKOUT"].flatMap(Double.init) else { return }
+    live = WorkoutWire(
+      startedAt: Date().addingTimeInterval(-minutes * 60).timeIntervalSince1970, heartRate: 128, heartRateAverage: 126,
+      heartRateMax: 151, sets: 2, reps: 17)
+    onEvent?("workout_mirror", ["state": -1, "seeded": true, "started_at": live?.startedAt ?? 0])
+  }
+
   private func ended(at date: Date) {
     guard let live else { return }
     defer {

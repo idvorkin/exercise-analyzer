@@ -28,6 +28,9 @@ struct WorkoutGalleryView: View {
   /// Days folded shut, by start-of-day time; days older than a week start folded, today and this week start open.
   @State private var collapsed: Set<Date> = []
   @State private var collapseSeeded = false
+  /// Once per opening of the sheet (#123): Workouts lands on the running workout's page; "‹" from it is the
+  /// day list, and the list's root re-appearing after that must not push the page again.
+  @State private var landedOnLive = false
 
   private static let dayKey: DateFormatter = {
     let f = DateFormatter()
@@ -163,6 +166,14 @@ struct WorkoutGalleryView: View {
         }
         suggestions.onEvent = onEvent
         suggestions.refresh(known: knownPhotosIDs)
+        // Mid-workout, Workouts is the workout (#123; Igor, from the gym: "if I'm in a live workout take me back
+        // to live workout"): the sheet opens on the running workout's page, the day list one "‹" behind it. A
+        // set opened from the page keeps `openedWorkout`, so that reopening lands on the page as before.
+        if !landedOnLive, openedWorkout == nil, let live = workouts.liveWorkout {
+          landedOnLive = true
+          openedWorkout = live
+          onEvent?("ui", ["action": "open_live_workout"])
+        }
         // Test hook: open the newest workout's page (053); simulator runs can't tap the green line.
         // "set" goes on to open the workout's first set 2 s later, as a tap on its row would, for "‹ Workout".
         if let hook = ProcessInfo.processInfo.environment["SWING_OPEN_WORKOUT"], let workout = workouts.index.workouts.last,
@@ -454,10 +465,7 @@ struct DayHeader: View {
       if let heartRate = live.heartRate { parts.append("♥ \(heartRate)") }
       parts.append("on the watch")
       // The running workout opens as a span up to now (053).
-      let soFar = StoredWorkout(
-        id: WorkoutMirror.liveID, start: live.startDate, end: Date(), heartRateAverage: live.heartRateAverage,
-        heartRateMax: live.heartRateMax, sets: live.sets, reps: live.reps)
-      lines.append((parts.joined(separator: " · "), soFar))
+      lines.append((parts.joined(separator: " · "), WorkoutMirror.soFar(live)))
     }
     return lines
   }
