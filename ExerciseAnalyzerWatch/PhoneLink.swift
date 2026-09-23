@@ -69,6 +69,18 @@ final class PhoneLink: NSObject, ObservableObject {
     return Date().timeIntervalSince(receivedAt) < Self.maxStatusAge
   }
 
+  /// When the watch app last came to the front.
+  private var wokeAt = Date.distantPast
+  /// How long a raised wrist keeps showing what it last knew before it says "not connected": the link comes back
+  /// ~0.5 s after the raise (≤ 1.1 s over 32 raises at the gym, 2026-09-22), fresh status one round trip later.
+  static let wakeGrace: TimeInterval = 2
+
+  /// What the screen trusts: a live phone, or the last status it heard for the first seconds after a raise, so
+  /// a raised wrist does not flash "Not connected" while the link it is about to get back comes up.
+  var showsAsLive: Bool {
+    isLive || (receivedAt != nil && Date().timeIntervalSince(wokeAt) < Self.wakeGrace)
+  }
+
   /// Asks the phone for a fresh status (a reachable phone app answers with one).
   func ping() {
     guard screenshot == nil else { return }
@@ -108,6 +120,7 @@ final class PhoneLink: NSObject, ObservableObject {
     guard screenshot == nil else { return }
     logEvent("scene", ["active": active])
     inFront = active
+    if active { wokeAt = Date() }
     // Only to a reachable phone: in the gym the link drops ~0.5 s after the wrist goes down and returns ~0.5 s
     // after it comes up, so a scene message sent on the scene change failed on 63 of 63 raises (2026-09-22).
     // The reachability up-edge sends it instead; a phone that lost the link sees the watch as away anyway.

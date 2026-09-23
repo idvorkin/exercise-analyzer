@@ -100,6 +100,14 @@ the first frame (story 001).
 - **When:** the phone app has not reported for 8 s
 - **Then:** the watch shows the not-reachable screen with how long since it last heard and the last rep count, and retries every 2 s until the phone reports again
 
+- **Scenario:** A raised wrist does not flash "Not connected"
+- **Given:** a workout at the gym, the wrist down long enough that the last status is older than 8 s
+- **When:** the wrist comes up
+- **Then:** for the first 2 s the watch shows the screen of the last status it heard (the link returns ~0.5 s after
+  a raise, fresh status one round trip later), and only a phone still silent after that gets the not-reachable
+  screen; before, each of the 32 raises of the 2026-09-22 gym workout showed "Not connected" for about half a
+  second (Igor, 2026-09-22: "go", [#76](https://github.com/idvorkin/exercise-analyzer/issues/76))
+
 - **Scenario:** The link is measured, so a drop has a time and a pattern
 - **Given:** the watch app in front, or a workout keeping it running wrist-down
 - **When:** the gym hour goes by

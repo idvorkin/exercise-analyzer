@@ -19,7 +19,7 @@ struct WatchContentView: View {
       // The picture page whenever the camera is live: `recording` means the camera is up. `phoneActive` is the
       // follow-the-wrist decision (041), never a gate on the picture (2026-09-13 regression: the wrist dropped to
       // the idle pages whenever the phone app was not .active, and lost its framing controls with it).
-      if phone.isLive && status.recording {
+      if phone.showsAsLive && status.recording {
         recordingPages
       } else {
         idlePages
@@ -28,6 +28,12 @@ struct WatchContentView: View {
     .onReceive(clock) { now = $0; if !phone.isLive { phone.ping() } }
     .onAppear { phone.sceneActive(true) }  // also pings; the phone learns the app is in front even without a scene change
     .onChange(of: scenePhase) { _, phase in phone.sceneActive(phase == .active) }
+    // Redraw when the wake grace runs out, so a phone that never answered is shown as such on time.
+    .task(id: scenePhase) {
+      guard scenePhase == .active else { return }
+      try? await Task.sleep(for: .seconds(PhoneLink.wakeGrace + 0.1))
+      now = Date()
+    }
   }
 
   /// Everything that is not a recording: the not-connected, backgrounded-phone and idle screens. A running
@@ -38,7 +44,7 @@ struct WatchContentView: View {
       ScrollView {
         VStack(spacing: 8) {
           if workout.running { workoutHeader }
-          if !phone.isLive {
+          if !phone.showsAsLive {
             if !workout.running {
               Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
             }
