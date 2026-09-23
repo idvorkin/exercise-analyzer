@@ -53,6 +53,10 @@ struct Fixture {
     // the rear foot going up to the bench mid-crouch (elevated in 77 % of its frames, 0.83 s long); rep 2
     // (10.0–10.8 s) is a 0.10 L head wobble. The eight real dips are 0.43–0.51 L deep and 1.5–2.5 s long.
     Fixture(name: "bulgarian-4CF19A9A-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: true),
+    // Igor's gym set (2026-09-22, #134), dumbbells, camera front-left with the bench nearer the camera than him:
+    // Igor counted 6 on the video (the live count said 7, the offline pass 0). Perspective puts the rear ankle level
+    // with the front one on screen, so only the bench box (every second, from `posetrack`) shows the foot up.
+    Fixture(name: "bulgarian-7424BEDD-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 6, humanVerified: true),
     // Igor's TGU clip (2026-09-12, IMG_4342): two get-ups, one per side, with a rest lying between them.
     Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false),
     // Igor's second TGU clip (IMG_4343, issue #14): one get-up per side; a pose glitch at 14 s once counted as a rep.
@@ -94,7 +98,8 @@ struct Fixture {
         analysis: nil,
         bells: (f.bells ?? []).map {
           BellSighting(box: CGRect(x: $0.box[0][0], y: $0.box[0][1], width: $0.box[1][0], height: $0.box[1][1]), conf: $0.conf, color: $0.color)
-        })
+        },
+        bench: f.bench.map { CGRect(x: $0[0][0], y: $0[0][1], width: $0[1][0], height: $0[1][1]) })
     }
   }
 
@@ -114,6 +119,7 @@ struct Fixture {
       let box: [[Double]]?
       let pose: StoredPose?
       let bells: [StoredBell]?
+      let bench: [[Double]]?
     }
     let frames: [StoredFrame]
   }
@@ -133,7 +139,9 @@ extension Array where Element == FrameRecord {
       let bells = frame.bells.map {
         BellSighting(box: CGRect(x: 1 - $0.box.maxX, y: $0.box.minY, width: $0.box.width, height: $0.box.height), conf: $0.conf, color: $0.color)
       }
-      return FrameRecord(time: frame.time, imageSize: frame.imageSize, pose: pose, box: box, analysis: nil, bells: bells)
+      let bench = frame.bench.map { CGRect(x: 1 - $0.maxX, y: $0.minY, width: $0.width, height: $0.height) }
+      return FrameRecord(
+        time: frame.time, imageSize: frame.imageSize, pose: pose, box: box, analysis: nil, bells: bells, bench: bench)
     }
   }
 }

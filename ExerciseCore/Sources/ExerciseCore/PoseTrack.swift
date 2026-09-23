@@ -16,10 +16,13 @@ public struct FrameRecord: Codable {
   /// Every kettlebell the detector saw (empty when the detector did not run), and the one in play (#18).
   public let bells: [BellSighting]
   public let bell: BellSighting?
+  /// The bench the bench detector saw on this frame, normalized; set only on the frames it ran on (about one a
+  /// second: a bench doesn't move) and nil elsewhere (#134).
+  public let bench: CGRect?
 
   public init(
     time: Double, imageSize: CGSize, pose: Pose?, box: CGRect?, analysis: ExerciseFrameResult?,
-    bells: [BellSighting] = [], bell: BellSighting? = nil
+    bells: [BellSighting] = [], bell: BellSighting? = nil, bench: CGRect? = nil
   ) {
     self.time = time
     self.imageSize = imageSize
@@ -28,6 +31,7 @@ public struct FrameRecord: Codable {
     self.analysis = analysis
     self.bells = bells
     self.bell = bell
+    self.bench = bench
   }
 
   // Tracks stored before the detector existed have no bell fields.
@@ -40,6 +44,7 @@ public struct FrameRecord: Codable {
     analysis = try c.decodeIfPresent(ExerciseFrameResult.self, forKey: .analysis)
     bells = try c.decodeIfPresent([BellSighting].self, forKey: .bells) ?? []
     bell = try c.decodeIfPresent(BellSighting.self, forKey: .bell)
+    bench = try c.decodeIfPresent(CGRect.self, forKey: .bench)
   }
 }
 
@@ -78,7 +83,7 @@ public final class PoseTrack {
     track.frames = frames.filter { $0.time >= start && $0.time <= end }.map {
       FrameRecord(
         time: $0.time - start, imageSize: $0.imageSize, pose: $0.pose, box: $0.box, analysis: $0.analysis,
-        bells: $0.bells, bell: $0.bell)
+        bells: $0.bells, bell: $0.bell, bench: $0.bench)
     }
     return track
   }

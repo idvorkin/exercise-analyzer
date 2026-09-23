@@ -38,6 +38,16 @@ public struct BulgarianSplitSquatThresholds {
   /// front one for a second or two while the foot is on the bench (4CF19A9A, 33–34 s); forgetting the top then
   /// measured the next dip from a lower head and put the Standing picture on the way down (#132).
   public var forgetTopAfter = 4.0
+  /// An ankle on the top of the bench box also counts as the rear foot up (#134): with the bench nearer the camera
+  /// than the lifter, perspective puts the rear ankle level with the front one on screen and the gap never votes
+  /// (7424BEDD: 0.013 of the frame at the bottom of a rep). On top = inside the box's width, from `benchTopMargin`
+  /// (normalized) above its top edge down to `benchTopShare` of its height. A foot on the bench sits 0.02–0.21 of
+  /// the box down (10th–90th percentile over both sets); from 4CF19A9A's diagonal camera the floor behind the bench
+  /// shows inside the box, and the walk-in stance and the front foot sit at 0.33, which half the box counted as up.
+  public var benchTopMargin = 0.03
+  public var benchTopShare = 0.25
+  /// The detector runs about once a second; its last box stands in for this long.
+  public var benchMaxAge = 3.0
 }
 
 public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
@@ -81,6 +91,8 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
   /// frozen during a rep; all head-travel thresholds scale by it.
   private var bodyHeight: Double?
   private var elevatedFlags: [Bool] = []
+  /// The last bench the detector saw, and when.
+  private var bench: (box: CGRect, time: Double)?
   private var repStartTime = 0.0
   private var frameCounter = 0
   /// Phase transitions and the values that triggered them, for tuning reports and the session log.
@@ -111,6 +123,7 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     frameHistory = []
     bodyHeight = nil
     elevatedFlags = []
+    bench = nil
     repStartTime = 0
     metrics = RepMetrics()
   }
@@ -120,15 +133,39 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     return Double(elevatedFlags.filter { $0 }.count) / Double(elevatedFlags.count) >= thresholds.elevatedRecentlyFraction
   }
 
-  private func observeFeet(_ skeleton: BodySkeleton, front: BodySide, scale: Double) {
-    guard let frontY = skeleton.ankleY(front), let rearY = skeleton.ankleY(front.other) else { return }
-    elevatedFlags.append(frontY - rearY > scale * thresholds.elevationVoteFraction)
+  /// Records the bench box from a frame the detector ran on.
+  public func observeBench(_ box: CGRect, time: Double) { bench = (box, time) }
+
+  /// The sides whose ankle rests on the top of the bench, while the last bench box is fresh.
+  private func sidesOnBench(_ pose: Pose, time: Double) -> [BodySide] {
+    guard let bench, time - bench.time <= thresholds.benchMaxAge else { return [] }
+    let box = bench.box
+    return [BodySide.left, .right].filter { side in
+      let i = side.ankle.rawValue
+      guard i < pose.xyn.count, i < pose.conf.count, pose.conf[i] > BodySkeleton.visibleThreshold else { return false }
+      let x = CGFloat(pose.xyn[i].x), y = CGFloat(pose.xyn[i].y)
+      return x >= box.minX && x <= box.maxX && y >= box.minY - CGFloat(thresholds.benchTopMargin)
+        && y <= box.minY + box.height * CGFloat(thresholds.benchTopShare)
+    }
+  }
+
+  private func observeFeet(_ skeleton: BodySkeleton, onBench: [BodySide], front: BodySide, scale: Double) {
+    let gap = skeleton.ankleY(front).flatMap { frontY in
+      skeleton.ankleY(front.other).map { frontY - $0 > scale * thresholds.elevationVoteFraction }
+    }
+    guard gap != nil || !onBench.isEmpty else { return }
+    elevatedFlags.append(gap == true || !onBench.isEmpty)
     if elevatedFlags.count > 30 { elevatedFlags.removeFirst() }
   }
 
   /// The front leg is the one whose ankle is lower on screen by a clear margin (rear foot is on the bench).
   /// The margin scales by body height on screen so a slight stagger with both feet on the floor never votes.
-  private func voteFrontLeg(_ skeleton: BodySkeleton) {
+  /// With one ankle on the bench, the other is the front one.
+  private func voteFrontLeg(_ skeleton: BodySkeleton, onBench: [BodySide]) {
+    if legs.workingLeg == nil, onBench.count == 1 {
+      legs.vote(for: onBench[0].other)
+      return
+    }
     guard legs.workingLeg == nil, let leftY = skeleton.ankleY(.left), let rightY = skeleton.ankleY(.right),
       let earY = skeleton.earY
     else { return }
@@ -142,7 +179,8 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
 
   public func process(pose: Pose, time: Double, image: () -> CGImage?) -> ExerciseFrameResult {
     let skeleton = BodySkeleton(pose: pose)
-    voteFrontLeg(skeleton)
+    let onBench = sidesOnBench(pose, time: time)
+    voteFrontLeg(skeleton, onBench: onBench)
     let front = legs.workingLeg ?? .left
     let frontKnee = skeleton.kneeAngle(front)
     let rearKnee = skeleton.kneeAngle(front.other)
@@ -159,7 +197,7 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
       return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil)
     }
     let currentHeight = max(ankleY - earY, 1)
-    observeFeet(skeleton, front: front, scale: bodyHeight ?? currentHeight)
+    observeFeet(skeleton, onBench: onBench, front: front, scale: bodyHeight ?? currentHeight)
     if elevatedFlags.last == true {
       if time - lastElevatedTime > thresholds.forgetTopAfter { setUpSince = time }
       lastElevatedTime = time

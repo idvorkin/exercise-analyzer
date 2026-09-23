@@ -73,6 +73,24 @@
       self.compiledModelURL = compiledModelURL
     }
 
+    /// The bench detector (#134): the same dense YOLOE decode over a model exported with the prompt "bench"
+    /// (`export_bell_detector.py yoloe 26s 640 bench`; the nano saw the bench in 7–12 % of frames, the small one in
+    /// 97–99 %). A bench doesn't move, so it runs about once every `benchInterval` seconds, not every frame.
+    public static let benchModelName = "yoloe-26s-bench"
+    public static let benchInterval = 1.0
+
+    public static func bench(compiledModelURL: URL, computeUnits: MLComputeUnits = .all) throws -> BellDetector {
+      let detector = try BellDetector(compiledModelURL: compiledModelURL, computeUnits: computeUnits)
+      detector.minConfidence = 0.4
+      detector.maxSightings = 1
+      detector.handExtra = 0
+      detector.samplesColor = false
+      return detector
+    }
+
+    /// The most confident bench in the frame, normalized, or nil (for a detector made by `bench`).
+    public func detectBench(in pixelBuffer: CVPixelBuffer) -> CGRect? { detect(in: pixelBuffer).first?.box }
+
     /// Every bell in the frame, boxes normalized to the image (origin top-left), colours sampled from the pixels.
     /// `wrists` are the frame's visible wrists in normalized coords: past the cap, boxes within reach of one are
     /// kept too (up to `handExtra`), so a crowded rack cannot crowd the swung bell out. Empty means the cap is

@@ -37,6 +37,7 @@ public final class AnalysisPipeline: @unchecked Sendable {
   /// Runs the analyzer over an already-extracted frame (pose and box, no analysis yet).
   @discardableResult
   public func process(extracted: FrameRecord, image: () -> CGImage?) -> FrameRecord {
+    if let bench = extracted.bench { (analyzer as? BulgarianSplitSquatAnalyzer)?.observeBench(bench, time: extracted.time) }
     let analysis = extracted.pose.map { analyzer.process(pose: $0, time: extracted.time, image: image) }
     // The tracker sees every frame, including one with no sighting at all: that is how a track ages, and how a
     // blink of the detector is coasted over (Codex's review of 85ed8e5: skipping empty frames froze both).
@@ -47,7 +48,7 @@ public final class AnalysisPipeline: @unchecked Sendable {
       ? bellTracker.track(extracted.bells, pose: extracted.pose, personHeight: extracted.box?.height) : nil
     let frame = FrameRecord(
       time: extracted.time, imageSize: extracted.imageSize, pose: extracted.pose, box: extracted.box,
-      analysis: analysis, bells: extracted.bells, bell: bell)
+      analysis: analysis, bells: extracted.bells, bell: bell, bench: extracted.bench)
     track.append(frame)
     if let rep = analysis?.completedRep { reps.append(rep) }
     return frame

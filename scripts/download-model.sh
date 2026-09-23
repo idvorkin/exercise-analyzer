@@ -22,3 +22,7 @@ fetch yolo26n-pose "https://github.com/ultralytics/yolo-ios-app/releases/downloa
 # asset; without it the app runs with no bells.
 fetch yoloe-26n-kettlebell "https://github.com/idvorkin/exercise-analyzer/releases/download/models-2026-09-12/yoloe-26n-kettlebell.mlpackage.zip" \
   || echo "kettlebell detector not fetched: publish the models-2026-09-12 release or run scripts/model-trials/export_bell_detector.py yoloe 26n and copy the package into ExerciseAnalyzer/"
+# The bench detector (#134) has no release asset yet; without it a Bulgarian filmed with the bench nearer the camera
+# than the lifter counts nothing.
+[ -d ExerciseAnalyzer/yoloe-26s-bench.mlpackage ] \
+  || echo "bench detector missing: run scripts/model-trials/export_bell_detector.py yoloe 26s 640 bench and copy yoloe-26s-bench-640.mlpackage to ExerciseAnalyzer/yoloe-26s-bench.mlpackage"

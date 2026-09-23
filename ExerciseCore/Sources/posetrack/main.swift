@@ -6,10 +6,12 @@
 //    swift run -c release posetrack <video> --model ../ExerciseAnalyzer/yolo26n-pose.mlpackage \
 //      [--exercise kettlebell-swing] [--fixture out.json] [--conf 0.25] \
 //      [--bell-model ../ExerciseAnalyzer/yoloe-26n-kettlebell.mlpackage | --no-bells] [--poses-from old.json]
+//      [--bench-model ../ExerciseAnalyzer/yoloe-26s-bench.mlpackage | --no-bench]
 //
 //  The bell detector (#18) runs on every frame too when its package is present, and the fixture then carries every
-//  bell sighting with its mean colour. `--poses-from` keeps an existing fixture's poses and boxes (frame by frame,
-//  same clip) and only adds the bells, so a human-verified fixture keeps the exact track it was verified on.
+//  bell sighting with its mean colour. The bench detector (#134) runs about once a second, as on the phone.
+//  `--poses-from` keeps an existing fixture's poses and boxes (frame by frame, same clip) and only adds the bells
+//  and benches, so a human-verified fixture keeps the exact track it was verified on.
 //
 //  Frames are read with the same rotation-applying video composition the app uses, letterboxed by Vision's
 //  scaleFit like the SDK, and the end2end output ([1, 300, 57]: xyxy, conf, class, 17 × (x, y, conf)) is mapped
@@ -32,6 +34,8 @@ struct Options {
   /// Detector floor; the tracker gates by wrist and rest anyway, so a low floor is cheap to try.
   var bellConfidence: Float = 0.15
   var posesFrom: String?
+  /// Nil for "the package next to the pose model, if it is there"; `--no-bench` sets it to "".
+  var benchModel: String?
 
   init(_ args: [String]) {
     var i = 0
@@ -47,6 +51,8 @@ struct Options {
       case "--bell-conf": bellConfidence = Float(value()) ?? 0.15
       case "--no-bells": bellModel = ""
       case "--poses-from": posesFrom = value()
+      case "--bench-model": benchModel = value()
+      case "--no-bench": benchModel = ""
       default: if video.isEmpty { video = a }
       }
       i += 1
@@ -108,6 +114,20 @@ let bellDetector: BellDetector? = try {
   detector.minConfidence = options.bellConfidence
   if let max = ProcessInfo.processInfo.environment["POSETRACK_BELL_MAX"].flatMap(Int.init) { detector.maxSightings = max }
   return detector
+}()
+
+/// The bench detector, when its package is there (a missing default is simply "no bench").
+let benchDetector: BellDetector? = try {
+  let path: String
+  if let given = options.benchModel {
+    if given.isEmpty { return nil }
+    path = given
+    guard FileManager.default.fileExists(atPath: path) else { fail("bench model not found: \(path)") }
+  } else {
+    path = modelURL.deletingLastPathComponent().appendingPathComponent(BellDetector.benchModelName + ".mlpackage").path
+    guard FileManager.default.fileExists(atPath: path) else { return nil }
+  }
+  return try BellDetector.bench(compiledModelURL: try compiled(URL(fileURLWithPath: path)))
 }()
 guard let imageInput = mlModel.modelDescription.inputDescriptionsByName.values.first(where: { $0.type == .image }),
   let constraint = imageInput.imageConstraint
@@ -171,6 +191,7 @@ let asset = AVURLAsset(url: URL(fileURLWithPath: options.video))
 let semaphore = DispatchSemaphore(value: 0)
 var frames: [FrameRecord] = []
 var lastWrists: [CGPoint] = []  // previous frame's wrists, for the parallel bell path below
+var lastBenchTime = -Double.infinity
 var elapsed = 0.0
 let traceTracker: BellTracker = {  // trace only: what the pipeline's tracker will pick
   var t = BellTracker.Thresholds()
@@ -231,7 +252,13 @@ Task {
         let line = "  frame \(frames.count) t=\(String(format: "%.2f", time)) bells=\(bells.count) \(bells.prefix(3).map { String(format: "%.2f@%.2f,%.2f", $0.conf, $0.box.midX, $0.box.midY) }.joined(separator: " ")) wrists \(wrists) tracked \(tracked.map { String(format: "%.2f@%.2f,%.2f", $0.conf, $0.box.midX, $0.box.midY) } ?? "-")\n"
         FileHandle.standardError.write(line.data(using: .utf8)!)
       }
-      frames.append(FrameRecord(time: time, imageSize: size, pose: person?.pose, box: person?.box, analysis: nil, bells: bells))
+      var bench: CGRect?
+      if let benchDetector, time - lastBenchTime >= BellDetector.benchInterval {
+        bench = benchDetector.detectBench(in: pixelBuffer)
+        lastBenchTime = time
+      }
+      frames.append(
+        FrameRecord(time: time, imageSize: size, pose: person?.pose, box: person?.box, analysis: nil, bells: bells, bench: bench))
       if frames.count % 300 == 0 { FileHandle.standardError.write("  \(frames.count) frames…\n".data(using: .utf8)!) }
     }
     elapsed = Date().timeIntervalSince(started)
@@ -257,14 +284,14 @@ if let path = options.posesFrom {
   frames = old.frames.map { o in
     let size = CGSize(width: o.imageSize[0], height: o.imageSize[1])
     let nearest = byTime.min { abs($0.time - o.time) < abs($1.time - o.time) }
-    let bells = (nearest.map { abs($0.time - o.time) <= 0.02 } ?? false) ? nearest!.bells : []
+    let matched = (nearest.map { abs($0.time - o.time) <= 0.02 } ?? false) ? nearest : nil
     return FrameRecord(
       time: o.time, imageSize: size,
       pose: o.pose.map { Pose(xyn: $0.xyn.map { PosePoint(x: $0.x, y: $0.y) }, conf: $0.conf, imageSize: size) },
       box: o.box.map { CGRect(x: $0[0][0], y: $0[0][1], width: $0[1][0], height: $0[1][1]) },
-      analysis: nil, bells: bells)
+      analysis: nil, bells: matched?.bells ?? [], bench: matched?.bench)
   }
-  print("poses and boxes kept from \(path); bells added to \(frames.filter { !$0.bells.isEmpty }.count) frames")
+  print("poses and boxes kept from \(path); bells added to \(frames.filter { !$0.bells.isEmpty }.count) frames, a bench to \(frames.filter { $0.bench != nil }.count)")
 }
 
 // MARK: - Analysis
@@ -313,6 +340,7 @@ if let path = options.fixture {
   struct StoredBell: Encodable { let box: [[Double]]; let conf: Float; let color: [Float]? }
   struct StoredFrame: Encodable {
     let time: Double; let imageSize: [Double]; let box: [[Double]]?; let pose: StoredPose?; let bells: [StoredBell]?
+    let bench: [[Double]]?
   }
   struct Stored: Encodable { let version = 1; let frames: [StoredFrame] }
   let stored = Stored(frames: frames.map { f in
@@ -324,7 +352,8 @@ if let path = options.fixture {
         StoredBell(
           box: [[Double($0.box.minX), Double($0.box.minY)], [Double($0.box.width), Double($0.box.height)]],
           conf: $0.conf, color: $0.color.map { $0.map { (($0 * 1000).rounded() / 1000) } })
-      })
+      },
+      bench: f.bench.map { [[Double($0.minX), Double($0.minY)], [Double($0.width), Double($0.height)]] })
   })
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.withoutEscapingSlashes]

@@ -108,7 +108,8 @@ public final class BellTracker {
     return zip(frames, backward.reversed()).map { f, b in
       guard f.bell == nil, let b, b.conf > 0 else { return f }
       return FrameRecord(
-        time: f.time, imageSize: f.imageSize, pose: f.pose, box: f.box, analysis: f.analysis, bells: f.bells, bell: b)
+        time: f.time, imageSize: f.imageSize, pose: f.pose, box: f.box, analysis: f.analysis, bells: f.bells, bell: b,
+        bench: f.bench)
     }
   }
 

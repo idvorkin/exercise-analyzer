@@ -498,7 +498,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       guard let self else { return .cancelled }
       do {
         let (frames, summary) = try await OfflineAnalyzer.extract(
-          url: job.url, predictor: job.predictor, bellDetector: job.bellDetector,
+          url: job.url, predictor: job.predictor, bellDetector: job.bellDetector, benchDetector: job.benchDetector,
           progress: { [weak self] fraction in
             if job.isUserPass {
               Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
@@ -557,6 +557,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
       "avg_infer_ms": summary.averageInferenceMs, "fps": fps,
       "bell_frames": summary.bellFrames, "bell_avg_infer_ms": summary.bellAverageInferenceMs,
       "bell_seen": frames.filter { !$0.bells.isEmpty }.count,
+      "bench_frames": summary.benchFrames, "bench_avg_infer_ms": summary.benchAverageInferenceMs,
+      "bench_seen": frames.filter { $0.bench != nil }.count,
       // The read's clock against the asset's (#80): a read_end past clip_s means the reader gave media time and
       // the frames were mapped through the edit list (segments), dropping the ones the edit hides.
       "read_end_s": summary.timeline.readEnd, "clip_s": summary.timeline.duration,
@@ -888,7 +890,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   ) -> ClipJob {
     jobGeneration += 1
     return ClipJob(
-      generation: jobGeneration, kind: kind, url: url, predictor: predictor, bellDetector: bellDetector)
+      generation: jobGeneration, kind: kind, url: url, predictor: predictor, bellDetector: bellDetector,
+      benchDetector: models.benchDetector)
   }
 
   /// An instrumented run in progress (Igor, 2026-09-13: "a debug run that pre-picks the clips, shake is disabled,

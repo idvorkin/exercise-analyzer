@@ -27,6 +27,9 @@ enum OfflineAnalyzer {
     /// The bell detector's share (#18): frames it ran on and its mean time per frame; zero without a detector.
     var bellFrames = 0
     var bellAverageInferenceMs = 0.0
+    /// The bench detector's (#134): frames it ran on (about one a second) and its mean time per run.
+    var benchFrames = 0
+    var benchAverageInferenceMs = 0.0
     var timeline = Timeline()
   }
 
@@ -73,7 +76,8 @@ enum OfflineAnalyzer {
   }
 
   static func extract(
-    url: URL, predictor: BasePredictor, bellDetector: BellDetector? = nil, progress: @escaping @Sendable (Double) -> Void,
+    url: URL, predictor: BasePredictor, bellDetector: BellDetector? = nil, benchDetector: BellDetector? = nil,
+    progress: @escaping @Sendable (Double) -> Void,
     heartbeat: (@Sendable (Heartbeat) -> Void)? = nil
   ) async throws -> ([FrameRecord], Summary) {
     let asset = AVURLAsset(url: url)
@@ -107,6 +111,9 @@ enum OfflineAnalyzer {
       var inferenceTotal = 0.0
       var bellTotal = 0.0
       var bellFrames = 0
+      var benchTotal = 0.0
+      var benchFrames = 0
+      var lastBenchTime = -Double.infinity
       var lastProgress = 0.0
       // Rolling window for the heartbeat: sums over the last 60 frames, and when that window started.
       var windowPose = 0.0, windowBell = 0.0, windowDecode = 0.0, windowStart = CACurrentMediaTime()
@@ -153,6 +160,18 @@ enum OfflineAnalyzer {
             windowBell += bellDetector.lastInferenceMs
             bellFrames += 1
             frame = FrameRecord(time: frame.time, imageSize: frame.imageSize, pose: frame.pose, box: frame.box, analysis: nil, bells: bells)
+          }
+          // The bench doesn't move: about once a second, after the pose, on this thread (#134).
+          if let benchDetector, time - lastBenchTime >= BellDetector.benchInterval,
+            let buffer = CMSampleBufferGetImageBuffer(sampleBuffer)
+          {
+            lastBenchTime = time
+            let bench = benchDetector.detectBench(in: buffer)
+            benchTotal += benchDetector.lastInferenceMs
+            benchFrames += 1
+            frame = FrameRecord(
+              time: frame.time, imageSize: frame.imageSize, pose: frame.pose, box: frame.box, analysis: nil,
+              bells: frame.bells, bench: bench)
           }
           return (result, frame)
         }
@@ -202,7 +221,7 @@ enum OfflineAnalyzer {
           let time = mapping.target.start.seconds + (frame.time - mapping.source.start.seconds) * rate
           return FrameRecord(
             time: time, imageSize: frame.imageSize, pose: frame.pose, box: frame.box, analysis: frame.analysis,
-            bells: frame.bells)
+            bells: frame.bells, bench: frame.bench)
         }
         timeline.mapped = true
         timeline.dropped = frames.count - mapped.count
@@ -220,6 +239,7 @@ enum OfflineAnalyzer {
         frames: frames.count, elapsed: CACurrentMediaTime() - started,
         averageInferenceMs: frames.isEmpty ? 0 : inferenceTotal / Double(frames.count),
         bellFrames: bellFrames, bellAverageInferenceMs: bellFrames == 0 ? 0 : bellTotal / Double(bellFrames),
+        benchFrames: benchFrames, benchAverageInferenceMs: benchFrames == 0 ? 0 : benchTotal / Double(benchFrames),
         timeline: timeline)
       return (frames, summary)
     }

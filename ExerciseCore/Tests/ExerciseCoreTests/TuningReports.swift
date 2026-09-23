@@ -72,6 +72,27 @@ final class TuningReports: XCTestCase {
     }
   }
 
+  /// #134: every Bulgarian fixture counted without its bench boxes, and with them at each depth into the box that
+  /// still counts as on top. 7424BEDD (Igor: 6) needs the bench; half the box counted 4CF19A9A's setup (9).
+  func testBulgarianBenchSweep() throws {
+    let tracks = try Fixture.all.filter { $0.expectedExercise == .bulgarianSplitSquat }.map { ($0, try $0.frames()) }
+    report("bulgarian-7424BEDD-phone defaults", analyze(tracks.first { $0.0.name.contains("7424BEDD") }!.1, BulgarianSplitSquatThresholds()))
+    func count(_ frames: [FrameRecord], _ t: BulgarianSplitSquatThresholds) -> Int {
+      let pipeline = AnalysisPipeline(exercise: .bulgarianSplitSquat, analyzer: BulgarianSplitSquatAnalyzer(thresholds: t))
+      for frame in frames { pipeline.process(extracted: frame) { nil } }
+      return pipeline.reps.count
+    }
+    let stripped = tracks.map { f, frames in
+      (f, frames.map { FrameRecord(time: $0.time, imageSize: $0.imageSize, pose: $0.pose, box: $0.box, analysis: nil, bells: $0.bells) })
+    }
+    print("  no bench: " + stripped.map { "\($0.0.name.prefix(22)) \(count($0.1, BulgarianSplitSquatThresholds()))/\($0.0.expectedReps)" }.joined(separator: " · "))
+    for share in [0.15, 0.25, 0.35, 0.5] {
+      var t = BulgarianSplitSquatThresholds()
+      t.benchTopShare = share
+      print(String(format: "  top %.2f: ", share) + tracks.map { "\($0.0.name.prefix(22)) \(count($0.1, t))/\($0.0.expectedReps)" }.joined(separator: " · "))
+    }
+  }
+
   /// The pull-up fixtures (#108): every transition with the shoulders' distance under the bar, the reps, and the
   /// count under other rises, to see how far the setup on the pegs sits from a rep.
   func testPullUpTrace() throws {

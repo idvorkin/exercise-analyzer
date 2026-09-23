@@ -30,6 +30,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
   fifth of my leg's length is not a rep (Igor, 2026-09-22: "Rep 1 was just me setting up. I think rep 2 was
   garbage too", [#132](https://github.com/idvorkin/exercise-analyzer/issues/132))
 
+- **Scenario:** A Bulgarian counts with the bench nearer the camera than me
+- **Given:** the phone stands in front of me and to one side, so the bench sits between it and me and my rear foot
+  looks no higher than my front one on screen
+- **When:** the set is analyzed as a Bulgarian split squat
+- **Then:** it counts my reps, because my rear foot resting on the top of the bench the app sees counts as up
+  (7424BEDD: six, Igor's count; it had counted none, [#134](https://github.com/idvorkin/exercise-analyzer/issues/134))
+
 - **Scenario:** Live opens on the camera I used last time
 - **Given:** my last set was recorded on the front camera (or the back camera at 0.5×)
 - **When:** I open Live for the next set

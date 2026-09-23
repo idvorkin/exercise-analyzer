@@ -10,6 +10,10 @@ less from a diagonal camera), so it scores quality but does not gate the phases.
 
 - **Front leg**: the foot that sits lower on screen (the rear foot is up on the bench). Elevation is voted over
   recent frames (`elevationVoteFraction` 0.12 of leg length, `elevatedRecentlyFraction` 0.3).
+- **The bench**: the offline pass runs a bench detector (YOLOE-26s, prompt "bench", `BellDetector.bench`) about
+  once a second; an ankle inside the box's width, from 0.03 above its top edge down to `benchTopShare` (0.25) of its
+  height, also counts as the rear foot up, and with one ankle there the other is the front leg. The last box
+  stands for `benchMaxAge` (3 s). Live recording has no bench; the offline pass decides the stored count.
 - **Descend** when the head drops more than `descendFraction` (0.08) of leg length below standing height; **rise**
   after it comes back up `riseFraction` (0.02) from the bottom; **standing** again within `returnFraction` (0.05) of
   the standing height. Frames with spine over `maxValidSpineAngle` (60°) are rejected.
@@ -25,7 +29,8 @@ less from a diagonal camera), so it scores quality but does not gate the phases.
 |---|---|---|---|
 | bulgarian-10reps | 8 | no | head drops 8 times at a steady ~4.2 s rhythm; the earlier front-knee analyzer counted 10 |
 | bulgarian-phone | 8 | no | Igor's gym set (report 2026-09-12): 8 head drops at ~4 s, setup crouches at both ends |
-| bulgarian-4CF19A9A-phone | 8 | yes | Igor's gym set (2026-09-22, #132), diagonal camera: a setup crouch and a head wobble counted as reps 1 and 2 |
+| bulgarian-4CF19A9A-phone | 8 | yes | Igor's gym set (2026-09-22, #132), diagonal camera: a setup crouch and a head wobble counted as reps 1 and 2; bench boxes added by `posetrack --poses-from` |
+| bulgarian-7424BEDD-phone | 6 | yes | Igor's gym set (2026-09-22, #134), camera front-left, bench nearer the camera than him: counted 0 without the bench |
 | tracks/bulgarian-split-squat-20260909-98B26725 | archived | | must still analyze (`ArchivedTracks`) |
 
 Reports: `TuningReports.testBulgarianPhoneSetUnderThresholds`, `testBulgarianTenRepSetTrace`,
@@ -63,3 +68,16 @@ Reports: `TuningReports.testBulgarianPhoneSetUnderThresholds`, `testBulgarianTen
   dips from a lower head and cut the archived 98B26725 to 6. `TuningReports.testBulgarianSetupAndWobbleSweep`:
   depth 0.2 L with 2.5 s of setup counts 8 on all four tracks (depth 0.15–0.2 with setup ≤ 1.5 s leaves 9 here).
   `BulgarianStandingTests` holds every Standing picture at the highest head. AnalysisVersion 2026-09-22.1.
+- **2026-09-22, bulgarian-7424BEDD-phone ([#134](https://github.com/idvorkin/exercise-analyzer/issues/134))**:
+  0 counted (live 7), Igor counted 6 on the video. The bench sits between the camera and him, so at the bottom
+  of a rep the rear ankle is 0.013 of the frame above the front one and the gap vote never fires (elevated 0.00
+  through every dip). A bench detector: the nano YOLOE saw the bench (≥ 0.4) in 12 % / 7 % of frames of 4CF19A9A /
+  7424BEDD, the small one in 97 % / 99 % (the bench-only export as well; 20 MB against the nano bell model's
+  5.4 MB). With an ankle anywhere in the box's upper half, 7424BEDD counted 6 but 4CF19A9A went back to 9: from its
+  diagonal camera the floor behind the bench shows inside the box, and the walk-in stance (1.0–2.2 s) and the
+  front foot sat at 0.33 of the box, starting the setup clock early. A foot on the bench sits 0.02–0.21 of the box
+  down (10th–90th percentile, both sets). `TuningReports.testBulgarianBenchSweep` (top share → 10reps, phone,
+  4CF19A9A, 7424BEDD): no bench 8, 8, 8, **0**; 0.15 → 8, 8, 8, **3**; **0.25 → 8, 8, 8, 6**; 0.35 and 0.5 → 8, 8,
+  **9**, 6. The window is narrow (0.25 alone gets both new sets right), and bulgarian-10reps and bulgarian-phone
+  carry no bench boxes (no clip on the Mac), so they test only that nothing changed without one.
+  AnalysisVersion 2026-09-22.3.

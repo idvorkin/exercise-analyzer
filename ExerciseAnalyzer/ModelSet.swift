@@ -18,6 +18,9 @@ final class ModelSet {
   private(set) var predictor: BasePredictor?
   /// The kettlebell detector (#18), offline pass only; nil when its package is not bundled or it is switched off.
   private(set) var bellDetector: BellDetector?
+  /// The bench detector (#134), offline pass only, about once a second; not behind the bell switch, since a
+  /// Bulgarian filmed with the bench nearer the camera counts nothing without it. Nil when not bundled.
+  private(set) var benchDetector: BellDetector?
 
   /// Names of the models this build runs on a clip: the pose model and, when bundled, the detector. Stored with
   /// every analysis; a stored set made by a different set is re-run from its video on reopen (story 035).
@@ -28,6 +31,9 @@ final class ModelSet {
     ["yolo26n-pose"]
       + (bellDetector.map {
         [String(format: "yoloe-26n-kettlebell@%.2fx%d+%d", $0.minConfidence, $0.maxSightings, $0.handExtra)]
+      } ?? [])
+      + (benchDetector.map {
+        [String(format: "%@@%.2f/%.0fs", BellDetector.benchModelName, $0.minConfidence, BellDetector.benchInterval)]
       } ?? [])
   }
 
@@ -62,6 +68,7 @@ final class ModelSet {
           self.log.event("model_loaded", ["model": "yolo26n-pose", "compute_units": "all"])
           self.logPlan(model: "yolo26n-pose", url: url)
           self.loadBellDetector()
+          self.loadBenchDetector()
           self.settled = true
           self.resumeReady()
         case .failure(let error):
@@ -186,6 +193,21 @@ final class ModelSet {
       logPlan(model: "yoloe-26n-kettlebell", url: url)
     } catch {
       log.event("error", ["where": "bell_model", "message": "\(error)"])
+    }
+  }
+
+  private func loadBenchDetector() {
+    let name = BellDetector.benchModelName
+    guard let url = Bundle.main.url(forResource: name, withExtension: "mlmodelc") else {
+      log.event("model_missing", ["model": name])
+      return
+    }
+    do {
+      benchDetector = try BellDetector.bench(compiledModelURL: url)
+      log.event("model_loaded", ["model": name, "compute_units": "all"])
+      logPlan(model: name, url: url)
+    } catch {
+      log.event("error", ["where": "bench_model", "message": "\(error)"])
     }
   }
 }

@@ -25,6 +25,7 @@ struct ClipJob {
   /// Resolved at describe time: every describe site holds a predictor (ready or guard), so the job never waits.
   let predictor: BasePredictor
   let bellDetector: BellDetector?
+  let benchDetector: BellDetector?
 
   var isUserPass: Bool {
     if case .userPass = kind { return true }
