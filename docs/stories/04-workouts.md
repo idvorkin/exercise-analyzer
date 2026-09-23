@@ -422,7 +422,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 058:
 
 - **Summary:** The log is home: a set, a workout's page and the camera are each a screen with a way back
-- **Status:** implemented in the commit after this line's first version; verified on the simulator (launch on the log, a set pushed with "‹", a workout's page with a set over it and "‹ Workout" back to the page, mid-workout launch on the live page, a set inside the live workout back to that page)
+- **Status:** implemented in [8f3cffe](https://github.com/idvorkin/exercise-analyzer/commit/8f3cffe); verified on the simulator (launch on the log, a set pushed with "‹", a workout's page with a set over it and "‹ Workout" back to the page, mid-workout launch on the live page, a set inside the live workout back to that page)
 - **Why:** Igor, 2026-09-22, on the three architectures ([proposal](https://claude.ai/artifact/46aiQ5J8WxTuZbJBfJZpwZ)): "build the flow for B, I like that". The app opened on an empty player with a menu card, Workouts was a sheet over it with a Close, and a set's way back to the list was the folder button, the card, then Workouts again.
 
 #### Use Case:
