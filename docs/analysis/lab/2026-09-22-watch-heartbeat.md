@@ -44,3 +44,38 @@ jq -c 'select(.type=="watch_heartbeat" and .gap_ms > 2500) | {t, gap_ms, missed,
 jq -c 'select(.type=="watch_heartbeat_minute") | {t, sent, replied, failed, skipped, rtt_avg_ms, rtt_max_ms}' $f
 jq -c 'select(.type=="watch_reachable") | {t, reachable}' $f
 ```
+
+## Result, the gym session of 2026-09-22 (`swing-20260922-053722.jsonl`)
+
+Two workouts on the wrist: the gym workout (6:20–7:02, 42 min, 6 sets) and one right after (7:05–7:18, 13 min,
+no sets). Write-up with the second-by-second timeline: https://claude.ai/artifact/YPiSMauEdSLac6ZJKuvGwY
+
+| | gym workout | the next one |
+|---|---|---|
+| wrist up (`watch_scene active`) | 259 s, 10 % | 69 s, 9 % |
+| beats the watch sent / counted | 264 / 2,543 (10 %) | 786 / 787 (100 %) |
+| answered, failed | 240, 21 (all at edges) | 786, 2 |
+| holes > 2.5 s | 47, median 38 s, max 206 s | none |
+| round trip, per-minute average | median 199 ms | median 172 ms |
+| HealthKit mirror `workout_data` | 40 / 40, every ~62 s, through every hole | every ~62 s |
+
+1. **Held.** Every long hole ends with `watch_reachable` up. One step earlier, each of the 32 starts a median
+   0.53 s after `watch_scene active: 0` and ends 0.49 s (max 1.06 s) after `active: 1`; 36 wrist-down spells over
+   10 s (2,220 s) let 0 beats through. In the gym, the link is the wrist.
+2. **Held.** `missed` equals the hole's length because the watch skipped (2,283 skips): both sides agreed the link
+   was down. Messages lost on a link both thought up: 21 of 264, within a second of an edge.
+3. **Failed.** The round trip does not rise before a hole; it stays 150–300 ms to the moment the wrist drops.
+   There is no early warning to give.
+
+Side finding: the watch's `watchActive` scene message, sent on the screen's wake, failed on 63 of 63 raises (the
+link comes back ~0.5 s later); the heartbeat's `front` repaired the phone's flag within a second.
+
+Open: the second workout kept the link through a 7-minute wrist-down stretch, same build, same workout session.
+Distance (tripod vs pocket), shared Wi-Fi, or the phone app's state; Igor asked where he and the phone were.
+
+Changed (Igor, "do A and C"): the watch sends `watchActive` and asks for status on the reachability up-edge, and
+does not send a scene change into a link that is down; the phone pushes status on the same edge; the phone's
+`watch_reachable` carries `app_state` and `protected_data`. Read next session: the time from `watch_scene active:
+1` to the first `watch_status` on the phone (was ≤ 2 s, the retry timer; predicted ≈ the 0.5 s edge + one round
+trip), `watch_scene_send_failed` (predicted ≈ 0), and `app_state` / `protected_data` on the down-edges of a workout
+that keeps the link against one that loses it.

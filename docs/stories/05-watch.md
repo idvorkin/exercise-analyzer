@@ -105,6 +105,15 @@ the first frame (story 001).
 - **When:** the gym hour goes by
 - **Then:** the watch sends the phone one small message a second and the phone logs each with the gap since the last and the beats that never came (`watch_heartbeat`: seq, gap_ms, missed, front, workout, reachable); once a minute the watch adds its own tally (`watch_heartbeat_minute`: sent, replied, failed, skipped, the round trip's average and worst); a beat to a phone the watch reads as unreachable is counted and skipped, not sent, and a beat that fails is logged once per spell. Nothing on either screen changes (Igor, 2026-09-21: "log the communication channel from the watch to the phone … see if we have a drop so we can see if there's some kind of pattern, because losing the watch is terrible", [#122](https://github.com/idvorkin/exercise-analyzer/issues/122))
 
+- **Scenario:** A raised wrist is current within a round trip
+- **Given:** a workout on the wrist at the gym, the wrist down long enough for the link to drop
+- **When:** the wrist comes up and the link returns (about half a second later)
+- **Then:** the watch tells the phone it is in front on that edge (not on the screen's wake, when the message
+  cannot arrive) and asks for status; the phone pushes its status on the same edge without waiting to be asked; a
+  wrist-down scene change is not sent into a link that is already gone, so it is no longer logged as a failure. The
+  phone's `watch_reachable` carries its own `app_state` and `protected_data` (false while locked), to tell whether
+  the phone's side decides when the link survives a lowered wrist (Igor, 2026-09-22: "do A and C", [#76](https://github.com/idvorkin/exercise-analyzer/issues/76))
+
 - **Notes:** With the wrist down the watch app is suspended and the status stops; that is the price of having no
   workout session ([#32](https://github.com/idvorkin/exercise-analyzer/issues/32), see the end of this file). The
   state arrives through the application context on wake, and the face complication (043) is the screen that

@@ -251,6 +251,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     CrashReports.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     CrashReports.shared.reportSignalLogs { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
+    watch.onReachable = { [weak self] in self?.pushWatchStatus(force: true) }
     watch.onExercise = { [weak self] mode in
       guard let self else { return }
       self.log.event("ui", ["action": "exercise", "from": "watch", "mode": mode])

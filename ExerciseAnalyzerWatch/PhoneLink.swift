@@ -108,7 +108,10 @@ final class PhoneLink: NSObject, ObservableObject {
     guard screenshot == nil else { return }
     logEvent("scene", ["active": active])
     inFront = active
-    sendScene(active)
+    // Only to a reachable phone: in the gym the link drops ~0.5 s after the wrist goes down and returns ~0.5 s
+    // after it comes up, so a scene message sent on the scene change failed on 63 of 63 raises (2026-09-22).
+    // The reachability up-edge sends it instead; a phone that lost the link sees the watch as away anyway.
+    if WCSession.default.isReachable { sendScene(active) }
     if active { ping() } else { flushHeartbeat() }
   }
 
@@ -371,6 +374,11 @@ extension PhoneLink: WCSessionDelegate {
     Task { @MainActor in
       self.reachable = reachable
       self.logEvent("reachable", ["reachable": reachable])
+      // The link is back (a raised wrist, most of the time): say "in front" now that it can arrive, and ask for
+      // the phone's status so the face is current within a round trip, not on the next 2 s timer.
+      guard reachable, self.inFront, self.screenshot == nil else { return }
+      self.sendScene(true)
+      self.send(.status)
     }
   }
 

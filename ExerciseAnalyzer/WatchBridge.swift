@@ -5,6 +5,7 @@
 
 import ExerciseCore
 import Foundation
+import UIKit
 import WatchConnectivity
 
 @MainActor
@@ -13,6 +14,8 @@ final class WatchBridge: NSObject, ObservableObject {
   /// Exercise picked on the watch: "auto" or an ExerciseKind raw value.
   var onExercise: ((String) -> Void)?
   var onEvent: ((String, [String: Any]) -> Void)?
+  /// The watch just became reachable (a raised wrist): push a fresh status without waiting to be asked.
+  var onReachable: (() -> Void)?
   @Published private(set) var reachable = false
 
   private var lastSent: WatchStatus?
@@ -152,9 +155,17 @@ extension WatchBridge: WCSessionDelegate {
       // always present and downstream analysis never has to guess about a missing key.
       let msSincePreview =
         self.lastPreviewAt == .distantPast ? -1 : Int(Date().timeIntervalSince(self.lastPreviewAt) * 1000)
+      // The phone's own state at the flip (2026-09-22): the gym workout lost the wrist whenever it went down, the
+      // workout after it never did; app_state (0 active, 1 inactive, 2 background) and protected_data (false
+      // while the phone is locked) say whether the phone's side is the difference.
       self.onEvent?(
         "watch_reachable",
-        ["reachable": reachable, "watch_active": self.watchActive, "ms_since_preview": msSincePreview])
+        [
+          "reachable": reachable, "watch_active": self.watchActive, "ms_since_preview": msSincePreview,
+          "app_state": UIApplication.shared.applicationState.rawValue,
+          "protected_data": UIApplication.shared.isProtectedDataAvailable,
+        ])
+      if reachable { self.onReachable?() }
     }
   }
 
