@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 001:
 
 - **Summary:** Record a set and get a trusted rep count without touching the phone afterwards
-- **Status:** implemented in [0517562](https://github.com/idvorkin/exercise-analyzer/commit/0517562), [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529); verified on the phone (daily use); the camera memory in [#66](https://github.com/idvorkin/exercise-analyzer/issues/66) on the phone since 2026-09-13
+- **Status:** implemented in [0517562](https://github.com/idvorkin/exercise-analyzer/commit/0517562), [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529); verified on the phone (daily use); the camera memory in [#66](https://github.com/idvorkin/exercise-analyzer/issues/66) on the phone since 2026-09-13; the Bulgarian setup and wobble in [77c6731](https://github.com/idvorkin/exercise-analyzer/commit/77c6731), verified on the host (bulgarian-4CF19A9A-phone, 8, Igor's count)
 
 #### Use Case:
 - **As a** solo lifter with the phone on a tripod
