@@ -75,7 +75,14 @@ final class TuningReports: XCTestCase {
   /// #134: every Bulgarian fixture counted without its bench boxes, and with them at each depth into the box that
   /// still counts as on top. 7424BEDD (Igor: 6) needs the bench; half the box counted 4CF19A9A's setup (9).
   func testBulgarianBenchSweep() throws {
-    let tracks = try Fixture.all.filter { $0.expectedExercise == .bulgarianSplitSquat }.map { ($0, try $0.frames()) }
+    var tracks = try Fixture.all.filter { $0.expectedExercise == .bulgarianSplitSquat }.map { ($0, try $0.frames()) }
+    // The archived Bulgarian sets as the phone stored them (bench boxes from the phone's own detector), count unknown.
+    let dir = try XCTUnwrap(Bundle.module.url(forResource: "Fixtures/tracks", withExtension: nil))
+    for url in try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+    where url.lastPathComponent.hasPrefix("bulgarian-split-squat-") {
+      let name = "arch-" + url.deletingPathExtension().lastPathComponent.suffix(8)
+      tracks.append((Fixture(name: name, expectedExercise: .bulgarianSplitSquat, expectedReps: -1, humanVerified: false), try Fixture.frames(at: url)))
+    }
     report("bulgarian-7424BEDD-phone defaults", analyze(tracks.first { $0.0.name.contains("7424BEDD") }!.1, BulgarianSplitSquatThresholds()))
     func count(_ frames: [FrameRecord], _ t: BulgarianSplitSquatThresholds) -> Int {
       let pipeline = AnalysisPipeline(exercise: .bulgarianSplitSquat, analyzer: BulgarianSplitSquatAnalyzer(thresholds: t))

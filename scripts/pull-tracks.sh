@@ -49,6 +49,7 @@ for snap in sorted(stage.glob("*/analysis.json")):
     day = datetime.datetime(2001, 1, 1) + datetime.timedelta(seconds=stamp) if stamp else None
     dated_name = f"{exercise}-{day.strftime('%Y%m%d') if day else 'nodate'}-{id8}.json"
     has_bells = any(f.get("bells") for f in d["frames"])
+    has_bench = any(f.get("bench") for f in d["frames"])
 
     # The archive key is the entry id: every file already holding it, under any date prefix.
     same_id = sorted(out.glob(f"*-{id8}.json"))
@@ -68,8 +69,10 @@ for snap in sorted(stage.glob("*/analysis.json")):
         # One set, re-pulled: a single file. The dated name wins once a date is known.
         target = out / dated_name if day else next(
             (p for p in same_exercise if "-nodate-" not in p.name), out / dated_name)
-    # An archived track is refreshed once when the phone's copy gained the detector's sightings (#50).
-    if target.exists() and not (has_bells and '"bells"' not in target.read_text()):
+    # An archived track is refreshed once when the phone's copy gained the detector's sightings (#50) or bench
+    # boxes (#134).
+    text = target.read_text() if target.exists() else ""
+    if target.exists() and not (has_bells and '"bells"' not in text) and not (has_bench and '"bench"' not in text):
         if not same_exercise:
             print(f"kept {target.name} (no new sightings)")
         # Consolidate same-exercise twins even when the content is kept: one file per id.
@@ -80,7 +83,8 @@ for snap in sorted(stage.glob("*/analysis.json")):
         continue
     frames = [{"time": f["time"], "imageSize": f["imageSize"], "box": f.get("box"),
                "pose": ({"xyn": f["pose"]["xyn"], "conf": f["pose"]["conf"]} if f.get("pose") else None),
-               **({"bells": f["bells"]} if f.get("bells") else {})} for f in d["frames"]]
+               **({"bells": f["bells"]} if f.get("bells") else {}),
+               **({"bench": f["bench"]} if f.get("bench") else {})} for f in d["frames"]]
     json.dump({"version": 1, "source": {"recents_id": entry_id, "exercise": exercise, "reps_when_saved": len(d.get("reps", []))},
                "frames": frames}, open(target, "w"), separators=(",", ":"))
     for twin in same_exercise:
