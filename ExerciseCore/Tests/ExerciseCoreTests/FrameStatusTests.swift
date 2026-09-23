@@ -52,6 +52,19 @@ final class FrameStatusTests: XCTestCase {
     XCTAssertGreaterThan(try share("swing-phone-13reps", "Feet cut off"), 0.95)
   }
 
+  func testAnAnkleAtTheSideIsCutOffThere() throws {
+    // #135: the rear foot and bench off the left edge; the box stopped short of the edge, the ankle did not.
+    var xyn = Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17)
+    xyn[CocoKeypoint.rightAnkle.rawValue] = PosePoint(x: 0.04, y: 0.8)
+    let pose = Pose(xyn: xyn, conf: Array(repeating: Float(0.9), count: 17), imageSize: CGSize(width: 100, height: 100))
+    XCTAssertEqual(FrameStatus(box: CGRect(x: 0.05, y: 0.2, width: 0.5, height: 0.7), pose: pose).hint, "Cut off on the left")
+    let url = try XCTUnwrap(
+      Bundle.module.url(forResource: "bulgarian-split-squat-20260922-79271425", withExtension: "json", subdirectory: "Fixtures/tracks"))
+    let frames = try Fixture.frames(at: url).filter { $0.pose != nil }
+    let left = frames.filter { FrameStatus(box: $0.box, pose: $0.pose).clippedEdges.contains(.left) }.count
+    XCTAssertGreaterThan(Double(left) / Double(frames.count), 0.5)
+  }
+
   func testWatchStatusRoundTripsThroughJSON() throws {
     var status = WatchStatus(
       recording: true, frame: FrameStatus(personSeen: true, clippedEdges: [.bottom], coverage: 0.9), reps: 3,

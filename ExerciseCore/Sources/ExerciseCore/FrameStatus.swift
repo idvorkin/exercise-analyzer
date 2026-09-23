@@ -41,7 +41,9 @@ public struct FrameStatus: Codable, Equatable, Sendable {
   /// box runs into it (within `edgeMargin`); feet also count as cut off when both ankles are unmeasured while the
   /// box nearly touches the bottom, but not when they are merely low-confidence (hands and bell pass in front of
   /// the shins at the bottom of a swing).
-  public init(box: CGRect?, pose: Pose?, edgeMargin: Double = 0.01) {
+  /// Over the 60 archived sets an ankle sits this close to a side in a median of 0 % of frames and at most 5 %,
+  /// except where the lifter really ran off the side: 79271425 59 %, a swing set 83 %, a get-up 19 %.
+  public init(box: CGRect?, pose: Pose?, edgeMargin: Double = 0.01, ankleSideMargin: Double = 0.06) {
     guard let box else {
       self.init(personSeen: false, clippedEdges: [], coverage: 0)
       return
@@ -54,6 +56,16 @@ public struct FrameStatus: Codable, Equatable, Sendable {
     if let pose, !edges.contains(.bottom), Double(box.maxY) >= 0.97 {
       let ankles = [CocoKeypoint.leftAnkle, .rightAnkle].map { pose.conf[$0.rawValue] }
       if ankles.allSatisfy({ $0 < 0.1 }) { edges.append(.bottom) }
+    }
+    // A foot off the side of the picture (#135): the pose model puts an ankle it can't see at the edge, and the box
+    // stops a few percent short of it. A Bulgarian's rear foot and bench off the left edge (79271425) counted
+    // nothing, and live the hint only flickered "Feet cut off". An ankle this close to a side counts as cut off there.
+    if let pose {
+      for ankle in [CocoKeypoint.leftAnkle, .rightAnkle] where pose.conf[ankle.rawValue] > BodySkeleton.visibleThreshold {
+        let x = Double(pose.xyn[ankle.rawValue].x)
+        if x < ankleSideMargin, !edges.contains(.left) { edges.append(.left) }
+        if x > 1 - ankleSideMargin, !edges.contains(.right) { edges.append(.right) }
+      }
     }
     self.init(personSeen: true, clippedEdges: edges, coverage: min(1, max(0, Double(box.height))))
   }

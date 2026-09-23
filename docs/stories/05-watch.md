@@ -51,6 +51,13 @@ the first frame (story 001).
 - **When:** I stand where my feet are below the bottom edge of the frame
 - **Then:** the watch shows "Feet cut off" within a second and taps my wrist, over the camera picture, which refreshes about once a second
 
+- **Scenario:** A foot off the side of the picture
+- **Given:** the camera is live
+- **When:** a foot is off the left or right edge, like a Bulgarian's rear foot and bench with the phone too close
+- **Then:** the phone and the watch say "Cut off on the left" (or right), even though the rest of me stays just
+  inside the edge ([#135](https://github.com/idvorkin/exercise-analyzer/issues/135): 79271425's recording only
+  flickered "Feet cut off")
+
 - **Scenario:** The picture streams only to a watch that is in front
 - **Given:** the camera is live on the phone
 - **When:** the watch app is in front and reachable
