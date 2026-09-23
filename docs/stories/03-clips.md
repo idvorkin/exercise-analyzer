@@ -74,7 +74,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 025:
 
 - **Summary:** Start from a centred panel; Open as a sheet with big rows, most-used first
-- **Status:** implemented in [5fead59](https://github.com/idvorkin/exercise-analyzer/commit/5fead59), [387e252](https://github.com/idvorkin/exercise-analyzer/commit/387e252), [4059301](https://github.com/idvorkin/exercise-analyzer/commit/4059301); on the phone, Igor's check pending; modal over the whole screen for [#96](https://github.com/idvorkin/exercise-analyzer/issues/96), verified on the simulator (`SWING_SHOW_MENU=1` over a reopened set)
+- **Status:** replaced by [058](04-workouts.md) (the log is home: Live is its red button, the other rows its "…" menu); before that implemented in [5fead59](https://github.com/idvorkin/exercise-analyzer/commit/5fead59), [387e252](https://github.com/idvorkin/exercise-analyzer/commit/387e252), [4059301](https://github.com/idvorkin/exercise-analyzer/commit/4059301); on the phone, Igor's check pending; modal over the whole screen for [#96](https://github.com/idvorkin/exercise-analyzer/issues/96), verified on the simulator (`SWING_SHOW_MENU=1` over a reopened set)
 
 #### Use Case:
 - **As a** lifter opening a clip with sweaty hands

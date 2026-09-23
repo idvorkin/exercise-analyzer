@@ -15,21 +15,15 @@ struct WorkoutGalleryView: View {
   /// Opens a Photos video that has not been analyzed yet (identifier and creation date).
   var onImport: ((String, Date?) -> Void)? = nil
   var onEvent: ((String, [String: Any]) -> Void)? = nil
-  /// For a shake while this sheet is up: the report is presented over Workouts rather than in its place (#41).
   var session: VideoPoseSession? = nil
-  var bugReport: Binding<Bool> = .constant(false)
-  /// Selected sheet height, owned by ContentView: collapsed shows only today's summary row (#58).
-  @Binding var detent: PresentationDetent
-  /// The workout whose page is pushed (053), from a tap on its green line. Owned by ContentView: it stays set
-  /// while a set opened from the page is on screen, so reopening Workouts lands back on the page.
-  @Binding var openedWorkout: StoredWorkout?
-  @Environment(\.dismiss) private var dismiss
+  /// Pushes a workout's page (053), from a tap on its line, or on landing mid-workout (#123).
+  let onOpenWorkout: (StoredWorkout) -> Void
   @StateObject private var suggestions = PhotosSuggestions()
   /// Days folded shut, by start-of-day time; days older than a week start folded, today and this week start open.
   @State private var collapsed: Set<Date> = []
   @State private var collapseSeeded = false
-  /// Once per opening of the sheet (#123): Workouts lands on the running workout's page; "‹" from it is the
-  /// day list, and the list's root re-appearing after that must not push the page again.
+  /// Once per launch (#123): the log lands on the running workout's page; "‹" from it is the day list, and the
+  /// list re-appearing after that must not push the page again.
   @State private var landedOnLive = false
 
   private static let dayKey: DateFormatter = {
@@ -40,44 +34,12 @@ struct WorkoutGalleryView: View {
 
   private var knownPhotosIDs: Set<String> { Set(store.entries.compactMap(\.photosIdentifier)) }
 
-  /// Collapsed height: the drag handle plus one summary row.
-  static let collapsedDetent: PresentationDetent = .height(128)
-
-  private var isCollapsed: Bool { detent == Self.collapsedDetent }
-
-  /// Today's grouping, if today has any sets.
-  private var todayDay: WorkoutDay? {
-    days.first { Calendar.current.isDateInToday($0.date) }
-  }
-
   /// The days, from the sets and the workouts alike: a workout without a set on camera is still a day.
   private var days: [WorkoutDay] { WorkoutDay.group(store.entries, workouts: workouts.index.workouts, live: workouts.live) }
 
+  /// The log, the app's home (story 058): the root of ContentView's navigation, which pushes a workout's page,
+  /// a set and the camera over it.
   var body: some View {
-    Group {
-      if isCollapsed {
-        collapsedBody
-      } else {
-        galleryBody
-      }
-    }
-  }
-
-  /// Collapsed sheet (#58): the handle plus today's exercises in set order, nothing else.
-  /// Absent on an empty day (the handle alone).
-  private var collapsedBody: some View {
-    Group {
-      if let today = todayDay, !today.exercises.isEmpty {
-        TodaySummaryRow(day: today)
-          .padding(.horizontal, 16)
-          .padding(.vertical, 14)
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
-    }
-  }
-
-  private var galleryBody: some View {
-    NavigationStack {
       Group {
         if days.isEmpty && suggestions.clips.isEmpty {
           ContentUnavailableView(
@@ -88,7 +50,6 @@ struct WorkoutGalleryView: View {
             LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
               if !suggestions.clips.isEmpty, let onImport {
                 PhotosSuggestionsRow(suggestions: suggestions) { clip in
-                  dismiss()
                   // An analyzed clip is already a set: open that instead of importing it a second time.
                   if clip.analyzed, let entry = store.entries.first(where: { $0.photosIdentifier == clip.id }) {
                     onEvent?("photos_suggestion_open", ["id": entry.id])
@@ -113,10 +74,7 @@ struct WorkoutGalleryView: View {
                     ForEach(day.exercises) { exercise in
                       ExerciseSetsRow(
                         group: exercise, store: store,
-                        onOpen: { entry in
-                          dismiss()
-                          onOpen(entry)
-                        },
+                        onOpen: onOpen,
                         onDelete: { entry in
                           if let session { session.delete(set: entry, from: "workouts") } else { store.remove(id: entry.id) }
                         })
@@ -132,7 +90,7 @@ struct WorkoutGalleryView: View {
                         if opening { collapsed.remove(day.date) } else { collapsed.insert(day.date) }
                       }
                     },
-                    onOpenWorkout: { openedWorkout = $0 })
+                    onOpenWorkout: onOpenWorkout)
                 }
               }
             }
@@ -141,23 +99,8 @@ struct WorkoutGalleryView: View {
           }
         }
       }
-      .navigationDestination(item: $openedWorkout) { workout in
-        WorkoutDetailView(
-          workout: workout, sets: store.entries, workouts: workouts,
-          onOpen: { entry in
-            // `openedWorkout` stays set: the playback screen offers "‹ Workout" back to this page.
-            dismiss()
-            onOpen(entry)
-          }, thumbnail: { store.thumbnailImage(for: $0) }, onEvent: onEvent)
-      }
       .navigationTitle("Workouts")
       .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
-      }
-      .sheet(isPresented: bugReport) {
-        if let session { BugReportSheet(session: session) }
-      }
       .onAppear {
         if !collapseSeeded {
           collapseSeeded = true
@@ -168,27 +111,23 @@ struct WorkoutGalleryView: View {
         }
         suggestions.onEvent = onEvent
         suggestions.refresh(known: knownPhotosIDs)
-        // Mid-workout, Workouts is the workout (#123; Igor, from the gym: "if I'm in a live workout take me back
-        // to live workout"): the sheet opens on the running workout's page, the day list one "‹" behind it. A
-        // set opened from the page keeps `openedWorkout`, so that reopening lands on the page as before.
-        if !landedOnLive, openedWorkout == nil, let live = workouts.liveWorkout {
-          landedOnLive = true
-          openedWorkout = live
+        guard !landedOnLive else { return }
+        landedOnLive = true
+        // Mid-workout, the app opens on the workout (#123; Igor, from the gym: "if I'm in a live workout take me
+        // back to live workout"): the running workout's page, the day list one "‹" behind it.
+        if let live = workouts.liveWorkout {
+          onOpenWorkout(live)
           onEvent?("ui", ["action": "open_live_workout"])
-        }
-        // Test hook: open the newest workout's page (053); simulator runs can't tap the green line.
-        // "set" goes on to open the workout's first set 2 s later, as a tap on its row would, for "‹ Workout".
-        if let hook = ProcessInfo.processInfo.environment["SWING_OPEN_WORKOUT"], let workout = workouts.index.workouts.last,
-          openedWorkout == nil
+        } else if let hook = ProcessInfo.processInfo.environment["SWING_OPEN_WORKOUT"],
+          let workout = workouts.index.workouts.last
         {
-          openedWorkout = workout
+          // Test hook: open the newest workout's page (053); simulator runs can't tap the line. "set" goes on to
+          // open the workout's first set 2 s later, as a tap on its row would, for "‹ Workout".
+          onOpenWorkout(workout)
           if hook == "set", let first = WorkoutTimeline(workout: workout, sets: store.entries, heartRate: nil).rows.first,
             let entry = store.entry(id: first.id)
           {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-              dismiss()
-              onOpen(entry)
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { onOpen(entry) }
           }
         }
         // Test hook: ask for Photos access on open so a simulator run can answer the system dialog.
@@ -196,7 +135,6 @@ struct WorkoutGalleryView: View {
           suggestions.requestAccess()
         }
       }
-    }
   }
 }
 
@@ -499,34 +437,6 @@ struct DayHeader: View {
       lines.append((parts.joined(separator: " · "), WorkoutMirror.soFar(live)))
     }
     return lines
-  }
-}
-
-/// Collapsed Workouts summary (#58): today's exercises in the order first done that day
-/// (`WorkoutDay.exercises` already keeps first-done order), a glyph and short word each, no counts.
-/// One line, gym-first type; extra exercises clip at the trailing edge.
-struct TodaySummaryRow: View {
-  let day: WorkoutDay
-
-  var body: some View {
-    HStack(spacing: 10) {
-      ForEach(day.exercises.indices, id: \.self) { index in
-        let exercise = day.exercises[index]
-        if index > 0 {
-          Text("·").foregroundStyle(.secondary)
-        }
-        HStack(spacing: 5) {
-          ExerciseGlyph(kind: exercise.kind)
-          Text(exercise.kind.shortWord)
-            .font(.headline)
-            .lineLimit(1)
-        }
-      }
-    }
-    .lineLimit(1)
-    .truncationMode(.tail)
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("Today: " + day.exercises.map { $0.kind.shortWord }.joined(separator: ", "))
   }
 }
 

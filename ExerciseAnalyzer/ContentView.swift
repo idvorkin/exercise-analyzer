@@ -11,31 +11,31 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// A screen pushed over the log (story 058): a workout's page, or the player (a set, or the camera).
+enum AppRoute: Hashable {
+  case workout(StoredWorkout)
+  case player
+}
+
 struct ContentView: View {
   @StateObject private var session = VideoPoseSession()
   @State private var pickerItem: PhotosPickerItem?
   @State private var showFileImporter = false
   @State private var showPhotosPicker = false
-  @State private var showRecents = false
-  /// Workouts sheet height (#58): collapsed is the handle plus today's summary row; pull up for the full gallery.
-  @State private var workoutsDetent: PresentationDetent = .large
-  /// The workout whose page is open in Workouts (053). It stays set while a set opened from that page is on
-  /// screen, so "‹ Workout" can go back to the page; Back on the page clears it.
-  @State private var openedWorkout: StoredWorkout?
+  /// The log is home; this is what is pushed over it (story 058). A set opened from a workout's page sits over
+  /// that page, so "‹" goes back to it.
+  @State private var path: [AppRoute] = []
   /// Middle-hold key stacks (stories 039, #60): up after a middle hold, staying up until a
   /// dismissing tap, a new clip, the clip's end, disappear or an inactive scene.
   @State private var stacksUp = false
   @State private var middleLeftLit: StepKey? = nil
   @State private var middleRightLit: StepKey? = nil
   @State private var middlePulse = 0
-  @State private var showOpenDialog = false
   /// The set the trash button was tapped on, while its "delete?" dialog is up (#111).
   @State private var deleting: RecentEntry?
   @Environment(\.openURL) private var openURL
   @State private var lastClockLog = Date.distantPast
   @State private var showBugReport = false
-  /// A shake while Workouts is up: the report sheet is presented from inside that sheet so Workouts stays (#41).
-  @State private var showWorkoutsBugReport = false
   @State private var showGallery = false
   @State private var showKeyframeViewer = false
   @State private var focusedPhase: String?
@@ -65,7 +65,196 @@ struct ContentView: View {
     }
   }
 
+  /// The log at the root, a workout's page and the player pushed over it (story 058; Igor, 2026-09-22: "build
+  /// the flow for B"). The app-wide dialogs, pickers and hooks hang here, so they work on every screen.
   private var mainBody: some View {
+    NavigationStack(path: $path) {
+      WorkoutGalleryView(
+        store: session.recents, workouts: workouts, onOpen: openSet,
+        onImport: { identifier, date in
+          Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) }
+          showPlayer()
+        },
+        onEvent: { session.log.event($0, $1) }, session: session,
+        onOpenWorkout: { path = [.workout($0)] })
+        .toolbar {
+          ToolbarItem(placement: .topBarTrailing) { moreMenu }
+        }
+        .safeAreaInset(edge: .bottom) { liveButton }
+        .navigationDestination(for: AppRoute.self) { route in
+          switch route {
+          case .workout(let workout):
+            WorkoutDetailView(
+              workout: workout, sets: session.recents.entries, workouts: workouts, onOpen: openSet,
+              thumbnail: { session.recents.thumbnailImage(for: $0) }, onEvent: { session.log.event($0, $1) })
+          case .player:
+            // Full screen, as the picture always was: the HUD's "‹" is the way back, and the edge swipe stays
+            // the frame steppers' (story 030), so the system back and its swipe are off.
+            playerScreen
+              .toolbar(.hidden, for: .navigationBar)
+              .navigationBarBackButtonHidden(true)
+          }
+        }
+    }
+    .background(
+      ShakeDetector {
+        guard session.instrumentedRun == nil else { return }  // a shake mid-run is the phone being carried, not a report
+        session.captureBugScreenshot()
+        showBugReport = true
+      })
+    .sheet(isPresented: $showBugReport) { BugReportSheet(session: session) }
+    .confirmationDialog(
+      "No reps found in this recording", isPresented: $session.emptyRecordingPrompt, titleVisibility: .visible
+    ) {
+      Button("Delete recording", role: .destructive) { session.deleteCurrentRecording() }
+      Button("Keep it", role: .cancel) {}
+    } message: {
+      Text("Nothing was saved to Photos. Delete the recording, or keep it to look at?")
+    }
+    .setDeletionDialog($deleting) { session.delete(set: $0, from: "review") }
+    // A Photos clip was just trimmed to its set: offer the replace right away instead of leaving it to the
+    // Save button (#90). Replace is story 011's save: the trimmed clip goes in, iOS asks once to delete the
+    // original, Undo trim brings it back.
+    .confirmationDialog(
+      "Replace the original in Photos?", isPresented: $session.replaceOriginalPrompt, titleVisibility: .visible
+    ) {
+      Button("Replace with the trimmed set") {
+        session.log.event("ui", ["action": "replace_original", "choice": "replace"])
+        session.saveToPhotos()
+      }
+      Button("Keep both for now", role: .cancel) {
+        session.log.event("ui", ["action": "replace_original", "choice": "keep"])
+      }
+    } message: {
+      Text("The trimmed set goes into Photos and iOS asks once to delete the original. Undo trim brings it back. Save to Photos does the same later.")
+    }
+    .onAppear(perform: loadFromEnvironment)
+    .onChange(of: pickerItem) { _, item in
+      guard let item else { return }
+      Task {
+        await session.importPicked(item: item)
+        pickerItem = nil
+      }
+    }
+    // The player follows the session (story 058): a camera or a clip coming up puts it on screen, wherever it
+    // was started (the wrist's Record, a picker, a hook); the camera cancelled or the set deleted takes it away.
+    .onChange(of: session.source) { _, source in
+      switch source {
+      case .camera:
+        // A new recording belongs to the running workout, if any: "‹" after it is that workout's page, not a
+        // page that happened to be open (053).
+        path = (workouts.liveWorkout.map { [AppRoute.workout($0)] } ?? []) + [.player]
+      case .file: showPlayer()
+      case .none: if path.last == .player { path.removeLast() }
+      }
+    }
+    .onChange(of: session.currentTime) { _, time in
+      if isScrubbing && !session.isPlaying {
+        // A seek from outside the slider landed while a drag looked live (gallery, pills, steps, or the
+        // full-screen viewer's buttons): the drag is stale, so end it and follow the playhead (#54). An
+        // active drag while paused never moves currentTime, and the slider's own seek already cleared the
+        // flag, so this only fires for someone else's seek.
+        isScrubbing = false
+      }
+      if !isScrubbing { scrubTime = time }
+      // Why the slider might not follow the clock (#23): log the view's side every 5 s.
+      if Date().timeIntervalSince(lastClockLog) > 5 {
+        lastClockLog = Date()
+        session.log.event(
+          "clock",
+          ["current": time, "slider": scrubTime, "scrubbing": isScrubbing, "duration": session.duration, "playing": session.isPlaying])
+      }
+    }
+    .photosPicker(
+      isPresented: $showPhotosPicker, selection: $pickerItem, matching: .videos,
+      photoLibrary: .shared())
+    .fileImporter(
+      isPresented: $showFileImporter, allowedContentTypes: [.movie, .video, .mpeg4Movie]
+    ) { result in
+      guard case .success(let url) = result else { return }
+      let accessed = url.startAccessingSecurityScopedResource()
+      defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+      let dest = FileManager.default.temporaryDirectory.appendingPathComponent(
+        url.lastPathComponent)
+      try? FileManager.default.removeItem(at: dest)
+      if (try? FileManager.default.copyItem(at: url, to: dest)) != nil {
+        session.load(url: dest)
+        showPlayer()
+      }
+    }
+    .fullScreenCover(isPresented: $showKeyframeViewer) {
+      KeyframeViewer(session: session)
+    }
+    .sheet(isPresented: $showGallery) {
+      RepGallerySheet(
+        reps: session.reps, columns: session.exercise.definition.galleryOrder,
+        currentRep: session.currentRep?.number
+      ) { position in
+        chromeSeek(to: position.time, from: "keyframe_viewer")
+      }
+    }
+  }
+
+  /// Opens a stored set on the player, over whatever page it was tapped on.
+  private func openSet(_ entry: RecentEntry) {
+    session.open(recent: entry)
+    showPlayer()
+  }
+
+  private func showPlayer() {
+    if path.last != .player { path.append(.player) }
+  }
+
+  /// "‹" on a set: the page under it, the log when it was opened from there. Playback stops; the set stays loaded.
+  private func leavePlayer() {
+    session.pause()
+    session.log.event("ui", ["action": "back", "to": path.count > 1 ? "workout" : "log"])
+    if path.last == .player { path.removeLast() }
+  }
+
+  /// The top bar's "…": the ways in that are not a workout, and the tools (story 058; the old start card's rows).
+  private var moreMenu: some View {
+    Menu {
+      Button {
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+          Task { @MainActor in showPhotosPicker = true }
+        }
+      } label: { Label("Photos", systemImage: "photo.on.rectangle") }
+      Button { showFileImporter = true } label: { Label("Files", systemImage: "folder") }
+      Button { session.captureBugScreenshot(); showBugReport = true } label: {
+        Label("Report a problem", systemImage: "ladybug")
+      }
+      Button { Task { await session.startInstrumentedRun() } } label: {
+        Label("Instrumented run", systemImage: "waveform.path.ecg")
+      }
+      Button { openURL(URL(string: "https://github.com/idvorkin/exercise-analyzer")!) } label: {
+        Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+      }
+    } label: {
+      Image(systemName: "ellipsis.circle").font(.title3)
+    }
+    .accessibilityLabel("More")
+  }
+
+  /// The camera, one large red target pinned under the log (gym-first).
+  private var liveButton: some View {
+    Button {
+      session.log.event("ui", ["action": "live", "from": "log"])
+      session.startCamera(position: session.cameraPosition)
+    } label: {
+      Label("Live", systemImage: "record.circle")
+        .font(.title3.bold())
+        .frame(maxWidth: .infinity, minHeight: 52)
+    }
+    .buttonStyle(.borderedProminent)
+    .tint(.red)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 8)
+    .background(.bar)
+  }
+
+  /// The picture, the HUD, the rep gallery and the transport bar: a set or the camera.
+  private var playerScreen: some View {
     VStack(spacing: 0) {
       ZStack {
         Color.black
@@ -133,119 +322,7 @@ struct ContentView: View {
       }
       controls
     }
-    // The main menu is modal: over the whole screen, the rep gallery and the transport bar included, all of it
-    // dimmed and out of reach until the menu is answered or dismissed (Igor, 2026-09-18: inside the picture's
-    // stack it covered the video only, and the gallery and the controls under it stayed bright and live). Above
-    // the HUD, not under it: at launch the phase pills and the count drew over the panel's top edge (#89).
-    .overlay {
-      if (session.source == .none && session.activity == .idle) || showOpenDialog {
-        startPanel
-      }
-    }
     .background(Color(.systemBackground))
-    .background(
-      ShakeDetector {
-        guard session.instrumentedRun == nil else { return }  // a shake mid-run is the phone being carried, not a report
-        session.captureBugScreenshot()
-        if showRecents { showWorkoutsBugReport = true } else { showBugReport = true }
-      })
-    .sheet(isPresented: $showBugReport) { BugReportSheet(session: session) }
-    .confirmationDialog(
-      "No reps found in this recording", isPresented: $session.emptyRecordingPrompt, titleVisibility: .visible
-    ) {
-      Button("Delete recording", role: .destructive) { session.deleteCurrentRecording() }
-      Button("Keep it", role: .cancel) {}
-    } message: {
-      Text("Nothing was saved to Photos. Delete the recording, or keep it to look at?")
-    }
-    .setDeletionDialog($deleting) { session.delete(set: $0, from: "review") }
-    // A Photos clip was just trimmed to its set: offer the replace right away instead of leaving it to the
-    // Save button (#90). Replace is story 011's save: the trimmed clip goes in, iOS asks once to delete the
-    // original, Undo trim brings it back.
-    .confirmationDialog(
-      "Replace the original in Photos?", isPresented: $session.replaceOriginalPrompt, titleVisibility: .visible
-    ) {
-      Button("Replace with the trimmed set") {
-        session.log.event("ui", ["action": "replace_original", "choice": "replace"])
-        session.saveToPhotos()
-      }
-      Button("Keep both for now", role: .cancel) {
-        session.log.event("ui", ["action": "replace_original", "choice": "keep"])
-      }
-    } message: {
-      Text("The trimmed set goes into Photos and iOS asks once to delete the original. Undo trim brings it back. Save to Photos does the same later.")
-    }
-    .onAppear(perform: loadFromEnvironment)
-    .onChange(of: pickerItem) { _, item in
-      guard let item else { return }
-      Task {
-        await session.importPicked(item: item)
-        pickerItem = nil
-      }
-    }
-    .onChange(of: showRecents) { _, open in
-      // Reopening shows the full gallery (story 012); the collapsed hook keeps it down for screenshots.
-      if open, ProcessInfo.processInfo.environment["SWING_WORKOUTS_COLLAPSED"] != "1" {
-        workoutsDetent = .large
-      }
-    }
-    // A new recording is not a set of the workout page that was open: "‹ Workout" goes with the camera (053).
-    .onChange(of: session.source) { _, source in
-      if source == .camera { openedWorkout = nil }
-    }
-    .onChange(of: session.currentTime) { _, time in
-      if isScrubbing && !session.isPlaying {
-        // A seek from outside the slider landed while a drag looked live (gallery, pills, steps, or the
-        // full-screen viewer's buttons): the drag is stale, so end it and follow the playhead (#54). An
-        // active drag while paused never moves currentTime, and the slider's own seek already cleared the
-        // flag, so this only fires for someone else's seek.
-        isScrubbing = false
-      }
-      if !isScrubbing { scrubTime = time }
-      // Why the slider might not follow the clock (#23): log the view's side every 5 s.
-      if Date().timeIntervalSince(lastClockLog) > 5 {
-        lastClockLog = Date()
-        session.log.event(
-          "clock",
-          ["current": time, "slider": scrubTime, "scrubbing": isScrubbing, "duration": session.duration, "playing": session.isPlaying])
-      }
-    }
-    .photosPicker(
-      isPresented: $showPhotosPicker, selection: $pickerItem, matching: .videos,
-      photoLibrary: .shared())
-    .sheet(isPresented: $showRecents) {
-      WorkoutGalleryView(
-        store: session.recents, workouts: workouts, onOpen: { session.open(recent: $0) },
-        onImport: { identifier, date in Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) } },
-        onEvent: { session.log.event($0, $1) }, session: session, bugReport: $showWorkoutsBugReport,
-        detent: $workoutsDetent, openedWorkout: $openedWorkout)
-        .presentationDetents([WorkoutGalleryView.collapsedDetent, .large], selection: $workoutsDetent)
-        .presentationDragIndicator(.visible)
-    }
-    .fileImporter(
-      isPresented: $showFileImporter, allowedContentTypes: [.movie, .video, .mpeg4Movie]
-    ) { result in
-      guard case .success(let url) = result else { return }
-      let accessed = url.startAccessingSecurityScopedResource()
-      defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-      let dest = FileManager.default.temporaryDirectory.appendingPathComponent(
-        url.lastPathComponent)
-      try? FileManager.default.removeItem(at: dest)
-      if (try? FileManager.default.copyItem(at: url, to: dest)) != nil {
-        session.load(url: dest)
-      }
-    }
-    .fullScreenCover(isPresented: $showKeyframeViewer) {
-      KeyframeViewer(session: session)
-    }
-    .sheet(isPresented: $showGallery) {
-      RepGallerySheet(
-        reps: session.reps, columns: session.exercise.definition.galleryOrder,
-        currentRep: session.currentRep?.number
-      ) { position in
-        chromeSeek(to: position.time, from: "keyframe_viewer")
-      }
-    }
   }
 
   /// Drag to give the gallery more or less of the screen; double-tap to collapse or restore it.
@@ -277,7 +354,7 @@ struct ContentView: View {
   /// or a set outside every workout.
   private var workoutOfLoadedSet: StoredWorkout? {
     guard session.source == .file else { return nil }
-    if let openedWorkout { return openedWorkout }
+    if path.count > 1, case .workout(let under) = path[path.count - 2] { return under }
     guard let start = session.currentEntry?.span.lowerBound else { return nil }
     if let live = workouts.liveWorkout, live.contains(start) { return live }
     return workouts.index.workouts.last { $0.contains(start) }
@@ -291,11 +368,12 @@ struct ContentView: View {
     return WorkoutTimeline(workout: workout, sets: session.recents.entries, heartRate: series).rows.first { $0.id == id }
   }
 
-  /// Workouts opens on the workout's page: `openedWorkout` is what the gallery's navigation pushes.
+  /// The workout's page: popped back to when the set was opened from it, else put on screen in the set's place.
   private func backToWorkout(_ workout: StoredWorkout) {
-    session.log.event("ui", ["action": "back_to_workout", "from_page": openedWorkout != nil])
-    openedWorkout = workout
-    showRecents = true
+    let fromPage = path.count > 1 && path[path.count - 2] == .workout(workout)
+    session.log.event("ui", ["action": "back_to_workout", "from_page": fromPage])
+    session.pause()
+    if fromPage { path.removeLast() } else { path = [.workout(workout)] }
   }
 
   /// The count's face, for its letter height: the top line's other pieces are sized and set against it.
@@ -322,6 +400,8 @@ struct ContentView: View {
         // A set that belongs to a stored workout (053): one tap to that workout's page, however the set was
         // opened (#99). A sign at the head of the top line, so no line of its own lies over the lifter (#98),
         // exactly as tall as the count's digit and level with it.
+        // The player's only way back (story 058): to its workout's page when the set has one, else to the log.
+        // The camera has none: its Done and Cancel end it.
         if let workout = workoutOfLoadedSet {
           Button {
             backToWorkout(workout)
@@ -335,6 +415,14 @@ struct ContentView: View {
             .contentShape(Rectangle().inset(by: -10))
           }
           .accessibilityLabel("Back to the workout")
+        } else if session.source != .camera {
+          Button(action: leavePlayer) {
+            Image(systemName: "chevron.left").font(.title3.bold())
+              .frame(height: 28)
+              .contentShape(Rectangle().inset(by: -10))
+          }
+          .alignmentGuide(.top, computeValue: Self.capTop(Self.countFont))
+          .accessibilityLabel("Back to Workouts")
         }
         // The count's line box is cut to its cap height, so the header sits at the very top of the picture and
         // the phase pills snug under it (Igor, #98).
@@ -404,22 +492,31 @@ struct ContentView: View {
       }
       // The workout running on the wrist (048), mirrored here: its clock, heart rate and the sets recorded
       // inside it. One strip under the count, gone when the workout ends.
+      // The Now bar (story 058): on a set, one tap to the running workout's page; on the camera it only reads,
+      // a tap there must not walk away from a recording.
       if let live = workouts.live {
         let sets = workouts.setsInLiveWorkout(session.recents.entries).count
-        HStack(spacing: 6) {
-          Image(systemName: "applewatch").font(.caption2)
-          Text("Workout").font(.caption.bold())
-          Text(live.startDate, style: .timer).font(.caption.bold()).monospacedDigit()
-          Text("·").opacity(0.5)
-          Image(systemName: "heart.fill").font(.caption2).foregroundStyle(.red)
-          Text(live.heartRate.map(String.init) ?? "--").font(.caption.bold()).monospacedDigit()
-          Text("·").opacity(0.5)
-          Text("\(sets) set\(sets == 1 ? "" : "s")").font(.caption).monospacedDigit()
-          Spacer()
+        Button {
+          if let page = workouts.liveWorkout { backToWorkout(page) }
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "figure.strengthtraining.traditional").font(.caption2)
+            Text("Workout").font(.caption.bold())
+            Text(live.startDate, style: .timer).font(.caption.bold()).monospacedDigit()
+            Text("·").opacity(0.5)
+            Image(systemName: "heart.fill").font(.caption2).foregroundStyle(.red)
+            Text(live.heartRate.map(String.init) ?? "--").font(.caption.bold()).monospacedDigit()
+            Text("·").opacity(0.5)
+            Text("\(sets) set\(sets == 1 ? "" : "s")").font(.caption).monospacedDigit()
+            Spacer()
+            if session.source == .file { Image(systemName: "chevron.right").font(.caption2.bold()) }
+          }
+          .foregroundStyle(.green)
+          .padding(.horizontal, 8).padding(.vertical, 4)
+          .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
         }
-        .foregroundStyle(.green)
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 6))
+        .buttonStyle(.plain)
+        .disabled(session.source != .file)
         .accessibilityLabel("Workout on the watch, \(sets) sets, heart rate \(live.heartRate.map(String.init) ?? "unknown")")
       }
       HStack(spacing: 5) {
@@ -679,61 +776,6 @@ struct ContentView: View {
        "delta": delta, "repeat": repeatIndex, "at_end": atEnd])
   }
 
-  /// Nothing loaded: a centred panel with the four ways to start, big enough for the gym.
-  private var startPanel: some View {
-    ZStack {
-      // Dim whatever is behind (the idle HUD at launch, the picture under Open); over a clip a tap outside
-      // dismisses. The panel itself is near-opaque with a clear edge and a shadow, so it is one thing (#89).
-      Color.black.opacity(0.55).ignoresSafeArea().onTapGesture { if showOpenDialog { showOpenDialog = false } }
-      VStack(spacing: 10) {
-        Text("Exercise Analyzer").font(.title2.bold()).foregroundStyle(.white).padding(.bottom, 4)
-        startRow("Live", "camera.fill") { showOpenDialog = false; session.startCamera(position: session.cameraPosition) }
-        startRow("Workouts", "calendar") { showOpenDialog = false; showRecents = true }
-        startRow("Photos", "photo.on.rectangle") {
-          showOpenDialog = false
-          PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
-            Task { @MainActor in showPhotosPicker = true }
-          }
-        }
-        startRow("Files", "folder") { showOpenDialog = false; showFileImporter = true }
-        startRow("Report a problem", "ladybug") { showOpenDialog = false; session.captureBugScreenshot(); showBugReport = true }
-        startRow("Instrumented run", "waveform.path.ecg") {
-          showOpenDialog = false
-          Task { await session.startInstrumentedRun() }
-        }
-        startRow("GitHub", "chevron.left.forwardslash.chevron.right") {
-          showOpenDialog = false
-          openURL(URL(string: "https://github.com/idvorkin/exercise-analyzer")!)
-        }
-        if showOpenDialog {
-          Button("Cancel") { showOpenDialog = false }
-            .font(.headline).foregroundStyle(.white.opacity(0.8)).padding(.top, 4)
-        }
-      }
-      .padding(20)
-      .frame(maxWidth: 320)
-      .background(Color(white: 0.09), in: RoundedRectangle(cornerRadius: 20))
-      .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.4), lineWidth: 1.5))
-      .shadow(color: .black.opacity(0.7), radius: 28, y: 8)
-    }
-  }
-
-  private func startRow(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      HStack(spacing: 12) {
-        Image(systemName: symbol).font(.title3).frame(width: 28)
-        Text(title).font(.title3.weight(.semibold))
-        Spacer()
-        Image(systemName: "chevron.right").font(.footnote).opacity(0.5)
-      }
-      .padding(.horizontal, 16).padding(.vertical, 14)
-      .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-      .foregroundStyle(.white)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-  }
-
   private var cameraControls: some View {
     HStack {
       Button {
@@ -878,11 +920,6 @@ struct ContentView: View {
         } label: {
           Label("Camera", systemImage: "camera")
         }
-        Button {
-          showOpenDialog = true  // the same centred panel as the first screen (#25)
-        } label: {
-          Label("Open", systemImage: "folder.badge.plus")
-        }
       }
       .labelStyle(.iconOnly)
       .font(.title3)
@@ -923,11 +960,7 @@ struct ContentView: View {
         session.reportBug(note: note)
       }
     }
-    if env["SWING_SHOW_WORKOUTS"] == "1" { showRecents = true }
     if env["SWING_SHOW_GALLERY"] == "1" { showGallery = true }
-    if env["SWING_WORKOUTS_COLLAPSED"] == "1" { workoutsDetent = WorkoutGalleryView.collapsedDetent }
-    // Test hook: the main menu over whatever loads (with SWING_OPEN_RECENT, over a set and its rep gallery).
-    if env["SWING_SHOW_MENU"] == "1" { showOpenDialog = true }
     if env["SWING_SHOW_SEEK_CONTROLS"] == "1" {
       Task { @MainActor in
         try? await Task.sleep(for: .seconds(4))

@@ -201,7 +201,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 038:
 
 - **Summary:** See what I did today at a glance when the Workouts sheet is collapsed
-- **Status:** implemented in [52ecac2](https://github.com/idvorkin/exercise-analyzer/commit/52ecac2); verified by simulator screenshot ([docs/screenshots/workouts-collapsed.png](../screenshots/workouts-collapsed.png)); on the phone since 2026-09-13, Igor's check pending; approved A icons in [d6a139f](https://github.com/idvorkin/exercise-analyzer/commit/d6a139f) verified on the simulator (all six workout-detail fallbacks in light/dark, expanded headers with real photos, collapsed summary) and by signed phone build; installed 2026-09-20, launch blocked by the phone lock
+- **Status:** replaced by 058 (no sheet; a folded day's chips, #129, say what was done, and a set's green workout strip leads to the day's workout); before that implemented in [52ecac2](https://github.com/idvorkin/exercise-analyzer/commit/52ecac2); verified by simulator screenshot ([docs/screenshots/workouts-collapsed.png](../screenshots/workouts-collapsed.png)); on the phone since 2026-09-13, Igor's check pending; approved A icons in [d6a139f](https://github.com/idvorkin/exercise-analyzer/commit/d6a139f) verified on the simulator (all six workout-detail fallbacks in light/dark, expanded headers with real photos, collapsed summary) and by signed phone build; installed 2026-09-20, launch blocked by the phone lock
 
 #### Use Case:
 - **As a** lifter between sets with the Workouts sheet pulled down
@@ -416,3 +416,48 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Notes:** A run is consecutive sets of one exercise in one workout with no other exercise between them; the card's numbers are the workout page's (053: peak, drop over the rest, the rest before the next). Two builds are possible and the issue weighs them: a queue player with generated card items (no file, instant, the gallery maps rep → item + time) or a composition export (a real file for Photos, the cards drawn into it, minutes of encoding for a run of get-ups).
 
 - **Issues:** [#124](https://github.com/idvorkin/exercise-analyzer/issues/124)
+
+---
+
+### User Story 058:
+
+- **Summary:** The log is home: a set, a workout's page and the camera are each a screen with a way back
+- **Status:** implemented in the commit after this line's first version; verified on the simulator (launch on the log, a set pushed with "‹", a workout's page with a set over it and "‹ Workout" back to the page, mid-workout launch on the live page, a set inside the live workout back to that page)
+- **Why:** Igor, 2026-09-22, on the three architectures ([proposal](https://claude.ai/artifact/46aiQ5J8WxTuZbJBfJZpwZ)): "build the flow for B, I like that". The app opened on an empty player with a menu card, Workouts was a sheet over it with a Close, and a set's way back to the list was the folder button, the card, then Workouts again.
+
+#### Use Case:
+- **As a** lifter opening the app at the gym or on the couch
+- **I want to** land on my workouts and move between them, a set and the camera the way every iOS app does
+- **so that** I always know where I am and "‹" always takes me one step back
+
+#### Acceptance Criteria:
+- **Scenario:** Opening the app
+- **Given:** no workout running on the wrist
+- **When:** the app opens
+- **Then:** the Workouts list is the screen, full height, with "…" at the top (Photos, Files, Report a problem, Instrumented run, GitHub) and a large red Live button pinned at the bottom; no menu card, no sheet, no Close
+
+- **Scenario:** Opening mid-workout
+- **Given:** a workout running on the wrist
+- **When:** the app opens
+- **Then:** the running workout's page is on screen, the list one "‹" behind it (#123)
+
+- **Scenario:** A set and back
+- **Given:** the list, or a workout's page
+- **When:** I tap a set
+- **Then:** the set plays full screen with a "‹" at the head of the HUD (with the lifter figure when the set belongs to a workout); "‹" pauses it and goes back to the page I came from, or to the set's workout page when it has one, else to the list. The screen edges stay the frame steppers' (030): there is no edge swipe back
+
+- **Scenario:** The camera
+- **Given:** any screen
+- **When:** I tap Live, or Record on the wrist
+- **Then:** the camera comes up over the running workout's page when there is one (so the set's "‹" leads there), else over the list; it has no "‹": Done turns it into the set, Cancel takes it away and leaves me where it was opened from
+
+- **Scenario:** Between sets, mid-workout
+- **Given:** a set on screen while a workout runs on the wrist
+- **When:** I tap the green workout strip under the count ("Workout 12:03 · ♥ 131 · 6 sets ›")
+- **Then:** the running workout's page opens; on the camera the strip only reads
+
+- **Notes:** Replaces the start card (025) and the Workouts sheet with its collapsed summary (038, #58): the log is
+  the one place the app starts from. Anything that loads a clip (a picker, Files, the Photos strip, an
+  instrumented run, a hook) puts the player on screen; the camera cancelled or the set deleted takes it away.
+
+- **Issues:** none; the architecture pick on 2026-09-22
