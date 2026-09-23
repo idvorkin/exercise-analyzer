@@ -22,6 +22,9 @@ less from a diagonal camera), so it scores quality but does not gate the phases.
   mid-crouch). The standing height is forgotten only after `forgetTopAfter` (4 s) with no elevated reading: from
   a diagonal camera the front leg hides the rear ankle while standing tall.
 - **Standing picture**: the frame of the highest head since the last rep, not the frame that tripped the descent.
+- **A turn ends the rep**: on the way up, a head that turns back down by a rep's depth (`minDepthFraction`) ends
+  the rep there: counted when the turn is within `turnCountsFraction` (0.15 L) of the standing height, abandoned
+  further short, and the turn becomes the standing height either way.
 
 ## Fixtures
 
@@ -30,6 +33,7 @@ less from a diagonal camera), so it scores quality but does not gate the phases.
 | bulgarian-10reps | 8 | no | head drops 8 times at a steady ~4.2 s rhythm; the earlier front-knee analyzer counted 10 |
 | bulgarian-phone | 8 | no | Igor's gym set (report 2026-09-12): 8 head drops at ~4 s, setup crouches at both ends |
 | bulgarian-4CF19A9A-phone | 8 | yes | Igor's gym set (2026-09-22, #132), diagonal camera: a setup crouch and a head wobble counted as reps 1 and 2; bench boxes added by `posetrack --poses-from` |
+| bulgarian-599F988A-phone | 8 | no | Igor's evening set (#135), side camera: Muse counted 8 over one strip per head drop, the first checked by eye; counted 6 |
 | bulgarian-7424BEDD-phone | 6 | yes | Igor's gym set (2026-09-22, #134), camera front-left, bench nearer the camera than him: counted 0 without the bench |
 | tracks/bulgarian-split-squat-20260909-98B26725 | archived | | must still analyze (`ArchivedTracks`) |
 
@@ -81,3 +85,16 @@ Reports: `TuningReports.testBulgarianPhoneSetUnderThresholds`, `testBulgarianTen
   **9**, 6. The window is narrow (0.25 alone gets both new sets right), and bulgarian-10reps and bulgarian-phone
   carry no bench boxes (no clip on the Mac), so they test only that nothing changed without one.
   AnalysisVersion 2026-09-22.3.
+- **2026-09-22, tracks 79271425 and 599F988A ([#135](https://github.com/idvorkin/exercise-analyzer/issues/135))**:
+  79271425 counted 0. Close camera, the rear leg and the bench off the left edge; Muse over one four-frame strip
+  per head drop (`~/tmp/agent/skill/135/strips`): setup (0.8–4.5 s), 8 reps (bottoms 6.2–31.8 s), then the
+  dumbbells put down (35.8 s), which Muse called a rep and its own note described as the put-down (checked by eye).
+  The rear foot was not the cause (it read up in 34–45 % of frames from ankles guessed at the edge): the standing
+  height was learned in the walk-in (ear 336 px) and the lifter then stood at 489 near the camera, so the setup
+  dip's rep waited in ascending for the whole set. Tried and dropped: a head-only fallback (never triggered, the
+  foot read up), a 4–6 s rep timeout (abandoned mid-rep; 8 by coincidence, missing rep 1 and counting the put-down),
+  the knees apart at the bottom (bulgarian-10reps' real reps bottom at 0.04 L), the rear foot up at the bottom
+  (79271425 → 0). Kept: the turn rule. A turn at `descendFraction` abandoned reps on a wobble; at
+  `minDepthFraction`, 79271425 counts 9 (8 + the put-down, open), and abandoning every short turn made
+  599F988A 7, whose first rep came back 0.06 L short (Muse and by eye: 8), hence `turnCountsFraction` 0.15:
+  599F988A 8 (was 6). Verified fixtures unchanged (8, 8, 8, 6). AnalysisVersion 2026-09-22.4.

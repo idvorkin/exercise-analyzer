@@ -57,6 +57,11 @@ struct Fixture {
     // Igor counted 6 on the video (the live count said 7, the offline pass 0). Perspective puts the rear ankle level
     // with the front one on screen, so only the bench box (every second, from `posetrack`) shows the foot up.
     Fixture(name: "bulgarian-7424BEDD-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 6, humanVerified: true),
+    // Igor's gym set (2026-09-22 evening, #135), side camera, rear foot on the bench: 8 reps by Muse over one strip
+    // per head drop (bottoms 6.1–36.1 s, then the dumbbells put down), the first one checked by eye. It counted 6:
+    // the first rep came back 0.06 L short of the standing height and waited to be merged into the second.
+    // Not confirmed by Igor.
+    Fixture(name: "bulgarian-599F988A-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
     // Igor's TGU clip (2026-09-12, IMG_4342): two get-ups, one per side, with a rest lying between them.
     Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false),
     // Igor's second TGU clip (IMG_4343, issue #14): one get-up per side; a pose glitch at 14 s once counted as a rep.

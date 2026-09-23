@@ -37,6 +37,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** it counts my reps, because my rear foot resting on the top of the bench the app sees counts as up
   (7424BEDD: six, Igor's count; it had counted none, [#134](https://github.com/idvorkin/exercise-analyzer/issues/134))
 
+- **Scenario:** A Bulgarian counts after I walk up close to the camera
+- **Given:** I stand tall further from the phone first, then set up near it, where my head sits lower on screen
+- **When:** the set is analyzed as a Bulgarian split squat
+- **Then:** it counts my reps: a rep whose head turns back down far short of the standing height is not a rep and
+  resets it, and one that turns just short (under 0.15 of my height) is a rep that didn't quite stand tall
+  ([#135](https://github.com/idvorkin/exercise-analyzer/issues/135): 79271425 had counted none, 599F988A six of eight)
+
 - **Scenario:** Live opens on the camera I used last time
 - **Given:** my last set was recorded on the front camera (or the back camera at 0.5×)
 - **When:** I open Live for the next set

@@ -83,7 +83,6 @@ final class TuningReports: XCTestCase {
       let name = "arch-" + url.deletingPathExtension().lastPathComponent.suffix(8)
       tracks.append((Fixture(name: name, expectedExercise: .bulgarianSplitSquat, expectedReps: -1, humanVerified: false), try Fixture.frames(at: url)))
     }
-    report("bulgarian-7424BEDD-phone defaults", analyze(tracks.first { $0.0.name.contains("7424BEDD") }!.1, BulgarianSplitSquatThresholds()))
     func count(_ frames: [FrameRecord], _ t: BulgarianSplitSquatThresholds) -> Int {
       let pipeline = AnalysisPipeline(exercise: .bulgarianSplitSquat, analyzer: BulgarianSplitSquatAnalyzer(thresholds: t))
       for frame in frames { pipeline.process(extracted: frame) { nil } }
@@ -93,11 +92,43 @@ final class TuningReports: XCTestCase {
       (f, frames.map { FrameRecord(time: $0.time, imageSize: $0.imageSize, pose: $0.pose, box: $0.box, analysis: nil, bells: $0.bells) })
     }
     print("  no bench: " + stripped.map { "\($0.0.name.prefix(22)) \(count($0.1, BulgarianSplitSquatThresholds()))/\($0.0.expectedReps)" }.joined(separator: " · "))
+    print("  defaults: " + tracks.map { "\($0.0.name.prefix(22)) \(count($0.1, BulgarianSplitSquatThresholds()))/\($0.0.expectedReps)" }.joined(separator: " · "))    // Knees' side-to-side gap at each rep's bottom, over the standing body height (ear to lower ankle at Standing):
+    // a split stance against a hinge with the feet together (79271425's put-down: 0.01 of the frame).
+    for (f, frames) in tracks {
+      let reps = AnalysisPipeline.analyze(frames: frames, exercise: .bulgarianSplitSquat).reps
+      let gaps = reps.compactMap { rep -> String? in
+        guard let bottom = rep.positions[BulgarianSplitSquatAnalyzer.bottom]?.pose,
+          let top = rep.positions[BulgarianSplitSquatAnalyzer.standing]?.pose
+        else { return nil }
+        let height = Double(max(top.xy[15].y, top.xy[16].y) - min(top.xy[3].y, top.xy[4].y))
+        let gap = Double(abs(bottom.xy[13].x - bottom.xy[14].x))
+        return String(format: "%.1f:%.2f", rep.positions[BulgarianSplitSquatAnalyzer.bottom]!.time, gap / max(height, 0.01))
+      }
+      print("  knee gap / height at bottoms, \(f.name): " + gaps.joined(separator: " "))
+    }
     for share in [0.15, 0.25, 0.35, 0.5] {
       var t = BulgarianSplitSquatThresholds()
       t.benchTopShare = share
       print(String(format: "  top %.2f: ", share) + tracks.map { "\($0.0.name.prefix(22)) \(count($0.1, t))/\($0.0.expectedReps)" }.joined(separator: " · "))
     }
+    fflush(stdout)  // redirected, XCTest exits with the tail of a long report still buffered
+  }
+
+  /// #135: 79271425's transitions through its setup and first reps (Muse's strips: setup 0.8–4.5 s, reps bottom
+  /// at 6.2, 9.4, 13.0, 16.7, 20.2, 23.9, 27.5, 31.8 s, the dumbbells put down at 35.8 s).
+  /// 599F988A (Muse's strips: 8 reps, bottoms at 6.1, 9.8, 13.9, 18.1, 22.2, 26.9, 31.2, 36.1 s, then the put-down).
+  func testBulgarian79271425Trace() throws {
+    for id in ["79271425", "599F988A"] {
+      let url = try XCTUnwrap(
+        Bundle.module.url(forResource: "bulgarian-split-squat-20260922-\(id)", withExtension: "json", subdirectory: "Fixtures/tracks"))
+      let analyzer = BulgarianSplitSquatAnalyzer()
+      var lines: [String] = []
+      analyzer.trace = { lines.append($0) }
+      let pipeline = AnalysisPipeline(exercise: .bulgarianSplitSquat, analyzer: analyzer)
+      for frame in try Fixture.frames(at: url) { pipeline.process(extracted: frame) { nil } }
+      print("\(id):\n" + lines.filter { Double($0.prefix { $0 != "s" }) ?? 99 < 11 }.joined(separator: "\n"))
+    }
+    fflush(stdout)
   }
 
   /// The pull-up fixtures (#108): every transition with the shoulders' distance under the bar, the reps, and the

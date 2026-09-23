@@ -21,5 +21,7 @@ public enum AnalysisVersion {
   // 2026-09-22.2: only a swing or a get-up tracks a bell; a dumbbell in the hand read as one (#131).
   // 2026-09-22.3: a Bulgarian's rear foot is also up when an ankle rests on the top of the bench the bench
   // detector sees; a bench nearer the camera than the lifter hid the gap and the set counted 0 (#134).
-  public static let current = "2026-09-22.3"
+  // 2026-09-22.4: a Bulgarian rep ends where the head turns back down, counted near the standing height and
+  // abandoned far short of it; a standing height learned in the walk-in held 79271425 in one rep all set (#135).
+  public static let current = "2026-09-22.4"
 }

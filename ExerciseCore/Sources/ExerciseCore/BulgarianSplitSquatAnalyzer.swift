@@ -48,6 +48,9 @@ public struct BulgarianSplitSquatThresholds {
   public var benchTopShare = 0.25
   /// The detector runs about once a second; its last box stands in for this long.
   public var benchMaxAge = 3.0
+  /// A rep whose head turned back down (as deep as a rep) within this fraction of body height of the standing
+  /// height counts; further short, it is abandoned and the turn becomes the standing height (#135).
+  public var turnCountsFraction = 0.15
 }
 
 public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
@@ -86,6 +89,8 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
   private var bottomCandidate: SingleLegFrame?
   private var bottomImage: CGImage?
   private var framesAscendingAfterBottom = 0
+  /// The highest the head has come back on the way up.
+  private var ascentTop: SingleLegFrame?
   private var frameHistory: [SingleLegFrame] = []
   /// Standing body height on screen (front ankle to ear), learned while standing with the rear foot up and
   /// frozen during a rep; all head-travel thresholds scale by it.
@@ -120,6 +125,7 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     bottomCandidate = nil
     bottomImage = nil
     framesAscendingAfterBottom = 0
+    ascentTop = nil
     frameHistory = []
     bodyHeight = nil
     elevatedFlags = []
@@ -300,14 +306,44 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
       if machine.canTransition, let bottom = bottomCandidate {
         let exit = bottom.earY - legLength * thresholds.riseFraction * 2
         let completion = standingEarY.map { $0 + legLength * thresholds.returnFraction } ?? exit
-        if earY < max(exit, completion) { machine.transition(to: Self.ascending) }
+        if earY < max(exit, completion) {
+          machine.transition(to: Self.ascending)
+          ascentTop = frame
+        }
       }
     default:  // ascending: back near the standing height completes the rep
-      if machine.canTransition, let top = standingEarY, earY < top + legLength * thresholds.returnFraction {
-        trace?(String(format: "%.2fs rep %d done: ear %.0f < top %.0f + %.0f", time, machine.repCount + 1, earY, top, legLength * thresholds.returnFraction))
+      if earY < ascentTop?.earY ?? earY { ascentTop = frame }
+      guard let top = standingEarY else { break }
+      // The frame that ends the rep: back near the standing height, or where the head turned down (#135).
+      var end: SingleLegFrame?
+      if let turn = ascentTop, turn.earY >= top + legLength * thresholds.returnFraction,
+        earY > turn.earY + legLength * thresholds.minDepthFraction
+      {
+        // Turned back down short of the standing height, as deep as a rep (at `descendFraction` a wobble on the way
+        // up counted as a turn, 79271425 at 6.8 s). Near the top it is a rep that didn't quite stand tall
+        // (599F988A's first came back 0.06 L short and was merged into the next); far short, the standing height
+        // was wrong: 79271425 learned it in the walk-in, 0.39 L above where the lifter stood near the camera, and
+        // the setup dip's rep waited in ascending through the whole set (0 counted). The turn is the new top.
+        guard turn.earY < top + legLength * thresholds.turnCountsFraction else {
+          trace?(String(format: "%.2fs not a rep: turned down at ear %.0f, %.2f L short of top %.0f", time, turn.earY, (turn.earY - top) / legLength, top))
+          machine.transition(to: Self.standing)
+          standingEarY = turn.earY
+          standingFrame = turn
+          standingImage = nil
+          bottomCandidate = nil
+          bottomImage = nil
+          metrics = RepMetrics()
+          return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil)
+        }
+        end = turn
+      } else if machine.canTransition, earY < top + legLength * thresholds.returnFraction {
+        end = frame
+      }
+      if let end {
+        trace?(String(format: "%.2fs rep %d done: ear %.0f at %.2fs, top %.0f", time, machine.repCount + 1, end.earY, end.time, top))
         if let bottom = bottomCandidate {
           let target = bottom.earY - (bottom.earY - top) * 0.5
-          if let closest = frameHistory.filter({ $0.time > bottom.time })
+          if let closest = frameHistory.filter({ $0.time > bottom.time && $0.time <= end.time })
             .min(by: { abs($0.earY - target) < abs($1.earY - target) })
           {
             machine.storePeak(
@@ -318,9 +354,9 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
         }
         completedRep = machine.completeRep(quality: calculateRepQuality())
         machine.transition(to: Self.standing)
-        standingEarY = earY
-        standingFrame = frame
-        standingImage = image()
+        standingEarY = end.earY
+        standingFrame = end
+        standingImage = end.time == time ? image() : nil
         metrics = RepMetrics()
       }
     }
