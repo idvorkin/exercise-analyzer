@@ -17,6 +17,10 @@ public enum ExerciseKind: String, Codable, CaseIterable, Identifiable {
 
   public var id: String { rawValue }
 
+  /// Whether a kettlebell is in play. The detector can't tell a dumbbell in the hand from a kettlebell, so a
+  /// Bulgarian with dumbbells tracked a phantom bell in 58 % of its frames (#131); only these exercises track one.
+  public var holdsBell: Bool { self == .kettlebellSwing || self == .turkishGetUp }
+
   public var definition: ExerciseDefinition {
     switch self {
     case .kettlebellSwing: return KettlebellSwingAnalyzer.definition

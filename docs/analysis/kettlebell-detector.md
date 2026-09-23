@@ -406,6 +406,17 @@ circles 12 → 9. The window zones the swung bell's own cells and the get-up's f
 loss outweighs the false circles it removes. Reverted (the rule and its tests are gone; this entry stays as
 the record). No version bump — nothing shipped.
 
+**Dumbbells read as kettlebells; only bell exercises track one (2026-09-22, #131).** Igor asked for dumbbell
+detection on Bulgarians. Measured over 4CF19A9A and 7424BEDD (two dumbbell Bulgarians) with a dense YOLOE-26s
+exported with "kettlebell,dumbbell,bench": a full-frame "dumbbell" box sits on the dumbbell rack in every frame
+and never within 0.06 of a wrist (0 % in hand, both sets); on 0.3-frame-high crops around the wrists, dumbbell
+≥ 0.4 in 1 % and 13 % of crops, kettlebell ≥ 0.4 in 6 % and **42 %**. The phone's own track of 7424BEDD holds a
+"bell in play" in 739 of 1271 frames. A dumbbell detector is out; `ExerciseKind.holdsBell` (swing, get-up)
+gates the tracker and the backward fill, and every other exercise keeps its sightings but tracks none
+(`BellTests.testOnlyBellExercisesTrackABell`). No kettlebell fixture changes. AnalysisVersion 2026-09-22.2.
+Caution for the next frame read: the Haiku helper confirmed the overlay's "dumbbell in hand" label in 7 of 7
+frames; one frame by eye showed it on the rack.
+
 ## Plan (offline only; live and the watch unchanged)
 
 1. **Plumbing**: YOLOE nano in the offline pass, a `bell` box per frame in the pose track (fixtures gain a field),

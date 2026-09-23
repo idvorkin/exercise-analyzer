@@ -18,5 +18,6 @@ public enum AnalysisVersion {
   // 2026-09-22.1: Bulgarian Standing is the highest head before the rep, not the frame that tripped the descent;
   // a dip shallower than 0.2 L is not a rep; a rep needs the rear foot up 2.5 s first; the standing height
   // survives the rear ankle hiding behind the front leg (#132).
-  public static let current = "2026-09-22.1"
+  // 2026-09-22.2: only a swing or a get-up tracks a bell; a dumbbell in the hand read as one (#131).
+  public static let current = "2026-09-22.2"
 }

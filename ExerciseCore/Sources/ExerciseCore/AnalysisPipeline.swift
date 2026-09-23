@@ -41,7 +41,10 @@ public final class AnalysisPipeline: @unchecked Sendable {
     // The tracker sees every frame, including one with no sighting at all: that is how a track ages, and how a
     // blink of the detector is coasted over (Codex's review of 85ed8e5: skipping empty frames froze both).
     // A stored frame's own `bell` is ignored: replaying a set is how a tracker change reaches it (#49).
-    let bell = bellTracker.track(extracted.bells, pose: extracted.pose, personHeight: extracted.box?.height)
+    // The sightings are kept either way, so re-analyzing as a bell exercise still finds its bell.
+    let bell =
+      exercise.holdsBell
+      ? bellTracker.track(extracted.bells, pose: extracted.pose, personHeight: extracted.box?.height) : nil
     let frame = FrameRecord(
       time: extracted.time, imageSize: extracted.imageSize, pose: extracted.pose, box: extracted.box,
       analysis: analysis, bells: extracted.bells, bell: bell)
@@ -58,6 +61,7 @@ public final class AnalysisPipeline: @unchecked Sendable {
     let zones = BellTracker.staticZones(in: frames)
     pipeline.bellTracker.staticZones = zones
     for frame in frames { pipeline.process(extracted: frame) { nil } }
+    guard exercise.holdsBell else { return pipeline }
     pipeline.track.replaceAll(with: BellTracker.filledBackward(pipeline.track.frames, staticZones: zones))
     return pipeline
   }

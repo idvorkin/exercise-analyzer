@@ -223,7 +223,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I record a swing set
 - **Then:** a dot in the bell's colour rides on the bell in the preview and the recording's HUD as I move; the set is still trimmed and analyzed by the offline pass afterwards as before, and with the switches off the recording is unchanged
 
-- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#69](https://github.com/idvorkin/exercise-analyzer/issues/69), [#85](https://github.com/idvorkin/exercise-analyzer/issues/85) no bell on the overlay: the switch had no control in the app
+- **Scenario:** Dumbbells are not a bell
+- **Given:** a Bulgarian, a pistol, a split squat or a pull-up, with dumbbells in my hands or none
+- **When:** it is analyzed, live or afterwards, with the detector on
+- **Then:** no dot appears and the set's line names no bell weight (the detector reads a dumbbell in the hand as a kettlebell); only a swing or a get-up tracks a bell, and the sightings stay in the track so re-analyzing the set as a swing still finds its bell
+
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#69](https://github.com/idvorkin/exercise-analyzer/issues/69), [#85](https://github.com/idvorkin/exercise-analyzer/issues/85) no bell on the overlay: the switch had no control in the app; [#131](https://github.com/idvorkin/exercise-analyzer/issues/131) a Bulgarian with dumbbells tracked a phantom bell in 739 of 1271 frames
 
 ---
 

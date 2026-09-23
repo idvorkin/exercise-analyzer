@@ -215,4 +215,22 @@ final class BellTests: XCTestCase {
     let restored = AnalysisPipeline.restored(frames: frames, reps: [], exercise: .kettlebellSwing).track.frames
     XCTAssertEqual(restored.map { $0.bell?.center.x }, Array(repeating: 0.1, count: 6), "a restore keeps the stored analysis as is")
   }
+
+  func testOnlyBellExercisesTrackABell() {
+    // A dumbbell in the hand reads as a kettlebell (#131): a Bulgarian keeps the sightings but tracks no bell, and
+    // the same frames analyzed as a swing still find it.
+    let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
+    let frames = (0..<6).map { i in
+      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
+        box: CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8), analysis: nil,
+        bells: [bell(0.5, 0.6 + 0.03 * Double(i), conf: 0.9)])
+    }
+    for kind in ExerciseKind.allCases where !kind.holdsBell {
+      let track = AnalysisPipeline.analyze(frames: frames, exercise: kind).track.frames
+      XCTAssertEqual(track.filter { $0.bell != nil }.count, 0, "\(kind) tracks no bell")
+      XCTAssertEqual(track.map(\.bells.count), Array(repeating: 1, count: 6), "\(kind) keeps the sightings")
+    }
+    let swing = AnalysisPipeline.analyze(frames: frames, exercise: .kettlebellSwing).track.frames
+    XCTAssertEqual(swing.filter { $0.bell != nil }.count, 6)
+  }
 }
