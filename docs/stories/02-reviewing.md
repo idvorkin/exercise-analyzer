@@ -34,7 +34,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 006:
 
 - **Summary:** Line up the same moment of every rep to compare form
-- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone; the me-view stills of [#61](https://github.com/idvorkin/exercise-analyzer/issues/61) on the phone since 2026-09-13; eye-toggle fix [c30e384](https://github.com/idvorkin/exercise-analyzer/commit/c30e384) verified by simulator screenshots with the skeleton off and on (2026-09-20); installed and launched on the phone 2026-09-20; Igor's visual check pending
+- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone; the me-view stills of [#61](https://github.com/idvorkin/exercise-analyzer/issues/61) on the phone since 2026-09-13; eye-toggle fix [c30e384](https://github.com/idvorkin/exercise-analyzer/commit/c30e384) verified by simulator screenshots with the skeleton off and on (2026-09-20); installed and launched on the phone 2026-09-20; Igor's visual check pending; the Bulgarian Standing column in [77c6731](https://github.com/idvorkin/exercise-analyzer/commit/77c6731), verified on the host (`BulgarianStandingTests`)
 
 #### Use Case:
 - **As a** lifter looking for the rep where form slipped
