@@ -87,7 +87,7 @@ the first frame (story 001).
 ### User Story 018:
 
 - **Summary:** The watch never lies about the phone
-- **Status:** implemented in [c5c2d13](https://github.com/idvorkin/exercise-analyzer/commit/c5c2d13), [6199d9d](https://github.com/idvorkin/exercise-analyzer/commit/6199d9d), [b6c5d43](https://github.com/idvorkin/exercise-analyzer/commit/b6c5d43); verified on phone + watch; the heartbeat of [#122](https://github.com/idvorkin/exercise-analyzer/issues/122) in [0fed44b](https://github.com/idvorkin/exercise-analyzer/commit/0fed44b), verified on the host and the watch simulator, on the phone and the watch since 2026-09-22, read from the logs after the next gym session inside a workout
+- **Status:** implemented in [c5c2d13](https://github.com/idvorkin/exercise-analyzer/commit/c5c2d13), [6199d9d](https://github.com/idvorkin/exercise-analyzer/commit/6199d9d), [b6c5d43](https://github.com/idvorkin/exercise-analyzer/commit/b6c5d43); verified on phone + watch; the heartbeat of [#122](https://github.com/idvorkin/exercise-analyzer/issues/122) in [0fed44b](https://github.com/idvorkin/exercise-analyzer/commit/0fed44b), verified on the host and the watch simulator, on the phone and the watch since 2026-09-22, read from the gym session of 2026-09-22 (the link is the wrist; lab note); the wrist-up edge and the phone's state at each flip in [66167c8](https://github.com/idvorkin/exercise-analyzer/commit/66167c8), built for the device (phone + watch targets), not yet installed: the phone was off the Mac
 
 #### Use Case:
 - **As a** lifter glancing at the watch
