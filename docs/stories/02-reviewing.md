@@ -52,6 +52,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I look at the rep gallery
 - **Then:** each still is the me-view crop with the skeleton remapped into it; the whole frame stays when no person was found
 
+- **Scenario:** The Standing column shows me standing
+- **Given:** a Bulgarian split squat set is open
+- **When:** I look down the Standing column
+- **Then:** each still is the highest my head got before that rep, standing tall on the front leg, not a frame on
+  the way down (Igor, 2026-09-22: "The top isn't the top. Look in the rep gallery.", [#132](https://github.com/idvorkin/exercise-analyzer/issues/132))
+
 - **Scenario:** The eye toggle also controls gallery skeletons
 - **Given:** a set is open with its rep gallery
 - **When:** I switch between video only and video with skeleton using the eye button

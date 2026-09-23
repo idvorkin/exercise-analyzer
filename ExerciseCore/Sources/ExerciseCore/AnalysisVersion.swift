@@ -15,5 +15,8 @@ public enum AnalysisVersion {
   // 2026-09-20.1: split-squat Standing checkpoints retain the fully upright pose (#118).
   // 2026-09-20.2: split-squat detection survives long setup; stable upright scale and split-stance evidence
   // preserve occluded lunges without counting setup or doubling a noisy ascent (#119).
-  public static let current = "2026-09-20.2"
+  // 2026-09-22.1: Bulgarian Standing is the highest head before the rep, not the frame that tripped the descent;
+  // a dip shallower than 0.2 L is not a rep; a rep needs the rear foot up 2.5 s first; the standing height
+  // survives the rear ankle hiding behind the front leg (#132).
+  public static let current = "2026-09-22.1"
 }

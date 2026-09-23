@@ -48,6 +48,11 @@ struct Fixture {
     Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
     // Igor's gym set (prod bug report 2026-09-12): 8 head drops at a ~4 s rhythm, setup crouches at both ends.
     Fixture(name: "bulgarian-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
+    // Igor's gym set (2026-09-22, recents 4CF19A9A, #131/#132), diagonal camera: 10 were counted. Igor: "Rep 1 was
+    // just me setting up. I think rep 2 was garbage too. I think there were only 8 reps here." Rep 1 (5.8–6.7 s) is
+    // the rear foot going up to the bench mid-crouch (elevated in 77 % of its frames, 0.83 s long); rep 2
+    // (10.0–10.8 s) is a 0.10 L head wobble. The eight real dips are 0.43–0.51 L deep and 1.5–2.5 s long.
+    Fixture(name: "bulgarian-4CF19A9A-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: true),
     // Igor's TGU clip (2026-09-12, IMG_4342): two get-ups, one per side, with a rest lying between them.
     Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false),
     // Igor's second TGU clip (IMG_4343, issue #14): one get-up per side; a pose glitch at 14 s once counted as a rep.

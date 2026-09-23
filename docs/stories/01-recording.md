@@ -23,6 +23,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I perform ten kettlebell swings and tap Done
 - **Then:** the clip shows exactly ten reps, each with a 0–100 score and a one-line reason for any lost points
 
+- **Scenario:** A Bulgarian set counts the reps, not the setup or a wobble
+- **Given:** I crouch while putting my rear foot up on the bench, sway once while standing, then do eight reps
+- **When:** the set is analyzed as a Bulgarian split squat
+- **Then:** it counts eight: a dip before the rear foot has been up for 2.5 s is setup, and a head drop under a
+  fifth of my leg's length is not a rep (Igor, 2026-09-22: "Rep 1 was just me setting up. I think rep 2 was
+  garbage too", [#132](https://github.com/idvorkin/exercise-analyzer/issues/132))
+
 - **Scenario:** Live opens on the camera I used last time
 - **Given:** my last set was recorded on the front camera (or the back camera at 0.5×)
 - **When:** I open Live for the next set

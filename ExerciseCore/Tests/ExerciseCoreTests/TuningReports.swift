@@ -51,6 +51,27 @@ final class TuningReports: XCTestCase {
     report("bulgarian-10reps defaults", analyze(frames, BulgarianSplitSquatThresholds()))
   }
 
+  /// #132: Igor's 4CF19A9A set (8 reps, verified) traced, and the two new gates swept over every Bulgarian track:
+  /// how deep a dip must go (`minDepthFraction`) and how long the rear foot must be up before a rep may start
+  /// (`minSetUpSeconds`).
+  func testBulgarianSetupAndWobbleSweep() throws {
+    let url = try XCTUnwrap(
+      Bundle.module.url(
+        forResource: "bulgarian-split-squat-20260909-98B26725", withExtension: "json", subdirectory: "Fixtures/tracks"))
+    var tracks = try Fixture.all.filter { $0.expectedExercise == .bulgarianSplitSquat }.map { ($0.name, try $0.frames()) }
+    tracks.append(("98B26725 (archived, 8)", try Fixture.frames(at: url)))
+    report("bulgarian-4CF19A9A-phone defaults", analyze(tracks[2].1, BulgarianSplitSquatThresholds()))
+    for depth in [0.0, 0.15, 0.2, 0.3] {
+      for setUp in [0.0, 1.0, 1.5, 2.5] {
+        var t = BulgarianSplitSquatThresholds()
+        t.minDepthFraction = depth
+        t.minSetUpSeconds = setUp
+        let counts = tracks.map { "\($0.0.prefix(22)) \(analyze($0.1, t).reps.count)" }.joined(separator: " · ")
+        print(String(format: "  depth %.2f setUp %.1f s: ", depth, setUp) + counts)
+      }
+    }
+  }
+
   /// The pull-up fixtures (#108): every transition with the shoulders' distance under the bar, the reps, and the
   /// count under other rises, to see how far the setup on the pegs sits from a rep.
   func testPullUpTrace() throws {

@@ -23,6 +23,21 @@ public struct BulgarianSplitSquatThresholds {
   /// A rep may only start when at least this fraction of the last second showed the rear foot elevated; keeps
   /// setup crouches with both feet on the floor from counting.
   public var elevatedRecentlyFraction = 0.3
+  /// A dip must reach this fraction of body height below the standing height to be a rep. Real reps on the
+  /// 4CF19A9A set go 0.43–0.51; a 0.10 head wobble there was counted (#132).
+  public var minDepthFraction = 0.2
+  /// A rep may only start once the rear foot has been up this long since it first went up (after the top was
+  /// last forgotten): on 4CF19A9A the foot went up to the bench during a crouch, first read up at 4.9 s, and the
+  /// crouch tripped the descent at 6.4 s and counted as rep 1 (#132). 1.5 s still counted it; 2.5 s counts 8 on
+  /// all four Bulgarian tracks (`TuningReports.testBulgarianSetupAndWobbleSweep`). The share of elevated frames
+  /// inside a dip does not separate them: from other cameras real dips read the rear foot up in only 10–50 % of
+  /// their frames (bulgarian-10reps).
+  public var minSetUpSeconds = 2.5
+  /// The standing height is forgotten only after this long with no elevated reading at all (the lifter stepped
+  /// off). Standing tall from a diagonal camera, the front leg hides the rear ankle and it reads level with the
+  /// front one for a second or two while the foot is on the bench (4CF19A9A, 33–34 s); forgetting the top then
+  /// measured the next dip from a lower head and put the Standing picture on the way down (#132).
+  public var forgetTopAfter = 4.0
 }
 
 public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
@@ -52,6 +67,12 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
   private let machine = PhaseStateMachine(initialPhase: BulgarianSplitSquatAnalyzer.standing)
   private let legs = SingleLegTracker(asymmetryVoteThreshold: 20)
   private var standingEarY: Double?
+  /// The frame at `standingEarY`, the highest the head has been: the rep's Standing picture (#132).
+  private var standingFrame: SingleLegFrame?
+  private var standingImage: CGImage?
+  private var lastElevatedTime = -Double.infinity
+  /// When the rear foot first went up in the current setup (reset with the top, after `forgetTopAfter`).
+  private var setUpSince: Double?
   private var bottomCandidate: SingleLegFrame?
   private var bottomImage: CGImage?
   private var framesAscendingAfterBottom = 0
@@ -80,6 +101,10 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     machine.resetState(to: Self.standing)
     legs.reset()
     standingEarY = nil
+    standingFrame = nil
+    standingImage = nil
+    lastElevatedTime = -.infinity
+    setUpSince = nil
     bottomCandidate = nil
     bottomImage = nil
     framesAscendingAfterBottom = 0
@@ -135,6 +160,10 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     }
     let currentHeight = max(ankleY - earY, 1)
     observeFeet(skeleton, front: front, scale: bodyHeight ?? currentHeight)
+    if elevatedFlags.last == true {
+      if time - lastElevatedTime > thresholds.forgetTopAfter { setUpSince = time }
+      lastElevatedTime = time
+    }
     if machine.phase == Self.standing, elevatedRecently {
       bodyHeight = bodyHeight.map { $0 * 0.9 + currentHeight * 0.1 } ?? currentHeight
     }
@@ -158,15 +187,22 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     var completedRep: RepRecord?
     switch machine.phase {
     case Self.standing:
-      // The standing height is the highest the head has been while standing.
-      standingEarY = min(standingEarY ?? earY, earY)
-      if !elevatedRecently {
-        standingEarY = nil  // both feet on the floor: not set up yet, forget the standing height
-      } else if machine.canTransition, let top = standingEarY, earY > top + legLength * thresholds.descendFraction {
+      // The standing height is the highest the head has been while standing; its frame is the Standing picture.
+      if time - lastElevatedTime > thresholds.forgetTopAfter {
+        standingEarY = nil  // not set up yet, or stepped off: no standing height
+        standingFrame = nil
+        standingImage = nil
+      } else if earY <= standingEarY ?? earY {
+        standingEarY = earY
+        standingFrame = frame
+        standingImage = image()
+      }
+      let setUp = setUpSince.map { time - $0 >= thresholds.minSetUpSeconds } ?? false
+      if elevatedRecently, setUp, machine.canTransition, let top = standingEarY,
+        earY > top + legLength * thresholds.descendFraction
+      {
         trace?(String(format: "%.2fs descending: ear %.0f > top %.0f + %.0f", time, earY, top, legLength * thresholds.descendFraction))
         repStartTime = time
-        machine.storePeak(
-          RepPosition(phase: Self.standing, time: time, pose: pose, metrics: m, score: -earY, image: image()))
         machine.transition(to: Self.descending)
         bottomCandidate = nil
         bottomImage = nil
@@ -184,7 +220,22 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
         framesAscendingAfterBottom = 0
       }
       if machine.canTransition, let bottom = bottomCandidate, framesAscendingAfterBottom >= 3 {
+        // Not a rep (#132): a dip too shallow, a wobble of the head. Back to standing, the top kept.
+        let depth = standingEarY.map { bottom.earY - $0 } ?? 0
+        if depth < legLength * thresholds.minDepthFraction {
+          trace?(String(format: "%.2fs not a rep: depth %.2f L", time, depth / legLength))
+          machine.transition(to: Self.standing)
+          bottomCandidate = nil
+          bottomImage = nil
+          return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil)
+        }
         trace?(String(format: "%.2fs bottom: bottom ear %.0f at %.2fs", time, bottom.earY, bottom.time))
+        if let top = standingFrame {
+          machine.storePeak(
+            RepPosition(
+              phase: Self.standing, time: top.time, pose: top.pose, metrics: top.metrics, score: -top.earY,
+              image: standingImage))
+        }
         machine.storePeak(
           RepPosition(
             phase: Self.bottom, time: bottom.time, pose: bottom.pose, metrics: bottom.metrics,
@@ -230,6 +281,8 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
         completedRep = machine.completeRep(quality: calculateRepQuality())
         machine.transition(to: Self.standing)
         standingEarY = earY
+        standingFrame = frame
+        standingImage = image()
         metrics = RepMetrics()
       }
     }
