@@ -79,5 +79,9 @@ carry only what was decided.
   device commands.
 - **Background agents** that investigate are read-only, in a worktree, notes under `~/tmp/agent/notes/`; confirm scope
   before an agent that writes to the repo. Reap background commands when done.
+- **An outside agent that writes (Codex, Muse) works in a Herdr worktree**: `herdr worktree create --cwd <repo>
+  --branch <name> --base main`, the agent started in that worktree's pane (never `cd`'d into it), commits on its
+  branch, never pushes; review every commit, then `git merge --ff-only <name>` and remove the worktree
+  ([decision](docs/architecture/2026-09-26-agent-worktrees.md)).
 - **Gym-first UI**: few large targets, HUD on the video, Recents point at Photos. Propose with a numeric plan or a
   trade-off table, then one "do it".
