@@ -60,6 +60,28 @@ final class RepCountTests: XCTestCase {
     let crop = try XCTUnwrap(pipeline.stableCrop)
     XCTAssertLessThan(crop.width, 0.6, "walk-in frames must not widen the crop to the whole picture")
   }
+
+  /// Automatic trims from the phone logs (`trim_start` after a recording: reps, source_duration_s), #141.
+  func testImplausibleCountSkipsTheAutomaticTrim() {
+    let miscounts: [(ExerciseKind, Int, Double)] = [
+      (.kettlebellSwing, 1, 25.8), (.kettlebellSwing, 1, 28.4), (.kettlebellSwing, 1, 41.8),
+      (.bulgarianSplitSquat, 1, 38.0), (.bulgarianSplitSquat, 1, 58.8),
+    ]
+    for (exercise, reps, duration) in miscounts {
+      XCTAssertTrue(
+        TrimPolicy.countIsImplausible(exercise: exercise, reps: reps, duration: duration), "\(exercise) \(reps) in \(duration) s")
+    }
+    let normal: [(ExerciseKind, Int, Double)] = [
+      (.kettlebellSwing, 10, 25.9), (.kettlebellSwing, 11, 28.6), (.kettlebellSwing, 9, 44.3), (.kettlebellSwing, 10, 43.0),
+      (.kettlebellSwing, 20, 59.2), (.pistolSquat, 24, 121.9), (.pistolSquat, 7, 96.8), (.bulgarianSplitSquat, 7, 82.6),
+      (.bulgarianSplitSquat, 10, 101.2), (.pullUp, 5, 97.4), (.turkishGetUp, 2, 113.5), (.turkishGetUp, 2, 90.4),
+    ]
+    for (exercise, reps, duration) in normal {
+      XCTAssertFalse(
+        TrimPolicy.countIsImplausible(exercise: exercise, reps: reps, duration: duration), "\(exercise) \(reps) in \(duration) s")
+    }
+    XCTAssertFalse(TrimPolicy.countIsImplausible(exercise: .kettlebellSwing, reps: 0, duration: 30), "no reps is its own skip")
+  }
 }
 
 final class SkeletonTests: XCTestCase {

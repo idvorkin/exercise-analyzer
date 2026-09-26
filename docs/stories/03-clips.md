@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 009:
 
 - **Summary:** Keep only the set, losslessly and fast
-- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check; clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator trim→B check; Photos undo and HDR on the phone pending
+- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check; clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator trim→B check; Photos undo and HDR on the phone pending; the automatic trim skipped on an implausible count: fix for #141 in this commit, verified on the host
 
 #### Use Case:
 - **As a** lifter who leaves the camera running while setting up
@@ -27,7 +27,15 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I open set B before that operation finishes
 - **Then:** A's late result cannot replace B's video, analysis, progress or saved entry, and no late playback starts
 
-- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set
+- **Scenario:** A count too low for the recording does not trim it
+- **Given:** I recorded 26 s of swings and the app counted one
+- **When:** the recording finishes
+- **Then:** the whole clip is kept and saved, the status says "Too few reps for the clip's length, keeping the whole clip", `trim_skipped` logs reason "implausible count" with reps and duration_s, and "Trim to reps" still trims by hand
+- **And:** a normal set (ten swings in 26 s) is trimmed as before
+
+- **Notes:** Implausible means more seconds of recording per counted rep than `TrimPolicy` allows: 5 for swings, 25 for squats and pull-ups, 120 for get-ups. Against the 57 automatic trims in the phone logs to 2026-09-24 it skips the five 1-rep miscounts (swings 1 in 25.8, 28.4 and 41.8 s; Bulgarians 1 in 38.0 and 58.8 s) and one normal count (96FEBD60, 9 swings in a 70.6 s recording paused on the wrist, 7.8 s a rep). Of the 53 fixture tracks with a saved count, it flags only the two 1-rep swing miscounts (9F8F947D, FFCBDDAB).
+
+- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set; [#141](https://github.com/idvorkin/exercise-analyzer/issues/141) a wrong count trimmed the real set away before the save
 
 ---
 

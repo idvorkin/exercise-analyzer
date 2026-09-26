@@ -2420,6 +2420,20 @@ final class VideoPoseSession: NSObject, ObservableObject {
       if thenAnalyze { await analyzeAndPlay(url: url, operation: operation) } else { activity = .idle }
       return
     }
+    // After a recording only: a count this low for the length would trim the real set away (#141).
+    if thenAnalyze,
+      TrimPolicy.countIsImplausible(exercise: analyzed.exercise, reps: analyzed.reps.count, duration: clipDuration)
+    {
+      statusMessage = "Too few reps for the clip's length, keeping the whole clip"
+      log.event(
+        "trim_skipped",
+        [
+          "reason": "implausible count", "reps": analyzed.reps.count, "duration_s": clipDuration,
+          "exercise": analyzed.exercise.rawValue,
+        ])
+      await analyzeAndPlay(url: url, operation: operation)
+      return
+    }
     activity = .working("Trimming", progress: 0)
     log.event(
       "trim_start",

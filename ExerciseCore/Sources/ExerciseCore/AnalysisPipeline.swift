@@ -138,6 +138,28 @@ public final class AnalysisPipeline: @unchecked Sendable {
   }
 }
 
+/// When the automatic trim after a recording must not trust the count (#141): a count far too low for the
+/// recording's length (1 swing in 25.8 s) trimmed the real set away before the save, and nothing kept the original.
+/// The hand "Trim to reps" does not ask.
+public enum TrimPolicy {
+  /// The most seconds of recording one counted rep may stand for. From the automatic trims in the phone logs to
+  /// 2026-09-24: swings ran 2.6–4.9 s a rep, the miscounts 25.8–41.8; squats and pull-ups up to 19.5, the
+  /// miscounts 38.0 and 58.8; get-ups 45–57 with no miscount seen, so theirs is about twice the slowest.
+  public static func maxSecondsPerRep(_ exercise: ExerciseKind) -> Double {
+    switch exercise {
+    case .kettlebellSwing: return 5
+    case .pistolSquat, .bulgarianSplitSquat, .splitSquat, .pullUp: return 25
+    case .turkishGetUp: return 120
+    }
+  }
+
+  /// True when `reps` counted reps are too few for a recording of `duration` seconds to trim to them.
+  /// No reps is not implausible here: the trim already keeps the whole clip then.
+  public static func countIsImplausible(exercise: ExerciseKind, reps: Int, duration: Double) -> Bool {
+    reps > 0 && duration / Double(reps) > maxSecondsPerRep(exercise)
+  }
+}
+
 public enum PersonCrop {
   /// Where the lifter is in a frame: the bounds of the confident keypoints (over 0.5), or the person box when
   /// fewer than three are confident, or nil without either.
