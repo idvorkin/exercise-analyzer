@@ -418,7 +418,7 @@ the first frame (story 001).
 ### User Story 046:
 
 - **Summary:** Rest timer on the wrist
-- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); on phone + watch since 2026-09-13, Igor's check pending; delayed-permission identity and deadline fix in [88768f5](https://github.com/idvorkin/exercise-analyzer/commit/88768f5), verified on the host (five regression tests), signed iOS + watch build, and watch simulator (`just watch-screens`: 14 states, done/workout/viewfinder inspected); fixed tap delivery on the wrist pending
+- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); on phone + watch since 2026-09-13, Igor's check pending; delayed-permission identity and deadline fix in [88768f5](https://github.com/idvorkin/exercise-analyzer/commit/88768f5), verified on the host (five regression tests), signed iOS + watch build, and watch simulator (`just watch-screens`: 14 states, done/workout/viewfinder inspected); fixed tap delivery on the wrist pending; fix for [#145](https://github.com/idvorkin/exercise-analyzer/issues/145) (the rest events reached the phone log as `watch_watch_rest…`) in this commit, verified on the host and by a signed iOS + watch build, the names in a pulled log pending
 - **Why:** rest length is the one number between sets, and the watch is the only screen on the lifter; it showed nothing between Done and the next Record.
 
 #### Use Case:
@@ -452,7 +452,7 @@ the first frame (story 001).
   prompt, on the watch, the first time; the notification is scheduled once the answer is known, so the first
   rest taps too if the answer precedes its deadline); without that permission the count still shows, the tap does not come, and the log says so.
 
-- **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67)
+- **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67); [#145](https://github.com/idvorkin/exercise-analyzer/issues/145) the rest events were double-prefixed in the phone log
 
 ---
 

@@ -22,6 +22,7 @@ final class RestTimer: ObservableObject {
   static let choices = [60, 90, 120, 180]
   nonisolated static let requestID = "rest-over"
 
+  /// `PhoneLink.logEvent`: names go unprefixed, the phone's log adds `watch_` (#145).
   private var log: (String, [String: Any]) -> Void
   private let notifications: RestNotifications
   /// In-front double tap at length (the notification covers suspended).
@@ -44,11 +45,11 @@ final class RestTimer: ObservableObject {
         guard let self, self.state.remaining(for: id, at: Date()) != nil else { return }
         switch status {
         case .notDetermined:
-          self.log("watch_notification_auth", ["status": status.rawValue])
+          self.log("notification_auth", ["status": status.rawValue])
           self.notifications.requestAuthorization { [weak self] granted, error in
             Task { @MainActor [weak self] in
               self?.log(
-                "watch_notification_auth",
+                "notification_auth",
                 ["requested": true, "granted": granted, "error": error.map { "\($0)" } ?? ""])
               self?.schedule(id: id, notify: granted)
             }
@@ -56,7 +57,7 @@ final class RestTimer: ObservableObject {
         case .authorized, .provisional, .ephemeral:
           self.schedule(id: id, notify: true)
         default:
-          self.log("watch_notification_auth", ["status": status.rawValue])
+          self.log("notification_auth", ["status": status.rawValue])
           self.schedule(id: id, notify: false)
         }
       }
@@ -74,7 +75,7 @@ final class RestTimer: ObservableObject {
     guard restEnded != nil else { cancel(); return }
     state.clear()
     cancel()
-    log("watch_rest_cleared", [:])
+    log("rest_cleared", [:])
   }
 
   /// Schedule the tap at length: two haptics for in front, and, with permission, the notification for
@@ -87,14 +88,14 @@ final class RestTimer: ObservableObject {
       notifications.schedule(after: seconds) { [weak self] error in
         Task { @MainActor [weak self] in
           if let error {
-            self?.log("watch_rest_failed", ["seconds": seconds, "message": "\(error)"])
+            self?.log("rest_failed", ["seconds": seconds, "message": "\(error)"])
           } else {
-            self?.log("watch_rest", ["seconds": seconds, "notified": true])
+            self?.log("rest", ["seconds": seconds, "notified": true])
           }
         }
       }
     } else {
-      log("watch_rest", ["seconds": seconds, "notified": false])
+      log("rest", ["seconds": seconds, "notified": false])
     }
     tapTask = Task { [weak self] in
       guard let remaining = self?.state.remaining(for: id, at: Date()) else { return }
