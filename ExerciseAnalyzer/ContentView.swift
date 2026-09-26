@@ -25,6 +25,8 @@ struct ContentView: View {
   /// The log is home; this is what is pushed over it (story 058). A set opened from a workout's page sits over
   /// that page, so "‹" goes back to it.
   @State private var path: [AppRoute] = []
+  /// Where the camera was opened from, and the stored set on screen then: what its Cancel goes back to (#146).
+  @State private var cameraOrigin: (path: [AppRoute], set: RecentEntry?)?
   /// Middle-hold key stacks (stories 039, #60): up after a middle hold, staying up until a
   /// dismissing tap, a new clip, the clip's end, disappear or an inactive scene.
   @State private var stacksUp = false
@@ -58,10 +60,39 @@ struct ContentView: View {
   private var busy: Bool { session.activity != .idle && session.source != .camera }
 
   var body: some View {
-    if session.watchMode {
-      WatchModeView(session: session)
-    } else {
-      mainBody
+    // A ZStack, not a Group: a Group hands its modifiers to each branch, so the handler below would come and go
+    // with watch mode.
+    ZStack {
+      if session.watchMode {
+        WatchModeView(session: session)
+      } else {
+        mainBody
+      }
+    }
+    // The player follows the session (story 058): a camera or a clip coming up puts it on screen, wherever it
+    // was started (the wrist's Record, a picker, a hook); the camera ended or the set deleted takes it away. Here,
+    // not on mainBody: a wrist start or Cancel switches watch mode in the same change, where mainBody sees none.
+    .onChange(of: session.source) { old, source in
+      switch source {
+      case .camera:
+        guard old != .camera else { return }
+        // Cancel comes back here (#146), with the set on screen reopened when it is a stored one.
+        cameraOrigin = (path, old == .file && path.last == .player ? session.currentEntry : nil)
+        // A new recording belongs to the running workout, if any: "‹" after it is that workout's page, not a
+        // page that happened to be open (053).
+        path = CameraNavigation.opening(
+          liveWorkout: workouts.liveWorkout.map { AppRoute.workout(WorkoutIdentity(start: $0.start)) }, player: .player)
+      case .file:
+        cameraOrigin = nil
+        showPlayer()
+      case .none:
+        let origin = cameraOrigin
+        cameraOrigin = nil
+        let cancelled = old == .camera && session.cameraCancelled
+        path = CameraNavigation.closing(
+          path: path, openedFrom: cancelled ? origin?.path : nil, reopensSet: origin?.set != nil, player: .player)
+        if cancelled, let set = origin?.set { session.open(recent: set) }
+      }
     }
   }
 
@@ -134,18 +165,6 @@ struct ContentView: View {
       Task {
         await session.importPicked(item: item)
         pickerItem = nil
-      }
-    }
-    // The player follows the session (story 058): a camera or a clip coming up puts it on screen, wherever it
-    // was started (the wrist's Record, a picker, a hook); the camera cancelled or the set deleted takes it away.
-    .onChange(of: session.source) { _, source in
-      switch source {
-      case .camera:
-        // A new recording belongs to the running workout, if any: "‹" after it is that workout's page, not a
-        // page that happened to be open (053).
-        path = (workouts.liveWorkout.map { [AppRoute.workout(WorkoutIdentity(start: $0.start))] } ?? []) + [.player]
-      case .file: showPlayer()
-      case .none: if path.last == .player { path.removeLast() }
       }
     }
     .onChange(of: session.currentTime) { _, time in

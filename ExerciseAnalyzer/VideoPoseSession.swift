@@ -1719,6 +1719,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var viewfinder = false
   /// When the viewfinder attached, for the `viewfinder_s` framing seconds on `record_start`.
   private var viewfinderSince: Date?
+  /// The camera last ended by Cancel, not Done: Cancel goes back to where the camera was opened from (058, #146).
+  private(set) var cameraCancelled = false
   private var cancellables = Set<AnyCancellable>()
   private var keepAwake = false
 
@@ -1850,6 +1852,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     duration = 0
     stopCamera()
     bellBusy = false  // only here, after the camera stopped: a bell run can still be in flight at Record
+    cameraCancelled = false
     self.viewfinder = viewfinder
     viewfinderSince = nil
     // A viewfinder is not a set: the last set's line and its pass flag stay until Record (045, 047).
@@ -2177,6 +2180,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   func cancelCamera() {
     _ = beginCurrentOperation()
     clipOperations.invalidate()
+    cameraCancelled = true  // before the source drops: the navigation reads it there (#146)
     // Clear first: stopCamera's push must carry the idle state, not a framing one.
     viewfinder = false
     viewfinderSince = nil

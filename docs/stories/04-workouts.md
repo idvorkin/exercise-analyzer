@@ -455,7 +455,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 058:
 
 - **Summary:** The log is home: a set, a workout's page and the camera are each a screen with a way back
-- **Status:** implemented in [8f3cffe](https://github.com/idvorkin/exercise-analyzer/commit/8f3cffe); verified on the simulator (launch on the log, a set pushed with "‹", a workout's page with a set over it and "‹ Workout" back to the page, mid-workout launch on the live page, a set inside the live workout back to that page); live page updates and saved hand-over in [bdcfda4](https://github.com/idvorkin/exercise-analyzer/commit/bdcfda4), verified on the host (three regressions) and simulator (`ONLY=live_workout just test-sim`: 1 → 2 sets / 16 reps, advancing window, saved page retains both); signed iPhone + watch build passed; the clock on the 20 s tick in [b639300](https://github.com/idvorkin/exercise-analyzer/commit/b639300) (review), the same simulator check passed; on the phone pending
+- **Status:** implemented in [8f3cffe](https://github.com/idvorkin/exercise-analyzer/commit/8f3cffe); verified on the simulator (launch on the log, a set pushed with "‹", a workout's page with a set over it and "‹ Workout" back to the page, mid-workout launch on the live page, a set inside the live workout back to that page); live page updates and saved hand-over in [bdcfda4](https://github.com/idvorkin/exercise-analyzer/commit/bdcfda4), verified on the host (three regressions) and simulator (`ONLY=live_workout just test-sim`: 1 → 2 sets / 16 reps, advancing window, saved page retains both); signed iPhone + watch build passed; the clock on the 20 s tick in [b639300](https://github.com/idvorkin/exercise-analyzer/commit/b639300) (review), the same simulator check passed; on the phone pending; Cancel back to where the camera was opened, fix for [#146](https://github.com/idvorkin/exercise-analyzer/issues/146) in this commit, verified on the host (`CameraNavigationTests`) and by signed build, on the phone pending
 - **Why:** Igor, 2026-09-22, on the three architectures ([proposal](https://claude.ai/artifact/46aiQ5J8WxTuZbJBfJZpwZ)): "build the flow for B, I like that". The app opened on an empty player with a menu card, Workouts was a sheet over it with a Close, and a set's way back to the list was the folder button, the card, then Workouts again.
 
 #### Use Case:
@@ -482,7 +482,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** The camera
 - **Given:** any screen
 - **When:** I tap Live, or Record on the wrist
-- **Then:** the camera comes up over the running workout's page when there is one (so the set's "‹" leads there), else over the list; it has no "‹": Done turns it into the set, Cancel takes it away and leaves me where it was opened from
+- **Then:** the camera comes up over the running workout's page when there is one (so the set's "‹" leads there), else over the list; it has no "‹": Done turns it into the set, Cancel takes it away and leaves me where it was opened from: the list, a workout's page, or the set I was watching, reopened on its own page (#146); on the wrist or the phone, in watch mode or not
 
 - **Scenario:** Between sets, mid-workout
 - **Given:** a set on screen while a workout runs on the wrist
@@ -491,6 +491,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Notes:** Replaces the start card (025) and the Workouts sheet with its collapsed summary (038, #58): the log is
   the one place the app starts from. Anything that loads a clip (a picker, Files, the Photos strip, an
-  instrumented run, a hook) puts the player on screen; the camera cancelled or the set deleted takes it away.
+  instrumented run, a hook) puts the player on screen; the camera cancelled or the set deleted takes it away. The rule is
+  `CameraNavigation` in ExerciseCore (host tests); the app keeps the path the camera was opened from.
 
-- **Issues:** none; the architecture pick on 2026-09-22
+- **Issues:** the architecture pick on 2026-09-22; [#146](https://github.com/idvorkin/exercise-analyzer/issues/146) Cancel landed on the list instead of where the camera was opened
