@@ -293,53 +293,14 @@ final class PhoneLink: NSObject, ObservableObject {
     }
   }
 
-  /// Mirrors the set into the shared container for the face complication (story 043): transitions always,
-  /// otherwise at most every 10 s while the set runs, so the face count is at most 10 s old while the app is
-  /// in front. Never per rep — WidgetKit throttles frequent reloads and the timer ticks by itself.
+  /// Mirrors the set into the shared container for the face complication (story 043); what changes and when
+  /// is `FaceState.applying`.
   private func updateFace(previous: WatchStatus, next: WatchStatus) {
     let now = Date()
-    // `rolling` = the recorder rolls: a Preview (camera live, nothing recorded) is not a set on the face (047).
-    let started = !previous.rolling && next.rolling
-    let finished = previous.rolling && !next.rolling
-    let resumed = previous.paused && !next.paused && next.rolling
-    var face = loadFace() ?? FaceState()
-    // The pass's final count lands in a non-transition status after Done: adopt it when it changes, so the
-    // face shows the pass's count within seconds and a cancelled set (no pass, no arrival) keeps the previous
-    // final (043).
-    let arrived = next.lastSet.map(FaceState.LastSet.init(wire:))
-    let lastSetArrived = !finished && arrived != nil && arrived != face.lastSet
-    let transition = started || finished || resumed || lastSetArrived
-    // The periodic write is for a rolling set only: a preview would reload the face for nothing (047).
-    guard transition || (next.rolling && now.timeIntervalSince(lastFaceWrite) >= 10) else { return }
-    face.updatedAt = now
-    if started {
-      face.recording = true
-      face.reps = next.reps
-      face.exercise = next.exercise
-      face.startedAt = now.addingTimeInterval(-next.elapsed)
-      face.lastSet = nil  // the final shows until the next set
-    } else if finished {
-      // Done and Cancel look identical here and neither fabricates a final: a stale context (relaunch after
-      // Done) must not shrink the count or lose the exercise, and the pass's value arrives below.
-      face.recording = false
-      face.reps = max(previous.reps, next.reps)
-      face.exercise = previous.exercise.isEmpty ? next.exercise : previous.exercise
-      face.startedAt = nil
-    } else if resumed {
-      // The pause left live time on the next frame in camera time: re-base the face timer on the phone's
-      // pause-excluded elapsed so it rejoins the wrist exactly instead of leading by the pause (040).
-      face.reps = next.reps
-      face.exercise = next.exercise
-      face.startedAt = now.addingTimeInterval(-next.elapsed)
-    } else if lastSetArrived, let arrived {
-      face.lastSet = arrived
-      face.reps = next.reps
-      face.exercise = next.exercise
-    } else {
-      face.reps = next.reps
-      face.exercise = next.exercise
-      if face.recording, face.startedAt == nil { face.startedAt = now.addingTimeInterval(-next.elapsed) }
-    }
+    guard
+      let (face, transition) = (loadFace() ?? FaceState()).applying(
+        previous: previous, next: next, now: now, lastWrite: lastFaceWrite)
+    else { return }
     do {
       guard let dir = FileManager.default.containerURL(
         forSecurityApplicationGroupIdentifier: FaceState.groupID)

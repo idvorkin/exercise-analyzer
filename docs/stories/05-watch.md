@@ -312,7 +312,7 @@ the first frame (story 001).
 ### User Story 043:
 
 - **Summary:** The watch face shows the set
-- **Status:** implemented in [375e3aa](https://github.com/idvorkin/exercise-analyzer/commit/375e3aa), [0bde654](https://github.com/idvorkin/exercise-analyzer/commit/0bde654), [3255a38](https://github.com/idvorkin/exercise-analyzer/commit/3255a38); verified on the host (`FaceStateTests`) and by device signing; on the watch since 2026-09-14, Igor's check pending (add the complication to a face; its bundle id changed, so the old one is gone from the face); the kettlebell icon and glyph of [#88](https://github.com/idvorkin/exercise-analyzer/issues/88) verified by the simulator build (the icon in the watch app's Assets.car) and installed on the watch 2026-09-16, Igor's look pending
+- **Status:** implemented in [375e3aa](https://github.com/idvorkin/exercise-analyzer/commit/375e3aa), [0bde654](https://github.com/idvorkin/exercise-analyzer/commit/0bde654), [3255a38](https://github.com/idvorkin/exercise-analyzer/commit/3255a38); verified on the host (`FaceStateTests`) and by device signing; on the watch since 2026-09-14, Igor's check pending (add the complication to a face; its bundle id changed, so the old one is gone from the face); the kettlebell icon and glyph of [#88](https://github.com/idvorkin/exercise-analyzer/issues/88) verified by the simulator build (the icon in the watch app's Assets.car) and installed on the watch 2026-09-16, Igor's look pending; fix for [#143](https://github.com/idvorkin/exercise-analyzer/issues/143) (a Cancel wiped the previous final) in this commit, verified on the host (`FaceStateTests`) and by a signed iOS + watch build
 - **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and the complication was only a launcher.
 
 #### Use Case:
@@ -351,9 +351,11 @@ the first frame (story 001).
   refreshed on transitions (record, finish, cancel, the final count arriving) and every 10 s while a set rolls,
   not per rep; the timer is a date, so it ticks without any update. A Preview writes nothing to the face. The
   complication's bundle id is `…watchkitapp.face` (the `.complication` id could not be registered to the team).
-  No HealthKit; wrist-down still suspends the app (018 stands).
+  No HealthKit; wrist-down still suspends the app (018 stands). The phone drops its last set when a set starts,
+  so the face holds the previous final in face.json across the set and puts it back when the set lands none;
+  Done and Cancel look alike at the stop, so it also shows for the instant before the phone says "analyzing".
 
-- **Issues:** [#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; [#75](https://github.com/idvorkin/exercise-analyzer/issues/75) the App Group registration
+- **Issues:** [#70](https://github.com/idvorkin/exercise-analyzer/issues/70) read as "on the wrist"; [#75](https://github.com/idvorkin/exercise-analyzer/issues/75) the App Group registration; [#143](https://github.com/idvorkin/exercise-analyzer/issues/143) a Cancel wiped the previous final
 
 ---
 
