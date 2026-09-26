@@ -6,6 +6,39 @@
 
 import Foundation
 
+/// The session start survives the live → saved hand-over (the saved row receives a new file id).
+public struct WorkoutIdentity: Hashable, Sendable {
+  public let start: Date
+  public init(start: Date) { self.start = start }
+
+  public func resolve(live: WorkoutWire?, saved: [StoredWorkout], now: Date) -> StoredWorkout? {
+    // Saving publishes the index before clearing the mirror. Prefer the final record during that overlap.
+    if let ended = saved.last(where: { $0.start == start }) { return ended }
+    guard let live, live.startDate == start else { return nil }
+    return StoredWorkout(
+      id: Self.liveID, start: start, end: max(start, now), heartRateAverage: live.heartRateAverage,
+      heartRateMax: live.heartRateMax, sets: live.sets, reps: live.reps)
+  }
+
+  public static let liveID = "live"
+}
+
+/// One render's workout, timeline and full chart window, using an explicit clock for host tests.
+public struct WorkoutPageSnapshot {
+  public let workout: StoredWorkout
+  public let timeline: WorkoutTimeline
+  public var wholeSeconds: TimeInterval { max(workout.duration, 60) }
+
+  public init?(
+    identity: WorkoutIdentity, live: WorkoutWire?, saved: [StoredWorkout], now: Date,
+    sets: [RecentEntry], heartRate: HeartRateSeries?
+  ) {
+    guard let workout = identity.resolve(live: live, saved: saved, now: now) else { return nil }
+    self.workout = workout
+    timeline = WorkoutTimeline(workout: workout, sets: sets, heartRate: heartRate)
+  }
+}
+
 extension RecentEntry {
   /// When the set's clip starts and ends on the wall clock. Exact for sets that know their first frame
   /// (`clipStartedAt`, #92); older sets fall back to `recordedAt`, which for a set recorded in the app is when

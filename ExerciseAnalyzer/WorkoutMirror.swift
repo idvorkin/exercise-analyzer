@@ -112,7 +112,7 @@ final class WorkoutMirror: NSObject, ObservableObject {
   }
 
   /// The id the page of 053 gives the running workout, shown as a span up to now.
-  static let liveID = "live"
+  static let liveID = WorkoutIdentity.liveID
 
   /// The running workout as a span up to now (053, #123): what its page and "‹" open, never kept.
   var liveWorkout: StoredWorkout? { live.map(Self.soFar) }
@@ -160,6 +160,10 @@ final class WorkoutMirror: NSObject, ObservableObject {
     }
     onEvent?("workout_saved", fields)
   }
+
+  #if targetEnvironment(simulator)
+  func endSeededWorkout() { ended(at: Date()) }
+  #endif
 }
 
 extension WorkoutMirror: HKWorkoutSessionDelegate {

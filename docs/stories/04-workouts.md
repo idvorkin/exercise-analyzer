@@ -313,6 +313,16 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I read its row
 - **Then:** it says "♥ 150 · −20/30s": the drop over the rest I got, with the rest's length beside it because it does not compare with a full minute's drop
 
+- **Scenario:** A set recorded while the workout page is open appears on it
+- **Given:** the running workout's page is open
+- **When:** another recorded set arrives, including while I review a set and return to this page
+- **Then:** its row and chart band appear and the totals include it; the full chart window and duration advance, and Health is re-read every 20 seconds while the page is active, without resetting a zoomed window
+
+- **Scenario:** The workout ends while its page is open
+- **Given:** the running workout's page with its recorded sets
+- **When:** the wrist ends and saves that workout
+- **Then:** the same page resolves the saved workout, retains its sets, reads the saved workout's heart rate, and holds the final duration and chart span
+
 - **Scenario:** A tap on a set's bar opens the set
 - **Given:** the heart-rate chart with each set as a band behind the line
 - **When:** I tap a band, or within a thumb's width (24 pt) of one

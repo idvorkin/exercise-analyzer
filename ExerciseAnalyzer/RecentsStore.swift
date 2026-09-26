@@ -35,6 +35,17 @@ final class RecentsStore: ObservableObject {
 
   func entry(id: String) -> RecentEntry? { entries.first { $0.id == id } }
 
+  #if targetEnvironment(simulator)
+  /// In-memory rows for the live page check; no video, analysis, or user's index is overwritten.
+  func seedWorkoutPageSet(id: String, start: Date) {
+    entries.removeAll { $0.id == id }
+    entries.append(RecentEntry(
+      id: id, analyzedAt: Date(), recordedAt: start, duration: 1, repCount: 8, bestScore: nil,
+      source: .file(name: "seed.mov"), thumbnail: nil, exercise: .kettlebellSwing, originalName: nil,
+      clipStartedAt: start))
+  }
+  #endif
+
   /// Adds or replaces an entry, writing its analysis, rep images, and (for file sources) the clip itself.
   func save(
     id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,

@@ -14,6 +14,54 @@ final class WorkoutTimelineTests: XCTestCase {
       clipStartedAt: clipStart.map(date))
   }
 
+  func testLivePageIncludesSetRecordedAfterOpeningAndAdvancesWindow() throws {
+    let identity = WorkoutIdentity(start: date(1000))
+    let live = WorkoutWire(startedAt: 1000, heartRateAverage: 125)
+    let first = set("first", clipStart: 1100)
+    let opened = try XCTUnwrap(WorkoutPageSnapshot(
+      identity: identity, live: live, saved: [], now: date(1200), sets: [first], heartRate: nil))
+    let later = try XCTUnwrap(WorkoutPageSnapshot(
+      identity: identity, live: live, saved: [], now: date(1400),
+      sets: [first, set("second", clipStart: 1320)], heartRate: nil))
+    XCTAssertEqual(opened.timeline.rows.map(\.id), ["first"])
+    XCTAssertEqual(later.timeline.rows.map(\.id), ["first", "second"])
+    XCTAssertEqual(later.timeline.rows.reduce(0) { $0 + $1.reps }, 20)
+    XCTAssertEqual(later.timeline.workSeconds, 50)
+    XCTAssertEqual(later.timeline.restSeconds, 195)
+    XCTAssertEqual(opened.wholeSeconds, 200)
+    XCTAssertEqual(later.wholeSeconds, 400)
+    XCTAssertEqual(later.workout.duration, 400)
+  }
+
+  func testOpenLivePageHandsOverToSavedRecordEvenBeforeMirrorClears() throws {
+    let identity = WorkoutIdentity(start: date(1000))
+    let live = WorkoutWire(startedAt: 1000, heartRateAverage: 125)
+    let saved = StoredWorkout(id: "ended", start: date(1000), end: date(1400), heartRateAverage: 135)
+    let sets = [set("first", clipStart: 1100), set("second", clipStart: 1320), set("outside", clipStart: 1500)]
+    for mirror in [live, nil] {
+      let page = try XCTUnwrap(WorkoutPageSnapshot(
+        identity: identity, live: mirror, saved: [saved], now: date(1600), sets: sets, heartRate: nil))
+      XCTAssertEqual(page.workout, saved)
+      XCTAssertEqual(page.wholeSeconds, 400)
+      XCTAssertEqual(page.timeline.rows.map(\.id), ["first", "second"])
+    }
+    XCTAssertNil(identity.resolve(live: WorkoutWire(startedAt: 1500), saved: [], now: date(1600)),
+      "A discarded workout must not follow a different live session")
+  }
+
+  func testSavedPageDoesNotGrowWithClockOrAnotherLiveWorkout() throws {
+    let saved = StoredWorkout(id: "saved", start: date(1000), end: date(1400))
+    let sets = [set("inside", clipStart: 1100), set("outside", clipStart: 1500)]
+    for now in [1600.0, 2000] {
+      let page = try XCTUnwrap(WorkoutPageSnapshot(
+        identity: WorkoutIdentity(start: saved.start), live: WorkoutWire(startedAt: 1500), saved: [saved],
+        now: date(now), sets: sets, heartRate: nil))
+      XCTAssertEqual(page.workout, saved)
+      XCTAssertEqual(page.wholeSeconds, 400)
+      XCTAssertEqual(page.timeline, WorkoutTimeline(workout: saved, sets: sets, heartRate: nil))
+    }
+  }
+
   /// 1000–2000 s workout: a set at 1100–1125, one at 1215–1240 (90 s rest), one at 1270–1295 (30 s rest), and
   /// one outside the workout. Heart rate: 130 as each set starts, 144 at its end, peaking at 150 ten seconds
   /// later (the heart lags the work), down to 120 a minute after the end unless the next set started first.

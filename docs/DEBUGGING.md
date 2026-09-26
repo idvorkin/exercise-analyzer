@@ -32,6 +32,10 @@ means the phone was busy or locked, so run it again. The current session's file 
 
 ## Event catalogue
 
+`workout_page` is also emitted when the displayed workout changes: `sets`, `reps`, `heart_rate_samples`,
+`live`, `workout_id`, `duration_s`, and `window_s` describe the current render. A live page refreshes its clock
+and re-asks Health every 20 seconds while active; saving switches `workout_id` from `live` to the saved id.
+
 | Area | Events (key fields) |
 |---|---|
 | Launch | `session_start` (device, system, app, build, analysis: the AnalysisVersion, started), `error` where logs_prune (an unreadable bugs.jsonl prunes nothing; a file that would not delete), `logs_pruned` (count, bytes, kept_for_reports: logs older than 30 days deleted at launch except files named by bugs.jsonl, #72), `model_loaded` (model: yolo26n-pose, yoloe-26n-kettlebell; compute_units), `model_plan` (where Core ML scheduled the model's ops: ane, gpu, cpu, unassigned counts and the total, from MLComputePlan, #44), `model_missing` (model: yolo26n-pose when the pose package is missing from the bundle — no predictor, nothing runs; yoloe-26n-kettlebell when the detector is not bundled: no bells), `model_released` (model, reason: the detector an instrumented run forced is dropped when the run ends, so the session runs as the switch says; reason switch when the lifter turns it off), `model_skipped` (the detector is bundled but off, the default since 2026-09-12; the "Bell detector" toggle in the exercise menu, `SWING_BELLS=1` or the `bellDetector` default turns it on), `bell_detector` (on: the toggle in the exercise menu, #85), `notification_auth` |

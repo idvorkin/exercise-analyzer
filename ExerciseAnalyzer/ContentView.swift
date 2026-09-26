@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 
 /// A screen pushed over the log (story 058): a workout's page, or the player (a set, or the camera).
 enum AppRoute: Hashable {
-  case workout(StoredWorkout)
+  case workout(WorkoutIdentity)
   case player
 }
 
@@ -76,7 +76,7 @@ struct ContentView: View {
           showPlayer()
         },
         onEvent: { session.log.event($0, $1) }, session: session,
-        onOpenWorkout: { path = [.workout($0)] })
+        onOpenWorkout: { path = [.workout(WorkoutIdentity(start: $0.start))] })
         .toolbar {
           ToolbarItem(placement: .topBarTrailing) { moreMenu }
         }
@@ -85,7 +85,7 @@ struct ContentView: View {
           switch route {
           case .workout(let workout):
             WorkoutDetailView(
-              workout: workout, sets: session.recents.entries, workouts: workouts, onOpen: openSet,
+              identity: workout, store: session.recents, workouts: workouts, onOpen: openSet,
               thumbnail: { session.recents.thumbnailImage(for: $0) }, onEvent: { session.log.event($0, $1) })
           case .player:
             // Full screen, as the picture always was: the HUD's "‹" is the way back, and the edge swipe stays
@@ -143,7 +143,7 @@ struct ContentView: View {
       case .camera:
         // A new recording belongs to the running workout, if any: "‹" after it is that workout's page, not a
         // page that happened to be open (053).
-        path = (workouts.liveWorkout.map { [AppRoute.workout($0)] } ?? []) + [.player]
+        path = (workouts.liveWorkout.map { [AppRoute.workout(WorkoutIdentity(start: $0.start))] } ?? []) + [.player]
       case .file: showPlayer()
       case .none: if path.last == .player { path.removeLast() }
       }
@@ -354,7 +354,9 @@ struct ContentView: View {
   /// or a set outside every workout.
   private var workoutOfLoadedSet: StoredWorkout? {
     guard session.source == .file else { return nil }
-    if path.count > 1, case .workout(let under) = path[path.count - 2] { return under }
+    if path.count > 1, case .workout(let under) = path[path.count - 2] {
+      return under.resolve(live: workouts.live, saved: workouts.index.workouts, now: Date())
+    }
     guard let start = session.currentEntry?.span.lowerBound else { return nil }
     if let live = workouts.liveWorkout, live.contains(start) { return live }
     return workouts.index.workouts.last { $0.contains(start) }
@@ -370,10 +372,11 @@ struct ContentView: View {
 
   /// The workout's page: popped back to when the set was opened from it, else put on screen in the set's place.
   private func backToWorkout(_ workout: StoredWorkout) {
-    let fromPage = path.count > 1 && path[path.count - 2] == .workout(workout)
+    let identity = WorkoutIdentity(start: workout.start)
+    let fromPage = path.count > 1 && path[path.count - 2] == .workout(identity)
     session.log.event("ui", ["action": "back_to_workout", "from_page": fromPage])
     session.pause()
-    if fromPage { path.removeLast() } else { path = [.workout(workout)] }
+    if fromPage { path.removeLast() } else { path = [.workout(identity)] }
   }
 
   /// The count's face, for its letter height: the top line's other pieces are sized and set against it.

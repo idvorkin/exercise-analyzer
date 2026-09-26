@@ -121,6 +121,28 @@ check_clip_switch() {  # stage: force A's render/replay/Photos/trim result to ar
   else echo "FAIL  clip_switch $1: $f"; fail=1; fi
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
 }
+check_live_workout() {
+  reset_mode
+  SIMCTL_CHILD_SWING_LIVE_WORKOUT=2 SIMCTL_CHILD_SWING_WORKOUT_EVOLVE=1 \
+    xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
+  wait_for workout_saved 60 || echo "      (timed out waiting for live workout to end)"
+  sleep 2
+  local f; f=$(newest_log)
+  if jq -se '
+    [.[] | select(.type=="workout_page")] as $pages |
+    ([$pages[] | select(.live == true and .sets == 1)][0]) as $first |
+    ([$pages[] | select(.live == true and .sets == 2)][-1]) as $later |
+    ([$pages[] | select(.live == false)][-1]) as $saved |
+    $first != null and $later != null and $saved != null and
+    $later.reps == 16 and $later.duration_s > $first.duration_s + 15 and
+    $later.window_s > $first.window_s + 15 and
+    $saved.sets == 2 and $saved.reps == 16 and $saved.workout_id != "live" and
+    ([.[] | select(.type=="workout_heart_rate")] | length) >= 3
+  ' "$f" >/dev/null; then
+    echo "ok    live_workout: 1 → 2 sets / 16 reps, clock and window advanced, Health re-asked, saved page retained both sets"
+  else echo "FAIL  live_workout: $f"; fail=1; fi
+  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+}
 # ONLY=<substring> runs just the matching checks (e.g. ONLY=trim).
 run() { if [ -z "${ONLY:-}" ] || [[ "$*" == *"${ONLY}"* ]]; then "$@"; fi; }
 run check swing-sample-4reps kettlebell-swing 4 90
@@ -133,4 +155,5 @@ run check_clip_switch render
 run check_clip_switch mode
 run check_clip_switch photos
 run check_clip_switch trim
+run check_live_workout
 exit $fail

@@ -9,15 +9,78 @@ import ExerciseCore
 import SwiftUI
 
 struct WorkoutDetailView: View {
-  let workout: StoredWorkout
-  let sets: [RecentEntry]
+  let identity: WorkoutIdentity
+  @ObservedObject var store: RecentsStore
   @ObservedObject var workouts: WorkoutMirror
   let onOpen: (RecentEntry) -> Void
-  /// The set's picture, the same one its card in Workouts shows.
   var thumbnail: (RecentEntry) -> UIImage? = { _ in nil }
   var onEvent: ((String, [String: Any]) -> Void)? = nil
-
+  @Environment(\.scenePhase) private var scenePhase
+  @State private var tick = Date()
   @State private var heartRate: HeartRateSeries?
+
+  var body: some View {
+    let snapshot = WorkoutPageSnapshot(
+      identity: identity, live: workouts.live, saved: workouts.index.workouts,
+      now: max(tick, Date()), sets: store.entries, heartRate: heartRate)
+    Group {
+      if let snapshot {
+        WorkoutPageView(
+          snapshot: snapshot, sets: store.entries, heartRate: heartRate, onOpen: onOpen,
+          thumbnail: thumbnail, onEvent: onEvent)
+          // Twenty seconds matches the set page's Health re-ask (#107). A saved id triggers one final read.
+          .task(id: HeartRateRequest(workout: snapshot.workout, active: scenePhase == .active)) {
+            guard scenePhase == .active else { return }
+            let read = await workouts.heartRate(for: snapshot.workout)
+            guard !Task.isCancelled else { return }
+            if let read, read.samples.count > (heartRate?.samples.count ?? 0) { heartRate = read }
+          }
+      } else {
+        Text("This workout is no longer available.").foregroundStyle(.secondary)
+      }
+    }
+    .task(id: scenePhase) {
+      guard scenePhase == .active else { return }
+      tick = Date()
+      while !Task.isCancelled {
+        guard identity.resolve(live: workouts.live, saved: workouts.index.workouts, now: Date())?.id == WorkoutMirror.liveID else { return }
+        do { try await Task.sleep(for: .seconds(20)) } catch { return }
+        tick = Date()
+      }
+    }
+    #if targetEnvironment(simulator)
+    .task {
+      guard ProcessInfo.processInfo.environment["SWING_WORKOUT_EVOLVE"] == "1" else { return }
+      store.seedWorkoutPageSet(id: "live-page-first", start: identity.start.addingTimeInterval(10))
+      do { try await Task.sleep(for: .seconds(3)) } catch { return }
+      store.seedWorkoutPageSet(id: "live-page-second", start: Date())
+      // Leave the page up beyond one refresh, then exercise the real save/clear hand-over.
+      do { try await Task.sleep(for: .seconds(22)) } catch { return }
+      workouts.endSeededWorkout()
+    }
+    #endif
+  }
+
+  private struct HeartRateRequest: Equatable {
+    let id: String
+    let bucket: Int
+    let active: Bool
+    init(workout: StoredWorkout, active: Bool) {
+      id = workout.id
+      bucket = workout.id == WorkoutMirror.liveID ? Int(workout.end.timeIntervalSince1970 / 20) : 0
+      self.active = active
+    }
+  }
+}
+
+private struct WorkoutPageView: View {
+  let snapshot: WorkoutPageSnapshot
+  let sets: [RecentEntry]
+  let heartRate: HeartRateSeries?
+  let onOpen: (RecentEntry) -> Void
+  var thumbnail: (RecentEntry) -> UIImage?
+  var onEvent: ((String, [String: Any]) -> Void)?
+  private var workout: StoredWorkout { snapshot.workout }
   /// The rows' pictures by set id, read once (see `.task`).
   @State private var thumbnails: [String: UIImage] = [:]
   /// The chart's window in seconds (#125): the whole workout until a pinch narrows it, never under a minute.
@@ -39,10 +102,10 @@ struct WorkoutDetailView: View {
     case none, zoom(Double), zoomed, pan(Double), tap(Double)
   }
 
-  private var timeline: WorkoutTimeline { WorkoutTimeline(workout: workout, sets: sets, heartRate: heartRate) }
+  private var timeline: WorkoutTimeline { snapshot.timeline }
 
   /// The plot spans the workout, a minute at least (a workout just started is not a zero-width axis).
-  private var wholeSeconds: Double { max(workout.end.timeIntervalSince(workout.start), 60) }
+  private var wholeSeconds: Double { snapshot.wholeSeconds }
   private var visibleSeconds: Double { min(max(windowSeconds ?? wholeSeconds, 60), wholeSeconds) }
   private var zoomed: Bool { visibleSeconds < wholeSeconds }
   private var windowEnd: Date { windowStart.addingTimeInterval(visibleSeconds) }
@@ -100,17 +163,32 @@ struct WorkoutDetailView: View {
         }
       }
     }
-    .task {
+    .task(id: timeline.rows.map(\.id)) {
       if windowStart == .distantPast { windowStart = workout.start }
       // The rows' pictures once: read per render they would be re-read on every tick of a pan or a pinch (#128).
       for row in timeline.rows where thumbnails[row.id] == nil {
         if let entry = sets.first(where: { $0.id == row.id }), let image = thumbnail(entry) { thumbnails[row.id] = image }
       }
-      heartRate = await workouts.heartRate(for: workout)
+    }
+    .onChange(of: PageLog(workout: workout, timeline: timeline, samples: heartRate?.samples.count ?? 0), initial: true) { _, value in
       onEvent?(
         "workout_page",
-        ["sets": timeline.rows.count, "heart_rate_samples": heartRate?.samples.count ?? 0,
-         "live": workout.id == WorkoutMirror.liveID])
+        ["sets": value.sets, "reps": value.reps, "heart_rate_samples": value.samples,
+         "live": workout.id == WorkoutMirror.liveID, "workout_id": workout.id,
+         "duration_s": workout.duration, "window_s": visibleSeconds])
+    }
+  }
+
+  private struct PageLog: Equatable {
+    let workout: StoredWorkout
+    let sets: Int
+    let reps: Int
+    let samples: Int
+    init(workout: StoredWorkout, timeline: WorkoutTimeline, samples: Int) {
+      self.workout = workout
+      sets = timeline.rows.count
+      reps = timeline.rows.reduce(0) { $0 + $1.reps }
+      self.samples = samples
     }
   }
 
@@ -277,7 +355,8 @@ struct WorkoutDetailView: View {
     let before = visibleSeconds
     let start = windowStart == .distantPast ? workout.start : windowStart
     let share = min(max(moment.timeIntervalSince(start) / before, 0), 1)
-    windowSeconds = min(max(seconds, 60), wholeSeconds)
+    let requested = min(max(seconds, 60), wholeSeconds)
+    windowSeconds = requested < wholeSeconds ? requested : nil
     pan(to: moment.addingTimeInterval(-visibleSeconds * share))
   }
 
@@ -351,7 +430,7 @@ private struct SetTimelineRow: View {
             .font(.subheadline.bold()).monospacedDigit().foregroundStyle(.red).lineLimit(1).fixedSize()
         }
         if let rest = row.restAfter {
-          Text("rest \(WorkoutDetailView.minutes(rest))").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+          Text("rest \(WorkoutPageView.minutes(rest))").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
         }
       }
       Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.tertiary)
