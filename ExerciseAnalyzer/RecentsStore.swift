@@ -25,6 +25,7 @@ final class RecentsStore: ObservableObject {
       ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("recents", isDirectory: true)
     try? FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true)
+    try? RecentsSave.recover(root: self.root)
     var index = RecentsIndex.load(root: self.root)
     if index.backfill(root: self.root) { try? index.save(root: self.root) }
     entries = index.entries
@@ -43,44 +44,56 @@ final class RecentsStore: ObservableObject {
     // A pass that was under way when its set was deleted must not bring it back (#111, the 2026-09-19 review):
     // the launch refresh and a re-run save by id minutes after they started.
     guard !removedIDs.contains(id) else { throw RemovedSetError(id: id) }
-    // Re-analyzing a clip replaces its earlier entry instead of adding a second set to the workout.
-    for old in entries where old.id != id && old.isSameClip(source: source, originalName: originalName, duration: duration) {
-      remove(id: old.id)
-    }
-    let dir = folder(for: id)
-    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-
-    if case .file(let name) = source, let clipURL {
-      let dest = dir.appendingPathComponent(name)
-      if dest != clipURL {
-        try? FileManager.default.removeItem(at: dest)
-        try FileManager.default.copyItem(at: clipURL, to: dest)
-      }
-    }
-
     var snapshot = AnalysisSnapshot(exercise: pipeline.exercise, frames: pipeline.track.frames, reps: pipeline.reps)
     snapshot.models = models
-    try JSONEncoder().encode(snapshot).write(to: dir.appendingPathComponent("analysis.json"))
-    for rep in pipeline.reps {
-      for (phase, position) in rep.positions {
-        guard let image = position.image, let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.8) else { continue }
-        try data.write(to: dir.appendingPathComponent(Self.imageName(rep: rep.number, phase: phase)))
-      }
-    }
-    var thumbnailName: String?
-    if let thumbnail, let data = thumbnail.jpegData(compressionQuality: 0.8) {
-      thumbnailName = "thumbnail.jpg"
-      try data.write(to: dir.appendingPathComponent(thumbnailName!))
-    }
-
-    let entry = RecentEntry(
+    let fresh = RecentEntry(
       id: id, analyzedAt: Date(), recordedAt: recordedAt, duration: duration,
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
-      source: source, thumbnail: thumbnailName, exercise: pipeline.exercise, originalName: originalName,
+      source: source, thumbnail: nil, exercise: pipeline.exercise, originalName: originalName,
       analysisVersion: AnalysisVersion.current, models: models, clipStartedAt: clipStartedAt)
-    entries.removeAll { $0.id == id }
-    entries.insert(entry, at: 0)
-    try persistIndex()
+    let saved = try RecentsSave.save(root: root, index: RecentsIndex(entries: entries), id: id, source: source) { old in
+      var entry = old ?? fresh
+      entry.id = id
+      entry.analyzedAt = fresh.analyzedAt
+      entry.recordedAt = recordedAt ?? entry.recordedAt
+      entry.duration = duration
+      entry.repCount = fresh.repCount
+      entry.bestScore = fresh.bestScore
+      entry.source = source
+      entry.exercise = pipeline.exercise
+      entry.originalName = originalName ?? entry.originalName
+      entry.analysisVersion = AnalysisVersion.current
+      entry.models = models
+      entry.clipStartedAt = clipStartedAt ?? entry.clipStartedAt
+      if thumbnail != nil { entry.thumbnail = "thumbnail.jpg" }
+      return entry
+    } writeFiles: { dir in
+      if case .file(let name) = source {
+        let dest = dir.appendingPathComponent(name)
+        if let clipURL {
+          if FileManager.default.fileExists(atPath: dest.path) { try FileManager.default.removeItem(at: dest) }
+          try FileManager.default.copyItem(at: clipURL, to: dest)
+        } else if !FileManager.default.fileExists(atPath: dest.path) {
+          throw CocoaError(.fileNoSuchFile)
+        }
+      }
+      try JSONEncoder().encode(snapshot).write(to: dir.appendingPathComponent("analysis.json"), options: .atomic)
+      for rep in pipeline.reps {
+        for (phase, position) in rep.positions {
+          guard let image = position.image else { continue }
+          guard let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.8) else {
+            throw CocoaError(.fileWriteUnknown)
+          }
+          try data.write(to: dir.appendingPathComponent(Self.imageName(rep: rep.number, phase: phase)), options: .atomic)
+        }
+      }
+      if let thumbnail {
+        guard let data = thumbnail.jpegData(compressionQuality: 0.8) else { throw CocoaError(.fileWriteUnknown) }
+        try data.write(to: dir.appendingPathComponent("thumbnail.jpg"), options: .atomic)
+      }
+    }
+    removedIDs.formUnion(Set(entries.map(\.id)).subtracting(saved.entries.map(\.id)))
+    entries = saved.entries
   }
 
   /// Ids removed since launch: `save` refuses them. In memory only, a relaunch has no pass under way.

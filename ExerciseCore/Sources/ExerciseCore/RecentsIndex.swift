@@ -18,7 +18,7 @@ public struct RecentEntry: Codable, Identifiable {
     }
   }
 
-  public let id: String
+  public var id: String
   public var analyzedAt: Date
   public var recordedAt: Date?
   public var duration: Double
@@ -73,11 +73,10 @@ public struct RecentEntry: Codable, Identifiable {
     analysisVersion != currentVersion
   }
 
-  /// Same Photos asset, or the same imported file name with the same length (within a frame or two).
+  /// Only a Photos asset identifier establishes identity across entry IDs. File names and lengths collide.
   public func isSameClip(source other: Source, originalName name: String?, duration length: Double) -> Bool {
     if case .photos(let a) = source, case .photos(let b) = other { return a == b }
-    guard let name, let mine = originalName, name == mine else { return false }
-    return abs(duration - length) < 0.1
+    return false
   }
 
   /// The Photos identifier when the clip lives in Photos, nil for an in-app file.
@@ -160,7 +159,7 @@ public struct RecentsIndex {
   }
 
   public func save(root: URL) throws {
-    try JSONEncoder().encode(entries).write(to: Self.indexURL(root: root))
+    try JSONEncoder().encode(entries).write(to: Self.indexURL(root: root), options: .atomic)
   }
 
   /// Fill rows that predate the metadata fields from their snapshots, once per entry: true when anything

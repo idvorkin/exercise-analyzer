@@ -113,7 +113,8 @@ final class RecentsIndexTests: XCTestCase {
     XCTAssertTrue(photosEntry.isSameClip(source: .photos(identifier: "ABC"), originalName: nil, duration: 999))
     XCTAssertFalse(photosEntry.isSameClip(source: .photos(identifier: "DEF"), originalName: nil, duration: 60))
     let file = entry("b")
-    XCTAssertTrue(file.isSameClip(source: .file(name: "other.mov"), originalName: "clip.mov", duration: 60.05))
+    XCTAssertFalse(file.isSameClip(source: .file(name: "other.mov"), originalName: "clip.mov", duration: 60.05))
+    XCTAssertFalse(file.isSameClip(source: .photos(identifier: "ABC"), originalName: "clip.mov", duration: 60))
     XCTAssertFalse(file.isSameClip(source: .file(name: "other.mov"), originalName: "clip.mov", duration: 61))
     XCTAssertFalse(file.isSameClip(source: .file(name: "other.mov"), originalName: "renamed.mov", duration: 60))
   }
