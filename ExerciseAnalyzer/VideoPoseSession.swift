@@ -1408,11 +1408,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
     pause()
     let before = player.currentTime().seconds
     let time = CMTime(seconds: seconds, preferredTimescale: 600)
-    let operation = clipOperations.current
+    // Keyed on the player item, not the clip operation: a clip left open after Cancel has no operation, and its
+    // scrubs must still land.
     let item = player.currentItem
     player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
       Task { @MainActor in
-        guard let self, let operation, self.isCurrent(operation), self.player.currentItem === item else { return }
+        guard let self, self.player.currentItem === item else { return }
         let after = self.player.currentTime().seconds
         if finished { self.currentTime = after.isFinite ? after : seconds }
         self.log.event(
@@ -2499,11 +2500,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
           recents.markSavedToPhotos(id: id, identifier: newID)
           recents.update(id: id) { $0.originalName = url.lastPathComponent }
           currentOrigin = .photos(identifier: newID)
-          untrimmed = Untrimmed(url: before.url, pipeline: before.pipeline, frames: before.frames, origin: .photos(identifier: newID))
-          replacedOriginalID = originalID
           canSave = false
           try await VideoFile.deleteFromPhotos(identifier: originalID)
           guard isCurrent(operation) else { return }
+          // Undo re-adds the original only once it is really gone: a declined delete (iOS asks) leaves it in
+          // Photos, and Undo then just re-links the set to it.
+          untrimmed = Untrimmed(url: before.url, pipeline: before.pipeline, frames: before.frames, origin: .photos(identifier: newID))
+          replacedOriginalID = originalID
           statusMessage = "Trimmed clip saved; original replaced (Undo trim restores it)"
           log.event("photos_replaced", ["original": originalID, "trimmed": newID, "clip": url.lastPathComponent])
         } else {
