@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 009:
 
 - **Summary:** Keep only the set, losslessly and fast
-- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check; clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and simulator trim→B check; Photos undo and HDR on the phone pending
+- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check; clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator trim→B check; Photos undo and HDR on the phone pending
 
 #### Use Case:
 - **As a** lifter who leaves the camera running while setting up
@@ -34,7 +34,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 010:
 
 - **Summary:** Open old clips from Photos with nothing copied
-- **Status:** implemented in [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a); verified on the phone; clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and signed iOS/watch build; slow iCloud fetch on the phone pending
+- **Status:** implemented in [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a); verified on the phone; clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and signed iOS/watch build; slow iCloud fetch on the phone pending
 
 #### Use Case:
 - **As a** lifter with months of sets in Photos
@@ -59,7 +59,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 011:
 
 - **Summary:** Save the trimmed set to Photos, clean, in place of the original
-- **Status:** implemented in [2376b1b](https://github.com/idvorkin/exercise-analyzer/commit/2376b1b); verified on the phone; clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and simulator delayed fake Photos→B check; real Photos replacement/undo on the phone pending
+- **Status:** implemented in [2376b1b](https://github.com/idvorkin/exercise-analyzer/commit/2376b1b); verified on the phone; clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator delayed fake Photos→B check; real Photos replacement/undo on the phone pending
 
 #### Use Case:
 - **As a** lifter who keeps sets to compare over months
@@ -120,7 +120,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 028:
 
 - **Summary:** Stop an analysis I didn't mean to start
-- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9), [d3d4cf7](https://github.com/idvorkin/exercise-analyzer/commit/d3d4cf7); verified on the simulator (the `cancel` check of `just test-sim`, including paused playback); d3d4cf7 also passes host tests and the iOS/watch build; clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host invalidation tests and simulator extraction-cancel check; render supersession also checked on the simulator
+- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9), [d3d4cf7](https://github.com/idvorkin/exercise-analyzer/commit/d3d4cf7); verified on the simulator (the `cancel` check of `just test-sim`, including paused playback); d3d4cf7 also passes host tests and the iOS/watch build; clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host invalidation tests and simulator extraction-cancel check; render supersession also checked on the simulator; scrubbing the paused clip after Cancel kept working in [b114b2a](https://github.com/idvorkin/exercise-analyzer/commit/b114b2a) (review), built for the device
 
 #### Use Case:
 - **As a** lifter who opened the wrong clip, or a long one

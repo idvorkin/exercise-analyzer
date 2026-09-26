@@ -171,7 +171,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 035:
 
 - **Summary:** A set made by older models is run through the new ones when I reopen it (technical)
-- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952), [a37440b](https://github.com/idvorkin/exercise-analyzer/commit/a37440b), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the host (`StoredSetPlan` tests, the replay of [#49](https://github.com/idvorkin/exercise-analyzer/issues/49)), the simulator (the smoke checks) and the phone (a pre-detector get-up reopened: `recents_rerun`, the pass from the video, `analyzed` with reason rerun_models); clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and simulator render→B check
+- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952), [a37440b](https://github.com/idvorkin/exercise-analyzer/commit/a37440b), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the host (`StoredSetPlan` tests, the replay of [#49](https://github.com/idvorkin/exercise-analyzer/issues/49)), the simulator (the smoke checks) and the phone (a pre-detector get-up reopened: `recents_rerun`, the pass from the video, `analyzed` with reason rerun_models); clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator render→B check
 
 #### Use Case:
 - **As a** developer shipping a new model (a detector, a bigger pose model)
