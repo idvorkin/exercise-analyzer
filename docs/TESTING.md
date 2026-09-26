@@ -77,6 +77,9 @@ assertions. `swift test --filter TuningReports` prints, per fixture, every phase
 thresholds. This is how an analyzer gets tuned against a bad set, and how a "why did it count that" question gets
 answered with numbers instead of theories.
 
+**SwiftPM caps a test's stdout**: a long report is cut off silently, mid-line. Keep a report to a summary table (a
+few dozen lines), `fflush(stdout)` after it, and write long traces to a file under `~/tmp/agent/`.
+
 ## Rung 1.5: the model on the Mac
 
 [`ExerciseCore/Sources/posetrack/main.swift`](../ExerciseCore/Sources/posetrack/main.swift) is a macOS executable
