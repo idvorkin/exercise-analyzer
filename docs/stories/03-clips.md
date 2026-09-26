@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 009:
 
 - **Summary:** Keep only the set, losslessly and fast
-- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check; clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator trim→B check; Photos undo and HDR on the phone pending; the automatic trim skipped on an implausible count: fix for #141 in this commit, verified on the host
+- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check; clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator trim→B check; Photos undo and HDR on the phone pending; the automatic trim skipped on an implausible count: fix for #141 in [638f3e8](https://github.com/idvorkin/exercise-analyzer/commit/638f3e8), verified on the host
 
 #### Use Case:
 - **As a** lifter who leaves the camera running while setting up

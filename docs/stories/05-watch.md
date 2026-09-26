@@ -156,7 +156,7 @@ the first frame (story 001).
 ### User Story 019:
 
 - **Summary:** The phone stays awake while the watch is in charge
-- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); on the phone, Igor's check pending; fix for #142 in this commit, verified on the host
+- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); on the phone, Igor's check pending; fix for #142 in [cb20f99](https://github.com/idvorkin/exercise-analyzer/commit/cb20f99), verified on the host
 - **Why:** Igor (2026-09-26, #142): keep the phone awake while a workout runs on the watch, and outside one for 10 minutes after the last contact. Reachability could not decide it: with the wrist down the watch reads as unreachable most of the time (#76).
 
 #### Use Case:
@@ -312,7 +312,7 @@ the first frame (story 001).
 ### User Story 043:
 
 - **Summary:** The watch face shows the set
-- **Status:** implemented in [375e3aa](https://github.com/idvorkin/exercise-analyzer/commit/375e3aa), [0bde654](https://github.com/idvorkin/exercise-analyzer/commit/0bde654), [3255a38](https://github.com/idvorkin/exercise-analyzer/commit/3255a38); verified on the host (`FaceStateTests`) and by device signing; on the watch since 2026-09-14, Igor's check pending (add the complication to a face; its bundle id changed, so the old one is gone from the face); the kettlebell icon and glyph of [#88](https://github.com/idvorkin/exercise-analyzer/issues/88) verified by the simulator build (the icon in the watch app's Assets.car) and installed on the watch 2026-09-16, Igor's look pending; fix for [#143](https://github.com/idvorkin/exercise-analyzer/issues/143) (a Cancel wiped the previous final) in this commit, verified on the host (`FaceStateTests`) and by a signed iOS + watch build
+- **Status:** implemented in [375e3aa](https://github.com/idvorkin/exercise-analyzer/commit/375e3aa), [0bde654](https://github.com/idvorkin/exercise-analyzer/commit/0bde654), [3255a38](https://github.com/idvorkin/exercise-analyzer/commit/3255a38); verified on the host (`FaceStateTests`) and by device signing; on the watch since 2026-09-14, Igor's check pending (add the complication to a face; its bundle id changed, so the old one is gone from the face); the kettlebell icon and glyph of [#88](https://github.com/idvorkin/exercise-analyzer/issues/88) verified by the simulator build (the icon in the watch app's Assets.car) and installed on the watch 2026-09-16, Igor's look pending; fix for [#143](https://github.com/idvorkin/exercise-analyzer/issues/143) (a Cancel wiped the previous final) in [ddfd0e1](https://github.com/idvorkin/exercise-analyzer/commit/ddfd0e1), verified on the host (`FaceStateTests`) and by a signed iOS + watch build
 - **Why:** with the wrist down the watch app is suspended (#32); the face is the one screen that stays right, and the complication was only a launcher.
 
 #### Use Case:
@@ -418,7 +418,7 @@ the first frame (story 001).
 ### User Story 046:
 
 - **Summary:** Rest timer on the wrist
-- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); on phone + watch since 2026-09-13, Igor's check pending; delayed-permission identity and deadline fix in [88768f5](https://github.com/idvorkin/exercise-analyzer/commit/88768f5), verified on the host (five regression tests), signed iOS + watch build, and watch simulator (`just watch-screens`: 14 states, done/workout/viewfinder inspected); fixed tap delivery on the wrist pending; fix for [#145](https://github.com/idvorkin/exercise-analyzer/issues/145) (the rest events reached the phone log as `watch_watch_rest…`) in this commit, verified on the host and by a signed iOS + watch build, the names in a pulled log pending
+- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); on phone + watch since 2026-09-13, Igor's check pending; delayed-permission identity and deadline fix in [88768f5](https://github.com/idvorkin/exercise-analyzer/commit/88768f5), verified on the host (five regression tests), signed iOS + watch build, and watch simulator (`just watch-screens`: 14 states, done/workout/viewfinder inspected); fixed tap delivery on the wrist pending; fix for [#145](https://github.com/idvorkin/exercise-analyzer/issues/145) (the rest events reached the phone log as `watch_watch_rest…`) in [6a17b25](https://github.com/idvorkin/exercise-analyzer/commit/6a17b25), verified on the host and by a signed iOS + watch build, the names in a pulled log pending
 - **Why:** rest length is the one number between sets, and the watch is the only screen on the lifter; it showed nothing between Done and the next Record.
 
 #### Use Case:
@@ -459,7 +459,7 @@ the first frame (story 001).
 ### User Story 047:
 
 - **Summary:** Preview the shot from the wrist before recording
-- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), [b3defc0](https://github.com/idvorkin/exercise-analyzer/commit/b3defc0) and the review fixes of [2c9cc58](https://github.com/idvorkin/exercise-analyzer/commit/2c9cc58); verified on the host, the simulator (the eight watch states, the six checks) and by two code reviews; on the phone since 2026-09-14, the watch app of 2c9cc58 pending the tunnel, Igor's check pending; the heart-rate chip for [#106](https://github.com/idvorkin/exercise-analyzer/issues/106) verified on the watch simulator (`just watch-screens`: the workoutViewfinder state), on the wrist pending; VIEWFINDER on the phone's watch mode too, fix for [#144](https://github.com/idvorkin/exercise-analyzer/issues/144) in this commit, verified on the host and by signed build, on the phone pending
+- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), [b3defc0](https://github.com/idvorkin/exercise-analyzer/commit/b3defc0) and the review fixes of [2c9cc58](https://github.com/idvorkin/exercise-analyzer/commit/2c9cc58); verified on the host, the simulator (the eight watch states, the six checks) and by two code reviews; on the phone since 2026-09-14, the watch app of 2c9cc58 pending the tunnel, Igor's check pending; the heart-rate chip for [#106](https://github.com/idvorkin/exercise-analyzer/issues/106) verified on the watch simulator (`just watch-screens`: the workoutViewfinder state), on the wrist pending; VIEWFINDER on the phone's watch mode too, fix for [#144](https://github.com/idvorkin/exercise-analyzer/issues/144) in [9120516](https://github.com/idvorkin/exercise-analyzer/commit/9120516), verified on the host and by signed build, on the phone pending
 - **Why:** Igor, 2026-09-14: "Can I start with two different buttons for Record? Start Recording, Start Viewfinder. Normally, when I start on my watch, I don't know if I'm in frame or not. I walk away from my phone, set my phone up, and think I'm in frame. Then I walk to my watch, make sure I'm good, maybe adjust the camera a bit, and then I hit Start."
 
 #### Use Case:
