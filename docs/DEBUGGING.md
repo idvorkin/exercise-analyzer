@@ -46,6 +46,11 @@ means the phone was busy or locked, so run it again. The current session's file 
 | Reports | `bug_report` (note, log, clip, exercise, playhead, phase, reps, recents_id, screenshot, frame) |
 | Failures | `error` (where: recorder / offline_pass / recents / save / bug_images / bell_model / …, message), `crash_report` (last launch's crash or hang from MetricKit: kind crash or hang, exception, signal, reason, file; kind signal or exception with the file's first lines as `top` for the app's own `signal-*.txt` and `exception-*.txt`, each announced once, #87) |
 
+The simulator's `SWING_CLIP_SWITCH` checks log `clip_switch_begin` (`stage`, `a`, `b`),
+`clip_switch_release` (`stage`) and `clip_switch_checked` (`stage`, `current_b`, `reps`, `local_exists`,
+`entry_unchanged`, `idle`). They force a stale render, mode replay, Photos response or trim completion after B
+opens. The Photos response is simulated; these events do not certify real library permissions or deletion.
+
 Adding one: `log.event("snake_case_type", ["field": value])` from the session, or the component's `onEvent` hook
 (the watch bridge, Photos suggestions and the workout gallery use it). Log a failure once per spell, not once per
 retry; put the deciding numbers in fields, not in prose; keep per-frame data in `frame` only.

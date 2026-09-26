@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 009:
 
 - **Summary:** Keep only the set, losslessly and fast
-- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check
+- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`: passthrough, first frame at 0); an HDR clip on the phone is Igor's check; clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and simulator trim→B check; Photos undo and HDR on the phone pending
 
 #### Use Case:
 - **As a** lifter who leaves the camera running while setting up
@@ -22,14 +22,19 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I tap Trim
 - **Then:** the clip starts about 5 s before the first rep and ends about 5 s after the last, plays from its first frame, keeps HDR, and the cut takes under a second; an Undo button restores the untrimmed clip
 
-- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed
+- **Scenario:** Switching sets during trim or undo
+- **Given:** set A is trimming or restoring its original from Photos
+- **When:** I open set B before that operation finishes
+- **Then:** A's late result cannot replace B's video, analysis, progress or saved entry, and no late playback starts
+
+- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set
 
 ---
 
 ### User Story 010:
 
 - **Summary:** Open old clips from Photos with nothing copied
-- **Status:** implemented in [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a); verified on the phone
+- **Status:** implemented in [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a); verified on the phone; clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and signed iOS/watch build; slow iCloud fetch on the phone pending
 
 #### Use Case:
 - **As a** lifter with months of sets in Photos
@@ -42,14 +47,19 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I pick a clip from Photos
 - **Then:** the clip is shown within a second and its analysis starts, with no copy created in the app's storage
 
-- **Issues:** [#80](https://github.com/idvorkin/exercise-analyzer/issues/80) a Photos clip's stored track ran two seconds past the clip and its skeleton ahead of the lifter; the set goes back to its video (story 035, [95b5173](https://github.com/idvorkin/exercise-analyzer/commit/95b5173))
+- **Scenario:** A slow Photos open finishes after my next choice
+- **Given:** clip A is still downloading or importing
+- **When:** I open clip B
+- **Then:** only B can take over the player; A's late download, metadata and progress leave B alone
+
+- **Issues:** [#80](https://github.com/idvorkin/exercise-analyzer/issues/80) a Photos clip's stored track ran two seconds past the clip and its skeleton ahead of the lifter; the set goes back to its video (story 035, [95b5173](https://github.com/idvorkin/exercise-analyzer/commit/95b5173)); [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set
 
 ---
 
 ### User Story 011:
 
 - **Summary:** Save the trimmed set to Photos, clean, in place of the original
-- **Status:** implemented in [2376b1b](https://github.com/idvorkin/exercise-analyzer/commit/2376b1b); verified on the phone
+- **Status:** implemented in [2376b1b](https://github.com/idvorkin/exercise-analyzer/commit/2376b1b); verified on the phone; clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and simulator delayed fake Photos→B check; real Photos replacement/undo on the phone pending
 
 #### Use Case:
 - **As a** lifter who keeps sets to compare over months
@@ -67,7 +77,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** the trimmed clip starts playing
 - **Then:** a sheet asks "Replace the original in Photos?" with "Replace with the trimmed set" and "Keep both for now"; Replace is the same save as the button (iOS asks once to delete the original, Undo trim brings it back), Keep leaves the Save button for later; a recording or a file from Files gets no such offer, there is nothing of theirs in Photos to replace
 
-- **Issues:** [#34](https://github.com/idvorkin/exercise-analyzer/issues/34); [#90](https://github.com/idvorkin/exercise-analyzer/issues/90) Igor, from the gym: "When I've done a trim and download prompt me to erase the original" (the download being the fetch from Photos; the save-and-replace existed but only behind the Save button)
+- **Scenario:** A Photos save finishes after I switch sets
+- **Given:** local set A is saving to Photos
+- **When:** I open set B before Photos replies
+- **Then:** B keeps its own Photos reference or local video and its own status; A's late reply cannot assign its Photos identifier to B or delete B's local video
+- **And:** a Photos write already submitted may finish, but a superseded operation starts no further replacement deletion
+
+- **Issues:** [#34](https://github.com/idvorkin/exercise-analyzer/issues/34); [#90](https://github.com/idvorkin/exercise-analyzer/issues/90) Igor, from the gym: "When I've done a trim and download prompt me to erase the original" (the download being the fetch from Photos; the save-and-replace existed but only behind the Save button); [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set
 
 ---
 
@@ -104,7 +120,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 028:
 
 - **Summary:** Stop an analysis I didn't mean to start
-- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9), [d3d4cf7](https://github.com/idvorkin/exercise-analyzer/commit/d3d4cf7); verified on the simulator (the `cancel` check of `just test-sim`, including paused playback); d3d4cf7 also passes host tests and the iOS/watch build
+- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9), [d3d4cf7](https://github.com/idvorkin/exercise-analyzer/commit/d3d4cf7); verified on the simulator (the `cancel` check of `just test-sim`, including paused playback); d3d4cf7 also passes host tests and the iOS/watch build; clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host invalidation tests and simulator extraction-cancel check; render supersession also checked on the simulator
 
 #### Use Case:
 - **As a** lifter who opened the wrong clip, or a long one
@@ -118,7 +134,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** the analysis stops within a second, the clip stays open and paused with no reps, and nothing is added to Workouts
 - **And:** finishing cancellation never starts playback or an automatic trim
 
-- **Issues:** [#30](https://github.com/idvorkin/exercise-analyzer/issues/30), [#37](https://github.com/idvorkin/exercise-analyzer/issues/37) Cancel only landed after the whole pass
+- **Scenario:** Cancel while rep images are being prepared
+- **Given:** extraction has finished but the analysis is still preparing its rep images
+- **When:** I tap Cancel
+- **Then:** that render cannot later publish reps, save the set or start playback, including after I open another set
+
+- **Issues:** [#30](https://github.com/idvorkin/exercise-analyzer/issues/30), [#37](https://github.com/idvorkin/exercise-analyzer/issues/37) Cancel only landed after the whole pass; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set
 
 ---
 

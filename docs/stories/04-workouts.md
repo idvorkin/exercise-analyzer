@@ -171,7 +171,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 035:
 
 - **Summary:** A set made by older models is run through the new ones when I reopen it (technical)
-- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952), [a37440b](https://github.com/idvorkin/exercise-analyzer/commit/a37440b), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the host (`StoredSetPlan` tests, the replay of [#49](https://github.com/idvorkin/exercise-analyzer/issues/49)), the simulator (the smoke checks) and the phone (a pre-detector get-up reopened: `recents_rerun`, the pass from the video, `analyzed` with reason rerun_models)
+- **Status:** implemented in [818d952](https://github.com/idvorkin/exercise-analyzer/commit/818d952), [a37440b](https://github.com/idvorkin/exercise-analyzer/commit/a37440b), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the host (`StoredSetPlan` tests, the replay of [#49](https://github.com/idvorkin/exercise-analyzer/issues/49)), the simulator (the smoke checks) and the phone (a pre-detector get-up reopened: `recents_rerun`, the pass from the video, `analyzed` with reason rerun_models); clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and simulator render→B check
 
 #### Use Case:
 - **As a** developer shipping a new model (a detector, a bigger pose model)
@@ -194,7 +194,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I open it
 - **Then:** the set goes back to its video (`recents_rerun` with reason track_past_clip, then `analyzed` with reason rerun_timeline), the pass keeps only frames the player can reach and logs the read's clock against the clip's in `offline_pass` (read_end_s, clip_s, segments, timeline_mapped, frames_dropped), the skeleton sits on the lifter, and a second open runs nothing
 
-- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#49](https://github.com/idvorkin/exercise-analyzer/issues/49), [#80](https://github.com/idvorkin/exercise-analyzer/issues/80) the track past its clip ([95b5173](https://github.com/idvorkin/exercise-analyzer/commit/95b5173), host tests and the simulator's edit-list clip; the reopened pistol set on the phone is Igor's check)
+- **Scenario:** Opening a stored set while another set is rendering
+- **Given:** set A's foreground re-analysis is still preparing its rep images
+- **When:** I open an already analyzed set B
+- **Then:** B opens with its own video and analysis; A's late render cannot adopt its reps, save into either entry, change B's metadata or progress, or start extra playback
+
+- **Issues:** [#18](https://github.com/idvorkin/exercise-analyzer/issues/18), [#49](https://github.com/idvorkin/exercise-analyzer/issues/49), [#80](https://github.com/idvorkin/exercise-analyzer/issues/80) the track past its clip ([95b5173](https://github.com/idvorkin/exercise-analyzer/commit/95b5173), host tests and the simulator's edit-list clip; the reopened pistol set on the phone is Igor's check); [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set
 
 ---
 

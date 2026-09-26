@@ -85,7 +85,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 003:
 
 - **Summary:** Override the detector when it guesses wrong, without re-running the video
-- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f), [4543828](https://github.com/idvorkin/exercise-analyzer/commit/4543828); verified on the phone and the simulator (the `interrupt` check of `just test-sim`)
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f), [4543828](https://github.com/idvorkin/exercise-analyzer/commit/4543828); verified on the phone and the simulator (the `interrupt` check of `just test-sim`); clip-operation isolation in [034975a](https://github.com/idvorkin/exercise-analyzer/commit/034975a), verified by host identity tests and simulator mode-replay→B check
 
 #### Use Case:
 - **As a** lifter whose set was mislabelled
@@ -99,13 +99,18 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I choose Turkish Get-Up from the exercise menu
 - **Then:** the rep count, phases, HUD and gallery update within a second, without the video being re-scanned
 
+- **Scenario:** Opening another set during an exercise override
+- **Given:** set A is fetching rep images for my new exercise choice
+- **When:** I open set B before that replay finishes
+- **Then:** B keeps its own analysis and playback; A's late replay changes neither B nor its saved entry
+
 - **Scenario:** An interrupted pass
 - **Given:** a clip whose offline pass was interrupted by the reader ("Operation Interrupted")
 - **and Given:** the status line reads "Analysis interrupted" with a retry, and no partial track was kept
 - **When:** I choose an exercise from the menu (or tap the status to retry)
 - **Then:** the clip is re-scanned from the video (an `offline_pass` precedes any `analyzed`), the full skeleton returns, and once the extraction is complete a later switch re-reads instantly without re-scanning
 
-- **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) an interrupted pass left a partial track and the mode switch re-read it instead of re-running the clip
+- **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) an interrupted pass left a partial track and the mode switch re-read it instead of re-running the clip; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set
 
 ---
 

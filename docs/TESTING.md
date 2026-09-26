@@ -148,6 +148,7 @@ The simulator cannot be tapped from a script, so the app has **launch hooks** re
 | `SWING_AUTO_TRIM=1` | trim to the rep span right after the first analysis |
 | `SWING_UNDO_TRIM=1` | undo that trim 3 s later (with `SWING_AUTO_TRIM`) |
 | `SWING_CANCEL_ANALYSIS=1` | cancel the offline pass one second in |
+| `SWING_CLIP_SWITCH=render\|mode\|photos\|trim` | simulator-only: suspend A at its render, mode replay, Photos-save or trim completion; open stored B (zero reps), then release A. The Photos case returns a fake identifier without library access. `ONLY=clip_switch just test-sim` asserts B's analysis, local video and entry survive and A neither saves nor starts playback; `clip_switch_begin`, `clip_switch_release`, `clip_switch_checked` mark the boundaries |
 | `SWING_INTERRUPT_READER=<frame>` | fail the first pass at that frame with `readerFailed("Operation Interrupted")`, like a backgrounded decoder (#57) |
 | `SWING_MODE=<exercise\|auto>` | switch exercise 2 s after an interrupted pass, proving a mode switch re-runs the clip (#57); launch-only, persists no default, and every smoke check resets the mode default first |
 | `SWING_OPEN_RECENT=1` | reopen the newest Recents entry |
@@ -170,7 +171,10 @@ simulator runs the pose model on the CPU at roughly 20 fps, a tenth of the phone
 
 Checks today: three clips must detect and count (4 swings, 6 pistols, 8 Bulgarian); the trim check auto-trims the
 9-rep clip and asserts a lossless passthrough cut that starts on a keyframe within 1.5 s of the requested start and
-a first displayed frame at time zero.
+a first displayed frame at time zero. Cancel must leave playback paused and save nothing; interruption followed
+by a mode switch must re-extract. Four `clip_switch` checks force late foreground completions after another
+stored set opens, including a simulated Photos response; real Photos permission/replacement/undo remains a
+phone check.
 
 Sample clips live outside the repo in `~/tmp/agent/swing-samples/` (`$SAMPLES`); sources are listed in the README.
 
