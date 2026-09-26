@@ -16,8 +16,9 @@ wait_for() {
   while [ "$waited" -lt "$2" ]; do
     sleep 2; waited=$((waited + 2))
     local f; f=$(newest_log)
-    [ -n "$f" ] && jq -e --arg t "$1" 'select(.type==$t)' "$f" >/dev/null 2>&1 && return 0
+    [ -n "$f" ] && [ "$f" != "$previous_log" ] && jq -e --arg t "$1" 'select(.type==$t)' "$f" >/dev/null 2>&1 && return 0
   done
+  fail=1  # A timeout must fail the run even if the following assertion finds a matching old result.
   return 1
 }
 # A mode-switching check must not leak its exercise into later launches (#57): terminate, then drop the
@@ -25,10 +26,10 @@ wait_for() {
 reset_mode() {
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   xcrun simctl spawn "$SIM" defaults delete "$BUNDLE" exerciseMode 2>/dev/null || true
+  previous_log=$(newest_log)
 }
 check() {  # clip expected-exercise expected-reps timeout-seconds
   reset_mode
-  local before; before=$(newest_log)
   SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
   sleep 3
   wait_for analyzed "$4" || echo "      (timed out after $4 s waiting for analysis)"
@@ -52,7 +53,10 @@ check_trim() {  # clip expected-reps wait-seconds: auto-trims after analysis, ex
   req=$(jq -r 'select(.type=="trim") | .requested_start_s' "$f" | tail -1)
   reps=$(jq -r 'select(.type=="trim") | .reps' "$f" | tail -1)
   # first displayed frame of the trimmed item: the player must start at the cut, not at the next keyframe
-  first=$(jq -r 'select(.type=="display_frame") | .player_time' "$f" | tail -3 | sort -n | head -1)
+  first=$(jq -sr '
+    ([.[] | select(.type=="trim")][-1].t) as $trim |
+    [.[] | select(.type=="display_frame" and .t >= $trim)][0].player_time // empty
+  ' "$f")
   if [ "$pass" = "true" ] && [ "$reps" = "$2" ] && awk "BEGIN{exit !($start <= $req && $req - $start < 1.5 && $first < 0.2)}"; then
     echo "ok    trim $1: passthrough, start $start (asked $req), first frame at ${first}s, $reps reps"
   else echo "FAIL  trim $1: passthrough=$pass start=$start asked=$req first_frame=$first reps=$reps (wanted $2)"; fail=1; fi
