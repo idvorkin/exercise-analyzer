@@ -10,7 +10,7 @@ BOTTOM, the first qualifying frame for CONNECT and RELEASE.
 
 | Phase | Meaning | Condition (degrees, `SwingThresholds`) |
 |---|---|---|
-| TOP | lockout: arms at peak height, standing tall | spine < 25 (`topSpineMax`), hip > 160 (`topHipMin`), arm > 40 (`topArmMin`), or > 32 within 0.4 s of the release (`ballisticTopArmMin`, `ballisticReleaseMax`); confirmed by the wrist-height peak |
+| TOP | lockout: arms at peak height, standing tall | spine < 25 (`topSpineMax`), hip > 160 (`topHipMin`), arm > 40 (`topArmMin`), or > 32 within 0.4 s of the release (`ballisticTopArmMin`, `ballisticReleaseMax`), or, within that same 0.4 s, > 20 with the wrists no more than 0.4 torso lengths below the shoulders (`wristTopArmMin`, `wristTopRiseMin`, #139); confirmed by the wrist-height peak |
 | CONNECT | arms vertical against the body before the hinge | arm < 25 (`connectArmMax`), spine < 25 (`connectSpineMax`) |
 | BOTTOM | deepest hinge, arms behind the body | arm < 75 + 15 (`bottomArmMax`, anything short of horizontal), spine > 35 (`bottomSpineMin`), hip < 140 (`bottomHipMax`) |
 | RELEASE | arms leaving the body after the hip snap | arm < 25 (`releaseArmMax`), spine < 25 (`releaseSpineMax`) |
@@ -54,10 +54,13 @@ Scored per rep from the stored positions (lockout angles, hinge depth); mirrored
 | swing-lowcam-10reps | 10 | no | #16 (IMG_4340): low, close camera; counted 0 before the arm thresholds were relaxed |
 | swing-hole-7reps | 7 | no | #94: a live set whose recording lost 12.68–14.88 s; 9 swings, 2 cut by the hole |
 | swing-onearm-10reps | 8 | no | #97: ten one-arm swings with the upper arm on the ribs, arm peaks 37–49° at the top; counted 5. The first two are not countable yet (see Experiments); the bell park at the end must not be a rep |
+| swing-farcam-10reps | 10 | no (Muse) | #139 (9283D45A): far camera behind the lifter, arms foreshortened, the float reads 30–38°; counted 1 |
+| swing-farcam-5tops | 4 | no (Muse) | #140 (CDC08BF2): same camera; the auto-trim (#141) cut the clip on the fifth top; counted 1 |
 
 Reports: `TuningReports.testSwingTopArmSweep` (every swing fixture's and archived swing track's count per
 `ballisticTopArmMin`; `SWING_TOP_HIP`, `SWING_BALLISTIC`, `SWING_MAX_REP` rerun it under other thresholds),
-`TuningReports.testSwingRepTraces`, `SwingThresholdSweep.testSwingThresholdSweep`, and
+`TuningReports.testSwingWristRiseSweep` (the same rows per `wristTopRiseMin`, off first; `SWING_WRIST_ARM`
+overrides `wristTopArmMin`), `TuningReports.testSwingRepTraces`, `SwingThresholdSweep.testSwingThresholdSweep`, and
 `TuningReports.testSwingSignals` (every frame's angles and phase for one archived track, `SWING_TRACK=<name>
 SWING_FROM=12 SWING_TO=17`).
 
@@ -105,3 +108,17 @@ SWING_FROM=12 SWING_TO=17`).
   reps, but swing-lowcam 10 → 3 and swing-pickup 9 → 10: foreshortened arms bounce across the cut-off). A
   shoulder→wrist angle would separate a top from hanging arms better, but the wrist here is mislabelled, so it
   was not tried. Not yet confirmed by Igor.
+- **2026-09-26, swing-farcam-10reps / swing-farcam-5tops (#139, #140)**: two sets from the 09-25 session counted
+  1 each. Frames show real swings (bell at chest height, arms straight out); Muse counts 10 and 5 tops (the second
+  clip was cut by the auto-trim, #141). The camera is far (the lifter fills 22 % of the frame height) and behind
+  him to one side, so the arms point away from it: standing-tall arm p90 33–34° against 41–47° for the sets of the
+  same session that counted 9–10. The wrist, though, rises to 15–30 px below the shoulders in both. Lowering
+  `ballisticTopArmMin` does not fix it (`testSwingTopArmSweep`: 30° gives 4 and 2, 28° gives 6 and 2, and
+  F853A918 gains its park at both). New measure `BodySkeleton.wristRise`: wrist height over the torso length,
+  scale-free (about -1 hanging, near 0 at chest height). First as an extra top rule at any speed
+  (`testSwingWristRiseSweep`, arm > 20°, rise ≥ -0.7/-0.6/-0.5/-0.4/-0.3): the target sets recover (9283D45A
+  1 → 10 at -0.7…-0.4, 8 at -0.3) but eight other tracks gain a rep at -0.5, among them the three known parks
+  (F853A918, 96FEBD60, FD1FCA37). Limited to a ballistic upswing (within `ballisticReleaseMax`, like the #97
+  rule), -0.4 moves nothing but the three far-camera sets: 9283D45A 1 → 10, CDC08BF2 1 → 4, 3BEF7CEF 0 → 2
+  (a 9 s trimmed fragment starting mid-set, 4 tops by Muse); at -0.5 F853A918's park and two 09-16 sets
+  (73014BDE, B69762F7) gain one. `wristTopRiseMin` -0.4, `wristTopArmMin` 20. Not yet confirmed by Igor.

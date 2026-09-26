@@ -290,6 +290,35 @@ extension TuningReports {
     for url in tracks { row(url.deletingPathExtension().lastPathComponent, "-", try Fixture.frames(at: url)) }
   }
 
+  /// #139: a far camera behind the lifter reads the float at 30–38°. Counts every swing fixture and archived
+  /// track with the wrist-rise top rule off ("off") and at each `wristTopRiseMin` (torso lengths);
+  /// SWING_WRIST_ARM overrides `wristTopArmMin`.
+  func testSwingWristRiseSweep() throws {
+    let armFloor = Double(ProcessInfo.processInfo.environment["SWING_WRIST_ARM"] ?? "")
+    let values: [Double?] = [nil, -0.7, -0.6, -0.5, -0.4, -0.3]
+    func row(_ name: String, _ want: String, _ frames: [FrameRecord]) {
+      let counts = values.map { value -> Int in
+        var thresholds = SwingThresholds()
+        thresholds.wristTopRiseMin = value
+        if let armFloor { thresholds.wristTopArmMin = armFloor }
+        let pipeline = AnalysisPipeline(exercise: .kettlebellSwing, analyzer: KettlebellSwingAnalyzer(thresholds: thresholds))
+        for frame in frames { pipeline.process(extracted: frame) { nil } }
+        return pipeline.reps.count
+      }
+      let marks = counts.dropFirst().contains { $0 != counts[0] } ? "  *" : ""
+      print(name.padding(toLength: 40, withPad: " ", startingAt: 0) + want.padding(toLength: 6, withPad: " ", startingAt: 0)
+        + counts.map { String(format: "%4d", $0) }.joined(separator: " ") + marks)
+    }
+    print("fixture".padding(toLength: 40, withPad: " ", startingAt: 0) + "want  "
+      + values.map { $0.map { String(format: "%4.1f", $0) } ?? " off" }.joined(separator: " "))
+    for fixture in Fixture.all where fixture.expectedExercise == .kettlebellSwing {
+      row(fixture.name, "\(fixture.expectedReps)", try fixture.frames())
+    }
+    let tracks = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? [])
+      .filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+    for url in tracks { row(url.deletingPathExtension().lastPathComponent, "-", try Fixture.frames(at: url)) }
+  }
+
   /// Raw signals for a fixture at ~4 Hz, plus a naive rep count from smoothed knee-angle dips.
   func testBulgarianPhoneSignals() throws {
     let frames = try Fixture(name: "bulgarian-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 0, humanVerified: false).frames()

@@ -23,5 +23,7 @@ public enum AnalysisVersion {
   // detector sees; a bench nearer the camera than the lifter hid the gap and the set counted 0 (#134).
   // 2026-09-22.4: a Bulgarian rep ends where the head turns back down, counted near the standing height and
   // abandoned far short of it; a standing height learned in the walk-in held 79271425 in one rep all set (#135).
-  public static let current = "2026-09-22.4"
+  // 2026-09-26.1: a swing top the arm angle reads low (a far camera behind the lifter, 30–38°) counts on a fast
+  // upswing when the wrists are within 0.4 torso lengths of the shoulders (#139, #140).
+  public static let current = "2026-09-26.1"
 }

@@ -43,6 +43,15 @@ struct Fixture {
     // and the first top (5.1 s) is never a TOP, so no rep starts there. Parking the bell and walking off (hip
     // 151–156°, arms 33–56°) is not a ninth rep. Not yet confirmed by Igor.
     Fixture(name: "swing-onearm-10reps", expectedExercise: .kettlebellSwing, expectedReps: 8, humanVerified: false),
+    // Igor's gym set (2026-09-25, recents 9283D45A, #139): "Something is really wrong with this analysis". The
+    // camera is far (the lifter fills 22 % of the frame height) and behind him to one side, so the arms point
+    // away from it and the float reads 30–38°: 1 rep was counted. Muse, twice (per-frame labels and a contact
+    // sheet): 10 swings, tops 8.0–22.0 s every ~1.5 s, after an 8 s setup. Not yet confirmed by Igor.
+    Fixture(name: "swing-farcam-10reps", expectedExercise: .kettlebellSwing, expectedReps: 10, humanVerified: false),
+    // Same session and camera (recents CDC08BF2, #140): 1 counted. The auto-trim cut the 28.4 s recording to
+    // 3.8–15.4 s on that count (#141); the clip left has five tops (5.25, 7.0, 8.5, 10.0, 11.5 s by Muse) and
+    // ends on the fifth, so four swings end in the clip. Not yet confirmed by Igor.
+    Fixture(name: "swing-farcam-5tops", expectedExercise: .kettlebellSwing, expectedReps: 4, humanVerified: false),
     Fixture(name: "pistol-6reps", expectedExercise: .pistolSquat, expectedReps: 6, humanVerified: false),
     // Head height drops 8 times at a steady ~4.2 s rhythm; the earlier front-knee analyzer counted 10.
     Fixture(name: "bulgarian-10reps", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),

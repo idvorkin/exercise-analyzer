@@ -31,6 +31,12 @@ public struct SwingThresholds {
   /// the arms a little forward (33–37°) takes 0.57–0.9 s.
   public var ballisticTopArmMin = 32.0
   public var ballisticReleaseMax = 0.4
+  /// A far camera behind the lifter foreshortens arms pointing away from it: the float reads 30–38° (#139). A top
+  /// that low counts on a ballistic upswing when the wrists are up near the shoulders (`BodySkeleton.wristRise`,
+  /// torso lengths). -0.4: the far-camera sets count, and no other fixture or archived track moves; at -0.5 a
+  /// parked bell (F853A918) counts again. nil turns the rule off.
+  public var wristTopRiseMin: Double? = -0.4
+  public var wristTopArmMin = 20.0
   /// CONNECT→BOTTOM uses |arm| < bottomArmMax + 15: anything short of horizontal. The spine and hip conditions
   /// already separate the bottom from the top; from a low camera the arms behind the body read up to 85° (#16).
   public var bottomArmMax = 75.0
@@ -89,6 +95,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
 
   private struct Angles {
     var arm = 0.0, spine = 0.0, hip = 0.0, knee = 0.0, wristHeight = 0.0
+    var wristRise: Double?
     /// BodySkeleton reports exactly 0 for an angle it could not measure; such frames must not drive transitions.
     var measured: Bool { arm != 0 && spine != 0 && hip != 0 }
     var metrics: [String: Double] {
@@ -125,7 +132,7 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
     let skeleton = BodySkeleton(pose: pose)
     let a = Angles(
       arm: skeleton.armToVerticalAngle, spine: skeleton.spineAngle, hip: skeleton.hipAngle,
-      knee: skeleton.kneeAngle, wristHeight: skeleton.wristHeight)
+      knee: skeleton.kneeAngle, wristHeight: skeleton.wristHeight, wristRise: skeleton.wristRise)
 
     if let last = lastFrameTime, time - last > thresholds.maxFrameGap {
       abandonRep()
@@ -245,7 +252,8 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
   /// the wrist height peaking or by the arm staying horizontal for a few frames.
   private func shouldTransitionToTop(_ a: Angles, time: Double) -> Bool {
     let ballistic = time - releaseStartTime <= thresholds.ballisticReleaseMax
-    guard machine.canTransition, isAtTop(a, armMin: ballistic ? thresholds.ballisticTopArmMin : thresholds.topArmMin)
+    guard machine.canTransition, isAtTop(
+      a, armMin: ballistic ? thresholds.ballisticTopArmMin : thresholds.topArmMin, ballistic: ballistic)
     else { return false }
 
     if wristHeightHistory.count >= 3 {
@@ -263,9 +271,12 @@ public final class KettlebellSwingAnalyzer: ExerciseAnalyzer {
   }
 
   /// Standing tall with the arms raised: the pose of a lockout, whatever the wrists did before it.
-  private func isAtTop(_ a: Angles, armMin: Double? = nil) -> Bool {
-    a.measured && a.spine <= thresholds.topSpineMax && a.hip >= thresholds.topHipMin
-      && abs(a.arm) > (armMin ?? thresholds.topArmMin)
+  /// `ballistic` lets the wrist-rise rule in: only a fast upswing may count a top the arm angle reads low.
+  private func isAtTop(_ a: Angles, armMin: Double? = nil, ballistic: Bool = false) -> Bool {
+    guard a.measured && a.spine <= thresholds.topSpineMax && a.hip >= thresholds.topHipMin else { return false }
+    if abs(a.arm) > (armMin ?? thresholds.topArmMin) { return true }
+    guard ballistic, let riseMin = thresholds.wristTopRiseMin, let rise = a.wristRise else { return false }
+    return abs(a.arm) > thresholds.wristTopArmMin && rise >= riseMin
   }
 
   private func smoothedWristHeight(center: Int, radius: Int) -> Double {

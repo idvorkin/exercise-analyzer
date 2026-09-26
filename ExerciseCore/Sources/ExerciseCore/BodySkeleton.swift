@@ -173,6 +173,19 @@ public struct BodySkeleton {
     return Double(shoulderMidY - highest)
   }
 
+  /// `wristHeight` in torso lengths (shoulder midpoint to hip midpoint), so it reads the same near and far from
+  /// the camera: about -1 with the arms hanging, near 0 with the bell at chest height. nil when a wrist, both
+  /// shoulders or the hips are missing.
+  public var wristRise: Double? {
+    let shoulders = [point(.leftShoulder), point(.rightShoulder)].compactMap { $0 }
+    let hips = [point(.leftHip), point(.rightHip)].compactMap { $0 }
+    guard shoulders.count == 2, let top = Self.centroid(shoulders), let bottom = Self.centroid(hips) else { return nil }
+    let torso = Double(((top.x - bottom.x) * (top.x - bottom.x) + (top.y - bottom.y) * (top.y - bottom.y)).squareRoot())
+    let height = wristHeight
+    guard torso > 0, height != 0 else { return nil }
+    return height / torso
+  }
+
   // MARK: - Helpers
 
   private static func centroid(_ points: [CGPoint]) -> CGPoint? {
