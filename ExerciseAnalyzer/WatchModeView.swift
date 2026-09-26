@@ -2,7 +2,8 @@
 
 //  Watch mode: the phone sits on a tripod and is driven from the wrist, so its screen shows what is readable
 //  from across the room: the rep count in huge digits, the in-frame hint in red when the lifter is out, the
-//  elapsed time and the exercise. Nothing else. Only while recording (the session refuses it otherwise and
+//  elapsed time and the exercise; VIEWFINDER in place of the count while framing (047). Nothing else. Only while
+//  the camera is up (the session refuses it otherwise and
 //  leaves it with the set, #36). Long-press anywhere to leave (a stray tap must not).
 
 import ExerciseCore
@@ -16,11 +17,19 @@ struct WatchModeView: View {
       Color.black.ignoresSafeArea()
       VStack(spacing: 12) {
         Spacer()
-        Text("\(session.reps.count)")
-          .font(.system(size: 220, weight: .bold, design: .rounded).monospacedDigit())
-          .minimumScaleFactor(0.4).lineLimit(1)
-          .foregroundStyle(.white)
-        Text(session.reps.count == 1 ? "rep" : "reps").font(.title).foregroundStyle(.gray)
+        if session.viewfinder {
+          // Framing from the wrist's Preview, not recording: the count names the state, as on the HUD (047, #144).
+          Text("VIEWFINDER")
+            .font(.system(size: 220, weight: .bold, design: .rounded))
+            .minimumScaleFactor(0.2).lineLimit(1)
+            .foregroundStyle(.white)
+        } else {
+          Text("\(session.reps.count)")
+            .font(.system(size: 220, weight: .bold, design: .rounded).monospacedDigit())
+            .minimumScaleFactor(0.4).lineLimit(1)
+            .foregroundStyle(.white)
+          Text(session.reps.count == 1 ? "rep" : "reps").font(.title).foregroundStyle(.gray)
+        }
         if session.paused {
           Text("PAUSED")
             .font(.system(size: 40, weight: .heavy))

@@ -441,7 +441,7 @@ the first frame (story 001).
 ### User Story 047:
 
 - **Summary:** Preview the shot from the wrist before recording
-- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), [b3defc0](https://github.com/idvorkin/exercise-analyzer/commit/b3defc0) and the review fixes of [2c9cc58](https://github.com/idvorkin/exercise-analyzer/commit/2c9cc58); verified on the host, the simulator (the eight watch states, the six checks) and by two code reviews; on the phone since 2026-09-14, the watch app of 2c9cc58 pending the tunnel, Igor's check pending; the heart-rate chip for [#106](https://github.com/idvorkin/exercise-analyzer/issues/106) verified on the watch simulator (`just watch-screens`: the workoutViewfinder state), on the wrist pending
+- **Status:** implemented in [4bf497b](https://github.com/idvorkin/exercise-analyzer/commit/4bf497b), [b3defc0](https://github.com/idvorkin/exercise-analyzer/commit/b3defc0) and the review fixes of [2c9cc58](https://github.com/idvorkin/exercise-analyzer/commit/2c9cc58); verified on the host, the simulator (the eight watch states, the six checks) and by two code reviews; on the phone since 2026-09-14, the watch app of 2c9cc58 pending the tunnel, Igor's check pending; the heart-rate chip for [#106](https://github.com/idvorkin/exercise-analyzer/issues/106) verified on the watch simulator (`just watch-screens`: the workoutViewfinder state), on the wrist pending; VIEWFINDER on the phone's watch mode too, fix for [#144](https://github.com/idvorkin/exercise-analyzer/issues/144) in this commit, verified on the host and by signed build, on the phone pending
 - **Why:** Igor, 2026-09-14: "Can I start with two different buttons for Record? Start Recording, Start Viewfinder. Normally, when I start on my watch, I don't know if I'm in frame or not. I walk away from my phone, set my phone up, and think I'm in frame. Then I walk to my watch, make sure I'm good, maybe adjust the camera a bit, and then I hit Start."
 
 #### Use Case:
@@ -486,7 +486,7 @@ the first frame (story 001).
   `record_start` carries the seconds spent framing. The Record notification carries the flag, so the tap
   route opens into the preview too. The phone's own Live still records from the first frame (story 001).
 
-- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73); [#106](https://github.com/idvorkin/exercise-analyzer/issues/106) Igor: "Heart rate on watch preview"
+- **Issues:** [#73](https://github.com/idvorkin/exercise-analyzer/issues/73); [#106](https://github.com/idvorkin/exercise-analyzer/issues/106) Igor: "Heart rate on watch preview"; [#144](https://github.com/idvorkin/exercise-analyzer/issues/144) the phone in watch mode read "0 reps" instead of VIEWFINDER
 
 ---
 
