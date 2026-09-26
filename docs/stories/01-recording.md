@@ -158,6 +158,11 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I turn the phone to landscape and keep swinging
 - **Then:** the preview turns with the phone, the rep count continues, and after Done the saved clip plays upright throughout
 
+- **Scenario:** Two quick rotations
+- **Given:** the phone is recording
+- **When:** I turn it twice within one second
+- **Then:** each recording segment has its own movie file, so starting the next segment cannot overwrite or collide with the previous one
+
 - **Issues:** [#22](https://github.com/idvorkin/exercise-analyzer/issues/22)
 
 ---
