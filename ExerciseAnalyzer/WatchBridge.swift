@@ -17,6 +17,10 @@ final class WatchBridge: NSObject, ObservableObject {
   /// The watch just became reachable (a raised wrist): push a fresh status without waiting to be asked.
   var onReachable: (() -> Void)?
   @Published private(set) var reachable = false
+  /// The last command, status, heartbeat or scene message from the watch (#142); not published, as heartbeats
+  /// arrive every second.
+  private(set) var lastContact: Date?
+  var onContact: (() -> Void)?
 
   private var lastSent: WatchStatus?
   private var lastSentAt = Date.distantPast
@@ -71,6 +75,11 @@ final class WatchBridge: NSObject, ObservableObject {
 
   nonisolated private func handle(_ message: [String: Any]) {
     guard let raw = message["command"] as? String, let command = WatchCommand(rawValue: raw) else { return }
+    // Any message is contact, the clock keep-awake runs on outside a workout (#142).
+    Task { @MainActor in
+      self.lastContact = Date()
+      self.onContact?()
+    }
     if command == .heartbeat {
       // The link, measured (#122; Igor: "log the communication channel from the watch to the phone … see if we
       // have a drop so we can see if there's some kind of pattern"): one line per beat, with the gap since the

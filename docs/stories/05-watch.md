@@ -156,11 +156,12 @@ the first frame (story 001).
 ### User Story 019:
 
 - **Summary:** The phone stays awake while the watch is in charge
-- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); on the phone, Igor's check pending
+- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); on the phone, Igor's check pending; fix for #142 in this commit, verified on the host
+- **Why:** Igor (2026-09-26, #142): keep the phone awake while a workout runs on the watch, and outside one for 10 minutes after the last contact. Reachability could not decide it: with the wrist down the watch reads as unreachable most of the time (#76).
 
 #### Use Case:
 - **As a** lifter controlling sets from the watch
-- **I want to** have the phone stay unlocked while the app is open and the watch is connected
+- **I want to** have the phone stay unlocked while the app is open and the watch is in use
 - **so that** Record from the wrist starts the camera instead of waking a locked phone
 
 #### Acceptance Criteria:
@@ -168,6 +169,21 @@ the first frame (story 001).
 - **Given:** the phone app is open in front and the watch is connected
 - **When:** I rest for longer than the phone's auto-lock interval
 - **Then:** the phone has not locked and a Record tap on the watch starts the camera immediately
+
+- **Scenario:** A long rest in a wrist workout, wrist down
+- **Given:** the phone app is open in front and a workout is running on the watch
+- **When:** I rest with my wrist down and the watch reads as unreachable for longer than the auto-lock interval
+- **Then:** the phone has not locked until the workout ends
+
+- **Scenario:** No workout, the watch goes quiet
+- **Given:** the phone app is open in front and no workout is running on the watch
+- **When:** ten minutes pass without a command, status, heartbeat or scene message from the watch
+- **Then:** the phone locks on its own auto-lock again; any message from the watch restarts the ten minutes
+
+#### Notes:
+- The rule is `KeepAwake.decide` in ExerciseCore (host tests in `KeepAwakeTests`); recording, an offline pass and watch mode keep the phone awake too, and a backgrounded app never does. The phone re-checks it on every watch message, on the workout starting or ending, and on its 3 s tick. `keep_awake` logs `reason` (recording, analyzing, watch_mode, workout, watch_contact, idle, background) and `contact_s`.
+
+- **Issues:** [#142](https://github.com/idvorkin/exercise-analyzer/issues/142) the phone locked during a rest in a wrist workout
 
 ---
 

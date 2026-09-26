@@ -275,6 +275,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     CrashReports.shared.reportSignalLogs { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
     watch.onReachable = { [weak self] in self?.pushWatchStatus(force: true) }
+    watch.onContact = { [weak self] in self?.updateKeepAwake() }
+    WorkoutMirror.shared.$live.map { $0 != nil }.removeDuplicates().dropFirst().receive(on: DispatchQueue.main)
+      .sink { [weak self] _ in self?.updateKeepAwake() }.store(in: &cancellables)
     watch.onExercise = { [weak self] mode in
       guard let self else { return }
       self.log.event("ui", ["action": "exercise", "from": "watch", "mode": mode])
@@ -283,6 +286,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     // Idle heartbeat: the watch marks a status stale after 8 s, and only a recording session pushes on its own.
     Timer.publish(every: 3, on: .main, in: .common).autoconnect().sink { [weak self] _ in
+      self?.updateKeepAwake()  // the ten-minute contact window closes with no event (#142)
       guard let self, self.watch.reachable else { return }
       self.pushWatchStatus(force: true)
     }.store(in: &cancellables)
@@ -1722,19 +1726,24 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// The camera last ended by Cancel, not Done: Cancel goes back to where the camera was opened from (058, #146).
   private(set) var cameraCancelled = false
   private var cancellables = Set<AnyCancellable>()
-  private var keepAwake = false
+  private var keepAwake = KeepAwake.idle
 
   /// The phone must stay in front for the watch to start a set (iOS keeps the camera and the foreground away from
-  /// a backgrounded app), so while the app is open and a watch is connected the phone does not auto-lock.
+  /// a backgrounded app), so while a workout runs on the wrist, or within ten minutes of the watch's last message,
+  /// the phone does not auto-lock (story 019, #142; the rule is `KeepAwake`). Re-run on the 3 s tick so the
+  /// window closes with no event.
   private func updateKeepAwake() {
-    let active = UIApplication.shared.applicationState == .active
-    // An offline pass on a two-minute clip outlasts auto-lock; a locked phone backgrounds the app and AVFoundation
-    // interrupts the reader ("Operation Interrupted" at 43 s, #46), so the pass keeps the screen on too.
-    let wanted = active && (source == .camera || watch.reachable || watchMode || currentJob != nil)
-    guard wanted != keepAwake else { return }
-    keepAwake = wanted
-    UIApplication.shared.isIdleTimerDisabled = wanted
-    log.event("keep_awake", ["on": wanted, "recording": source == .camera, "watch_reachable": watch.reachable])
+    let reason = KeepAwake.decide(
+      appActive: UIApplication.shared.applicationState == .active, recording: source == .camera,
+      analyzing: currentJob != nil, watchMode: watchMode, workoutRunning: WorkoutMirror.shared.live != nil,
+      lastWatchContact: watch.lastContact, now: Date())
+    guard reason != keepAwake else { return }
+    keepAwake = reason
+    UIApplication.shared.isIdleTimerDisabled = reason.on
+    log.event(
+      "keep_awake",
+      ["on": reason.on, "reason": reason.rawValue, "recording": source == .camera, "watch_reachable": watch.reachable,
+       "contact_s": watch.lastContact.map { Int(Date().timeIntervalSince($0)) } ?? -1])
   }
 
   private func pushWatchStatus(force: Bool = false) {
