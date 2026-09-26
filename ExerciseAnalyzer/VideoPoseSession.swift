@@ -1002,6 +1002,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     activity = .idle
     liveInferenceEnabled = true
+    // Cancel leaves the loaded clip paused (story 028); it must not fall through to playback or auto-trim.
+    if case .cancelled = result { return }
     play()
     // Test hook: SWING_AUTO_TRIM=1 trims right after the first analysis (simulator runs can't tap the UI).
     if trimmedURL == nil, ProcessInfo.processInfo.environment["SWING_AUTO_TRIM"] == "1" {

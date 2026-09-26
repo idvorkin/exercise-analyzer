@@ -62,14 +62,16 @@ check_cancel() {  # clip wait-seconds: cancels one second into the analysis (#37
   SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" SIMCTL_CHILD_SWING_CANCEL_ANALYSIS=1 xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
   sleep 3
   wait_for analysis_cancelled "$2" || echo "      (timed out after $2 s waiting for the cancel to land)"
+  sleep 2  # observe the completion path too: Cancel must not fall through to playback
   local f; f=$(newest_log)
-  local asked landed analyzed
+  local asked landed analyzed played
   asked=$(jq -r 'select(.type=="analysis_cancel") | .t' "$f" | head -1)
   landed=$(jq -r 'select(.type=="analysis_cancelled") | .t' "$f" | head -1)
   analyzed=$(jq -r 'select(.type=="analyzed" or .type=="recents_saved") | .type' "$f" | head -1)
-  if [ -n "$asked" ] && [ -n "$landed" ] && [ -z "$analyzed" ] && [ $((landed - asked)) -lt 3000 ]; then
-    echo "ok    cancel $1: stopped $((landed - asked)) ms after Cancel, nothing analyzed or saved"
-  else echo "FAIL  cancel $1: asked=$asked landed=$landed analyzed=$analyzed"; fail=1; fi
+  played=$(jq -r 'select(.type=="play") | .t' "$f" | head -1)
+  if [ -n "$asked" ] && [ -n "$landed" ] && [ -z "$analyzed" ] && [ -z "$played" ] && [ $((landed - asked)) -lt 3000 ]; then
+    echo "ok    cancel $1: stopped $((landed - asked)) ms after Cancel, paused, nothing analyzed or saved"
+  else echo "FAIL  cancel $1: asked=$asked landed=$landed analyzed=$analyzed played=$played"; fail=1; fi
 }
 check_interrupt() {  # clip interrupt-frame mode expected-reps wait-seconds: fails the first pass the way a
   # backgrounded decoder does (#57); the mode switch must then re-run the clip, so an offline_pass comes before
