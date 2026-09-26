@@ -22,7 +22,9 @@ struct WorkoutDetailView: View {
   var body: some View {
     let snapshot = WorkoutPageSnapshot(
       identity: identity, live: workouts.live, saved: workouts.index.workouts,
-      now: max(tick, Date()), sets: store.entries, heartRate: heartRate)
+      // The 20 s tick, not Date(): a live workout's end read per render changed on every pan and pinch frame,
+      // re-logging `workout_page` and rebuilding the timeline each time.
+      now: tick, sets: store.entries, heartRate: heartRate)
     Group {
       if let snapshot {
         WorkoutPageView(
