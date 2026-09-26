@@ -18,6 +18,38 @@ class PullTracksTests(unittest.TestCase):
     def test_same_id_reanalyzed_as_another_exercise_keeps_the_old_track(self):
         self.check_export("12345678-1111-1111-1111-111111111111", collision=False)
 
+    def test_a_changed_set_on_the_phone_refreshes_its_track_and_an_unchanged_one_is_left_alone(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            stage, out, bin_dir = (root / name for name in ("stage", "out", "bin"))
+            for directory in (stage, out, bin_dir):
+                directory.mkdir()
+            fake_copy = bin_dir / "xcrun"
+            fake_copy.write_text("#!/bin/sh\nexit 0\n")
+            fake_copy.chmod(0o755)
+            entry = "abcdef12-1111-1111-1111-111111111111"
+            snapshot = stage / entry / "analysis.json"
+            snapshot.parent.mkdir()
+            frame = {"time": 0.0, "imageSize": [1, 1], "box": None, "pose": None}
+            env = {**os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+                   "PULL_TRACKS_STAGE": str(stage), "PULL_TRACKS_OUT": str(out)}
+            run = lambda: subprocess.run(["bash", str(SCRIPT)], capture_output=True, text=True, env=env)
+
+            snapshot.write_text(json.dumps({"exercise": "pistol-squat", "frames": [frame], "reps": []}))
+            self.assertIn("archived", run().stdout)
+            track = out / "pistol-squat-nodate-abcdef12.json"
+            self.assertEqual(len(json.loads(track.read_text())["frames"]), 1)
+
+            self.assertIn("0 new or refreshed", run().stdout)
+
+            snapshot.write_text(json.dumps({"exercise": "pistol-squat", "frames": [frame, {**frame, "time": 0.1}], "reps": [{}]}))
+            result = run()
+            self.assertIn("refreshed", result.stdout, result.stderr)
+            refreshed = json.loads(track.read_text())
+            self.assertEqual(len(refreshed["frames"]), 2)
+            self.assertEqual(refreshed["source"]["reps_when_saved"], 1)
+            self.assertEqual(list(out.iterdir()), [track])
+
     def check_export(self, second, *, collision):
         with tempfile.TemporaryDirectory() as root:
             root = Path(root)

@@ -4,8 +4,8 @@
 # archive report (swift test --filter ArchivedTracks) shows how every set counts under the current analyzers.
 # Usage: scripts/pull-tracks.sh [device udid]
 # The archive is keyed by entry id, not by date: a file already holding an id keeps it under whatever date
-# prefix, so a re-pull refreshes it in place (renamed to the dated name once the phone's index carries a date)
-# instead of leaving a second file beside it. Full IDs are checked before using an 8-character filename key;
+# prefix, so a re-pull refreshes it in place whenever the phone's copy differs (renamed to the dated name once
+# the phone's index carries a date) instead of leaving a second file beside it. Full IDs are checked before using an 8-character filename key;
 # a prefix collision stops the export before any archive is changed. When the same id arrives with a different exercise, the
 # newer analysis wins and the older file is renamed to <name>-superseded[.N].json, never left beside it under
 # the id key and never deleted.
@@ -86,29 +86,24 @@ for snap in sorted(stage.glob("*/analysis.json")):
         # One set, re-pulled: a single file. The dated name wins once a date is known.
         target = out / dated_name if day else next(
             (p for p in same_exercise if "-nodate-" not in p.name), out / dated_name)
-    # An archived track is refreshed once when the phone's copy gained the detector's sightings (#50) or bench
-    # boxes (#134).
-    text = target.read_text() if target.exists() else ""
-    if target.exists() and not (has_bells and '"bells"' not in text) and not (has_bench and '"bench"' not in text):
-        if not same_exercise:
-            print(f"kept {target.name} (no new sightings)")
-        # Consolidate same-exercise twins even when the content is kept: one file per id.
-        for twin in same_exercise:
-            if twin != target:
-                twin.unlink()
-                print(f"consolidated {twin.name} -> {target.name}")
-        continue
     frames = [{"time": f["time"], "imageSize": f["imageSize"], "box": f.get("box"),
                "pose": ({"xyn": f["pose"]["xyn"], "conf": f["pose"]["conf"]} if f.get("pose") else None),
                **({"bells": f["bells"]} if f.get("bells") else {}),
                **({"bench": f["bench"]} if f.get("bench") else {})} for f in d["frames"]]
-    json.dump({"version": 1, "source": {"recents_id": entry_id, "exercise": exercise, "reps_when_saved": len(d.get("reps", []))},
-               "frames": frames}, open(target, "w"), separators=(",", ":"))
+    text = json.dumps({"version": 1, "source": {"recents_id": entry_id, "exercise": exercise, "reps_when_saved": len(d.get("reps", []))},
+                       "frames": frames}, separators=(",", ":"))
+    # The phone's copy is the truth: a set re-extracted, trimmed or re-analyzed there replaces its archived
+    # track in place (Igor, 2026-09-26: refresh when stale); git keeps the old one. Compared as parsed JSON:
+    # older files order a bell's keys differently, which is not a change.
+    existed = target.exists()
+    if not existed or json.loads(target.read_text()) != json.loads(text):
+        target.write_text(text)
+        written += 1
+        print(f"{'refreshed' if existed else 'archived'} {target.name}: {len(frames)} frames, {len(d.get('reps', []))} reps when saved")
+    # One file per id, whether or not the content changed.
     for twin in same_exercise:
         if twin != target:
             twin.unlink()
             print(f"consolidated {twin.name} -> {target.name}")
-    written += 1
-    print(f"archived {target.name}: {len(frames)} frames, {len(d.get('reps', []))} reps when saved")
-print(f"{written} new track(s); {len(list(out.glob('*.json')))} in the archive")
+print(f"{written} new or refreshed track(s); {len(list(out.glob('*.json')))} in the archive")
 PY
