@@ -19,7 +19,7 @@ struct WatchContentView: View {
       // The picture page whenever the camera is live: `recording` means the camera is up. `phoneActive` is the
       // follow-the-wrist decision (041), never a gate on the picture (2026-09-13 regression: the wrist dropped to
       // the idle pages whenever the phone app was not .active, and lost its framing controls with it).
-      if phone.showsAsLive && status.recording {
+      if (phone.showsAsLive || phone.answersLost) && status.recording {
         recordingPages
       } else {
         idlePages
@@ -266,7 +266,9 @@ struct WatchContentView: View {
         Text(hintText)
           .font(.caption2.weight(.semibold)).multilineTextAlignment(.center)
           .padding(.horizontal, 10).padding(.vertical, 3)
-          .background(status.frame.inFrame ? Color.green.opacity(0.4) : Color.red.opacity(0.7), in: Capsule())
+          .background(
+            phone.answersLost ? Color.orange.opacity(0.8) : status.frame.inFrame ? Color.green.opacity(0.4) : Color.red.opacity(0.7),
+            in: Capsule())
           .padding(.bottom, 2)
       }
       .safeAreaInset(edge: .bottom) {
@@ -378,6 +380,7 @@ struct WatchContentView: View {
 
   /// "PAUSED · FEET CUT OFF" when paused, "waiting for the picture" before the first preview arrives.
   private var hintText: String {
+    if phone.answersLost { return "PHONE NOT ANSWERING · TAPS STILL REACH IT" }
     guard phone.preview != nil else { return "waiting for the picture" }
     let hint = status.frame.hint.uppercased()
     return status.paused ? "PAUSED · \(hint)" : hint

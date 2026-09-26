@@ -129,6 +129,17 @@ the first frame (story 001).
   phone's `watch_reachable` carries its own `app_state` and `protected_data` (false while locked), to tell whether
   the phone's side decides when the link survives a lowered wrist (Igor, 2026-09-22: "do A and C", [#76](https://github.com/idvorkin/exercise-analyzer/issues/76))
 
+- **Scenario:** A link that dies one way keeps Done and Cancel
+- **Given:** a set recording from the watch
+- **When:** the phone stops answering while the watch still reads it as reachable (2026-09-25: phone sends failed
+  with WatchConnectivity 7001 for five minutes while every tap from the wrist still arrived)
+- **Then:** after the 2 s wake grace the watch keeps the recording pages and their buttons, with an orange "PHONE NOT
+  ANSWERING · TAPS STILL REACH IT" in place of the framing hint, instead of dropping to "Waiting for the phone…"
+  with only Retry; the first status after the silence is logged with the channel that brought it
+  (`watch_status_back`), and a failed application-context update on the phone is logged
+  (`watch_context_failed`) (Igor, 2026-09-25: "when the app failed, I couldn't get out of that broken state",
+  [#137](https://github.com/idvorkin/exercise-analyzer/issues/137))
+
 - **Notes:** With the wrist down the watch app is suspended and the status stops; that is the price of having no
   workout session ([#32](https://github.com/idvorkin/exercise-analyzer/issues/32), see the end of this file). The
   state arrives through the application context on wake, and the face complication (043) is the screen that
@@ -137,7 +148,7 @@ the first frame (story 001).
   is both radios and both apps awake per message; faster is a one-line change once the 1 s pattern asks for it.
   How to read a session: [DEBUGGING.md](../DEBUGGING.md#the-session-log), `docs/analysis/lab/2026-09-22-watch-heartbeat.md`.
 
-- **Issues:** [#32](https://github.com/idvorkin/exercise-analyzer/issues/32); [#122](https://github.com/idvorkin/exercise-analyzer/issues/122) the heartbeat, after [#76](https://github.com/idvorkin/exercise-analyzer/issues/76)'s reachability edges alone could not say what the link did between them
+- **Issues:** [#32](https://github.com/idvorkin/exercise-analyzer/issues/32); [#122](https://github.com/idvorkin/exercise-analyzer/issues/122) the heartbeat, after [#76](https://github.com/idvorkin/exercise-analyzer/issues/76)'s reachability edges alone could not say what the link did between them; [#137](https://github.com/idvorkin/exercise-analyzer/issues/137) the phone→watch direction died for five minutes mid-set and the wrist lost its Stop
 
 ---
 

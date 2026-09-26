@@ -81,6 +81,15 @@ final class PhoneLink: NSObject, ObservableObject {
     isLive || (receivedAt != nil && Date().timeIntervalSince(wokeAt) < Self.wakeGrace)
   }
 
+  /// A set the phone last said it was recording, from a phone that still reads as reachable but has stopped
+  /// answering (#137): the link can die one way, the phone's sends failing for minutes while every tap from
+  /// here still arrives. The recording controls stay, so Done and Cancel still reach it.
+  /// ponytail: a stored context can say "recording" long after the fact (review finding 8), so a phone that
+  /// quit mid-set also shows the controls; its taps are harmless, and context age would tell them apart.
+  var answersLost: Bool {
+    !showsAsLive && reachable && status.recording
+  }
+
   /// Asks the phone for a fresh status (a reachable phone app answers with one).
   func ping() {
     guard screenshot == nil else { return }
@@ -241,11 +250,16 @@ final class PhoneLink: NSObject, ObservableObject {
     workout.end(discard: discard)
   }
 
-  private func apply(_ message: [String: Any]) {
+  private func apply(_ message: [String: Any], via channel: String) {
     guard let data = message["status"] as? Data, let next = try? JSONDecoder().decode(WatchStatus.self, from: data)
     else { return }
     let previous = status
     status = next
+    // Which channel ends a silence, and how long it was (#137): says whether the application context still
+    // gets through when the phone's messages do not.
+    if let last = receivedAt, Date().timeIntervalSince(last) >= Self.maxStatusAge {
+      logEvent("status_back", ["via": channel, "silent_s": Int(Date().timeIntervalSince(last)), "reachable": reachable])
+    }
     receivedAt = Date()
     lastError = nil
     if previous.recording != next.recording || previous.rolling != next.rolling || previous.reps != next.reps {
@@ -377,7 +391,7 @@ extension PhoneLink: WCSessionDelegate {
     let fields: [String: Any] = ["state": state.rawValue, "reachable": session.isReachable, "error": error.map { "\($0)" } ?? ""]
     Task { @MainActor in
       self.reachable = session.isReachable
-      self.apply(context)
+      self.apply(context, via: "stored_context")
       self.logEvent("session", fields)
     }
   }
@@ -396,7 +410,7 @@ extension PhoneLink: WCSessionDelegate {
   }
 
   nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-    Task { @MainActor in self.apply(message) }
+    Task { @MainActor in self.apply(message, via: "message") }
   }
 
   nonisolated func session(_ session: WCSession, didReceiveMessageData messageData: Data) {
@@ -415,6 +429,6 @@ extension PhoneLink: WCSessionDelegate {
   }
 
   nonisolated func session(_ session: WCSession, didReceiveApplicationContext context: [String: Any]) {
-    Task { @MainActor in self.apply(context) }
+    Task { @MainActor in self.apply(context, via: "context") }
   }
 }

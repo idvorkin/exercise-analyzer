@@ -23,6 +23,7 @@ final class WatchBridge: NSObject, ObservableObject {
   private var lastPreviewAt = Date.distantPast
   private var lastContextAt = Date.distantPast
   private var unreachableLogged = false
+  private var contextFailedLogged = false
   private let minInterval = 0.3
   /// The watch app is in front (it says so on scene changes); previews are only worth sending then.
   @Published private(set) var watchActive = false
@@ -49,7 +50,14 @@ final class WatchBridge: NSObject, ObservableObject {
     // wrist shows the right state within a second even after a long unreachable spell.
     if force || now.timeIntervalSince(lastContextAt) >= 1 {
       lastContextAt = now
-      try? WCSession.default.updateApplicationContext(["status": data, "sentAt": now.timeIntervalSince1970])
+      // Logged once per failing spell (#137): the one-way outage could not say whether this channel died too.
+      do {
+        try WCSession.default.updateApplicationContext(["status": data, "sentAt": now.timeIntervalSince1970])
+        contextFailedLogged = false
+      } catch {
+        if !contextFailedLogged { onEvent?("watch_context_failed", ["message": "\(error)"]) }
+        contextFailedLogged = true
+      }
     }
     guard WCSession.default.isReachable else { return }
     WCSession.default.sendMessage(["status": data], replyHandler: nil) { [weak self] error in

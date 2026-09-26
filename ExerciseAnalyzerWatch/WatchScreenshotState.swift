@@ -16,6 +16,9 @@ enum WatchScreenshotState: String, CaseIterable {
   case workoutStart
   /// Framing the next set inside a workout (#106): the Preview with the heart-rate chip under its chips.
   case workoutViewfinder
+  /// A set recording while the phone reads reachable but has stopped answering (#137): the recording pages
+  /// keep their controls under the orange "PHONE NOT ANSWERING" hint.
+  case answersLost
 
   /// The fixed workout the controller presents: 42:10 in, 128 bpm (141 while a set runs); nil for no workout.
   var workout: (elapsed: TimeInterval, heartRate: Int)? {
@@ -38,8 +41,9 @@ enum WatchScreenshotState: String, CaseIterable {
     #endif
   }
 
-  /// Only the disconnected page distrusts the status; every other state renders as heard-from-the-phone.
-  var isLive: Bool { self != .disconnected }
+  /// The disconnected and silent-phone pages distrust the status; every other state renders as
+  /// heard-from-the-phone.
+  var isLive: Bool { self != .disconnected && self != .answersLost }
 
   /// The status the link presents, with reachability and the preview the page shows.
   var fixed: (status: WatchStatus, reachable: Bool, preview: UIImage?) {
@@ -58,7 +62,7 @@ enum WatchScreenshotState: String, CaseIterable {
         recording: true, frame: FrameStatus(personSeen: true, clippedEdges: [], coverage: 0.8), reps: 0,
         phase: "top", elapsed: 4, camera: "back", exercise: "Kettlebell Swing")
       return (status, true, WatchPreviewFigure.image())
-    case .recording:
+    case .recording, .answersLost:
       let status = WatchStatus(
         recording: true,
         frame: FrameStatus(box: CGRect(x: 0.3, y: 0.2, width: 0.3, height: 0.8), pose: nil), reps: 6,
