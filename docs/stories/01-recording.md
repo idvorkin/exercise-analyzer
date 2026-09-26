@@ -145,7 +145,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 020:
 
 - **Summary:** Turning the phone turns the picture, even mid-set
-- **Status:** implemented in [99a8525](https://github.com/idvorkin/exercise-analyzer/commit/99a8525); on the phone, Igor's check pending
+- **Status:** implemented in [99a8525](https://github.com/idvorkin/exercise-analyzer/commit/99a8525); on the phone, Igor's check pending; segment filename collisions fixed in [5c8bdc3](https://github.com/idvorkin/exercise-analyzer/commit/5c8bdc3), verified on the Mac (100 rapid recorder instances have distinct movie paths) and signed iOS/watch build; rapid rotation on the phone pending
 
 #### Use Case:
 - **As a** lifter who reframes from portrait to landscape after starting
