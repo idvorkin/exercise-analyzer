@@ -104,7 +104,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 028:
 
 - **Summary:** Stop an analysis I didn't mean to start
-- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9); verified on the simulator (the `cancel` check of `just test-sim`)
+- **Status:** implemented in [7ca6bbb](https://github.com/idvorkin/exercise-analyzer/commit/7ca6bbb), [6aa97f9](https://github.com/idvorkin/exercise-analyzer/commit/6aa97f9), [d3d4cf7](https://github.com/idvorkin/exercise-analyzer/commit/d3d4cf7); verified on the simulator (the `cancel` check of `just test-sim`, including paused playback); d3d4cf7 also passes host tests and the iOS/watch build
 
 #### Use Case:
 - **As a** lifter who opened the wrong clip, or a long one
