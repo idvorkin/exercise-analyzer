@@ -261,6 +261,10 @@ Task {
         FrameRecord(time: time, imageSize: size, pose: person?.pose, box: person?.box, analysis: nil, bells: bells, bench: bench))
       if frames.count % 300 == 0 { FileHandle.standardError.write("  \(frames.count) frames…\n".data(using: .utf8)!) }
     }
+    // A nil sample can mean a decoding failure, not EOF. Never publish a truncated track as a valid fixture.
+    guard reader.status == .completed else {
+      fail("reader stopped after \(frames.count) frames: \(reader.error?.localizedDescription ?? "status \(reader.status.rawValue)")")
+    }
     elapsed = Date().timeIntervalSince(started)
   } catch { fail("\(error)") }
   semaphore.signal()
