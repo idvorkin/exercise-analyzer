@@ -65,7 +65,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 013:
 
 - **Summary:** Re-analyzing a clip updates the set instead of duplicating it
-- **Status:** implemented in [ddd1d6f](https://github.com/idvorkin/exercise-analyzer/commit/ddd1d6f); verified on the simulator (same clip twice, one entry); failure-safe replacement and backup retention in [b6a7fb3](https://github.com/idvorkin/exercise-analyzer/commit/b6a7fb3), verified on the host (filesystem failure and restart-recovery tests) and simulator (all ten smoke checks, with event selection fixed in [460689c](https://github.com/idvorkin/exercise-analyzer/commit/460689c); the trimmed nine-rep set saved twice under one ID)
+- **Status:** implemented in [ddd1d6f](https://github.com/idvorkin/exercise-analyzer/commit/ddd1d6f); verified on the simulator (same clip twice, one entry); failure-safe replacement and backup retention in [b6a7fb3](https://github.com/idvorkin/exercise-analyzer/commit/b6a7fb3), verified on the host (filesystem failure and restart-recovery tests) and simulator (all ten smoke checks, with event selection fixed in [460689c](https://github.com/idvorkin/exercise-analyzer/commit/460689c); the trimmed nine-rep set saved twice under one ID); the same-file rule kept and the commit marker in [3691163](https://github.com/idvorkin/exercise-analyzer/commit/3691163) (review), verified on the host; a re-save on the phone pending
 
 #### Use Case:
 - **As a** lifter who opens the same clip twice
