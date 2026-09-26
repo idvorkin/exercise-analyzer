@@ -73,10 +73,12 @@ public struct RecentEntry: Codable, Identifiable {
     analysisVersion != currentVersion
   }
 
-  /// Only a Photos asset identifier establishes identity across entry IDs. File names and lengths collide.
+  /// Same Photos asset, or the same imported file name with the same length (within a frame or two): opening
+  /// the same clip twice keeps one set (story 013).
   public func isSameClip(source other: Source, originalName name: String?, duration length: Double) -> Bool {
     if case .photos(let a) = source, case .photos(let b) = other { return a == b }
-    return false
+    guard let name, let mine = originalName, name == mine else { return false }
+    return abs(duration - length) < 0.1
   }
 
   /// The Photos identifier when the clip lives in Photos, nil for an in-app file.

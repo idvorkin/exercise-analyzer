@@ -51,7 +51,10 @@ final class RecentsStore: ObservableObject {
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
       source: source, thumbnail: nil, exercise: pipeline.exercise, originalName: originalName,
       analysisVersion: AnalysisVersion.current, models: models, clipStartedAt: clipStartedAt)
-    let saved = try RecentsSave.save(root: root, index: RecentsIndex(entries: entries), id: id, source: source) { old in
+    let saved = try RecentsSave.save(
+      root: root, index: RecentsIndex(entries: entries), id: id, source: source,
+      originalName: originalName, duration: duration
+    ) { old in
       var entry = old ?? fresh
       entry.id = id
       entry.analyzedAt = fresh.analyzedAt

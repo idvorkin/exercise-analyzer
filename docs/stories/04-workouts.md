@@ -65,7 +65,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 013:
 
 - **Summary:** Re-analyzing a clip updates the set instead of duplicating it
-- **Status:** implemented in [ddd1d6f](https://github.com/idvorkin/exercise-analyzer/commit/ddd1d6f); verified on the simulator (same clip twice, one entry); failure-safe replacement, backup retention and Photos-only duplicate identity in [b6a7fb3](https://github.com/idvorkin/exercise-analyzer/commit/b6a7fb3), verified on the host (filesystem failure and restart-recovery tests) and simulator (all ten smoke checks, with event selection fixed in [460689c](https://github.com/idvorkin/exercise-analyzer/commit/460689c); the trimmed nine-rep set saved twice under one ID)
+- **Status:** implemented in [ddd1d6f](https://github.com/idvorkin/exercise-analyzer/commit/ddd1d6f); verified on the simulator (same clip twice, one entry); failure-safe replacement and backup retention in [b6a7fb3](https://github.com/idvorkin/exercise-analyzer/commit/b6a7fb3), verified on the host (filesystem failure and restart-recovery tests) and simulator (all ten smoke checks, with event selection fixed in [460689c](https://github.com/idvorkin/exercise-analyzer/commit/460689c); the trimmed nine-rep set saved twice under one ID)
 
 #### Use Case:
 - **As a** lifter who opens the same clip twice
@@ -88,10 +88,11 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** its newer analysis is saved successfully
 - **Then:** one entry remains with the new analysis, its original backup and the metadata needed to undo the trim
 
-- **Scenario:** Unrelated imported files share a name and length
+- **Scenario:** The same file is opened again
 - **Given:** a file named clip.mov is already in Workouts
-- **When:** I import another file with the same name and duration
-- **Then:** both sets remain; only the existing set's ID or the same Photos asset ID identifies a replacement
+- **When:** I open a file with the same name and a length within 0.1 s
+- **Then:** Workouts still shows one entry for it, with the newer analysis; the older set is retired only once the
+  newer one is saved
 
 - **Issues:** [#52](https://github.com/idvorkin/exercise-analyzer/issues/52), review finding 4: a failed re-save must not lose the stored set or its Undo trim backup
 

@@ -17,13 +17,16 @@ public struct RecentsSave {
   /// The writer receives a private copy of the old folder (including Undo trim and auxiliary files).
   public static func save(
     root: URL, index: RecentsIndex, id: String, source: RecentEntry.Source,
+    originalName: String? = nil, duration: Double = 0,
     makeEntry: (RecentEntry?) throws -> RecentEntry,
     writeFiles: (URL) throws -> Void,
     checkpoint: (Stage) throws -> Void = { _ in }
   ) throws -> RecentsIndex {
     try recover(root: root)
     let fm = FileManager.default
-    let matching = index.entries.filter { $0.id == id || $0.isSameClip(source: source, originalName: nil, duration: 0) }
+    let matching = index.entries.filter {
+      $0.id == id || $0.isSameClip(source: source, originalName: originalName, duration: duration)
+    }
     let existing = matching.first { $0.id == id } ?? matching.first
     var entry = try makeEntry(existing)
     precondition(entry.id == id)
@@ -62,6 +65,8 @@ public struct RecentsSave {
     // After the commit point, cleanup failure cannot turn a successful save into a reported failure.
     // Leave the journal for the next launch/save to finish retiring the old files.
     do {
+      // The marker keeps the commit known after a later index write (a delete) changes the index's bytes.
+      try Data().write(to: transaction.appendingPathComponent("committed"))
       try checkpoint(.indexWritten)
       try recover(root: root)
     } catch {}
@@ -80,7 +85,8 @@ public struct RecentsSave {
     let journal = try JSONDecoder().decode(Journal.self, from: Data(contentsOf: journalURL))
     let destination = root.appendingPathComponent(journal.id)
     let old = transaction.appendingPathComponent("old")
-    let committed = (try? Data(contentsOf: root.appendingPathComponent("index.json"))) == journal.index
+    let committed = fm.fileExists(atPath: transaction.appendingPathComponent("committed").path)
+      || (try? Data(contentsOf: root.appendingPathComponent("index.json"))) == journal.index
     if committed {
       for id in journal.retired {
         let url = root.appendingPathComponent(id)

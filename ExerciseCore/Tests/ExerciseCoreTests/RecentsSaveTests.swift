@@ -144,28 +144,61 @@ final class RecentsSaveTests: XCTestCase {
     }
   }
 
-  func testNewImportWithSameNameAndLengthDoesNotReplaceExistingFile() throws {
+  /// Story 013: the same file opened again (a new entry id, same name and length) replaces its set, and the old
+  /// set survives until the replacement commits.
+  func testReopeningTheSameFileReplacesItsSetOnlyAfterCommit() throws {
     let index = try seed()
     for fails in [true, false] {
       do {
-        let result = try RecentsSave.save(root: root, index: index, id: "new", source: .file(name: "clip.mov")) { old in
-          XCTAssertNil(old)
-          var entry = index.entries[0]
+        let result = try RecentsSave.save(
+          root: root, index: index, id: "new", source: .file(name: "clip.mov"),
+          originalName: "clip.mov", duration: 10.02
+        ) { old in
+          var entry = try XCTUnwrap(old)
           entry.id = "new"
           return entry
         } writeFiles: { dir in
-          try self.fm.copyItem(at: self.root.appendingPathComponent("old/clip.mov"), to: dir.appendingPathComponent("clip.mov"))
+          try Data("reopened".utf8).write(to: dir.appendingPathComponent("clip.mov"), options: .atomic)
         } checkpoint: { stage in
           if fails && stage == .installed { throw Failure.injected }
         }
         XCTAssertFalse(fails)
-        XCTAssertEqual(Set(result.entries.map(\.id)), ["old", "new"])
+        XCTAssertEqual(result.entries.map(\.id), ["new"])
+        XCTAssertEqual(result.entries[0].originalBackup, "original.mov")
+        XCTAssertEqual(try fm.contentsOfDirectory(atPath: root.path).sorted(), ["index.json", "new"])
       } catch {
         XCTAssertTrue(fails)
         XCTAssertEqual(RecentsIndex.load(root: root).entries.map(\.id), ["old"])
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("old/clip.mov")), Data("clip.mov".utf8))
         XCTAssertFalse(fm.fileExists(atPath: root.appendingPathComponent("new").path))
       }
-      XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("old/clip.mov")), Data("clip.mov".utf8))
     }
+  }
+
+  func testAnotherFileWithADifferentNameIsItsOwnSet() throws {
+    let index = try seed()
+    let result = try RecentsSave.save(
+      root: root, index: index, id: "new", source: .file(name: "other.mov"), originalName: "other.mov", duration: 10
+    ) { old in
+      XCTAssertNil(old)
+      var entry = index.entries[0]
+      entry.id = "new"
+      return entry
+    } writeFiles: { dir in
+      try Data("other".utf8).write(to: dir.appendingPathComponent("other.mov"), options: .atomic)
+    }
+    XCTAssertEqual(Set(result.entries.map(\.id)), ["old", "new"])
+  }
+
+  /// A cleanup that failed after the commit, then an index write (a delete) before the next launch: recovery
+  /// must still finish the commit, not roll the old folder back under the new index row.
+  func testCommittedSaveStaysCommittedAfterALaterIndexWrite() throws {
+    _ = try save(seed(photos: true), id: "new", fail: .indexWritten)
+    var index = RecentsIndex.load(root: root)
+    index.entries[0].repCount = 9
+    try index.save(root: root)
+    try RecentsSave.recover(root: root)
+    XCTAssertEqual(try fm.contentsOfDirectory(atPath: root.path).sorted(), ["index.json", "new"])
+    XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("new/clip.mov")), Data("new".utf8))
   }
 }
