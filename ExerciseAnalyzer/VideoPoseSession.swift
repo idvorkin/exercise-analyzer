@@ -32,7 +32,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Where a loaded clip came from; decides how Recents keeps it.
-  enum Origin {
+  enum Origin: Sendable {
     case photos(identifier: String)
     case file
     case recording
@@ -150,6 +150,28 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published var replaceOriginalPrompt = false
   private var currentOrigin: Origin = .file
   private var currentEntryID: String?
+  private typealias Operation = ClipOperation<Origin>
+  private var clipOperations = ClipOperationSlot<Origin>()
+
+  /// Claim before creating a Task or awaiting. The target survives first-save allocation and clip switches.
+  private func beginOperation(entryID: String, origin: Origin) -> Operation {
+    lastSetPassEnded("superseded")
+    currentTask?.cancel()
+    jobGeneration += 1
+    currentJob = nil
+    currentTask = nil
+    loadRetry?.cancel()
+    canCancelAnalysis = false
+    activity = .idle
+    liveInferenceEnabled = true
+    return clipOperations.begin(entryID: entryID, origin: origin)
+  }
+
+  private func beginCurrentOperation() -> Operation {
+    beginOperation(entryID: currentEntryID ?? UUID().uuidString, origin: currentOrigin)
+  }
+
+  private func isCurrent(_ operation: Operation) -> Bool { clipOperations.contains(operation) }
   /// The stored set on screen, if it is one: what tells the playback screen which workout it belongs to (#99).
   var currentEntry: RecentEntry? { currentEntryID.flatMap { id in recents.entries.first { $0.id == id } } }
   private var currentRecordedAt: Date?
@@ -188,6 +210,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
     #endif
     let id = currentEntryID
+    let operation = clipOperations.current
     let folder = id.map { recents.folder(for: $0) }
     let stored = folder.flatMap { HeartRateSeries.load(from: $0) }
     heartRate = stored
@@ -199,7 +222,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       var attempt = 1
       while true {
         let read = await WorkoutMirror.shared.heartRate(from: start.addingTimeInterval(-30), to: spanEnd)
-        guard let self, !Task.isCancelled, let read else { return }
+        guard let self, !Task.isCancelled, let operation, self.isCurrent(operation), let read else { return }
         let kept = self.heartRate?.samples.count ?? 0
         self.log.event(
           "heart_rate",
@@ -292,13 +315,21 @@ final class VideoPoseSession: NSObject, ObservableObject {
     player.actionAtItemEnd = .pause
     timeObserver = player.addPeriodicTimeObserver(
       forInterval: CMTime(value: 1, timescale: 30), queue: .main
-    ) { [weak self] time in
-      Task { @MainActor in self?.currentTime = time.seconds }
+    ) { [weak self] _ in
+      Task { @MainActor in
+        // This observer follows the player across clips; read its current clock, not a queued A tick.
+        guard let self, self.player.currentItem != nil else { return }
+        self.currentTime = self.player.currentTime().seconds
+      }
     }
     endObserver = NotificationCenter.default.addObserver(
       forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main
-    ) { [weak self] _ in
-      Task { @MainActor in self?.isPlaying = false }
+    ) { [weak self] notification in
+      let item = notification.object as? AVPlayerItem
+      Task { @MainActor in
+        guard let self, let item, self.player.currentItem === item else { return }
+        self.isPlaying = false
+      }
     }
     models.onStatus = { [weak self] in self?.modelStatus = $0 }
     modelStatus = models.status
@@ -481,6 +512,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// (callers cancel any occupant first); the extract task stays cancellable until it settles. Rendering and
   /// clearing are the caller's.
   private func run(_ job: ClipJob) async -> ClipResult {
+    let operation = job.isUserPass ? clipOperations.current : nil
     // A replay never takes the slot from the set the user opened: its caller re-checked after its clip fetch,
     // but a user pass can start between that check and this registration.
     if !job.isUserPass, currentJob?.isUserPass == true {
@@ -501,14 +533,22 @@ final class VideoPoseSession: NSObject, ObservableObject {
           url: job.url, predictor: job.predictor, bellDetector: job.bellDetector, benchDetector: job.benchDetector,
           progress: { [weak self] fraction in
             if job.isUserPass {
-              Task { @MainActor in self?.activity = .working("Analyzing", progress: fraction) }
+              Task { @MainActor in
+                guard let self, let operation, self.isCurrent(operation),
+                  self.currentJob?.generation == job.generation else { return }
+                self.activity = .working("Analyzing", progress: fraction)
+              }
             } else if job.replayWhere == "debug" {
               Task { @MainActor in self?.instrumentedRun?.progress = fraction }
             }
           },
           heartbeat: { [weak self] h in
             if job.isUserPass {
-              Task { @MainActor in self?.passFramesSeen = h.frames }
+              Task { @MainActor in
+                guard let self, let operation, self.isCurrent(operation),
+                  self.currentJob?.generation == job.generation else { return }
+                self.passFramesSeen = h.frames
+              }
               self?.log.event(
                 "offline_progress",
                 [
@@ -624,6 +664,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Imports a video: shows it paused, runs the offline pass, then plays with the stored track.
   func load(url: URL, origin: Origin = .file, recordedAt: Date? = nil) {
+    let operation = beginOperation(entryID: UUID().uuidString, origin: origin)
+    load(url: url, recordedAt: recordedAt, operation: operation)
+  }
+
+  private func load(url: URL, recordedAt: Date?, operation: Operation) {
+    guard isCurrent(operation) else { return }
+    let origin = operation.origin
     stopCamera()
     untrimmed = nil
     canUndoTrim = false
@@ -631,14 +678,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
       // Model still loading: retry when ready, latest tap wins (replaces pendingLoadURL).
       statusMessage = "Waiting for model…"
       loadRetry?.cancel()
-      loadRetry = Task { [weak self, url, origin, recordedAt] in
+      loadRetry = Task { [weak self, url, recordedAt] in
         guard let self else { return }
         guard await self.models.ready() != nil else {
+          guard self.isCurrent(operation) else { return }
           self.statusMessage = "Model not ready"
           return
         }
-        guard !Task.isCancelled else { return }
-        self.load(url: url, origin: origin, recordedAt: recordedAt)
+        guard !Task.isCancelled, self.isCurrent(operation) else { return }
+        self.load(url: url, recordedAt: recordedAt, operation: operation)
       }
       return
     }
@@ -646,7 +694,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     currentFileURL = url
     trimmedURL = nil
     currentOrigin = origin
-    currentEntryID = nil
+    currentEntryID = operation.entryID
     currentRecordedAt = recordedAt
     // ponytail: an imported clip has no trusted first-frame time (a Photos date is the asset's, and a clip this
     // app saved to Photos carries its save time), so no heart rate. Upgrade: read the movie's creation metadata.
@@ -657,58 +705,74 @@ final class VideoPoseSession: NSObject, ObservableObject {
     #endif
     canSave = true
     log.event("load", ["url": url.lastPathComponent, "source": "file"])
-    Task { await analyzeAndPlay(url: url) }
+    Task { await analyzeAndPlay(url: url, operation: operation) }
   }
 
   /// A Photos video chosen from the gallery's "From Photos" strip: opened in place by identifier.
   func importPhotosAsset(identifier: String, recordedAt: Date?) async {
+    let operation = beginOperation(entryID: UUID().uuidString, origin: .photos(identifier: identifier))
     activity = .working("Opening", progress: nil)
-    guard let url = await RecentsStore.photosClipURL(identifier: identifier) else {
+    let url = await RecentsStore.photosClipURL(identifier: identifier)
+    guard isCurrent(operation) else { return }
+    guard let url else {
       activity = .idle
       statusMessage = "Couldn't open that video from Photos"
       log.event("error", ["where": "photos_suggestion", "message": "no url for \(identifier)"])
       return
     }
     log.event("import", ["url": url.lastPathComponent, "path": "photos_suggestion"])
-    load(url: url, origin: .photos(identifier: identifier), recordedAt: recordedAt)
+    load(url: url, recordedAt: recordedAt, operation: operation)
   }
 
   /// A clip picked from Photos. With library read access the asset is opened in place (no copy, so no dead
   /// time); otherwise the picker's copy is used and Recents keeps that file.
   func importPicked(item: PhotosPickerItem) async {
+    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    let identifier = (status == .authorized || status == .limited) ? item.itemIdentifier : nil
+    let operation = beginOperation(
+      entryID: UUID().uuidString, origin: identifier.map { .photos(identifier: $0) } ?? .file)
     let started = CACurrentMediaTime()
     activity = .working("Importing", progress: nil)
-    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    if let identifier = item.itemIdentifier, status == .authorized || status == .limited,
+    if let identifier,
       let url = await RecentsStore.photosClipURL(identifier: identifier)
     {
+      guard isCurrent(operation) else { return }
       log.event(
         "import", ["path": "photos_in_place", "seconds": CACurrentMediaTime() - started, "url": url.lastPathComponent])
-      load(url: url, origin: .photos(identifier: identifier), recordedAt: RecentsStore.photosAssetDate(identifier: identifier))
+      load(url: url, recordedAt: RecentsStore.photosAssetDate(identifier: identifier), operation: operation)
       return
     }
-    guard let movie = try? await item.loadTransferable(type: PickedMovie.self) else {
+    guard isCurrent(operation) else { return }
+    let movie = try? await item.loadTransferable(type: PickedMovie.self)
+    guard isCurrent(operation) else { return }
+    guard let movie else {
       activity = .idle
       statusMessage = "Couldn't read that video"
       log.event("error", ["where": "import", "message": "loadTransferable failed"])
       return
     }
     log.event("import", ["path": "picker_copy", "seconds": CACurrentMediaTime() - started])
-    load(url: movie.url, origin: .file, recordedAt: Self.fileDate(movie.url))
+    let copied = beginOperation(entryID: operation.entryID, origin: .file)
+    load(url: movie.url, recordedAt: Self.fileDate(movie.url), operation: copied)
   }
 
   /// Reopens a Recents entry with its stored analysis: no inference, instant.
   func open(recent entry: RecentEntry) {
+    let operation = beginOperation(
+      entryID: entry.id, origin: entry.isInPhotos ? .photos(identifier: photosID(entry)) : .file)
     stopCamera()
     log.event("recents_tap", ["id": entry.id, "in_photos": entry.isInPhotos])
     Task {
+      guard isCurrent(operation) else { return }
       let url: URL?
       if case .photos(let identifier) = entry.source {
         // An old set may live only in iCloud: show the download rather than a tap that seems to do nothing (#35).
         activity = .working("Loading from Photos", progress: nil)
         let fetch = await RecentsStore.fetchPhotosClip(identifier: identifier) { [weak self] fraction in
-          self?.activity = .working("Downloading from iCloud", progress: fraction)
+          guard let self, self.isCurrent(operation) else { return }
+          self.activity = .working("Downloading from iCloud", progress: fraction)
         }
+        guard isCurrent(operation) else { return }
         log.event(
           "photos_fetch",
           [
@@ -719,6 +783,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       } else {
         url = await recents.clipURL(for: entry)
       }
+      guard isCurrent(operation) else { return }
       guard let url else {
         activity = .idle
         statusMessage = entry.isInPhotos ? "That clip is no longer in Photos" : "That clip's file is missing"
@@ -727,7 +792,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       guard let pipeline = recents.loadPipeline(for: entry) else {
         statusMessage = "Stored analysis unreadable; re-analyzing"
-        load(url: url, origin: entry.isInPhotos ? .photos(identifier: photosID(entry)) : .file, recordedAt: entry.recordedAt)
+        load(url: url, recordedAt: entry.recordedAt, operation: operation)
         return
       }
       currentFileURL = url
@@ -753,13 +818,14 @@ final class VideoPoseSession: NSObject, ObservableObject {
       // A stored track that runs past its clip was read on the media clock of an edited clip (#80): its poses sit
       // seconds ahead of the picture. Back to the video; the extraction maps the timeline now.
       let clipSeconds = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? 0
+      guard isCurrent(operation) else { return }
       if let trackEnd = pipeline.track.frames.last?.time,
         StoredSetPlan.trackOverruns(clipDuration: clipSeconds, trackEnd: trackEnd)
       {
         log.event(
           "recents_rerun",
           ["id": entry.id, "reason": "track_past_clip", "track_end_s": trackEnd, "clip_s": clipSeconds, "frames": pipeline.track.frames.count])
-        await analyzeAndPlay(url: url, reason: StoredSetReason.rerunTimeline.rawValue, stored: pipeline.exercise)
+        await analyzeAndPlay(url: url, operation: operation, reason: StoredSetReason.rerunTimeline.rawValue, stored: pipeline.exercise)
         return
       }
       let fresh: ExerciseDetection?
@@ -777,7 +843,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         log.event(
           "recents_rerun",
           ["id": entry.id, "reason": "models_changed", "stored": storedModels, "current": models.names, "exercise": exercise.rawValue])
-        await analyzeAndPlay(url: url, reason: StoredSetReason.rerunModels.rawValue, stored: exercise)
+        await analyzeAndPlay(url: url, operation: operation, reason: StoredSetReason.rerunModels.rawValue, stored: exercise)
         return
       case .replay(let exercise, let reason):
         // A stored analysis can predate an exercise the detector now knows (#17) or an analyzer fix (#19): re-analyze
@@ -788,9 +854,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
             ["id": entry.id, "was": pipeline.exercise.rawValue, "now": exercise.rawValue, "confidence": fresh.confidence])
         }
         activity = .working("Re-analyzing", progress: nil)
-        await analyzeExtracted(url: url, reason: reason.rawValue, stored: pipeline.exercise)
+        await analyzeExtracted(url: url, operation: operation, reason: reason.rawValue, stored: pipeline.exercise)
+        guard isCurrent(operation) else { return }
         statusMessage = "Re-analyzed as \(exercise.definition.name): \(self.pipeline.reps.count) reps"
-        rememberCurrent(clipURL: url)
+        rememberCurrent(clipURL: url, operation: operation)
         activity = .idle
       case .keep:
         break
@@ -829,16 +896,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
   }
 
   /// Writes the current clip and analysis into Recents (new entry, or updates the open one after a trim).
-  private func rememberCurrent(clipURL: URL) {
+  private func rememberCurrent(clipURL: URL, operation: Operation) {
+    guard isCurrent(operation) else { return }
     // The clip was deleted while its pass ran (#111): with no entry id left, saving would store it again as a
     // new set.
     guard !clipDeleted else {
       log.event("remember_skipped", ["reason": "clip deleted"])
       return
     }
-    let id = currentEntryID ?? UUID().uuidString
+    let id = operation.entryID
     let source: RecentEntry.Source
-    switch currentOrigin {
+    switch operation.origin {
     case .photos(let identifier) where trimmedURL == nil:
       source = .photos(identifier: identifier)
     default:
@@ -871,6 +939,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var currentJob: ClipJob?
   private var currentTask: Task<ClipResult, Never>?
   private var jobGeneration = 0
+  private var cancelledJobGeneration: Int?
 
   /// True while the user's pass holds the slot: replays wait (refresh falls back to stored poses).
   private var userPassActive: Bool { currentJob?.isUserPass ?? false }
@@ -917,7 +986,14 @@ final class VideoPoseSession: NSObject, ObservableObject {
   func cancelAnalysis() {
     guard let task = currentTask, currentJob?.isUserPass == true else { return }
     log.event("analysis_cancel", ["url": currentFileURL?.lastPathComponent ?? ""])
+    cancelledJobGeneration = currentJob?.generation
     task.cancel()
+    clipOperations.invalidate()
+    canCancelAnalysis = false
+    activity = .idle
+    liveInferenceEnabled = true
+    lastSetPassEnded("cancelled")
+    statusMessage = "Analysis cancelled"
   }
 
   /// What the last user pass was asked to do, so a retry after an interruption re-runs the same thing: a
@@ -928,16 +1004,20 @@ final class VideoPoseSession: NSObject, ObservableObject {
   func retryAnalysis() {
     guard source == .file, !userPassActive, let url = trimmedURL ?? currentFileURL else { return }
     let last = lastUserPass
-    Task { await analyzeAndPlay(url: url, reason: last.reason, stored: last.stored) }
+    let operation = beginCurrentOperation()
+    Task { await analyzeAndPlay(url: url, operation: operation, reason: last.reason, stored: last.stored) }
   }
 
   private func analyzeAndPlay(
-    url: URL, reason: String = StoredSetReason.load.rawValue, stored: ExerciseKind? = nil
+    url: URL, operation: Operation, reason: String = StoredSetReason.load.rawValue, stored: ExerciseKind? = nil
   ) async {
+    guard isCurrent(operation) else { return }
     lastUserPass = (reason, stored)
     // A set opened in the first second after launch (a Recents tap, the reopen hook) arrives before the model has
     // loaded; wait for it rather than abandoning the pass (#45).
-    guard let predictor = await models.ready() else {
+    let readyPredictor = await models.ready()
+    guard isCurrent(operation) else { return }
+    guard let predictor = readyPredictor else {
       statusMessage = "Pose model unavailable"
       log.event("error", ["where": "offline_pass", "message": "no pose model (package missing or load failed)"])
       return
@@ -958,25 +1038,30 @@ final class VideoPoseSession: NSObject, ObservableObject {
     activity = .working("Analyzing", progress: 0)
     canCancelAnalysis = true
     defer {
+      if cancelledJobGeneration == job.generation, jobGeneration == job.generation {
+        log.event("analysis_cancelled", ["url": url.lastPathComponent])
+      }
       // A superseded pass leaves the newer pass's Cancel alone.
-      if jobGeneration == job.generation { canCancelAnalysis = false }
+      if isCurrent(operation) { canCancelAnalysis = false }
       clearJob(job)
       updateKeepAwake()
     }
     // Test hook: SWING_CANCEL_ANALYSIS=1 cancels one second in (simulator runs can't tap the UI).
     if ProcessInfo.processInfo.environment["SWING_CANCEL_ANALYSIS"] == "1" {
-      Task { try? await Task.sleep(for: .seconds(1)); self.cancelAnalysis() }
+      Task {
+        try? await Task.sleep(for: .seconds(1))
+        guard isCurrent(operation) else { return }
+        cancelAnalysis()
+      }
     }
     let result = await run(job)
     // Superseded while extracting (the lifter opened another set): the newer pass owns the screen, the status
     // line and playback; this one renders nothing, not even "Analysis cancelled".
-    guard jobGeneration == job.generation else {
-      lastSetPassEnded("superseded")
-      return
-    }
+    guard isCurrent(operation), jobGeneration == job.generation else { return }
     switch result {
     case .done(let frames, let summary):
-      await finishAnalysis(job: job, frames: frames, summary: summary)
+      await finishAnalysis(job: job, operation: operation, frames: frames, summary: summary)
+      guard isCurrent(operation) else { return }
       lastSetPassEnded("no final count")  // a pass that was not the recording's own leaves nothing to land
     case .cancelled:
       lastSetPassEnded("cancelled")
@@ -996,6 +1081,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       if let mode = ProcessInfo.processInfo.environment["SWING_MODE"], !mode.isEmpty {
         Task {
           try? await Task.sleep(for: .seconds(2))
+          guard isCurrent(operation) else { return }
           setExerciseMode(ExerciseMode(storageValue: mode), persist: false)
         }
       }
@@ -1005,6 +1091,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
     // Cancel leaves the loaded clip paused (story 028); it must not fall through to playback or auto-trim.
     if case .cancelled = result { return }
     play()
+    #if targetEnvironment(simulator)
+      if !switchCheckStarted {
+        switch ProcessInfo.processInfo.environment["SWING_CLIP_SWITCH"] {
+        case "mode": setExerciseMode(.fixed(exercise), persist: false)
+        case "photos": saveToPhotos()
+        case "trim": trimToReps()
+        default: break
+        }
+      }
+    #endif
     // Test hook: SWING_AUTO_TRIM=1 trims right after the first analysis (simulator runs can't tap the UI).
     if trimmedURL == nil, ProcessInfo.processInfo.environment["SWING_AUTO_TRIM"] == "1" {
       trimToReps()
@@ -1013,17 +1109,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Render a finished user pass: only the current generation touches the session, so a superseded pass
   /// adopts, saves and plays nothing.
-  private func finishAnalysis(job: ClipJob, frames: [FrameRecord], summary: OfflineAnalyzer.Summary) async {
+  private func finishAnalysis(job: ClipJob, operation: Operation, frames: [FrameRecord], summary: OfflineAnalyzer.Summary) async {
     guard case .userPass(let exercise, let reason) = job.kind,
-      currentJob?.generation == job.generation
+      currentJob?.generation == job.generation, isCurrent(operation)
     else { return }
     extractedFrames = frames
-    await analyzeExtracted(url: job.url, reason: reason, stored: exercise)
+    await analyzeExtracted(url: job.url, operation: operation, reason: reason, stored: exercise)
+    guard isCurrent(operation) else { return }
     extractionComplete = true
     analysisInterrupted = false
     statusMessage = recordedLine(reps: pipeline.reps.count) + String(
       format: " · %d frames in %.1fs", summary.frames, summary.elapsed)
-    rememberCurrent(clipURL: job.url)
+    rememberCurrent(clipURL: job.url, operation: operation)
     // A recording with no reps is usually a false start: offer to throw it away (nothing was saved to Photos).
     if pipeline.reps.count == 0, case .recording = currentOrigin {
       log.event("empty_recording", ["url": job.url.lastPathComponent, "frames": frames.count])
@@ -1057,6 +1154,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
       if case .recording = currentOrigin, let url = currentFileURL { try? FileManager.default.removeItem(at: url) }
       if let trimmedURL { try? FileManager.default.removeItem(at: trimmedURL) }
       closeDeletedClip(status: entry.isInPhotos ? "Removed from Workouts" : "Set deleted")
+    } else if clipOperations.current?.entryID == entry.id {
+      // The deleted set is still fetching; retain the visible clip and invalidate that pending open.
+      _ = beginCurrentOperation()
     }
     recents.remove(id: entry.id)
   }
@@ -1066,6 +1166,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   private var clipDeleted = false
 
   private func closeDeletedClip(status: String) {
+    _ = beginCurrentOperation()
+    clipOperations.invalidate()
     clipDeleted = true
     if currentJob?.isUserPass == true { currentTask?.cancel() }
     currentClipStartedAt = nil  // ends the heart-rate re-ask (#107): its folder is gone
@@ -1085,7 +1187,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// Picks the exercise (detects it in Auto), runs its analyzer over the extracted poses, and pulls rep stills
   /// from the clip. Cheap: no inference. A stored set passes its own exercise as `stored`: a fixed mode is for
   /// what the lifter records next, not a reason to read a get-up as swings when its analyzer moved on (#42).
-  private func analyzeExtracted(url: URL, reason: String, stored: ExerciseKind? = nil) async {
+  private func analyzeExtracted(url: URL, operation: Operation, reason: String, stored: ExerciseKind? = nil) async {
+    guard isCurrent(operation) else { return }
     let chosen: ExerciseKind
     switch exerciseMode {
     case .fixed:
@@ -1102,6 +1205,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     let analyzed = AnalysisPipeline.analyze(frames: extractedFrames, exercise: chosen)
     await analyzed.fillRepImages(from: AVURLAsset(url: url), frameDuration: frameDuration)
+    #if targetEnvironment(simulator)
+      await checkClipSwitch(stage: reason == "mode" ? "mode" : "render", url: url, operation: operation)
+    #endif
+    guard isCurrent(operation) else { return }
     adopt(pipeline: analyzed)
     for frame in analyzed.track.frames {
       log.frame(frame, source: "offline", inferenceMs: 0, fps: 0, personConf: nil)
@@ -1110,8 +1217,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     log.event("analyzed", ["exercise": chosen.rawValue, "reps": analyzed.reps.count, "reason": reason])
     // The recording's own pass just settled the final count: land it on the watch idle screen (045). Any other
     // pass (a file opened, a re-analysis) leaves the last set alone.
-    if case .recording = currentOrigin, reason == "load" {
+    if case .recording = operation.origin, reason == "load" {
       let clipSeconds = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? duration
+      guard isCurrent(operation) else { return }
       lastSet = LastSet(
         reps: analyzed.reps.count, exercise: chosen.definition.name, seconds: clipSeconds,
         at: Date().timeIntervalSince1970)
@@ -1141,11 +1249,14 @@ final class VideoPoseSession: NSObject, ObservableObject {
     switch source {
     case .file where extractionComplete && !extractedFrames.isEmpty:
       guard let url = trimmedURL ?? currentFileURL else { return }
+      let operation = beginCurrentOperation()
       Task {
+        guard isCurrent(operation) else { return }
         activity = .working("Re-analyzing", progress: nil)
-        await analyzeExtracted(url: url, reason: "mode")
+        await analyzeExtracted(url: url, operation: operation, reason: "mode")
+        guard isCurrent(operation) else { return }
         statusMessage = "Re-analyzed as \(exercise.definition.name): \(pipeline.reps.count) reps"
-        rememberCurrent(clipURL: url)
+        rememberCurrent(clipURL: url, operation: operation)
         activity = .idle
       }
     case .file where !extractionComplete:
@@ -1153,7 +1264,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
       // re-reading partial frames. A pass already running picks the new mode up when it finishes.
       guard !userPassActive, let url = trimmedURL ?? currentFileURL else { return }
       let reason = lastUserPass.reason
-      Task { await analyzeAndPlay(url: url, reason: reason) }  // the lifter chose the exercise: stored stays nil
+      let operation = beginCurrentOperation()
+      Task { await analyzeAndPlay(url: url, operation: operation, reason: reason) }  // the lifter chose the exercise: stored stays nil
     case .camera:
       liveDetector.reset()
       liveDetectionLocked = false
@@ -1182,13 +1294,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
     source = .file
     debugFramesToLog = 5
     log.event("install_item", ["url": url.lastPathComponent, "track_frames": pipeline.track.frames.count])
+    let operation = clipOperations.current
     Task {
-      duration = (try? await asset.load(.duration).seconds) ?? 0
+      let seconds = (try? await asset.load(.duration).seconds) ?? 0
+      guard let operation, isCurrent(operation), player.currentItem === item else { return }
+      duration = seconds
       if let track = try? await asset.loadTracks(withMediaType: .video).first {
+        guard isCurrent(operation), player.currentItem === item else { return }
         if let rate = try? await track.load(.nominalFrameRate), rate > 0 {
+          guard isCurrent(operation), player.currentItem === item else { return }
           frameDuration = 1 / Double(rate)
         }
-        await logVideoTrack(track, url: url)
+        await logVideoTrack(track, url: url, operation: operation, item: item)
       }
     }
     startDisplayLink()
@@ -1196,7 +1313,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Records what the player was handed: codec, size, color tags, HDR flag, and the screen's EDR headroom. Used to
   /// diagnose washed-out HDR playback without a debugger attached.
-  private func logVideoTrack(_ track: AVAssetTrack, url: URL) async {
+  private func logVideoTrack(_ track: AVAssetTrack, url: URL, operation: Operation, item: AVPlayerItem) async {
     var fields: [String: Any] = ["url": url.lastPathComponent]
     if let size = try? await track.load(.naturalSize) {
       fields["width"] = size.width
@@ -1223,6 +1340,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     fields["edr_potential"] = UIScreen.main.potentialEDRHeadroom
     fields["low_power"] = ProcessInfo.processInfo.isLowPowerModeEnabled
     fields["display_gamut"] = UIScreen.main.traitCollection.displayGamut == .P3 ? "P3" : "sRGB"
+    guard isCurrent(operation), player.currentItem === item else { return }
     log.event("video_track", fields)
   }
 
@@ -1290,9 +1408,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
     pause()
     let before = player.currentTime().seconds
     let time = CMTime(seconds: seconds, preferredTimescale: 600)
+    let operation = clipOperations.current
+    let item = player.currentItem
     player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
       Task { @MainActor in
-        guard let self else { return }
+        guard let self, let operation, self.isCurrent(operation), self.player.currentItem === item else { return }
         let after = self.player.currentTime().seconds
         if finished { self.currentTime = after.isFinite ? after : seconds }
         self.log.event(
@@ -1723,6 +1843,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// Attaches the camera and runs the pipeline. With `viewfinder`, no recorder is created: the picture,
   /// the in-frame status and the watch previews work, but nothing is written and no reps count (047, #73).
   func startCamera(position: AVCaptureDevice.Position = .back, viewfinder: Bool = false) {
+    let operation = beginOperation(entryID: UUID().uuidString, origin: .recording)
     pause()
     player.replaceCurrentItem(with: nil)
     duration = 0
@@ -1744,7 +1865,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
     AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
       Task { @MainActor in
-        guard let self else { return }
+        guard let self, self.isCurrent(operation) else { return }
         guard granted else {
           self.statusMessage = "Camera access denied"
           self.log.event("error", ["where": "camera", "message": "access denied"])
@@ -2053,6 +2174,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Stops the camera without keeping the recording. A viewfinder cancel leaves nothing behind (047).
   func cancelCamera() {
+    _ = beginCurrentOperation()
+    clipOperations.invalidate()
     // Clear first: stopCamera's push must carry the idle state, not a framing one.
     viewfinder = false
     viewfinderSince = nil
@@ -2104,10 +2227,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
     if paused, let at = pausedAt, let last = lastCameraPts { pausedTime += last - at }
     stopCamera()
     // The offline pass runs next: the watch shows "Analyzing…" until `analyzed` lands it the final count (045).
-    analyzingLastSet = true
-    pushWatchStatus(force: true)
     guard let recorder else { return }
     self.recorder = nil
+    let operation = beginOperation(entryID: UUID().uuidString, origin: .recording)
+    analyzingLastSet = true
+    pushWatchStatus(force: true)
+    let closing = segmentFinishes
+    segmentFinishes = []
+    let clipStartedAt = recordingStartedAt
+    let hadPause = pausedTotal != 0
     activity = .working("Finishing recording", progress: nil)
     log.event(
       "camera_done",
@@ -2116,17 +2244,17 @@ final class VideoPoseSession: NSObject, ObservableObject {
         "live_reps": livePipeline.reps.count, "live_bell_frames": liveBellFrames,
         "live_bell_avg_infer_ms": liveBellFrames == 0 ? 0 : liveBellTotalMs / Double(liveBellFrames),
         "live_fps": fps, "live_bells_dropped": liveBellsDropped,
-        "paused_s": pausedTime, "segments": segmentFinishes.count + 1,
+        "paused_s": pausedTime, "segments": closing.count + 1,
       ])
     Task {
       let finished = await recorder.finish()
+      guard isCurrent(operation) else { return }
       // Segments closed by a pause or a rotation may still be finishing (finishWriting takes 100–300 ms):
       // wait for each, in order, so Done right after Pause never reads an empty list and loses the set
       // (the 2026-09-15 review).
-      let closing = segmentFinishes
-      segmentFinishes = []
       var segments: [URL] = []
       for task in closing { if let url = await task.value { segments.append(url) } }
+      guard isCurrent(operation) else { return }
       if let url = finished ?? recorder.partialURL {
         if finished == nil {
           statusMessage = "Recording was cut short, keeping what was captured"
@@ -2145,7 +2273,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
       if segments.count > 1 {
         // Rotated mid-set (#22) or paused (#67): join the segments into one clip before trimming and analysis.
         let progress: (@Sendable (Double) -> Void)? = { [weak self] progress in
-          Task { @MainActor in self?.activity = .working("Joining segments", progress: progress) }
+          Task { @MainActor in
+            guard let self, self.isCurrent(operation) else { return }
+            self.activity = .working("Joining segments", progress: progress)
+          }
         }
         activity = .working("Joining \(segments.count) segments", progress: 0)
         let started = Date()
@@ -2153,13 +2284,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
           // Same display size throughout: a passthrough join (seconds, no quality loss); a rotation across a
           // pause changes the size and still takes the re-encoding stitch.
           let passthrough = await VideoFile.sameDisplaySize(segments)
+          guard isCurrent(operation) else { return }
           if passthrough {
             clipURL = try await VideoFile.join(segments, progress: progress)
           } else {
             clipURL = try await VideoFile.stitch(segments, progress: progress)
           }
+          guard isCurrent(operation) else { return }
           log.event("stitch", ["segments": segments.count, "elapsed_s": Date().timeIntervalSince(started), "clip": clipURL.lastPathComponent, "passthrough": passthrough])
         } catch {
+          guard isCurrent(operation) else { return }
           log.event("error", ["where": "stitch", "message": "\(error)"])
           statusMessage = "Couldn't join the segments; keeping the last one"
           clipURL = segments[segments.count - 1]
@@ -2167,13 +2301,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       currentFileURL = clipURL
       currentOrigin = .recording
-      currentEntryID = nil
+      currentEntryID = operation.entryID
       currentRecordedAt = Date()
       // ponytail: a paused or rotated set has wall-clock time missing between its segments, so clip time is
       // not first frame + playhead any more and it gets no heart rate. Upgrade: keep each segment's start.
-      currentClipStartedAt = segments.count == 1 && pausedTotal == 0 ? recordingStartedAt : nil
+      currentClipStartedAt = segments.count == 1 && !hadPause ? clipStartedAt : nil
       canSave = true
-      await trim(url: clipURL, using: livePipeline, thenAnalyze: true)
+      await trim(url: clipURL, using: livePipeline, thenAnalyze: true, operation: operation)
     }
   }
 
@@ -2193,45 +2327,55 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   func trimToReps() {
     guard let url = trimmedURL ?? currentFileURL, source == .file else { return }
+    let operation = beginCurrentOperation()
     let current = pipeline
     untrimmed = Untrimmed(url: url, pipeline: current, frames: extractedFrames, origin: currentOrigin)
     untrimmedClipStartedAt = currentClipStartedAt
-    Task { await trim(url: url, using: current, thenAnalyze: false) }
+    Task { await trim(url: url, using: current, thenAnalyze: false, operation: operation) }
   }
 
   /// Puts the untrimmed clip and its analysis back (the trimmed file is dropped). If the save already replaced
   /// the original in Photos, the stashed original goes back into Photos and the trimmed asset is deleted.
   func undoTrim() {
     guard let before = untrimmed, source == .file else { return }
+    let operation = beginCurrentOperation()
     if replacedOriginalID != nil, let id = currentEntryID, let entry = recents.entry(id: id), let backup = recents.backupURL(for: entry),
       case .photos(let trimmedID) = entry.source
     {
       activity = .working("Restoring the original to Photos", progress: nil)
       Task {
+        guard isCurrent(operation) else { return }
         do {
           guard let restoredID = try await VideoFile.saveToPhotos(backup) else { throw VideoFile.VideoFileError.exportFailed("no asset") }
+          guard isCurrent(operation) else { return }
+          // Point at the surviving asset before a deletion that can outlive this operation.
+          recents.markSavedToPhotos(id: operation.entryID, identifier: restoredID)
           try await VideoFile.deleteFromPhotos(identifier: trimmedID)
-          recents.markSavedToPhotos(id: id, identifier: restoredID)
+          guard isCurrent(operation) else { return }
           recents.dropBackup(id: id)
           replacedOriginalID = nil
           log.event("photos_restored", ["restored": restoredID, "removed": trimmedID])
-          if let url = await RecentsStore.photosClipURL(identifier: restoredID) {
-            finishUndo(before: Untrimmed(url: url, pipeline: before.pipeline, frames: before.frames, origin: .photos(identifier: restoredID)))
-          } else {
-            finishUndo(before: before)
-          }
+          let url = await RecentsStore.photosClipURL(identifier: restoredID) ?? before.url
+          guard isCurrent(operation) else { return }
+          let restored = beginOperation(entryID: operation.entryID, origin: .photos(identifier: restoredID))
+          finishUndo(
+            before: Untrimmed(url: url, pipeline: before.pipeline, frames: before.frames, origin: restored.origin),
+            operation: restored)
         } catch {
+          guard isCurrent(operation) else { return }
           statusMessage = "Couldn't restore the original: \(error.localizedDescription)"
           log.event("error", ["where": "photos_restore", "message": "\(error)"])
         }
-        activity = .idle
+        if isCurrent(operation) { activity = .idle }
       }
       return
     }
-    finishUndo(before: before)
+    let restored = beginOperation(entryID: operation.entryID, origin: before.origin)
+    finishUndo(before: before, operation: restored)
   }
 
-  private func finishUndo(before: Untrimmed) {
+  private func finishUndo(before: Untrimmed, operation: Operation) {
+    guard isCurrent(operation) else { return }
     untrimmed = nil
     canUndoTrim = false
     let dropped = trimmedURL
@@ -2245,18 +2389,21 @@ final class VideoPoseSession: NSObject, ObservableObject {
     analysisInterrupted = false
     statusMessage = "Trim undone"
     log.event("trim_undo", ["dropped": dropped?.lastPathComponent ?? ""])
-    rememberCurrent(clipURL: before.url)
+    rememberCurrent(clipURL: before.url, operation: operation)
     if let dropped { try? FileManager.default.removeItem(at: dropped) }
     play()
   }
 
-  private func trim(url: URL, using analyzed: AnalysisPipeline, thenAnalyze: Bool) async {
+  private func trim(url: URL, using analyzed: AnalysisPipeline, thenAnalyze: Bool, operation: Operation) async {
+    guard isCurrent(operation) else { return }
+    let clipStartedAt = currentClipStartedAt
     let asset = AVURLAsset(url: url)
     let clipDuration = (try? await asset.load(.duration).seconds) ?? duration
+    guard isCurrent(operation) else { return }
     guard let span = analyzed.repSpan(padding: Self.trimPadding, duration: clipDuration) else {
       statusMessage = "No reps detected, keeping the whole clip"
       log.event("trim_skipped", ["reason": "no reps", "duration_s": clipDuration])
-      if thenAnalyze { await analyzeAndPlay(url: url) } else { activity = .idle }
+      if thenAnalyze { await analyzeAndPlay(url: url, operation: operation) } else { activity = .idle }
       return
     }
     activity = .working("Trimming", progress: 0)
@@ -2266,13 +2413,18 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let started = Date()
     do {
       let trimmed = try await VideoFile.trim(url, start: span.start, end: span.end) { [weak self] progress in
-        Task { @MainActor in self?.activity = .working("Trimming", progress: progress) }
+        Task { @MainActor in
+          guard let self, self.isCurrent(operation) else { return }
+          self.activity = .working("Trimming", progress: progress)
+        }
       }
       let clip = trimmed.url
+      #if targetEnvironment(simulator)
+        await checkClipSwitch(stage: "trim", url: url, operation: operation)
+      #endif
       // The set was deleted while it was being trimmed (#111): the trimmed file is nobody's.
-      guard !clipDeleted else {
+      guard isCurrent(operation) else {
         try? FileManager.default.removeItem(at: clip)
-        activity = .idle
         return
       }
       log.event(
@@ -2280,7 +2432,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         ["elapsed_s": Date().timeIntervalSince(started), "passthrough": trimmed.passthrough, "aligned_start_s": trimmed.start])
       trimmedURL = clip
       canSave = true
-      currentClipStartedAt = currentClipStartedAt?.addingTimeInterval(trimmed.start)  // the first frame moved
+      currentClipStartedAt = clipStartedAt?.addingTimeInterval(trimmed.start)  // the first frame moved
       log.event(
         "trim",
         [
@@ -2288,7 +2440,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
           "source_duration_s": clipDuration, "clip": clip.lastPathComponent,
         ])
       if thenAnalyze {
-        await analyzeAndPlay(url: clip)
+        await analyzeAndPlay(url: clip, operation: operation)
       } else {
         installPlayerItem(
           url: clip, pipeline: analyzed.shifted(toStartAt: trimmed.start, end: span.end), keepUndo: true)
@@ -2298,7 +2450,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         statusMessage = String(format: "Trimmed to %.1fs", span.end - trimmed.start)
         currentFileURL = clip
         canUndoTrim = untrimmed != nil
-        rememberCurrent(clipURL: clip)
+        rememberCurrent(clipURL: clip, operation: operation)
         activity = .idle
         play()
         // The original is still in Photos: ask now whether to replace it (#90), the same save the button does.
@@ -2310,11 +2462,13 @@ final class VideoPoseSession: NSObject, ObservableObject {
         if ProcessInfo.processInfo.environment["SWING_UNDO_TRIM"] == "1" {
           Task {
             try? await Task.sleep(for: .seconds(3))
+            guard isCurrent(operation) else { return }
             undoTrim()
           }
         }
       }
     } catch {
+      guard isCurrent(operation) else { return }
       statusMessage = "Trim failed: \(error.localizedDescription)"
       log.event("error", ["where": "trim", "message": "\(error)"])
       lastSetPassEnded("trim failed")
@@ -2324,36 +2478,47 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   func saveToPhotos() {
     guard let url = trimmedURL ?? currentFileURL else { return }
+    let operation = beginCurrentOperation()
+    let before = untrimmed
+    let isTrimmed = trimmedURL != nil
     activity = .working("Saving", progress: nil)
     Task {
+      guard isCurrent(operation) else { return }
       do {
         // A trimmed Photos clip replaces its original: the original is stashed in the set's folder so Undo trim
         // can bring it back, the trimmed clip goes into Photos, then the original asset is deleted (iOS asks).
-        if let before = untrimmed, case .photos(let originalID) = before.origin, trimmedURL != nil, let id = currentEntryID {
+        if let before, case .photos(let originalID) = before.origin, isTrimmed {
+          let id = operation.entryID
           activity = .working("Keeping a copy of the original", progress: nil)
           _ = try recents.stashOriginal(id: id, from: before.url)
           activity = .working("Saving", progress: nil)
           guard let newID = try await VideoFile.saveToPhotos(url) else { throw VideoFile.VideoFileError.exportFailed("no asset") }
-          try await VideoFile.deleteFromPhotos(identifier: originalID)
+          guard isCurrent(operation) else { return }
+          // Commit the surviving asset while current; a switch during the deletion must not leave A
+          // pointing at the original that Photos has just removed.
           recents.markSavedToPhotos(id: id, identifier: newID)
           recents.update(id: id) { $0.originalName = url.lastPathComponent }
           currentOrigin = .photos(identifier: newID)
           untrimmed = Untrimmed(url: before.url, pipeline: before.pipeline, frames: before.frames, origin: .photos(identifier: newID))
           replacedOriginalID = originalID
           canSave = false
+          try await VideoFile.deleteFromPhotos(identifier: originalID)
+          guard isCurrent(operation) else { return }
           statusMessage = "Trimmed clip saved; original replaced (Undo trim restores it)"
           log.event("photos_replaced", ["original": originalID, "trimmed": newID, "clip": url.lastPathComponent])
         } else {
-          let identifier = try await VideoFile.saveToPhotos(url)
+          let identifier = try await savePhotosClip(url, operation: operation)
+          guard isCurrent(operation) else { return }
           statusMessage = "Saved to Photos"
           log.event("saved", ["clip": url.lastPathComponent])
-          if let identifier, let id = currentEntryID {
-            recents.markSavedToPhotos(id: id, identifier: identifier)
+          if let identifier {
+            recents.markSavedToPhotos(id: operation.entryID, identifier: identifier)
             currentOrigin = .photos(identifier: identifier)
             canSave = false
           }
         }
       } catch {
+        guard isCurrent(operation) else { return }
         statusMessage = "Save failed: \(error.localizedDescription)"
         log.event("error", ["where": "save", "message": "\(error)"])
       }
@@ -2363,6 +2528,56 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Set when a save replaced the original in Photos; Undo trim then re-adds the original and removes the trim.
   private var replacedOriginalID: String?
+
+  private func savePhotosClip(_ url: URL, operation: Operation) async throws -> String? {
+    #if targetEnvironment(simulator)
+      if ProcessInfo.processInfo.environment["SWING_CLIP_SWITCH"] == "photos" {
+        await checkClipSwitch(stage: "photos", url: url, operation: operation)
+        return "simulated-photos-A"
+      }
+    #endif
+    return try await VideoFile.saveToPhotos(url)
+  }
+
+  #if targetEnvironment(simulator)
+    private var switchCheckStarted = false
+
+    /// Suspend A at a publication boundary, open a stored B with zero reps, then let A finish. Photos uses
+    /// a delayed fake identifier so this regression never requests library access or deletes a real asset.
+    private func checkClipSwitch(stage: String, url: URL, operation: Operation) async {
+      guard !switchCheckStarted, isCurrent(operation),
+        ProcessInfo.processInfo.environment["SWING_CLIP_SWITCH"] == stage else { return }
+      switchCheckStarted = true
+      let id = UUID().uuidString
+      let name = "switch-B." + url.pathExtension
+      do {
+        try recents.save(
+          id: id, source: .file(name: name), recordedAt: Date(), duration: duration,
+          pipeline: AnalysisPipeline(exercise: exercise), clipURL: url, thumbnail: nil,
+          originalName: name, models: models.names)
+        guard let entry = recents.entry(id: id) else { return }
+        log.event("clip_switch_begin", ["stage": stage, "a": operation.entryID, "b": id])
+        open(recent: entry)
+        // Await B's installation before releasing A's delayed completion.
+        for _ in 0..<500 {
+          if currentEntryID == id, source == .file, activity == .idle { break }
+          try? await Task.sleep(for: .milliseconds(10))
+        }
+        log.event("clip_switch_release", ["stage": stage])
+        Task {
+          try? await Task.sleep(for: .seconds(2))
+          let local = FileManager.default.fileExists(atPath: recents.folder(for: id).appendingPathComponent(name).path)
+          let unchanged = recents.entry(id: id).map { !$0.isInPhotos && $0.repCount == 0 } ?? false
+          log.event("clip_switch_checked", [
+            "stage": stage, "current_b": currentEntryID == id, "reps": reps.count,
+            "local_exists": local, "entry_unchanged": unchanged, "idle": activity == .idle,
+          ])
+        }
+      } catch {
+        log.event("error", ["where": "clip_switch_check", "message": "\(error)"])
+      }
+    }
+  #endif
 
   // MARK: - Bug reports
 

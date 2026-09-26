@@ -98,6 +98,25 @@ check_interrupt() {  # clip interrupt-frame mode expected-reps wait-seconds: fai
   mode_default=$(xcrun simctl spawn "$SIM" defaults read "$BUNDLE" exerciseMode 2>/dev/null || true)
   if [ -n "$mode_default" ]; then echo "FAIL  interrupt $1: hook persisted exerciseMode=$mode_default"; fail=1; fi
 }
+check_clip_switch() {  # stage: force A's render/replay/Photos/trim result to arrive after stored B opens
+  reset_mode
+  SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/swing-sample-4reps.mp4" SIMCTL_CHILD_SWING_CLIP_SWITCH="$1" \
+    xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
+  sleep 3
+  wait_for clip_switch_checked 120 || echo "      (timed out waiting for clip switch)"
+  local f; f=$(newest_log)
+  if jq -se '
+    ([.[] | select(.type=="clip_switch_begin")][0].t) as $start |
+    ([.[] | select(.type=="clip_switch_checked")][-1]) as $result |
+    $start != null and $result.current_b == true and $result.reps == 0 and
+    $result.local_exists == true and $result.entry_unchanged == true and $result.idle == true and
+    ([.[] | select(.t >= $start and (.type=="analyzed" or .type=="recents_saved" or .type=="saved" or .type=="trim"))] | length) == 0 and
+    ([.[] | select(.t >= $start and .type=="play")] | length) == 1
+  ' "$f" >/dev/null; then
+    echo "ok    clip_switch $1: B retained, zero reps, local video intact, no stale save or playback"
+  else echo "FAIL  clip_switch $1: $f"; fail=1; fi
+  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+}
 # ONLY=<substring> runs just the matching checks (e.g. ONLY=trim).
 run() { if [ -z "${ONLY:-}" ] || [[ "$*" == *"${ONLY}"* ]]; then "$@"; fi; }
 run check swing-sample-4reps kettlebell-swing 4 90
@@ -106,4 +125,8 @@ run check bulgarian bulgarian-split-squat 8 180
 run check_trim igor-1h-swing 9 150
 run check_cancel pistols 60
 run check_interrupt pistols 60 pistol-squat 6 180
+run check_clip_switch render
+run check_clip_switch mode
+run check_clip_switch photos
+run check_clip_switch trim
 exit $fail
