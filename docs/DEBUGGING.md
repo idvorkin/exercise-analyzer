@@ -46,6 +46,10 @@ means the phone was busy or locked, so run it again. The current session's file 
 | Reports | `bug_report` (note, log, clip, exercise, playhead, phase, reps, recents_id, screenshot, frame) |
 | Failures | `error` (where: recorder / offline_pass / recents / save / bug_images / bell_model / …, message), `crash_report` (last launch's crash or hang from MetricKit: kind crash or hang, exception, signal, reason, file; kind signal or exception with the file's first lines as `top` for the app's own `signal-*.txt` and `exception-*.txt`, each announced once, #87) |
 
+For rest scheduling, `watch_rest.seconds` and `watch_rest_failed.seconds` are the remaining delay to the
+deadline measured from Done (so a 90 s rest with a 25 s permission wait logs about 65 s). A stale or overdue
+permission reply schedules nothing and emits no `watch_rest` event.
+
 The simulator's `SWING_CLIP_SWITCH` checks log `clip_switch_begin` (`stage`, `a`, `b`),
 `clip_switch_release` (`stage`) and `clip_switch_checked` (`stage`, `current_b`, `reps`, `local_exists`,
 `entry_unchanged`, `idle`). They force a stale render, mode replay, Photos response or trim completion after B

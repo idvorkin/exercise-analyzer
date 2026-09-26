@@ -413,10 +413,25 @@ the first frame (story 001).
 - **When:** 90 s pass
 - **Then:** the watch has been counting the rest up under the Record button since Done, taps twice at 90 s (once, no repeat), and Record clears the count; a Preview and its Cancel leave the count alone (story 047)
 
+- **Scenario:** A new set before the tap is scheduled
+- **Given:** a set ended and the watch is still waiting for notification settings or the permission answer
+- **When:** I start the next set before that reply arrives
+- **Then:** the old reply schedules no notification or tap, including if another rest has already started
+
+- **Scenario:** Permission arrives during the rest
+- **Given:** the rest length was 90 s when the set ended
+- **When:** the notification permission answer arrives 25 s after Done
+- **Then:** the tap is scheduled for the remaining 65 s, at 90 s after Done alongside the displayed count
+
+- **Scenario:** Permission arrives after the rest deadline
+- **Given:** the rest length was 90 s when the set ended
+- **When:** the notification settings or permission answer arrives at or after 90 s
+- **Then:** no late tap is scheduled and the rest count keeps counting until Record
+
 - **Notes:** Watch only, no phone change; the rest length is a watch setting (60, 90, 120, 180 s). With the wrist
   down the app is suspended, so the tap at 90 s is a scheduled local notification on the watch (one permission
   prompt, on the watch, the first time; the notification is scheduled once the answer is known, so the first
-  rest taps too); without that permission the count still shows, the tap does not come, and the log says so.
+  rest taps too if the answer precedes its deadline); without that permission the count still shows, the tap does not come, and the log says so.
 
 - **Issues:** [#67](https://github.com/idvorkin/exercise-analyzer/issues/67)
 
