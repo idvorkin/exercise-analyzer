@@ -5,8 +5,8 @@
 # Usage: scripts/pull-tracks.sh [device udid]
 # The archive is keyed by entry id, not by date: a file already holding an id keeps it under whatever date
 # prefix, so a re-pull refreshes it in place (renamed to the dated name once the phone's index carries a date)
-# instead of leaving a second file beside it. Two different sets cannot share an 8-character id prefix by
-# accident; when the same id arrives with a different exercise (one clip re-analyzed as another exercise), the
+# instead of leaving a second file beside it. Full IDs are checked before using an 8-character filename key;
+# a prefix collision stops the export before any archive is changed. When the same id arrives with a different exercise, the
 # newer analysis wins and the older file is renamed to <name>-superseded[.N].json, never left beside it under
 # the id key and never deleted.
 # PULL_TRACKS_STAGE / PULL_TRACKS_OUT override the phone staging dir and the archive dir when testing this script.
@@ -18,6 +18,7 @@ OUT=${PULL_TRACKS_OUT:-ExerciseCore/Tests/ExerciseCoreTests/Fixtures/tracks}
 mkdir -p "$STAGE" "$OUT"
 # A failed copy (phone locked, unplugged) must stop here, or a stale stage is re-archived as if fresh.
 copy_log=$(mktemp)
+trap 'rm -f "$copy_log"' EXIT
 if ! xcrun devicectl device copy from --device "$DEVICE" --domain-type appDataContainer --domain-identifier $BUNDLE \
   --source Documents/recents --destination "$STAGE" >"$copy_log" 2>&1; then
   grep -E "rror" "$copy_log" | grep -v provisioning || true
@@ -29,6 +30,22 @@ python3 - "$STAGE" "$OUT" <<'PY'
 import json, pathlib, sys, datetime, re
 stage, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 index = {e["id"]: e for e in json.load(open(stage / "index.json"))} if (stage / "index.json").exists() else {}
+
+# A UUID prefix is only a filename abbreviation, never proof that two tracks are the same set. Preflight
+# both the existing archive and the incoming batch, before any rename, consolidation or write.
+ids_by_prefix = {}
+def check_id(entry_id):
+    prefix = entry_id[:8]
+    previous = ids_by_prefix.setdefault(prefix, entry_id)
+    if previous != entry_id:
+        sys.exit(f"different recents IDs share archive prefix {prefix}: {previous} and {entry_id}; archive unchanged")
+
+for archived in out.glob("*.json"):
+    source_id = json.load(open(archived)).get("source", {}).get("recents_id")
+    if source_id:
+        check_id(source_id)
+for snap in stage.glob("*/analysis.json"):
+    check_id(snap.parent.name)
 
 def archived_exercise(path):
     """The exercise an archive file holds: its embedded source, else its file stem."""
