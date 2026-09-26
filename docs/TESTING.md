@@ -135,6 +135,9 @@ A human spot-check of a few frames stays worthwhile; Muse's notes column says wh
 
 [`scripts/sim-smoke.sh`](../scripts/sim-smoke.sh), run by `just test-sim` after `just build-sim`.
 
+Each check waits for its event in a new launch log, so a slow startup cannot reuse the preceding clip's result.
+The trim check reads the first `display_frame` after `trim`, rather than sampling the last few frame events.
+
 A fresh checkout or worktree needs `just model` before any app build: the `.mlpackage` binaries are gitignored
 downloads, and a build without them launches with no predictor — one `model_missing` event, then silence until
 every check times out (2026-09-13).

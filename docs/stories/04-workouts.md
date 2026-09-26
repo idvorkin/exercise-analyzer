@@ -65,7 +65,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 013:
 
 - **Summary:** Re-analyzing a clip updates the set instead of duplicating it
-- **Status:** implemented in [ddd1d6f](https://github.com/idvorkin/exercise-analyzer/commit/ddd1d6f); verified on the simulator (same clip twice, one entry)
+- **Status:** implemented in [ddd1d6f](https://github.com/idvorkin/exercise-analyzer/commit/ddd1d6f); verified on the simulator (same clip twice, one entry); failure-safe replacement, backup retention and Photos-only duplicate identity in [b6a7fb3](https://github.com/idvorkin/exercise-analyzer/commit/b6a7fb3), verified on the host (filesystem failure and restart-recovery tests) and simulator (all ten smoke checks, with event selection fixed in [460689c](https://github.com/idvorkin/exercise-analyzer/commit/460689c); the trimmed nine-rep set saved twice under one ID)
 
 #### Use Case:
 - **As a** lifter who opens the same clip twice
@@ -77,6 +77,23 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Given:** a clip from Photos is already in Workouts
 - **When:** I open the same clip again
 - **Then:** Workouts still shows one entry for it, with the newer analysis
+
+- **Scenario:** Saving the newer analysis fails
+- **Given:** a stored set with a playable clip, analysis and rep pictures
+- **When:** saving its replacement fails while copying, encoding or writing files or publishing the index
+- **Then:** the previous set remains listed and opens with its previous clip, analysis and pictures; an interrupted save is recovered when the app next opens
+
+- **Scenario:** Re-analyzing a trimmed set keeps Undo trim
+- **Given:** a stored set has an untrimmed original kept for Undo trim
+- **When:** its newer analysis is saved successfully
+- **Then:** one entry remains with the new analysis, its original backup and the metadata needed to undo the trim
+
+- **Scenario:** Unrelated imported files share a name and length
+- **Given:** a file named clip.mov is already in Workouts
+- **When:** I import another file with the same name and duration
+- **Then:** both sets remain; only the existing set's ID or the same Photos asset ID identifies a replacement
+
+- **Issues:** [#52](https://github.com/idvorkin/exercise-analyzer/issues/52), review finding 4: a failed re-save must not lose the stored set or its Undo trim backup
 
 ---
 
