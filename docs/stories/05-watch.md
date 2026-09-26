@@ -399,7 +399,7 @@ the first frame (story 001).
 ### User Story 046:
 
 - **Summary:** Rest timer on the wrist
-- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); on phone + watch since 2026-09-13, Igor's check pending
+- **Status:** implemented in [da516fd](https://github.com/idvorkin/exercise-analyzer/commit/da516fd); on phone + watch since 2026-09-13, Igor's check pending; delayed-permission identity and deadline fix in [88768f5](https://github.com/idvorkin/exercise-analyzer/commit/88768f5), verified on the host (five regression tests), signed iOS + watch build, and watch simulator (`just watch-screens`: 14 states, done/workout/viewfinder inspected); fixed tap delivery on the wrist pending
 - **Why:** rest length is the one number between sets, and the watch is the only screen on the lifter; it showed nothing between Done and the next Record.
 
 #### Use Case:
