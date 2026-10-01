@@ -127,7 +127,7 @@ struct WatchContentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { proxy.scrollTo("workout-end", anchor: .bottom) }
       }
       .sheet(isPresented: $countingSet) {
-        let start = HandSet.start(mode: status.mode, analyzed: status.lastSet, byHand: phone.handSet)
+        let start = HandSet.start(mode: status.mode, analyzed: status.lastSet, byHand: phone.lastTyped)
         SetByHandPage(
           exercise: start.exercise, start: start.reps, choosing: phone.screenshotOpensExerciseList
         ) { exercise, reps in

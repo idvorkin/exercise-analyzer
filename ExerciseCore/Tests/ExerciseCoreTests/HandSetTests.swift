@@ -71,15 +71,13 @@ final class HandSetTests: XCTestCase {
     XCTAssertTrue(HandSet.start(mode: swing.rawValue, analyzed: analyzed, byHand: nil) == (swing, 3))
   }
 
-  func testTheNewerOfTheAnalyzedAndTheTypedSetIsTheLastSet() {
+  /// #183: the page reopens on the last set typed by hand, even after a filmed set of another exercise and
+  /// whatever the picker says: typed sets are the ones between filmed ones.
+  func testThePageReopensOnTheLastTypedSet() {
     let analyzed = LastSet(reps: 3, exercise: getUp.definition.name, seconds: 90, at: 1000)
-    let later = HandSet(exercise: swing, reps: 8, at: 1100)
-    let earlier = HandSet(exercise: swing, reps: 8, at: 900)
-    XCTAssertTrue(later.isNewer(than: analyzed))
-    XCTAssertFalse(earlier.isNewer(than: analyzed))
-    XCTAssertTrue(earlier.isNewer(than: nil))
-    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: later) == (swing, 8))
-    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: earlier) == (getUp, 3))
+    let earlier = HandSet(exercise: .pullUp, reps: 9, at: 900)
+    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: earlier) == (.pullUp, 9))
+    XCTAssertTrue(HandSet.start(mode: getUp.rawValue, analyzed: analyzed, byHand: earlier) == (.pullUp, 9))
   }
 
   func testAnAnalyzedCountOutsideTheRangeStartsClamped() {
@@ -157,5 +155,42 @@ final class HandSetTests: XCTestCase {
     XCTAssertEqual(timeline.rows.reduce(0) { $0 + $1.reps }, 18)
     XCTAssertEqual(timeline.row(near: Date(timeIntervalSince1970: 1140), slop: 20)?.id, "rec")
     XCTAssertNil(timeline.row(near: Date(timeIntervalSince1970: 1200), slop: 20))
+  }
+
+  /// #178: a tap on the chart that hits no set adds one at that moment, starting from the set before it.
+  func testATapOnEmptyChartDraftsASetAtThatMomentLikeTheOneBefore() {
+    let workout = StoredWorkout(start: Date(timeIntervalSince1970: 1000), end: Date(timeIntervalSince1970: 2000))
+    let recorded = RecentEntry(
+      id: "rec", analyzedAt: Date(timeIntervalSince1970: 1130), recordedAt: nil, duration: 30, repCount: 12,
+      bestScore: 80, source: .file(name: "clip.mov"), thumbnail: nil, exercise: getUp, originalName: nil,
+      clipStartedAt: Date(timeIntervalSince1970: 1100))
+    let typed = HandSet(id: "hand", exercise: .pullUp, reps: 5, at: 1500).entry
+    let timeline = WorkoutTimeline(workout: workout, sets: [recorded, typed], heartRate: nil)
+    let draft = timeline.handSet(at: Date(timeIntervalSince1970: 1300))
+    XCTAssertEqual(draft.at, 1300)
+    XCTAssertEqual(draft.exercise, getUp)
+    XCTAssertEqual(draft.reps, 12)
+    XCTAssertEqual(timeline.handSet(at: Date(timeIntervalSince1970: 1600)).exercise, .pullUp)
+    // Before every set: the first set's; with no set: a swing set of 10.
+    XCTAssertEqual(timeline.handSet(at: Date(timeIntervalSince1970: 1050)).exercise, getUp)
+    let empty = WorkoutTimeline(workout: workout, sets: [], heartRate: nil).handSet(at: Date(timeIntervalSince1970: 1050))
+    XCTAssertEqual(empty.exercise, swing)
+    XCTAssertEqual(empty.reps, HandSet.defaultReps)
+  }
+
+  /// #178 (Igor, 2026-09-30, on review): a tap on a typed set's mark opens that set, not a second add; a recorded
+  /// set in reach still takes the tap first.
+  func testATapNearATypedSetsMarkFindsThatSet() {
+    let workout = StoredWorkout(start: Date(timeIntervalSince1970: 1000), end: Date(timeIntervalSince1970: 2000))
+    let recorded = RecentEntry(
+      id: "rec", analyzedAt: Date(timeIntervalSince1970: 1130), recordedAt: nil, duration: 30, repCount: 10,
+      bestScore: 80, source: .file(name: "clip.mov"), thumbnail: nil, exercise: swing, originalName: nil,
+      clipStartedAt: Date(timeIntervalSince1970: 1100))
+    let typed = HandSet(id: "hand", exercise: .pullUp, reps: 5, at: 1500).entry
+    let timeline = WorkoutTimeline(workout: workout, sets: [recorded, typed], heartRate: nil)
+    XCTAssertEqual(timeline.typedRow(near: Date(timeIntervalSince1970: 1510), slop: 20)?.id, "hand")
+    XCTAssertNil(timeline.row(near: Date(timeIntervalSince1970: 1510), slop: 20))
+    XCTAssertNil(timeline.typedRow(near: Date(timeIntervalSince1970: 1600), slop: 20))
+    XCTAssertNil(timeline.typedRow(near: Date(timeIntervalSince1970: 1120), slop: 20))
   }
 }

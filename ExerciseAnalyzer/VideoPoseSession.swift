@@ -300,13 +300,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     watch.onReachable = { [weak self] in self?.pushWatchStatus(force: true) }
     watch.onContact = { [weak self] in self?.updateKeepAwake() }
     // A set typed on the wrist (059): a Workouts entry with no clip, once per id however often it arrives.
-    watch.onHandSet = { [weak self] set in
-      guard let self else { return }
-      let added = self.recents.add(set)
-      self.log.event(
-        "set_by_hand",
-        ["id": set.id, "exercise": set.exercise.rawValue, "reps": set.reps, "at": set.at, "duplicate": !added])
-    }
+    watch.onHandSet = { [weak self] set in self?.addByHand(set, from: "watch") }
     WorkoutMirror.shared.$live.map { $0 != nil }.removeDuplicates().dropFirst().receive(on: DispatchQueue.main)
       .sink { [weak self] _ in self?.updateKeepAwake() }.store(in: &cancellables)
     watch.onExercise = { [weak self] mode in
@@ -1211,6 +1205,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
       ["id": entry.id, "in_photos": entry.isInPhotos, "reps": entry.repCount, "on_screen": entry.id == currentEntryID, "where": place])
     letGo(of: entry, status: entry.isInPhotos ? "Removed from Workouts" : "Set deleted")
     recents.remove(id: entry.id)
+  }
+
+  /// A set typed by hand: on the wrist (059) or from a tap on a workout's chart (#178). Once per id however often
+  /// it arrives.
+  func addByHand(_ set: HandSet, from place: String) {
+    let added = recents.add(set)
+    log.event(
+      "set_by_hand",
+      ["id": set.id, "exercise": set.exercise.rawValue, "reps": set.reps, "at": set.at, "duplicate": !added,
+       "where": place])
   }
 
   /// The lifter's own exercise and count for a stored set (#156, #157): it stays in Workouts as a by-hand set and

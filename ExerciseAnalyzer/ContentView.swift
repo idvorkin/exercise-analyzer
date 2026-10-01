@@ -121,7 +121,8 @@ struct ContentView: View {
               identity: workout, store: session.recents, workouts: workouts, onOpen: openSet,
               thumbnail: { session.recents.thumbnailImage(for: $0) }, onEvent: { session.log.event($0, $1) },
               onDelete: { session.delete(set: $0, from: "workout_page") },
-              onKeepByHand: { session.keepByHand(set: $0, exercise: $1, reps: $2, from: "workout_page") })
+              onKeepByHand: { session.keepByHand(set: $0, exercise: $1, reps: $2, from: "workout_page") },
+              onAddByHand: { session.addByHand($0, from: "workout_chart") })
           case .player:
             // Full screen, as the picture always was: the HUD's "‹" is the way back, and the edge swipe stays
             // the frame steppers' (story 030), so the system back and its swipe are off.

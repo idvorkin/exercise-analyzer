@@ -188,6 +188,20 @@ check_live_workout() {
     echo "ok    live_workout: 1 → 2 sets / 16 reps, clock and window advanced, Health re-asked, saved page retained both sets"
   else echo "FAIL  live_workout: $f"; fail=1; fi
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+  # #178: a tap on the saved workout's chart where no set is adds a set by hand there, as Save on its sheet would.
+  previous_log=$(newest_log)
+  SIMCTL_CHILD_SWING_OPEN_WORKOUT=1 SIMCTL_CHILD_SWING_WORKOUT_BAR_TAP=0.05 SIMCTL_CHILD_SWING_WORKOUT_ADD_SAVE=1 \
+    xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
+  wait_for set_by_hand 30 || echo "      (timed out waiting for the chart's set)"
+  sleep 1
+  f=$(newest_log)
+  if jq -se '
+    ([.[] | select(.type=="ui" and .action=="workout_bar_tap")][-1] | .hit == false and .adding == true) and
+    ([.[] | select(.type=="set_by_hand")][-1] | .where == "workout_chart" and .duplicate == false)
+  ' "$f" >/dev/null; then
+    echo "ok    add_from_chart: an empty tap on the chart added a set by hand"
+  else echo "FAIL  add_from_chart: $f"; fail=1; fi
+  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   # 065: delete the workout just saved, as a confirmed long-press would. Its sets were the pretend watch's (no
   # video), so no set is saved here and none may appear or go.
   previous_log=$(newest_log)

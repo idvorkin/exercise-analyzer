@@ -126,9 +126,29 @@ public struct WorkoutTimeline: Equatable, Sendable {
   /// seconds (a set's band is a few points wide, a thumb is not), else none. A set typed by hand has nothing to
   /// open, so it never takes the tap from a recorded set beside it (059).
   public func row(near time: Date, slop: TimeInterval) -> SetRow? {
+    nearest(rows.filter { !$0.byHand }, to: time, slop: slop)
+  }
+
+  /// The set typed by hand a tap on the chart means when no recorded set is in reach (#178): the nearest mark
+  /// within `slop` seconds, so a tap on one's own typed set opens it to check or correct, not a second add.
+  public func typedRow(near time: Date, slop: TimeInterval) -> SetRow? {
+    nearest(rows.filter(\.byHand), to: time, slop: slop)
+  }
+
+  private func nearest(_ candidates: [SetRow], to time: Date, slop: TimeInterval) -> SetRow? {
     func distance(_ row: SetRow) -> TimeInterval {
       max(row.start.timeIntervalSince(time), time.timeIntervalSince(row.end), 0)
     }
-    return rows.filter { !$0.byHand }.min { distance($0) < distance($1) }.flatMap { distance($0) <= slop ? $0 : nil }
+    return candidates.min { distance($0) < distance($1) }.flatMap { distance($0) <= slop ? $0 : nil }
+  }
+
+  /// The set a tap on the chart's empty plot adds (#178; Igor: "put the time when it happened … closest to where my
+  /// finger"): at the tapped moment, with the exercise and count of the set before it (the first set's when the tap
+  /// is before them all, a swing set of 10 with none).
+  public func handSet(at time: Date) -> HandSet {
+    let before = rows.last { $0.start <= time } ?? rows.first
+    return HandSet(
+      exercise: before?.exercise ?? .kettlebellSwing, reps: HandSet.clamp(before?.reps ?? HandSet.defaultReps),
+      at: time.timeIntervalSince1970)
   }
 }

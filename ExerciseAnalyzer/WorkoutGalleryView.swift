@@ -430,7 +430,7 @@ struct DayHeader: View {
       } else {
         dayLine.accessibilityElement(children: .combine).accessibilityLabel("\(title), \(summary)")
       }
-      // The day's workouts from the wrist (048): the hour, its heart rate, and that it is in Health. Each line
+      // The day's workouts from the wrist (048): its start, length and average heart rate (#185). Each line
       // is its own target and opens the workout's page (053); a workout day has no fold of its own (#163).
       ForEach(workoutLines, id: \.workout.id) { line in
         Button {
@@ -451,6 +451,7 @@ struct DayHeader: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Workout \(line.text)")
         .accessibilityHint("Opens the whole workout")
         // An ended workout can be deleted (065); the running one belongs to the watch.
         .contextMenu {
@@ -479,9 +480,10 @@ struct DayHeader: View {
         Text(dateLine).font(.subheadline).foregroundStyle(.secondary)
       }
       Spacer()
-      if collapsed {
+      if collapsed || day.hasWorkout {
         // A folded day says what was done (#129; Igor: "show an icon like 8x8 swings, 3xTGUs"): sets ×
-        // reps per exercise with its drawing, "8×8 [swing] · 5×2 [get-up]", a range when the sets differ.
+        // reps per exercise with its drawing, "8×8 [swing] · 5×2 [get-up]", a range when the sets differ. A
+        // workout day reads the same (#185; Igor: "look like days … with little icons").
         HStack(spacing: 6) {
           ForEach(day.exercises) { exercise in
             HStack(spacing: 3) {
@@ -516,20 +518,16 @@ struct DayHeader: View {
     return f
   }()
 
-  /// "Workout 9:02–10:00 · 58 min · ♥ 128 avg · 156 max · in Health", one per workout, then the running one.
+  /// "9:02 AM · 58 min · ♥ 128" (the average), one per workout, then the running one: one line under a header
+  /// that already says what was done (#185; Igor: "drop word workout … drop max"; the lifter sign says workout).
   private var workoutLines: [(text: String, workout: StoredWorkout)] {
     var lines = day.workouts.map { workout -> (text: String, workout: StoredWorkout) in
-      var parts = [
-        "Workout \(Self.clock.string(from: workout.start))–\(Self.clock.string(from: workout.end))",
-        "\(Int(workout.duration / 60)) min",
-      ]
-      if let avg = workout.heartRateAverage { parts.append("♥ \(avg) avg") }
-      if let max = workout.heartRateMax { parts.append("\(max) max") }
-      parts.append("in Health")
+      var parts = [Self.clock.string(from: workout.start), "\(Int(workout.duration / 60)) min"]
+      if let avg = workout.heartRateAverage { parts.append("♥ \(avg)") }
       return (parts.joined(separator: " · "), workout)
     }
     if let live = day.live {
-      var parts = ["Workout since \(Self.clock.string(from: live.startDate))"]
+      var parts = ["Since \(Self.clock.string(from: live.startDate))"]
       if let heartRate = live.heartRate { parts.append("♥ \(heartRate)") }
       parts.append("on the watch")
       // The running workout opens as a span up to now (053).
@@ -596,13 +594,16 @@ struct ExerciseSetsRow: View {
 /// 60 pt buttons, and a line saying what happens to the video before Save makes the set a by-hand set.
 struct SetByHandSheet: View {
   let entry: RecentEntry
+  /// "Add a set at 10:42 AM" when the set is new, from a tap on the workout's chart (#178).
+  var title = "Set exercise and reps"
   let onSave: (ExerciseKind, Int) -> Void
   @State private var exercise: ExerciseKind
   @State private var reps: Int
   @Environment(\.dismiss) private var dismiss
 
-  init(entry: RecentEntry, onSave: @escaping (ExerciseKind, Int) -> Void) {
+  init(entry: RecentEntry, title: String = "Set exercise and reps", onSave: @escaping (ExerciseKind, Int) -> Void) {
     self.entry = entry
+    self.title = title
     self.onSave = onSave
     _exercise = State(initialValue: entry.exerciseKind)
     _reps = State(initialValue: HandSet.clamp(entry.repCount == 0 ? HandSet.defaultReps : entry.repCount))
@@ -657,7 +658,7 @@ struct SetByHandSheet: View {
         }
         .padding()
       }
-      .navigationTitle("Set exercise and reps")
+      .navigationTitle(title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
     }

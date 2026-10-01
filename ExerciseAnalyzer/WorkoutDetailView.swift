@@ -20,6 +20,8 @@ struct WorkoutDetailView: View {
   var onDelete: ((RecentEntry) -> Void)? = nil
   /// The lifter's own exercise and count for a set, from a row's long-press sheet (#156, #157).
   var onKeepByHand: ((RecentEntry, ExerciseKind, Int) -> Void)? = nil
+  /// A set the camera never saw, added from a tap on the chart where no set is (#178).
+  var onAddByHand: ((HandSet) -> Void)? = nil
   @Environment(\.scenePhase) private var scenePhase
   @State private var tick = Date()
   @State private var heartRate: HeartRateSeries?
@@ -34,7 +36,8 @@ struct WorkoutDetailView: View {
       if let snapshot {
         WorkoutPageView(
           snapshot: snapshot, sets: store.entries, heartRate: heartRate, onOpen: onOpen,
-          thumbnail: thumbnail, onEvent: onEvent, onDelete: onDelete, onKeepByHand: onKeepByHand)
+          thumbnail: thumbnail, onEvent: onEvent, onDelete: onDelete, onKeepByHand: onKeepByHand,
+          onAddByHand: onAddByHand)
           // Twenty seconds matches the set page's Health re-ask (#107). A saved id triggers one final read.
           .task(id: HeartRateRequest(workout: snapshot.workout, active: scenePhase == .active)) {
             guard scenePhase == .active else { return }
@@ -89,8 +92,11 @@ private struct WorkoutPageView: View {
   var onEvent: ((String, [String: Any]) -> Void)?
   var onDelete: ((RecentEntry) -> Void)?
   var onKeepByHand: ((RecentEntry, ExerciseKind, Int) -> Void)?
+  var onAddByHand: ((HandSet) -> Void)?
   @State private var deleting: RecentEntry?
   @State private var editing: RecentEntry?
+  /// The set a tap on the chart's empty plot would add, until its sheet saves or cancels (#178).
+  @State private var adding: RecentEntry?
   /// The set list by exercise instead of by time (#164), remembered across workouts.
   @AppStorage("workoutPageGrouped") private var grouped = false
   private var workout: StoredWorkout { snapshot.workout }
@@ -174,6 +180,11 @@ private struct WorkoutPageView: View {
         }
         .setDeletionDialog($deleting) { onDelete?($0) }
         .setByHandSheet($editing) { onKeepByHand?($0, $1, $2) }
+        .sheet(item: $adding) { draft in
+          SetByHandSheet(entry: draft, title: "Add a set at \(Self.clock.string(from: draft.analyzedAt))") {
+            add(draft, exercise: $0, reps: $1)
+          }
+        }
         if timeline.rows.isEmpty {
           Text("No sets were recorded inside this workout.").font(.subheadline).foregroundStyle(.secondary)
         }
@@ -331,9 +342,22 @@ private struct WorkoutPageView: View {
         let plot = proxy.plotFrame.map { geo[$0] } ?? .zero
         let moment = { (x: CGFloat) -> Date? in proxy.value(atX: x - plot.minX) }
         let open = { (x: CGFloat) in
-          let row = moment(x).flatMap { timeline.row(near: $0, slop: 24 * visibleSeconds / max(plot.width, 1)) }
-          onEvent?("ui", ["action": "workout_bar_tap", "hit": row != nil, "window_s": Int(visibleSeconds)])
+          let slop = 24 * visibleSeconds / max(plot.width, 1)
+          let row = moment(x).flatMap { timeline.row(near: $0, slop: slop) }
+          // A typed set's mark opens its by-hand sheet to check or correct it (#178).
+          let typed = row == nil && onKeepByHand != nil
+            ? moment(x).flatMap { timeline.typedRow(near: $0, slop: slop) }
+              .flatMap { mark in sets.first { $0.id == mark.id } } : nil
+          // A tap where no set is adds one there (#178), from the set before it, in the by-hand sheet.
+          let draft = row == nil && typed == nil && onAddByHand != nil
+            ? moment(x).map { timeline.handSet(at: min(max($0, workout.start), workout.end)).entry } : nil
+          onEvent?(
+            "ui",
+            ["action": "workout_bar_tap", "hit": row != nil, "window_s": Int(visibleSeconds),
+             "editing": typed != nil, "adding": draft != nil])
           if let row, let entry = sets.first(where: { $0.id == row.id }) { onOpen(entry) }
+          if let typed { editing = typed }
+          adding = draft
         }
         Rectangle().fill(.clear).contentShape(Rectangle())
           .onTapGesture { open($0.x) }
@@ -421,6 +445,13 @@ private struct WorkoutPageView: View {
             guard let share = env["SWING_WORKOUT_BAR_TAP"].flatMap(Double.init) else { return }
             try? await Task.sleep(for: .seconds(1))
             hookStep = .tap(share)
+            // SWING_WORKOUT_ADD_SAVE=1: Save on the sheet that tap opened, as it opened (#178).
+            guard env["SWING_WORKOUT_ADD_SAVE"] != nil else { return }
+            try? await Task.sleep(for: .seconds(1.5))
+            if let draft = adding {
+              add(draft, exercise: draft.exerciseKind, reps: draft.repCount)
+              adding = nil
+            }
           }
       }
     }
@@ -431,6 +462,11 @@ private struct WorkoutPageView: View {
       }
     }
     .accessibilityLabel("Heart rate across the workout with \(timeline.rows.count) sets marked")
+  }
+
+  /// A set added from the chart (#178): the draft's id and moment, the sheet's exercise and count.
+  private func add(_ draft: RecentEntry, exercise: ExerciseKind, reps: Int) {
+    onAddByHand?(HandSet(id: draft.id, exercise: exercise, reps: reps, at: draft.analyzedAt.timeIntervalSince1970))
   }
 
   /// Narrows or widens the window to `seconds` (a minute to the whole workout) with `moment` kept where it is
