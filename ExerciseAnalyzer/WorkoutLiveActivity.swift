@@ -12,10 +12,22 @@ import ExerciseCore
 import UIKit
 
 /// Declared twice with the same name and shape, here and in ExerciseAnalyzerControls/WorkoutActivityView.swift:
-/// the extension does not link ExerciseCore or the app, and ActivityKit matches the two by name.
+/// the extension cannot link the app, and ActivityKit matches the two by name.
 struct WorkoutActivityAttributes: ActivityAttributes {
   struct ContentState: Codable, Hashable {
     var heartRate: Int?
+    var sets: Int
+    var reps: Int
+    /// Reps by exercise in the order first done (#181) and the last set, whose end starts the rest clock (#182).
+    /// Optional, so an activity a previous build left up still decodes.
+    var exercises: [ExerciseCount]?
+    var last: ExerciseCount?
+    var lastEndedAt: Date?
+  }
+
+  /// An exercise by its raw value (ExerciseKind), with its sets and reps.
+  struct ExerciseCount: Codable, Hashable {
+    var exercise: String
     var sets: Int
     var reps: Int
   }
@@ -34,9 +46,13 @@ final class WorkoutLiveActivity {
   private var deferredLogged = false
   private var cancellables = Set<AnyCancellable>()
 
-  /// Follows the mirror from launch; takes over an activity a previous run left up.
-  func install(mirror: WorkoutMirror) {
+  private weak var recents: RecentsStore?
+
+  /// Follows the mirror from launch, and the store for the workout's sets; takes over an activity a previous run
+  /// left up.
+  func install(mirror: WorkoutMirror, recents: RecentsStore) {
     guard cancellables.isEmpty else { return }
+    self.recents = recents
     activity = Activity<WorkoutActivityAttributes>.activities.first
     // The mirror starts at nil until Health hands the running workout back, so that first nil must not end an
     // activity a previous run left up mid-workout; one with no workout behind it goes when the next workout
@@ -46,6 +62,9 @@ final class WorkoutLiveActivity {
       .store(in: &cancellables)
     NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
       .sink { [weak self] _ in if let live = mirror.live { self?.follow(live) } }.store(in: &cancellables)
+    // A set saved, typed or re-counted changes the reps by exercise and the rest clock's start (#181, #182).
+    recents.$entries.dropFirst().receive(on: DispatchQueue.main)
+      .sink { [weak self] _ in if let live = mirror.live { self?.follow(live) } }.store(in: &cancellables)
   }
 
   private func follow(_ live: WorkoutWire?) {
@@ -54,7 +73,7 @@ final class WorkoutLiveActivity {
       return
     }
     if let activity, activity.attributes.startedAt != live.startDate { end(reason: "replaced") }
-    let glance = WorkoutGlance(live)
+    let glance = WorkoutGlance(live).with(sets: recents?.entries ?? [], since: live.startDate)
     guard let activity else {
       start(live, glance)
       return
@@ -84,7 +103,11 @@ final class WorkoutLiveActivity {
       shown = glance
       shownAt = Date()
       deferredLogged = false
-      onEvent?("live_activity", ["action": "start", "started_at": live.startedAt, "sets": glance.sets, "reps": glance.reps])
+      onEvent?(
+        "live_activity",
+        ["action": "start", "started_at": live.startedAt, "sets": glance.sets, "reps": glance.reps,
+         "exercises": glance.exercises.map { "\($0.exercise.rawValue):\($0.reps)" }.joined(separator: ","),
+         "last": glance.last.map { "\($0.exercise.rawValue):\($0.reps)" } ?? ""])
     } catch {
       onEvent?("live_activity", ["action": "failed", "message": "\(error)"])
     }
@@ -101,6 +124,10 @@ final class WorkoutLiveActivity {
   }
 
   private static func state(_ glance: WorkoutGlance) -> WorkoutActivityAttributes.ContentState {
-    .init(heartRate: glance.heartRate, sets: glance.sets, reps: glance.reps)
+    .init(
+      heartRate: glance.heartRate, sets: glance.sets, reps: glance.reps,
+      exercises: glance.exercises.map { .init(exercise: $0.exercise.rawValue, sets: $0.sets, reps: $0.reps) },
+      last: glance.last.map { .init(exercise: $0.exercise.rawValue, sets: 1, reps: $0.reps) },
+      lastEndedAt: glance.last?.endedAt)
   }
 }

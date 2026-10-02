@@ -44,6 +44,10 @@ public struct WorkoutGlance: Equatable, Sendable {
   public var heartRate: Int?
   public var sets: Int
   public var reps: Int
+  /// The phone's own sets of the workout by exercise, in the order first done (#181), and the last of them, whose
+  /// recording's end starts the rest clock (#182; Igor picked "the end of the recording" on 2026-10-01).
+  public var exercises: [ExerciseTally] = []
+  public var last: LastSetTally?
 
   public static let heartRateEvery: TimeInterval = 30
 
@@ -55,12 +59,53 @@ public struct WorkoutGlance: Equatable, Sendable {
 
   public init(_ wire: WorkoutWire) { self.init(heartRate: wire.heartRate, sets: wire.sets, reps: wire.reps) }
 
+  /// This glance with the phone's sets recorded or typed since `start`: a set typed by hand ends at its save.
+  public func with(sets entries: [RecentEntry], since start: Date) -> WorkoutGlance {
+    let inside = entries.filter { $0.span.lowerBound >= start }.sorted { $0.span.lowerBound < $1.span.lowerBound }
+    var glance = self
+    glance.exercises = []
+    for entry in inside {
+      if let i = glance.exercises.firstIndex(where: { $0.exercise == entry.exerciseKind }) {
+        glance.exercises[i].sets += 1
+        glance.exercises[i].reps += entry.repCount
+      } else {
+        glance.exercises.append(ExerciseTally(exercise: entry.exerciseKind, sets: 1, reps: entry.repCount))
+      }
+    }
+    glance.last = inside.max { Self.ended($0) < Self.ended($1) }.map {
+      LastSetTally(exercise: $0.exerciseKind, reps: $0.repCount, endedAt: Self.ended($0))
+    }
+    return glance
+  }
+
+  /// When a set ended, the rest clock's start (#182): a recording's `recordedAt` is the moment Done stopped it,
+  /// whatever the trim kept or a pause dropped, and a typed set's is its save. The clip's span is only for a set
+  /// without one.
+  /// ponytail: an imported clip's `recordedAt` is the asset's date, its start, so a clip imported mid-workout
+  /// rests from its start, one clip length early; store the stop time on the set if imports during a workout matter.
+  private static func ended(_ entry: RecentEntry) -> Date { entry.recordedAt ?? entry.span.upperBound }
+
   /// Whether the activity should take `next`, shown `shown` since `shownAt`.
   public static func shouldShow(_ next: WorkoutGlance, over shown: WorkoutGlance?, shownAt: Date, now: Date) -> Bool {
     guard let shown else { return true }
     if next.sets != shown.sets || next.reps != shown.reps { return true }
+    if next.exercises != shown.exercises || next.last != shown.last { return true }
     return next.heartRate != shown.heartRate && now.timeIntervalSince(shownAt) >= heartRateEvery
   }
+}
+
+/// One exercise's sets and reps in the running workout (#181).
+public struct ExerciseTally: Equatable, Sendable {
+  public var exercise: ExerciseKind
+  public var sets: Int
+  public var reps: Int
+}
+
+/// The running workout's last set (#181) and when its recording ended, the rest clock's start (#182).
+public struct LastSetTally: Equatable, Sendable {
+  public var exercise: ExerciseKind
+  public var reps: Int
+  public var endedAt: Date
 }
 
 /// The workout chart's time axis in time into the workout, not time of day (#165; Igor: "In graph view switch to

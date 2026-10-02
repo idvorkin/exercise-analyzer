@@ -1,10 +1,14 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-//  The running wrist workout's Live Activity (#161): the lock screen shows WORKOUT, the clock counting up by itself
-//  from the start, heart rate and sets · reps; the Dynamic Island shows the figure and the clock, and the same four
-//  when pressed. A tap opens the app. The app (WorkoutLiveActivity) starts, updates and ends it.
+//  The running wrist workout's Live Activity (#161), laid out "rest first" (#181, #182; Igor picked B on
+//  2026-10-01): the lock screen shows REST counting up from the last set's end, large, with the heart rate and the
+//  workout clock small beside it, then the reps of each exercise by its drawing and the last set. Before the first
+//  set it shows WORKOUT and the workout clock as before. The Dynamic Island shows the last exercise's drawing and
+//  the rest clock, and the same lines when pressed. Both clocks run by themselves. A tap opens the app. The app
+//  (WorkoutLiveActivity) starts, updates and ends it.
 
 import ActivityKit
+import ExerciseCore
 import SwiftUI
 import WidgetKit
 
@@ -13,6 +17,15 @@ import WidgetKit
 struct WorkoutActivityAttributes: ActivityAttributes {
   struct ContentState: Codable, Hashable {
     var heartRate: Int?
+    var sets: Int
+    var reps: Int
+    var exercises: [ExerciseCount]?
+    var last: ExerciseCount?
+    var lastEndedAt: Date?
+  }
+
+  struct ExerciseCount: Codable, Hashable {
+    var exercise: String
     var sets: Int
     var reps: Int
   }
@@ -24,19 +37,29 @@ struct WorkoutActivityAttributes: ActivityAttributes {
 struct WorkoutActivityWidget: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in
-      HStack(spacing: 12) {
-        Image(systemName: "figure.strengthtraining.traditional")
-          .font(.title2).foregroundStyle(.green)
-          .frame(width: 44, height: 44)
-          .background(Color.green.opacity(0.2), in: Circle())
-        VStack(alignment: .leading, spacing: 0) {
-          Text("WORKOUT").font(.caption.bold()).foregroundStyle(.green)
-          clock(context.attributes.startedAt).font(.system(size: 34, weight: .bold, design: .rounded))
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text(context.state.lastEndedAt == nil ? "WORKOUT" : "REST").font(.caption.bold()).foregroundStyle(.green)
+            mainClock(context).font(.system(size: 34, weight: .bold, design: .rounded))
+          }
+          Spacer(minLength: 8)
+          VStack(alignment: .trailing, spacing: 2) {
+            heart(context.state.heartRate).font(.title3.bold())
+            if context.state.lastEndedAt != nil {
+              clock(context.attributes.startedAt).font(.subheadline).foregroundStyle(.secondary)
+            } else {
+              Text(tally(context.state)).font(.subheadline).foregroundStyle(.secondary)
+            }
+          }
         }
-        Spacer(minLength: 8)
-        VStack(alignment: .trailing, spacing: 2) {
-          heart(context.state.heartRate).font(.title3.bold())
-          Text(tally(context.state)).font(.subheadline).foregroundStyle(.secondary)
+        if let exercises = context.state.exercises, !exercises.isEmpty {
+          HStack(spacing: 12) {
+            ForEach(exercises, id: \.exercise) { reps($0) }
+            Spacer(minLength: 4)
+            if let last = context.state.last { lastSet(last) }
+          }
+          .font(.subheadline.bold())
         }
       }
       .padding(16)
@@ -45,30 +68,53 @@ struct WorkoutActivityWidget: Widget {
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
-          Label("Workout", systemImage: "figure.strengthtraining.traditional")
+          Label(context.state.lastEndedAt == nil ? "Workout" : "Rest", systemImage: "figure.strengthtraining.traditional")
             .font(.caption.bold()).foregroundStyle(.green)
         }
         DynamicIslandExpandedRegion(.trailing) {
           heart(context.state.heartRate).font(.headline)
         }
         DynamicIslandExpandedRegion(.bottom) {
-          HStack {
-            clock(context.attributes.startedAt).font(.system(size: 30, weight: .bold, design: .rounded))
-            Spacer()
-            Text(tally(context.state)).font(.headline)
+          VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+              mainClock(context).font(.system(size: 30, weight: .bold, design: .rounded))
+              Spacer()
+              if context.state.lastEndedAt != nil {
+                clock(context.attributes.startedAt).frame(width: 64).font(.subheadline).foregroundStyle(.secondary)
+              } else {
+                Text(tally(context.state)).font(.headline)
+              }
+            }
+            if let exercises = context.state.exercises, !exercises.isEmpty {
+              HStack(spacing: 12) {
+                ForEach(exercises, id: \.exercise) { reps($0) }
+                Spacer(minLength: 4)
+                if let last = context.state.last { lastSet(last) }
+              }
+              .font(.subheadline.bold())
+            }
           }
         }
       } compactLeading: {
-        Image(systemName: "figure.strengthtraining.traditional").foregroundStyle(.green)
+        if let kind = context.state.last.flatMap({ ExerciseKind(rawValue: $0.exercise) }) {
+          ExerciseGlyph(kind: kind, size: 20)
+        } else {
+          Image(systemName: "figure.strengthtraining.traditional").foregroundStyle(.green)
+        }
       } compactTrailing: {
-        clock(context.attributes.startedAt).frame(width: 52).font(.caption.bold())
+        mainClock(context).frame(width: 52).font(.caption.bold())
       } minimal: {
         Image(systemName: "figure.strengthtraining.traditional").foregroundStyle(.green)
       }
     }
   }
 
-  /// Counts up from the start with no update from the app.
+  /// The rest since the last set's end once there is a set, else the workout's clock.
+  private func mainClock(_ context: ActivityViewContext<WorkoutActivityAttributes>) -> some View {
+    clock(context.state.lastEndedAt ?? context.attributes.startedAt)
+  }
+
+  /// Counts up from `start` with no update from the app.
   private func clock(_ start: Date) -> some View {
     Text(timerInterval: start...Date.distantFuture, countsDown: false)
       .monospacedDigit().multilineTextAlignment(.trailing)
@@ -78,6 +124,22 @@ struct WorkoutActivityWidget: Widget {
     HStack(spacing: 3) {
       Image(systemName: "heart.fill").foregroundStyle(.red)
       Text(bpm.map(String.init) ?? "--").monospacedDigit()
+    }
+  }
+
+  /// "[swing] 45": an exercise's reps in the workout by its drawing.
+  @ViewBuilder private func reps(_ count: WorkoutActivityAttributes.ExerciseCount) -> some View {
+    HStack(spacing: 3) {
+      if let kind = ExerciseKind(rawValue: count.exercise) { ExerciseGlyph(kind: kind, size: 20) }
+      Text("\(count.reps)").monospacedDigit()
+    }
+  }
+
+  /// "last 15 [swing]".
+  @ViewBuilder private func lastSet(_ last: WorkoutActivityAttributes.ExerciseCount) -> some View {
+    HStack(spacing: 3) {
+      Text("last \(last.reps)").monospacedDigit().foregroundStyle(.secondary)
+      if let kind = ExerciseKind(rawValue: last.exercise) { ExerciseGlyph(kind: kind, size: 18) }
     }
   }
 

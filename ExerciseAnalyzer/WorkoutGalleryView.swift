@@ -372,21 +372,6 @@ extension RecentEntry {
   var start: Date { span.lowerBound }
 }
 
-extension ExerciseKind {
-  var tint: Color {
-    switch self {
-    case .kettlebellSwing: return .orange
-    case .pistolSquat: return .teal
-    case .bulgarianSplitSquat: return .purple
-    case .turkishGetUp: return .green
-    case .pullUp: return .blue
-    case .splitSquat: return .pink
-    case .sitUp: return .mint
-    case .halfKneelingRotation: return .indigo
-    }
-  }
-}
-
 // MARK: - Rows
 
 struct DayHeader: View {
@@ -430,7 +415,7 @@ struct DayHeader: View {
       } else {
         dayLine.accessibilityElement(children: .combine).accessibilityLabel("\(title), \(summary)")
       }
-      // The day's workouts from the wrist (048): the hour, its heart rate, and that it is in Health. Each line
+      // The day's workouts from the wrist (048): its start, length and average heart rate (#185). Each line
       // is its own target and opens the workout's page (053); a workout day has no fold of its own (#163).
       ForEach(workoutLines, id: \.workout.id) { line in
         Button {
@@ -451,6 +436,7 @@ struct DayHeader: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Workout \(line.text)")
         .accessibilityHint("Opens the whole workout")
         // An ended workout can be deleted (065); the running one belongs to the watch.
         .contextMenu {
@@ -466,6 +452,23 @@ struct DayHeader: View {
   }
 
   private var dayLine: some View {
+    // The day's drawings beside its title when they fit, else on their own line under it: never cut to "…"
+    // (#186; three exercises with a range, "1×8 · 3×0–21 · 1×5", did not fit beside "Yesterday").
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .firstTextBaseline) {
+        titleBlock
+        Spacer()
+        tally(wrapping: false)
+      }
+      VStack(alignment: .leading, spacing: 4) {
+        titleBlock
+        tally(wrapping: true).padding(.leading, onToggle != nil ? 20 : 0)
+      }
+    }
+    .contentShape(Rectangle())
+  }
+
+  private var titleBlock: some View {
     HStack(alignment: .firstTextBaseline) {
       // No arrow where the day does not fold (a workout day, #163).
       if onToggle != nil {
@@ -474,28 +477,39 @@ struct DayHeader: View {
           .rotationEffect(.degrees(collapsed ? 0 : 90))
           .foregroundStyle(.secondary)
       }
-      Text(title).font(.title3.bold())
-      if title == "Today" || title == "Yesterday" {
-        Text(dateLine).font(.subheadline).foregroundStyle(.secondary)
-      }
-      Spacer()
-      if collapsed {
-        // A folded day says what was done (#129; Igor: "show an icon like 8x8 swings, 3xTGUs"): sets ×
-        // reps per exercise with its drawing, "8×8 [swing] · 5×2 [get-up]", a range when the sets differ.
-        HStack(spacing: 6) {
-          ForEach(day.exercises) { exercise in
-            HStack(spacing: 3) {
-              Text(exercise.setsByReps).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
-              ExerciseGlyph(kind: exercise.kind, size: 18)
-            }
-          }
+      // "Today" and "Yesterday" carry their date under the word, not beside it, where it squeezed the day's
+      // drawings (#186).
+      VStack(alignment: .leading, spacing: 0) {
+        Text(title).font(.title3.bold())
+        if title == "Today" || title == "Yesterday" {
+          Text(dateLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
-        .lineLimit(1)
-      } else {
-        Text(summary).font(.subheadline).foregroundStyle(.secondary)
       }
     }
-    .contentShape(Rectangle())
+  }
+
+  /// On its own line the drawings wrap at the edge: the iPad's sidebar is narrower than a phone, and six
+  /// exercises ran past it there, the last ones cut off (#186).
+  @ViewBuilder private func tally(wrapping: Bool) -> some View {
+    if collapsed || day.hasWorkout {
+      // A folded day says what was done (#129; Igor: "show an icon like 8x8 swings, 3xTGUs"): sets ×
+      // reps per exercise with its drawing, "8×8 [swing] · 5×2 [get-up]", a range when the sets differ. A
+      // workout day reads the same (#185; Igor: "look like days … with little icons").
+      let items = ForEach(day.exercises) { exercise in
+        HStack(spacing: 3) {
+          Text(exercise.setsByReps).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+          ExerciseGlyph(kind: exercise.kind, size: 18)
+        }
+        .fixedSize()
+      }
+      if wrapping {
+        WrappingHStack(spacing: 6) { items }
+      } else {
+        HStack(spacing: 6) { items }.fixedSize()
+      }
+    } else {
+      Text(summary).font(.subheadline).foregroundStyle(.secondary)
+    }
   }
 
   private var summary: String {
@@ -516,26 +530,56 @@ struct DayHeader: View {
     return f
   }()
 
-  /// "Workout 9:02–10:00 · 58 min · ♥ 128 avg · 156 max · in Health", one per workout, then the running one.
+  /// "9:02 AM · 58 min · ♥ 128" (the average), one per workout, then the running one: one line under a header
+  /// that already says what was done (#185; Igor: "drop word workout … drop max"; the lifter sign says workout).
   private var workoutLines: [(text: String, workout: StoredWorkout)] {
     var lines = day.workouts.map { workout -> (text: String, workout: StoredWorkout) in
-      var parts = [
-        "Workout \(Self.clock.string(from: workout.start))–\(Self.clock.string(from: workout.end))",
-        "\(Int(workout.duration / 60)) min",
-      ]
-      if let avg = workout.heartRateAverage { parts.append("♥ \(avg) avg") }
-      if let max = workout.heartRateMax { parts.append("\(max) max") }
-      parts.append("in Health")
+      var parts = [Self.clock.string(from: workout.start), "\(Int(workout.duration / 60)) min"]
+      if let avg = workout.heartRateAverage { parts.append("♥ \(avg)") }
       return (parts.joined(separator: " · "), workout)
     }
     if let live = day.live {
-      var parts = ["Workout since \(Self.clock.string(from: live.startDate))"]
+      var parts = ["Since \(Self.clock.string(from: live.startDate))"]
       if let heartRate = live.heartRate { parts.append("♥ \(heartRate)") }
       parts.append("on the watch")
       // The running workout opens as a span up to now (053).
       lines.append((parts.joined(separator: " · "), WorkoutMirror.soFar(live)))
     }
     return lines
+  }
+}
+
+/// Its views left to right, a new line where the next would pass the edge (#186).
+struct WrappingHStack: Layout {
+  var spacing: CGFloat
+  var lineSpacing: CGFloat = 4
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    arrange(width: proposal.width ?? .infinity, subviews).size
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    for (subview, frame) in zip(subviews, arrange(width: bounds.width, subviews).frames) {
+      subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
+    }
+  }
+
+  private func arrange(width: CGFloat, _ subviews: Subviews) -> (frames: [CGRect], size: CGSize) {
+    var frames: [CGRect] = []
+    var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, widest: CGFloat = 0
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      if x > 0, x + size.width > width {
+        x = 0
+        y += lineHeight + lineSpacing
+        lineHeight = 0
+      }
+      frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+      widest = max(widest, x + size.width)
+      x += size.width + spacing
+      lineHeight = max(lineHeight, size.height)
+    }
+    return (frames, CGSize(width: widest, height: y + lineHeight))
   }
 }
 
@@ -596,13 +640,16 @@ struct ExerciseSetsRow: View {
 /// 60 pt buttons, and a line saying what happens to the video before Save makes the set a by-hand set.
 struct SetByHandSheet: View {
   let entry: RecentEntry
+  /// "Add a set at 10:42 AM" when the set is new, from a tap on the workout's chart (#178).
+  var title = "Set exercise and reps"
   let onSave: (ExerciseKind, Int) -> Void
   @State private var exercise: ExerciseKind
   @State private var reps: Int
   @Environment(\.dismiss) private var dismiss
 
-  init(entry: RecentEntry, onSave: @escaping (ExerciseKind, Int) -> Void) {
+  init(entry: RecentEntry, title: String = "Set exercise and reps", onSave: @escaping (ExerciseKind, Int) -> Void) {
     self.entry = entry
+    self.title = title
     self.onSave = onSave
     _exercise = State(initialValue: entry.exerciseKind)
     _reps = State(initialValue: HandSet.clamp(entry.repCount == 0 ? HandSet.defaultReps : entry.repCount))
@@ -657,7 +704,7 @@ struct SetByHandSheet: View {
         }
         .padding()
       }
-      .navigationTitle("Set exercise and reps")
+      .navigationTitle(title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
     }

@@ -293,20 +293,15 @@ final class VideoPoseSession: NSObject, ObservableObject {
       log.event("error", ["where": "workouts_index", "message": "\(damage)"])
     }
     WorkoutLiveActivity.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
-    WorkoutLiveActivity.shared.install(mirror: .shared)  // the workout on the lock screen and in the Dynamic Island (#161)
+    // The workout on the lock screen and in the Dynamic Island (#161), its sets by exercise from this store (#181).
+    WorkoutLiveActivity.shared.install(mirror: .shared, recents: recents)
     CrashReports.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     CrashReports.shared.reportSignalLogs { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
     watch.onReachable = { [weak self] in self?.pushWatchStatus(force: true) }
     watch.onContact = { [weak self] in self?.updateKeepAwake() }
     // A set typed on the wrist (059): a Workouts entry with no clip, once per id however often it arrives.
-    watch.onHandSet = { [weak self] set in
-      guard let self else { return }
-      let added = self.recents.add(set)
-      self.log.event(
-        "set_by_hand",
-        ["id": set.id, "exercise": set.exercise.rawValue, "reps": set.reps, "at": set.at, "duplicate": !added])
-    }
+    watch.onHandSet = { [weak self] set in self?.addByHand(set, from: "watch") }
     WorkoutMirror.shared.$live.map { $0 != nil }.removeDuplicates().dropFirst().receive(on: DispatchQueue.main)
       .sink { [weak self] _ in self?.updateKeepAwake() }.store(in: &cancellables)
     watch.onExercise = { [weak self] mode in
@@ -1211,6 +1206,26 @@ final class VideoPoseSession: NSObject, ObservableObject {
       ["id": entry.id, "in_photos": entry.isInPhotos, "reps": entry.repCount, "on_screen": entry.id == currentEntryID, "where": place])
     letGo(of: entry, status: entry.isInPhotos ? "Removed from Workouts" : "Set deleted")
     recents.remove(id: entry.id)
+  }
+
+  /// A set typed by hand: on the wrist (059) or from a tap on a workout's chart (#178). Once per id however often
+  /// it arrives.
+  func addByHand(_ set: HandSet, from place: String) {
+    let added = recents.add(set)
+    log.event(
+      "set_by_hand",
+      ["id": set.id, "exercise": set.exercise.rawValue, "reps": set.reps, "at": set.at, "duplicate": !added,
+       "where": place])
+  }
+
+  /// The bell's weight the lifter tapped for a set (066), with the detector's colour reading beside it when the set
+  /// is open, so the log can later say how often the two agree (the detector's guess is the next step, #102).
+  func setBellKg(_ kg: Int?, for entry: RecentEntry, from place: String) {
+    log.event(
+      "set_bell_kg",
+      ["id": entry.id, "kg": kg ?? 0, "was": entry.bellKg ?? 0, "exercise": entry.exerciseKind.rawValue,
+       "detector_kg": entry.id == currentEntryID ? (bellWeightKg ?? 0) : 0, "where": place])
+    recents.setBellKg(id: entry.id, kg: kg)
   }
 
   /// The lifter's own exercise and count for a stored set (#156, #157): it stays in Workouts as a by-hand set and
@@ -2340,6 +2355,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     // A pause open at Done ends here: its tail counts as paused time (#67).
     var pausedTime = pausedTotal
     if paused, let at = pausedAt, let last = lastCameraPts { pausedTime += last - at }
+    // The set's recordedAt, the rest clock's start (#182): the tap, not the end of finishing and joining below,
+    // which can take seconds (Codex's recheck of PR #187).
+    let stoppedAt = Date()
     stopCamera()
     // The offline pass runs next: the watch shows "Analyzing…" until `analyzed` lands it the final count (045).
     guard let recorder else { return }
@@ -2417,7 +2435,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       currentFileURL = clipURL
       currentOrigin = .recording
       currentEntryID = operation.entryID
-      currentRecordedAt = Date()
+      currentRecordedAt = stoppedAt
       // ponytail: a paused or rotated set has wall-clock time missing between its segments, so clip time is
       // not first frame + playhead any more and it gets no heart rate. Upgrade: keep each segment's start.
       currentClipStartedAt = segments.count == 1 && !hadPause ? clipStartedAt : nil

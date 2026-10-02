@@ -34,7 +34,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 006:
 
 - **Summary:** Line up the same moment of every rep to compare form
-- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone; the me-view stills (#61) in [369f3cb](https://github.com/idvorkin/exercise-analyzer/commit/369f3cb), on the phone since 2026-09-13; the eye toggle (#113) in [c30e384](https://github.com/idvorkin/exercise-analyzer/commit/c30e384), verified by simulator screenshots, on the phone since 2026-09-20, Igor's check pending; the Bulgarian Standing column (#132) in [77c6731](https://github.com/idvorkin/exercise-analyzer/commit/77c6731), verified on the host (`BulgarianStandingTests`), on the phone since 2026-09-22; the gallery following the playhead (#152) in [39b9c99](https://github.com/idvorkin/exercise-analyzer/commit/39b9c99), verified on the host (`RepGalleryFollowTests`) and the simulator (`SWING_VIDEO` swing sample: rep 4's Release zoomed at the end)
+- **Status:** implemented in [49c6529](https://github.com/idvorkin/exercise-analyzer/commit/49c6529), [44030f5](https://github.com/idvorkin/exercise-analyzer/commit/44030f5), [70976ae](https://github.com/idvorkin/exercise-analyzer/commit/70976ae); verified on the simulator and the phone; the me-view stills (#61) in [369f3cb](https://github.com/idvorkin/exercise-analyzer/commit/369f3cb), on the phone since 2026-09-13; the eye toggle (#113) in [c30e384](https://github.com/idvorkin/exercise-analyzer/commit/c30e384), verified by simulator screenshots, on the phone since 2026-09-20, Igor's check pending; the Bulgarian Standing column (#132) in [77c6731](https://github.com/idvorkin/exercise-analyzer/commit/77c6731), verified on the host (`BulgarianStandingTests`), on the phone since 2026-09-22; the gallery following the playhead (#152) in [39b9c99](https://github.com/idvorkin/exercise-analyzer/commit/39b9c99), verified on the host (`RepGalleryFollowTests`) and the simulator (`SWING_VIDEO` swing sample: rep 4's Release zoomed at the end); the iPad fit (#53) in [6560872](https://github.com/idvorkin/exercise-analyzer/commit/6560872), verified by an iPad Pro 13-inch simulator screenshot
 
 #### Use Case:
 - **As a** lifter looking for the rep where form slipped
@@ -82,7 +82,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I switch between video only and video with skeleton using the eye button
 - **Then:** the inline gallery, expanded gallery and comparison thumbnails immediately show the same skeleton setting as the main picture, while keeping their video stills
 
-- **Issues:** [#61](https://github.com/idvorkin/exercise-analyzer/issues/61), [#113](https://github.com/idvorkin/exercise-analyzer/issues/113), [#132](https://github.com/idvorkin/exercise-analyzer/issues/132), [#152](https://github.com/idvorkin/exercise-analyzer/issues/152)
+- **Scenario:** The gallery keeps its size on an iPad (#53)
+- **Given:** a set is open on an iPad, the screen far wider than a phone
+- **When:** I look at the rep gallery, inline or in the Reps sheet
+- **Then:** its rows are a phone's width at most (560 pt), centred, with the cells the phone shows; no column
+  stretches across the empty middle
+
+- **Issues:** [#61](https://github.com/idvorkin/exercise-analyzer/issues/61), [#113](https://github.com/idvorkin/exercise-analyzer/issues/113), [#132](https://github.com/idvorkin/exercise-analyzer/issues/132), [#152](https://github.com/idvorkin/exercise-analyzer/issues/152), [#53](https://github.com/idvorkin/exercise-analyzer/issues/53)
 
 ---
 
@@ -363,3 +369,39 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Notes:** The phone keeps only a workout's average and max (`StoredWorkout`), and the mirrored live value reaches it about once a minute (17 `workout_data` events in the 17-minute workout of 2026-09-18), so the series is read from Health, where the watch's live workout builder writes it; the read permission is the one already asked when a workout first arrives (048), and Health is only asked about time inside a workout the app knows. The samples are kept raw with their own timestamps in the set's folder (`heartrate.json`, the set's span plus 30 s before and 2 min after, for the drop of 053) and the value at the playhead is read between the two around it. Igor asked for a value every second (board, 2026-09-18): the sensor reports every few seconds during a workout, so per-second rows would be the same readings repeated; the chip moves every second by reading between them, and `heart_rate` (samples, median_interval_s, newest_age_s) logs the real cadence and how late the watch's samples reach the phone, which decides whether the watch has to send the series itself. The log of 2026-09-19 answered it: the four sets of that workout read 0 to 5 samples at Done (the newest 51 to 160 s old) and 32 to 54 when opened again later, the first of them 130 s after Done with the newest 28 s old; so the samples do come by themselves, a minute or two late, and asking again (every 20 s, `attempt` on the event) is enough (#107). Lining up needs the wall-clock time of the clip's first frame, `RecentEntry.clipStartedAt`: only sets recorded in the app have it (`recordedAt` is when the recording ended), a trim moves it, and paused or rotated sets and imported clips have none yet, so no chip. Igor picked the chip (92A); the curve belongs to 053.
 
 - **Issues:** [#92](https://github.com/idvorkin/exercise-analyzer/issues/92); [#100](https://github.com/idvorkin/exercise-analyzer/issues/100) Igor: "If I was part of a tracked workout, I'd love to see the heart rate statistics as well" (peak, drop and average beside the workout button); [#107](https://github.com/idvorkin/exercise-analyzer/issues/107) Igor: "On review show heart rate during the video if video has multiple samples" (a set just recorded showed no chip: Health had no samples yet)
+
+---
+
+### User Story 067:
+
+- **Summary:** On an iPad held sideways, the reps stand beside the picture
+- **Status:** implemented in [2bba572](https://github.com/idvorkin/exercise-analyzer/commit/2bba572); verified by an iPad Pro 13-inch simulator screenshot (`SWING_LANDSCAPE=1`, a full-screen build); no real iPad yet
+
+#### Use Case:
+- **As a** lifter looking back over a set on an iPad
+- **I want to** see the picture and every rep at once when the iPad lies sideways
+- **so that** the wide screen shows more reps, not a picture squeezed over a short strip
+
+#### Acceptance Criteria:
+- **Scenario:** Landscape
+- **Given:** a set with reps is open on an iPad in landscape
+- **When:** I look at the screen
+- **Then:** the picture, its HUD and the transport bar fill the left; the rep gallery stands on the right, the full
+  height, 40 % of the width at most 560 pt, and follows the playhead, seeks and zooms as it does under the picture
+
+- **Scenario:** Turning it
+- **Given:** a set is playing on an iPad
+- **When:** I turn it from portrait to landscape or back
+- **Then:** the gallery moves beside or under the picture and the video carries on; nothing else changes
+
+- **Scenario:** Phones and the camera keep their layout
+- **Given:** an iPhone held either way, or the camera on any device
+- **When:** I look at the screen
+- **Then:** the gallery is under the picture as before (the camera has none)
+
+- **Notes:** Viewing only (Igor, 2026-10-01: "viewing only not about recording"): recording on an iPad (#53's step 4)
+  is not built. The side is an iPad in the regular width size class with the screen wider than tall (a
+  large iPhone sideways is regular width too, and stays as it is), so an iPad window in split
+  view narrow enough to be compact keeps the phone layout.
+
+- **Issues:** [#53](https://github.com/idvorkin/exercise-analyzer/issues/53)

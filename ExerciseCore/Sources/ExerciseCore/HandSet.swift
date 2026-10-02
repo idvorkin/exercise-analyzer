@@ -30,14 +30,15 @@ public struct HandSet: Codable, Equatable, Sendable {
   /// This set is the watch's last set: typed after the phone's last analyzed one, or with none from the phone.
   public func isNewer(than analyzed: LastSet?) -> Bool { analyzed.map { at >= $0.at } ?? true }
 
-  /// What the count page opens on: the exercise picker's choice (`mode`, "auto" or a raw value), or in Auto the
-  /// last set's exercise (swing when it has none); the last set's count, 10 with none. The last set is the newer
-  /// of the phone's analyzed one and one typed here.
+  /// What the count page opens on: the last set typed on the wrist, exercise and count, whatever was filmed since
+  /// and whatever the picker says (#183; Igor: "Watch remembers a last exercises by hand": the sets typed by hand
+  /// are the ones the camera does not film, between filmed sets of another exercise). With none typed: the
+  /// picker's choice (`mode`, "auto" or a raw value), or in Auto the phone's last set's exercise (swing when it
+  /// has none); the last set's count, 10 with none.
   public static func start(mode: String, analyzed: LastSet?, byHand: HandSet?) -> (exercise: ExerciseKind, reps: Int) {
+    if let byHand { return (byHand.exercise, clamp(byHand.reps)) }
     let last: (exercise: ExerciseKind?, reps: Int)?
-    if let byHand, byHand.isNewer(than: analyzed) {
-      last = (byHand.exercise, byHand.reps)
-    } else if let analyzed {
+    if let analyzed {
       last = (ExerciseKind.allCases.first { $0.definition.name == analyzed.exercise }, analyzed.reps)
     } else {
       last = nil
@@ -76,10 +77,12 @@ extension RecentEntry {
   /// and time, so it stays where it was in its workout; no clip, picture, score or analysis, so nothing re-reads
   /// it and a new AnalysisVersion leaves it alone.
   public func keptByHand(exercise: ExerciseKind, reps: Int) -> RecentEntry {
-    RecentEntry(
+    var kept = RecentEntry(
       id: id, analyzedAt: analyzedAt, recordedAt: recordedAt, duration: duration, repCount: HandSet.clamp(reps),
       bestScore: nil, source: .byHand, thumbnail: nil, exercise: exercise, originalName: nil,
       clipStartedAt: clipStartedAt)
+    kept.bellKg = bellKg  // the lifter's weight is not the camera's (066)
+    return kept
   }
 }
 

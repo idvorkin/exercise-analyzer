@@ -498,7 +498,7 @@ the first frame (story 001).
 ### User Story 048:
 
 - **Summary:** The whole gym session is one workout on the wrist, with heart rate and a clock, across every set
-- **Status:** implemented in [b2df153](https://github.com/idvorkin/exercise-analyzer/commit/b2df153); verified on the host (`WorkoutTests`), the watch simulator (`just watch-screens`: workout, workoutEnd, workoutRecording) and the phone simulator; on the phone and the watch since 2026-09-16, Igor's check pending (the Health permission, heart rate, the mirrored session, the workout in Health)
+- **Status:** implemented in [b2df153](https://github.com/idvorkin/exercise-analyzer/commit/b2df153); verified on the host (`WorkoutTests`), the watch simulator (`just watch-screens`: workout, workoutEnd, workoutRecording) and the phone simulator; on the phone and the watch since 2026-09-16, Igor's check pending (the Health permission, heart rate, the mirrored session, the workout in Health); the shortened workout line on Workouts (#185) in [6d7b5db](https://github.com/idvorkin/exercise-analyzer/commit/6d7b5db), verified on the simulator (`SWING_WORKOUTS_FOLDED=1` screenshot), on the phone since 2026-10-01
 - **Why:** Igor, 2026-09-16, from the gym: "Let's figure out how to do this with the workout mode and this will be the workout. We need to think through keeping the workout alive across many analysis sessions. I'm doing multiple exercises and warming up and stuff but let's figure out how to make this workout and record the whole workout. Need to think about what my workout UI looks like on the watch. Should probably have heart rate on there and a timer. Those are probably the big ones before the control."
 
 #### Use Case:
@@ -520,12 +520,12 @@ the first frame (story 001).
 - **Scenario:** The phone shows the workout too
 - **Given:** a workout running on the wrist and the phone app open
 - **When:** I look at the phone
-- **Then:** a green strip under the count reads "Workout 42:10 · ♥ 128 · 6 sets" (the sets recorded since Start), and Workouts' Today header carries "Workout since 9:02 AM · ♥ 128 · on the watch"
+- **Then:** a green strip under the count reads "Workout 42:10 · ♥ 128 · 6 sets" (the sets recorded since Start), and Workouts' Today header carries "Since 9:02 AM · ♥ 128 · on the watch" by the lifter sign (#185)
 
 - **Scenario:** Ending the workout
 - **Given:** a workout with sets in it
 - **When:** I scroll to the bottom of the workout page and tap End workout
-- **Then:** the workout is written to Health once (functional strength training, its duration and heart rate, one activity per recorded set), the wrist returns to the idle page, and Workouts' day header reads "Workout 9:02 AM–10:00 AM · 58 min · ♥ 128 avg · 156 max · in Health"; Discard asks first and writes nothing anywhere, and the sets recorded inside it stay in Workouts either way
+- **Then:** the workout is written to Health once (functional strength training, its duration and heart rate, one activity per recorded set), the wrist returns to the idle page, and Workouts' day header carries "9:02 AM · 58 min · ♥ 128" by the lifter sign (#185); Discard asks first and writes nothing anywhere, and the sets recorded inside it stay in Workouts either way
 
 - **Notes:** The four decisions, taken 2026-09-16 (design canvas "Workout on the Wrist"): the workout starts by hand on the watch, not with the first Record, so the warm-up counts; the workout page is what the wrist shows whenever the camera is not live, including while the phone reviews a set, and Done returns to it; Pause (040) freezes the camera only, the workout clock runs through rests like a run's; the watch carries the session on its own (that is what `HKWorkoutSession` buys), so a killed or unreachable phone ends nothing and the phone picks the mirrored session up again when it returns. The build: `WorkoutController` on the watch owns the `HKWorkoutSession` + `HKLiveWorkoutBuilder`, mirrors it to the phone (`startMirroringToCompanionDevice`) and sends `WorkoutWire` through the mirrored session; `WorkoutMirror` on the phone adopts the session (`workoutSessionMirroringStartHandler`, installed at launch so a background launch gets it too) and keeps ended workouts in `Documents/workouts.json` (`WorkoutIndex`). The wrist counts sets from the pass's final counts (045) that arrive after Start; the phone counts the sets recorded since Start from its own store, so the two can differ by a set still analyzing. The 2026-09-13 research on the cost of a workout session (permission prompt, a workout in Health per session, battery, chrome, the lifecycle) still holds and is below.
 
@@ -569,7 +569,7 @@ the first frame (story 001).
 ### User Story 059:
 
 - **Summary:** Add a set I forgot to record to the workout, with its count typed on the wrist
-- **Status:** implemented in [0c07704](https://github.com/idvorkin/exercise-analyzer/commit/0c07704), [7a86049](https://github.com/idvorkin/exercise-analyzer/commit/7a86049) (#154, the exercise on the count page); verified on the host (`HandSetTests`), by build (the signed phone and watch apps) and on the watch simulator (`just watch-screens`: setByHand, setByHandExercise); on the phone and the watch since 2026-09-28, Igor's check pending
+- **Status:** implemented in [0c07704](https://github.com/idvorkin/exercise-analyzer/commit/0c07704), [7a86049](https://github.com/idvorkin/exercise-analyzer/commit/7a86049) (#154, the exercise on the count page); verified on the host (`HandSetTests`), by build (the signed phone and watch apps) and on the watch simulator (`just watch-screens`: setByHand, setByHandExercise); on the phone and the watch since 2026-09-28, Igor's check pending; the page reopens on the last set typed by hand (#183) in [fdc4d11](https://github.com/idvorkin/exercise-analyzer/commit/fdc4d11), verified on the host (`HandSetTests`) and by the watch build, not yet on the watch
 - **Why:** Igor, 2026-09-25, from the phone: "Let's add a watch button. Rep happened if I forgot to record." Decided 2026-09-26: a watch button adds one unrecorded set to the running workout, its count typed on the wrist, no video, no score, marked "by hand" in Workouts.
 
 #### Use Case:
@@ -582,7 +582,12 @@ the first frame (story 001).
 - **Given:** a workout is running on the wrist (048), the camera is not live, and I just did 8 swings without recording them
 - **When:** I turn the Crown past Preview and tap "+ Set by hand", a full-width button under Preview and above
   the pickers (Record and Preview stay where they are; Igor's pick, 2026-09-26)
-- **Then:** a count page opens with the exercise on top (the exercise picker's choice, or the last set's exercise when the picker is on Auto, Kettlebell Swing with no set yet), one large number in the middle starting at the last set's count (10 when there is none), a − and a + either side of it, and Save (green) and Cancel under it
+- **Then:** a count page opens with the exercise on top (the last set I typed on the wrist; with none typed, the exercise picker's choice, or the last set's exercise when the picker is on Auto, Kettlebell Swing with no set yet), one large number in the middle starting at that set's count (10 when there is none), a − and a + either side of it, and Save (green) and Cancel under it
+
+- **Scenario:** Typed sets between filmed ones (#183)
+- **Given:** I typed 9 pull-ups by hand, then filmed a set of split squats, or the watch app relaunched since
+- **When:** I open the count page again
+- **Then:** it opens on Pull-Up and 9, not on the filmed exercise (Igor: "Watch remembers a last exercises by hand")
 
 - **Scenario:** Choosing the exercise on the count page (#154)
 - **Given:** the count page reads "Kettlebell Swing ⌄" over 8, and the set I did was split squats
@@ -608,7 +613,7 @@ the first frame (story 001).
 - **Scenario:** The set on the phone's workout page
 - **Given:** the set was saved on the wrist and the phone app is open on the running workout's page (053)
 - **When:** I read the page
-- **Then:** the set's row sits at the time of the save with "8 [swing]" and a "by hand" tag in place of the picture and the score capsule, and a thin mark at that time on the heart-rate chart; the heart numbers come from Health as for any set; tapping it opens nothing (there is no video), a long press offers "Set exercise and reps…" (062) and "Remove from Workouts…" (056); the green strip and the day header count it among the sets and reps
+- **Then:** the set's row sits at the time of the save with "8 [swing]" and a "by hand" tag in place of the picture and the score capsule, and a thin mark at that time on the heart-rate chart; the heart numbers come from Health as for any set; tapping its row opens nothing (there is no video), a tap on its mark opens "Set exercise and reps" (#178, story 053), a long press offers "Set exercise and reps…" (062) and "Remove from Workouts…" (056); the green strip and the day header count it among the sets and reps
 
 - **Scenario:** The set in the day list
 - **Given:** the same set
@@ -679,7 +684,7 @@ the first frame (story 001).
 ### User Story 064:
 
 - **Summary:** The running wrist workout sits on the phone's lock screen and in the Dynamic Island, one tap back to the app
-- **Status:** implemented in [50388e1](https://github.com/idvorkin/exercise-analyzer/commit/50388e1); verified on the host (`WorkoutTests`) and the simulator (`SWING_LIVE_WORKOUT=30`: `live_activity` start, and chronod rendered the activity from the Controls extension); on the phone since 2026-09-28, Igor's check pending (the look of the activity in a real workout)
+- **Status:** implemented in [50388e1](https://github.com/idvorkin/exercise-analyzer/commit/50388e1); verified on the host (`WorkoutTests`) and the simulator (`SWING_LIVE_WORKOUT=30`: `live_activity` start, and chronod rendered the activity from the Controls extension); on the phone since 2026-09-28, Igor's check pending (the look of the activity in a real workout); rest first, the reps by exercise and the last set (#181, #182) in [f68618b](https://github.com/idvorkin/exercise-analyzer/commit/f68618b), verified on the host (`WorkoutTests`) and by build, on the phone since 2026-10-01, Igor's check pending (the look on the lock screen); rest from Done for a trimmed or paused recording in [34fb243](https://github.com/idvorkin/exercise-analyzer/commit/34fb243), [27b63c0](https://github.com/idvorkin/exercise-analyzer/commit/27b63c0) (the stop stamped at the tap), verified on the host (`WorkoutTests`) and by build
 - **Why:** Igor, 2026-09-27, from the phone: "Can we leave an icon at the top so I can get back to the workout app if I switch out or want to come back?" Picked the same day: a Live Activity. Story 044's rejection of one stands for the recording phone only; between sets the phone does sit locked or in another app.
 
 #### Use Case:
@@ -698,6 +703,11 @@ the first frame (story 001).
 - **When:** I wake it
 - **Then:** the lock screen carries WORKOUT with the clock large, ♥ and sets · reps; a new set shows at once, heart rate refreshes at most every 30 s
 
+- **Scenario:** Between sets, the rest first (#181, #182)
+- **Given:** the workout is 24 minutes in, with 45 swings, 4 get-ups and 8 pull-ups, the last set 15 swings whose recording stopped a minute ago
+- **When:** I wake the phone, or look at the Dynamic Island
+- **Then:** the lock screen carries REST with the rest clock large, counting up from the end of that recording (the moment Done stopped it, whatever the trim kept or a pause dropped), and ♥ 142 with the workout clock "24:10" small beside it; under them "[swing] 45 [get-up] 4 [pull-up] 8" by each exercise's drawing, and "last 15 [swing]"; a set typed by hand ends at its save; before the first set it shows WORKOUT and the workout clock as above. The Dynamic Island shows the last exercise's drawing and the rest clock, and pressed, the same lines (Igor, 2026-09-30: "the current sets and reps I've done, like I have in the workout summary with a little [icons], and … my last thing"; "restoration to work out times in smaller"; he picked B, rest first, and "the end of the recording" on the 2026-10-01 decisions page)
+
 - **Scenario:** The workout ends
 - **Given:** the activity is up
 - **When:** I end or discard the workout on the wrist
@@ -712,12 +722,14 @@ the first frame (story 001).
   once otherwise), update per `WorkoutGlance.shouldShow` (ExerciseCore, host tests: sets or reps at once, heart rate
   every 30 s), end on `ending` or nil. The clock is `Text(timerInterval:)` from the start, so it needs no update.
   `WorkoutActivityAttributes` is declared in the app and in the Controls extension with the same name and shape
-  (ActivityKit matches by name; the extension links neither the app nor ExerciseCore); the view is
+  (ActivityKit matches by name; the extension cannot link the app). Since #181 the extension links ExerciseCore and
+  compiles `Shared/` (the exercise drawings and colours) with the app; the reps by exercise and the last set come
+  from the phone's own sets since the start (`WorkoutGlance.with(sets:since:)`), not the wrist; the view is
   `WorkoutActivityWidget` in `ControlsBundle`. `NSSupportsLiveActivities` in Info.plist. Launch leaves an
   activity from a previous run alone until the mirror hears of the workout (its first nil is not an end). Log:
   `live_activity` (action: start, end with reason ended / discarded / replaced, deferred, disabled, failed).
 
-- **Issues:** [#161](https://github.com/idvorkin/exercise-analyzer/issues/161), [#153](https://github.com/idvorkin/exercise-analyzer/issues/153) (the report it was split from)
+- **Issues:** [#161](https://github.com/idvorkin/exercise-analyzer/issues/161), [#153](https://github.com/idvorkin/exercise-analyzer/issues/153) (the report it was split from), [#181](https://github.com/idvorkin/exercise-analyzer/issues/181) and [#182](https://github.com/idvorkin/exercise-analyzer/issues/182) the rest-first layout
 
 ---
 

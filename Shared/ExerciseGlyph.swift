@@ -1,10 +1,24 @@
 //  Exercise glyphs (#58, #120): one shared family for workout headers, summaries, and missing thumbnails.
-//  Approved in Lavish, drawn as vectors in each exercise's colour for light and dark appearance.
+//  Approved in Lavish, drawn as vectors in each exercise's colour for light and dark appearance. Shared/ is
+//  compiled into the app and the Controls extension, so the workout's Live Activity draws the same figures (#181).
 
 import ExerciseCore
 import SwiftUI
 
 extension ExerciseKind {
+  var tint: Color {
+    switch self {
+    case .kettlebellSwing: return .orange
+    case .pistolSquat: return .teal
+    case .bulgarianSplitSquat: return .purple
+    case .turkishGetUp: return .green
+    case .pullUp: return .blue
+    case .splitSquat: return .pink
+    case .sitUp: return .mint
+    case .halfKneelingRotation: return .indigo
+    }
+  }
+
   /// What one rep of the exercise is called, for a count: "10 swings", "1 get-up" (053; Igor: "if I did swings,
   /// I want to see a swings rep").
   func repWord(_ count: Int) -> String {

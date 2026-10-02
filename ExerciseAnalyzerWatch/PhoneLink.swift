@@ -20,6 +20,13 @@ final class PhoneLink: NSObject, ObservableObject {
   /// The last set typed here (story 059): the last-set line shows it while it is newer than the phone's
   /// `lastSet`; the next set that rolls clears it, as the phone clears its own.
   @Published private(set) var handSet: HandSet?
+  /// The last set typed here, kept through filmed sets and relaunches: the count page reopens on it (#183).
+  private(set) var lastTyped: HandSet? = UserDefaults.standard.data(forKey: PhoneLink.lastTypedKey)
+    .flatMap { try? JSONDecoder().decode(HandSet.self, from: $0) }
+  {
+    didSet { UserDefaults.standard.set(try? JSONEncoder().encode(lastTyped), forKey: Self.lastTypedKey) }
+  }
+  private static let lastTypedKey = "lastTypedSet"
   /// Last face.json write, and whether its failure is already logged (once per spell, story 043).
   private var lastFaceWrite = Date.distantPast
   private var faceWriteFailedLogged = false
@@ -265,6 +272,7 @@ final class PhoneLink: NSObject, ObservableObject {
     guard screenshot == nil else { return }
     let set = HandSet(exercise: exercise, reps: HandSet.clamp(reps), at: Date().timeIntervalSince1970)
     handSet = set
+    lastTyped = set
     workout.setAnalyzed(reps: set.reps)
     rest.setEnded()
     logEvent("set_by_hand", ["id": set.id, "exercise": exercise.rawValue, "reps": set.reps, "reachable": reachable])

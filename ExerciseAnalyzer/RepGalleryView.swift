@@ -26,6 +26,7 @@ struct RepGalleryWidget: View {
 
   var body: some View {
     GeometryReader { geo in
+      let width = GalleryLayout.width(fitting: geo.size.width)
       ScrollViewReader { proxy in
         ScrollView(.vertical) {
           LazyVStack(spacing: 4, pinnedViews: [.sectionHeaders]) {
@@ -33,7 +34,7 @@ struct RepGalleryWidget: View {
               ForEach(reps) { rep in
                 RepRow(
                   rep: rep, columns: columns, isCurrent: rep.number == currentRep, focusedPhase: focusedPhase,
-                  width: geo.size.width, height: rep.number == focusedRep ? 150 : 72,
+                  width: width, height: rep.number == focusedRep ? 150 : 72,
                   onSeek: onSeek,
                   onFocus: { phase in
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -51,9 +52,11 @@ struct RepGalleryWidget: View {
                 .id(rep.number)
               }
             } header: {
-              PhaseHeader(columns: columns, focusedPhase: $focusedPhase, width: geo.size.width)
+              PhaseHeader(columns: columns, focusedPhase: $focusedPhase, width: width)
             }
           }
+          .frame(width: width)
+          .frame(maxWidth: .infinity)
         }
         .onChange(of: currentRep) { _, rep in
           if let rep { withAnimation { proxy.scrollTo(rep, anchor: .center) } }
@@ -85,6 +88,11 @@ private struct PlayheadPosition: Equatable {
 enum GalleryLayout {
   static let gutter: CGFloat = 28
   static let spacing: CGFloat = 4
+  /// The widest the rows grow: a phone's width and a bit, so the iPad keeps the phone's cells, centred,
+  /// instead of stretching one across the screen (#53).
+  static let maxWidth: CGFloat = 560
+
+  static func width(fitting available: CGFloat) -> CGFloat { min(available, maxWidth) }
 
   static func columnWidth(for phase: String, focused: String?, count: Int, totalWidth: CGFloat) -> CGFloat {
     let available = totalWidth - gutter - spacing * CGFloat(count)
@@ -185,7 +193,8 @@ struct RepGallerySheet: View {
         if comparing {
           compareView(width: geo.size.width)
         } else {
-          gridView(width: geo.size.width)
+          gridView(width: GalleryLayout.width(fitting: geo.size.width))
+            .frame(maxWidth: .infinity)
         }
       }
       .navigationTitle(comparing ? "Compare" : "Reps")

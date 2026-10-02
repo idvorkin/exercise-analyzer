@@ -25,6 +25,10 @@ struct ContentView: View {
   /// The log is home; this is what is pushed over it (story 058). A set opened from a workout's page sits over
   /// that page, so "‹" goes back to it.
   @State private var path: [AppRoute] = []
+  /// The iPad's log column (068): hidden while the camera is up.
+  @State private var sidebar = NavigationSplitViewVisibility.all
+  /// The open set whose bell weight is being set from the playback screen's chip (066).
+  @State private var weighingLoadedSet: RecentEntry?
   /// Where the camera was opened from, and the stored set on screen then: what its Cancel goes back to (#146).
   @State private var cameraOrigin: (path: [AppRoute], set: RecentEntry?)?
   /// Middle-hold key stacks (stories 039, #60): up after a middle hold, staying up until a
@@ -36,6 +40,7 @@ struct ContentView: View {
   /// The set the trash button was tapped on, while its "delete?" dialog is up (#111).
   @State private var deleting: RecentEntry?
   @Environment(\.openURL) private var openURL
+  @Environment(\.horizontalSizeClass) private var sizeClass
   @State private var lastClockLog = Date.distantPast
   @State private var showBugReport = false
   @State private var showGallery = false
@@ -75,6 +80,7 @@ struct ContentView: View {
     // was started (the wrist's Record, a picker, a hook); the camera ended or the set deleted takes it away. Here,
     // not on mainBody: a wrist start or Cancel switches watch mode in the same change, where mainBody sees none.
     .onChange(of: session.source) { old, source in
+      if source == .camera { sidebar = .detailOnly } else if old == .camera { sidebar = .all }
       switch source {
       case .camera:
         guard old != .camera else { return }
@@ -101,36 +107,7 @@ struct ContentView: View {
   /// The log at the root, a workout's page and the player pushed over it (story 058; Igor, 2026-09-22: "build
   /// the flow for B"). The app-wide dialogs, pickers and hooks hang here, so they work on every screen.
   private var mainBody: some View {
-    NavigationStack(path: $path) {
-      WorkoutGalleryView(
-        store: session.recents, workouts: workouts, onOpen: openSet,
-        onImport: { identifier, date in
-          Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) }
-          showPlayer()
-        },
-        onEvent: { session.log.event($0, $1) }, session: session,
-        onOpenWorkout: { path = [.workout(WorkoutIdentity(start: $0.start))] })
-        .toolbar {
-          ToolbarItem(placement: .topBarTrailing) { moreMenu }
-        }
-        .safeAreaInset(edge: .bottom) { liveButton }
-        .navigationDestination(for: AppRoute.self) { route in
-          switch route {
-          case .workout(let workout):
-            WorkoutDetailView(
-              identity: workout, store: session.recents, workouts: workouts, onOpen: openSet,
-              thumbnail: { session.recents.thumbnailImage(for: $0) }, onEvent: { session.log.event($0, $1) },
-              onDelete: { session.delete(set: $0, from: "workout_page") },
-              onKeepByHand: { session.keepByHand(set: $0, exercise: $1, reps: $2, from: "workout_page") })
-          case .player:
-            // Full screen, as the picture always was: the HUD's "‹" is the way back, and the edge swipe stays
-            // the frame steppers' (story 030), so the system back and its swipe are off.
-            playerScreen
-              .toolbar(.hidden, for: .navigationBar)
-              .navigationBarBackButtonHidden(true)
-          }
-        }
-    }
+    navigation
     .background(
       ShakeDetector {
         guard session.instrumentedRun == nil else { return }  // a shake mid-run is the phone being carried, not a report
@@ -166,6 +143,9 @@ struct ContentView: View {
     .onAppear(perform: loadFromEnvironment)
     .onChange(of: pickerItem) { _, item in
       guard let item else { return }
+      // The player comes up here, as for Files: with a set already loaded the source stays `.file`, so the
+      // source change that opens the player never fires (Codex's review of PR #187).
+      showPlayer(fromLog: true)
       Task {
         await session.importPicked(item: item)
         pickerItem = nil
@@ -202,7 +182,7 @@ struct ContentView: View {
       try? FileManager.default.removeItem(at: dest)
       if (try? FileManager.default.copyItem(at: url, to: dest)) != nil {
         session.load(url: dest)
-        showPlayer()
+        showPlayer(fromLog: true)
       }
     }
     .fullScreenCover(isPresented: $showKeyframeViewer) {
@@ -222,15 +202,85 @@ struct ContentView: View {
     }
   }
 
-  /// Opens a stored set on the player, over whatever page it was tapped on.
-  private func openSet(_ entry: RecentEntry) {
-    guard !entry.isByHand else { return }  // typed on the wrist: no video to open (059)
-    session.open(recent: entry)
-    showPlayer()
+  /// The phone: the log at the root with pages pushed over it. The iPad (#53, story 068): the log stays in a
+  /// sidebar and its pages open beside it, on the same path; a narrow iPad window collapses to the phone's stack.
+  @ViewBuilder private var navigation: some View {
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      // The camera takes the whole screen, as on the phone: the log comes back when it closes.
+      NavigationSplitView(columnVisibility: $sidebar) {
+        workoutLog
+      } detail: {
+        NavigationStack(path: $path) {
+          ContentUnavailableView(
+            "Pick a workout", systemImage: "figure.strengthtraining.traditional",
+            description: Text("Its page and its sets open here."))
+            .navigationDestination(for: AppRoute.self, destination: page)
+        }
+      }
+    } else {
+      NavigationStack(path: $path) {
+        workoutLog.navigationDestination(for: AppRoute.self, destination: page)
+      }
+    }
   }
 
-  private func showPlayer() {
-    if path.last != .player { path.append(.player) }
+  private var workoutLog: some View {
+    WorkoutGalleryView(
+      store: session.recents, workouts: workouts, onOpen: { entry in fromLog { openSet(entry, fromLog: true) } },
+      onImport: { identifier, date in
+        fromLog {
+          Task { await session.importPhotosAsset(identifier: identifier, recordedAt: date) }
+          showPlayer(fromLog: true)
+        }
+      },
+      onEvent: { session.log.event($0, $1) }, session: session,
+      onOpenWorkout: { workout in fromLog { path = [.workout(WorkoutIdentity(start: workout.start))] } })
+      .toolbar {
+        ToolbarItem(placement: .topBarTrailing) { moreMenu.disabled(session.source == .camera) }
+      }
+      // On the iPad the log can be swiped back in over the camera: a second Live would drop the recording, and an
+      // import would replace it (Codex's recheck of PR #187).
+      .safeAreaInset(edge: .bottom) { liveButton.disabled(session.source == .camera) }
+  }
+
+  @ViewBuilder private func page(_ route: AppRoute) -> some View {
+    switch route {
+    case .workout(let workout):
+      WorkoutDetailView(
+        identity: workout, store: session.recents, workouts: workouts, onOpen: { openSet($0) },
+        thumbnail: { session.recents.thumbnailImage(for: $0) }, onEvent: { session.log.event($0, $1) },
+        onDelete: { session.delete(set: $0, from: "workout_page") },
+        onKeepByHand: { session.keepByHand(set: $0, exercise: $1, reps: $2, from: "workout_page") },
+        onAddByHand: { session.addByHand($0, from: "workout_chart") },
+        onSetBellKg: { session.setBellKg($1, for: $0, from: "workout_page") })
+    case .player:
+      // Full screen, as the picture always was: the HUD's "‹" is the way back, and the edge swipe stays
+      // the frame steppers' (story 030), so the system back and its swipe are off.
+      playerScreen
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
+    }
+  }
+
+  /// Opens a stored set on the player, over the page it was tapped on; from the log, over the log, never over a
+  /// page the iPad's sidebar left open beside it (068).
+  private func openSet(_ entry: RecentEntry, fromLog: Bool = false) {
+    guard !entry.isByHand else { return }  // typed on the wrist: no video to open (059)
+    session.open(recent: entry)
+    showPlayer(fromLog: fromLog)
+  }
+
+  /// A tap in the log. On the iPad the log stays beside the player (068), so a tap there must leave the set as
+  /// "‹" does, paused, and does nothing while the camera is up: the recording keeps its screen and its workout
+  /// (Codex's review of PR #187). On the phone the log only shows with nothing over it.
+  private func fromLog(_ go: () -> Void) {
+    guard session.source != .camera else { return }
+    session.pause()
+    go()
+  }
+
+  private func showPlayer(fromLog: Bool = false) {
+    if fromLog { path = [.player] } else if path.last != .player { path.append(.player) }
   }
 
   /// "‹" on a set: the page under it, the log when it was opened from there. Playback stops; the set stays loaded.
@@ -281,76 +331,103 @@ struct ContentView: View {
     .background(.bar)
   }
 
-  /// The picture, the HUD, the rep gallery and the transport bar: a set or the camera.
+  /// The picture, the HUD, the rep gallery and the transport bar: a set or the camera. On a wide screen held
+  /// sideways (an iPad in landscape, #53) the gallery stands to the right of the picture, full height, instead of
+  /// under it; the picture keeps its place in the tree, so turning the screen does not rebuild the player.
   private var playerScreen: some View {
-    VStack(spacing: 0) {
-      ZStack {
-        Color.black
-        // The lifter in the middle of the picture (#98): zoomed, head at the top with the eyes below the header,
-        // feet above the angle text. Zoom off is the whole frame where it always was.
-        MeViewZoom(
-          crop: meView ? session.personCrop : nil, eyeLine: session.personEyeLine,
-          imageSize: session.latestFrame?.imageSize, freeTop: hudHeaderBottom, freeBottom: hudAngleLineTop
-        ) { zoom in
-          ZStack {
-            if session.source == .camera {
-              CameraPreviewView(previewLayer: session.cameraPreviewLayer, zoom: zoom)
-            } else {
-              PlayerView(player: session.player, zoom: zoom, onReady: session.logPlayerLayer)
-            }
-            if overlayMode != .video {
-              PoseOverlayView(frame: session.latestFrame)
-                .scaleEffect(zoom.scale)
-                .offset(zoom.offset)
-                .animation(.easeOut(duration: 0.3), value: zoom)
-                .clipped()  // clip the vector overlay only; a clip on the video's ancestors can drop HDR
+    GeometryReader { geo in
+      let hasGallery = !session.reps.isEmpty && session.source != .camera
+      // An iPad only: a Pro Max phone held sideways is regular width too, and the phone stays as it is.
+      let beside = hasGallery && UIDevice.current.userInterfaceIdiom == .pad && sizeClass == .regular
+        && geo.size.width > geo.size.height
+      HStack(spacing: 0) {
+        VStack(spacing: 0) {
+          picture
+          if hasGallery && !beside {
+            galleryHandle
+            if galleryHeight >= 40 {
+              repGallery.frame(height: galleryHeight)
             }
           }
-          .contentShape(Rectangle())
-          .onTapGesture {
-            // A tap on the picture plays or pauses (#28); the HUD's own buttons sit above and win.
-            if session.source == .file { session.togglePlayback() }
-          }
+          controls
         }
-        if session.source == .file, session.duration > 0 {
-          edgeControls
-        }
-        if case .working(let label, let progress) = session.activity, session.source != .camera {
-          VStack(spacing: 8) {
-            ProgressView(value: progress).frame(width: 160)
-            Text(progress.map { "\(label) \(Int($0 * 100))%" } ?? "\(label)…")
-              .font(.footnote).foregroundStyle(.white)
-            if session.canCancelAnalysis {
-              Button("Cancel") { session.cancelAnalysis() }
-                .buttonStyle(.bordered).tint(.white).font(.footnote)
-            }
-          }
-          .padding(16)
-          .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
-        }
-        hud
-        if let run = session.instrumentedRun {
-          instrumentedRunBanner(run)
+        if beside {
+          Divider()
+          repGallery
+            .padding(.top, 8)
+            .frame(width: min(geo.size.width * 0.4, GalleryLayout.maxWidth))
         }
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      if !session.reps.isEmpty && session.source != .camera {
-        galleryHandle
-        if galleryHeight >= 40 {
-          RepGalleryWidget(
-            reps: session.reps, columns: session.exercise.definition.galleryOrder,
-            currentRep: session.currentRep?.number, playhead: session.currentTime, focusedPhase: $focusedPhase,
-            focusedRep: $focusedRep,
-            onSeek: { chromeSeek(to: $0.time, from: "gallery") },
-            onOpen: { _ in showKeyframeViewer = true }
-          )
-          .frame(height: galleryHeight)
-          .padding(.horizontal, 8)
-        }
-      }
-      controls
     }
     .background(Color(.systemBackground))
+  }
+
+  private var repGallery: some View {
+    RepGalleryWidget(
+      reps: session.reps, columns: session.exercise.definition.galleryOrder,
+      currentRep: session.currentRep?.number, playhead: session.currentTime, focusedPhase: $focusedPhase,
+      focusedRep: $focusedRep,
+      onSeek: { chromeSeek(to: $0.time, from: "gallery") },
+      onOpen: { _ in showKeyframeViewer = true }
+    )
+    .padding(.horizontal, 8)
+  }
+
+  private var picture: some View {
+    ZStack {
+      Color.black
+      // The lifter in the middle of the picture (#98): zoomed, head at the top with the eyes below the header,
+      // feet above the angle text. Zoom off is the whole frame where it always was.
+      MeViewZoom(
+        crop: meView ? session.personCrop : nil, eyeLine: session.personEyeLine,
+        imageSize: session.latestFrame?.imageSize, freeTop: hudHeaderBottom, freeBottom: hudAngleLineTop
+      ) { zoom in
+        ZStack {
+          if session.source == .camera {
+            CameraPreviewView(previewLayer: session.cameraPreviewLayer, zoom: zoom)
+          } else {
+            PlayerView(player: session.player, zoom: zoom, onReady: session.logPlayerLayer)
+          }
+          if overlayMode != .video {
+            PoseOverlayView(frame: session.latestFrame)
+              .scaleEffect(zoom.scale)
+              .offset(zoom.offset)
+              .animation(.easeOut(duration: 0.3), value: zoom)
+              .clipped()  // clip the vector overlay only; a clip on the video's ancestors can drop HDR
+          }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+          // A tap on the picture plays or pauses (#28); the HUD's own buttons sit above and win.
+          if session.source == .file { session.togglePlayback() }
+        }
+      }
+      if session.source == .file, session.duration > 0 {
+        edgeControls
+      }
+      if case .working(let label, let progress) = session.activity, session.source != .camera {
+        VStack(spacing: 8) {
+          ProgressView(value: progress).frame(width: 160)
+          Text(progress.map { "\(label) \(Int($0 * 100))%" } ?? "\(label)…")
+            .font(.footnote).foregroundStyle(.white)
+          if session.canCancelAnalysis {
+            Button("Cancel") { session.cancelAnalysis() }
+              .buttonStyle(.bordered).tint(.white).font(.footnote)
+          }
+        }
+        .padding(16)
+        .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
+      }
+      hud
+        .sheet(item: $weighingLoadedSet) { entry in
+          let weight = loadedSetKg(entry)
+          BellWeightSheet(kg: weight.kg, inherited: weight.inherited) { session.setBellKg($0, for: entry, from: "playback") }
+        }
+      if let run = session.instrumentedRun {
+        instrumentedRunBanner(run)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   /// Drag to give the gallery more or less of the screen; double-tap to collapse or restore it.
@@ -376,6 +453,15 @@ struct ContentView: View {
   }
 
   // MARK: - HUD
+
+  /// The open set's bell weight (066): its own, else the one its workout carries from the exercise's set before.
+  private func loadedSetKg(_ entry: RecentEntry) -> (kg: Int?, inherited: Bool) {
+    if let kg = entry.bellKg { return (kg, false) }
+    guard let workout = workoutOfLoadedSet,
+      let row = WorkoutTimeline(workout: workout, sets: session.recents.entries, heartRate: nil).rows.first(where: { $0.id == entry.id })
+    else { return (nil, false) }
+    return (row.kg, row.kgInherited)
+  }
 
   /// The stored workout the set on screen was done in: the page it was opened from, else the workout its first
   /// frame falls inside, the running one included (#123). Nil for the camera, a clip that is not a stored set,
@@ -472,6 +558,23 @@ struct ContentView: View {
         }
         exerciseMenu
           .alignmentGuide(.top, computeValue: Self.capTop(.preferredFont(forTextStyle: .subheadline)))
+        // The bell's weight on a stored set (066): one tap sets it; dimmer when carried from the exercise's set
+        // before in the workout, "kg?" when nothing says.
+        if session.source != .camera, let entry = session.currentEntry {
+          let weight = loadedSetKg(entry)
+          Button {
+            weighingLoadedSet = entry
+          } label: {
+            Text(weight.kg.map { "\($0) kg" } ?? "kg?").font(.subheadline.bold()).monospacedDigit()
+              .foregroundStyle(weight.kg == nil || weight.inherited ? .secondary : .primary)
+              .padding(.horizontal, 7).padding(.vertical, 2)
+              .background(Color.secondary.opacity(0.18), in: Capsule())
+              .contentShape(Rectangle().inset(by: -10))
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(weight.kg.map { "Bell weight \($0) kilograms" } ?? "Set the bell's weight")
+          .alignmentGuide(.top, computeValue: Self.capTop(.preferredFont(forTextStyle: .subheadline)))
+        }
         if session.source == .camera, !session.viewfinder {
           Group {
             if session.paused {
@@ -1001,6 +1104,14 @@ struct ContentView: View {
         session.reportBug(note: note)
       }
     }
+    // Test hook (#53): turn the screen sideways, as the simulator's Rotate would (an iPad in landscape).
+    if env["SWING_LANDSCAPE"] == "1",
+      let scene = UIApplication.shared.connectedScenes.first(where: { $0 is UIWindowScene }) as? UIWindowScene
+    {
+      scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) {
+        session.log.event("ui", ["action": "landscape_failed", "error": $0.localizedDescription])
+      }
+    }
     if env["SWING_SHOW_GALLERY"] == "1" { showGallery = true }
     if env["SWING_SHOW_SEEK_CONTROLS"] == "1" {
       Task { @MainActor in
@@ -1027,6 +1138,15 @@ struct ContentView: View {
             try? await Task.sleep(for: .seconds(4))
             guard let current = session.currentEntry else { return }
             if delete == "confirm" { session.delete(set: current, from: "hook") } else { deleting = current }
+          }
+        }
+        // Test hook (066): 4 s after the set opens, what a tap on a weight in its sheet does (a number: saved,
+        // `set_bell_kg` logs) or what a tap on the chip does ("sheet": the picker is up for a screenshot).
+        if let weight = env["SWING_SET_BELL_KG"] {
+          Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            guard let current = session.currentEntry else { return }
+            if let kg = Int(weight) { session.setBellKg(kg, for: current, from: "hook") } else { weighingLoadedSet = current }
           }
         }
         return

@@ -43,6 +43,9 @@ public struct RecentEntry: Codable, Identifiable, Sendable {
   /// for sets recorded in the app: `recordedAt` is when a recording ended (or a Photos asset's date), and a trim
   /// moves the first frame, so neither can stand in for it. Nil for imported clips and sets from before #92.
   public var clipStartedAt: Date? = nil
+  /// The bell's weight in kg as the lifter set it (story 066, #102); nil when never set. A set without one shows
+  /// the weight of the last set of its exercise before it in the same workout (`WorkoutTimeline`).
+  public var bellKg: Int? = nil
 
   public init(
     id: String, analyzedAt: Date, recordedAt: Date?, duration: Double, repCount: Int, bestScore: Int?,
