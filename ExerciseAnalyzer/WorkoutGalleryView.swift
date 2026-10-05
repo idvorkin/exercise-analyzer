@@ -497,10 +497,18 @@ struct DayHeader: View {
       // A folded day says what was done (#129; Igor: "show an icon like 8x8 swings, 3xTGUs"): sets ×
       // reps per exercise with its drawing, "8×8 [swing] · 5×2 [get-up]", a range when the sets differ. A
       // workout day reads the same (#185; Igor: "look like days … with little icons").
+      // While the workout runs the day counts sets only, drawing first: "[swing] 3 · [get-up] 10" (#192;
+      // Igor: "instead of 3x10, I want icon 3; icon 10").
+      let running = day.live != nil
       let items = ForEach(day.exercises) { exercise in
         HStack(spacing: 3) {
-          Text(exercise.setsByReps).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
-          ExerciseGlyph(kind: exercise.kind, size: 18)
+          if running {
+            ExerciseGlyph(kind: exercise.kind, size: 18)
+            Text("\(exercise.sets.count)").font(.subheadline.bold()).monospacedDigit()
+          } else {
+            Text(exercise.setsByReps).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+            ExerciseGlyph(kind: exercise.kind, size: 18)
+          }
         }
         .fixedSize()
       }
