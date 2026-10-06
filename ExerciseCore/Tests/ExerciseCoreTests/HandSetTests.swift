@@ -61,14 +61,26 @@ final class HandSetTests: XCTestCase {
 
   func testWithNoSetThePageOpensOnTenAndThePickersExercise() {
     XCTAssertTrue(HandSet.start(mode: "auto", analyzed: nil, byHand: nil) == (swing, 10))
-    XCTAssertTrue(HandSet.start(mode: getUp.rawValue, analyzed: nil, byHand: nil) == (getUp, 10))
+    XCTAssertTrue(HandSet.start(mode: ExerciseKind.pullUp.rawValue, analyzed: nil, byHand: nil) == (.pullUp, 10))
   }
 
   func testInAutoThePageOpensOnTheLastSet() {
-    let analyzed = LastSet(reps: 3, exercise: getUp.definition.name, seconds: 90, at: 1000)
-    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: nil) == (getUp, 3))
+    let analyzed = LastSet(reps: 3, exercise: ExerciseKind.pullUp.definition.name, seconds: 90, at: 1000)
+    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: nil) == (.pullUp, 3))
     // A fixed picker wins over the last set's exercise; the count is still the last set's.
-    XCTAssertTrue(HandSet.start(mode: swing.rawValue, analyzed: analyzed, byHand: nil) == (swing, 3))
+    XCTAssertTrue(HandSet.start(mode: ExerciseKind.sitUp.rawValue, analyzed: analyzed, byHand: nil) == (.sitUp, 3))
+  }
+
+  /// #196 (Igor: "tgu 5, swing 10, Bulgarian and split squats 10, everything else whatever last"): the usual
+  /// count wins over the last set's, typed or filmed; the other exercises start at the last count.
+  func testTheUsualExercisesOpenOnTheirUsualCount() {
+    let analyzed = LastSet(reps: 3, exercise: getUp.definition.name, seconds: 90, at: 1000)
+    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: nil) == (getUp, 5))
+    XCTAssertTrue(HandSet.start(mode: swing.rawValue, analyzed: analyzed, byHand: nil) == (swing, 10))
+    let typed = HandSet(exercise: .splitSquat, reps: 7, at: 900)
+    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: typed) == (.splitSquat, 10))
+    XCTAssertEqual(HandSet.usualReps(for: .bulgarianSplitSquat), 10)
+    XCTAssertNil(HandSet.usualReps(for: .pullUp))
   }
 
   /// #183: the page reopens on the last set typed by hand, even after a filmed set of another exercise and
@@ -81,8 +93,9 @@ final class HandSetTests: XCTestCase {
   }
 
   func testAnAnalyzedCountOutsideTheRangeStartsClamped() {
-    let big = LastSet(reps: 250, exercise: swing.definition.name, seconds: 600, at: 1000)
-    let none = LastSet(reps: 0, exercise: swing.definition.name, seconds: 20, at: 1000)
+    // Pull-ups: an exercise without a usual count, so the last count is what gets clamped.
+    let big = LastSet(reps: 250, exercise: ExerciseKind.pullUp.definition.name, seconds: 600, at: 1000)
+    let none = LastSet(reps: 0, exercise: ExerciseKind.pullUp.definition.name, seconds: 20, at: 1000)
     XCTAssertEqual(HandSet.start(mode: "auto", analyzed: big, byHand: nil).reps, 200)
     XCTAssertEqual(HandSet.start(mode: "auto", analyzed: none, byHand: nil).reps, 1)
   }

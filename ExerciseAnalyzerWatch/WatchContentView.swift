@@ -540,6 +540,8 @@ private struct SetByHandPage: View {
       List(ExerciseKind.allCases) { kind in
         Button {
           exercise = kind
+          // An exercise with a usual count opens on it (#196); the others keep the count on the page.
+          if let usual = HandSet.usualReps(for: kind) { count = Double(usual) }
           choosing = false
         } label: {
           HStack {
