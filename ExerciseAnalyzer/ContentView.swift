@@ -141,6 +141,8 @@ struct ContentView: View {
       Text("The trimmed set goes into Photos and iOS asks once to delete the original. Undo trim brings it back. Save to Photos does the same later.")
     }
     .onAppear(perform: loadFromEnvironment)
+    // Story 069: another app (Grabber Native) opened us with exerciseanalyzer://; it only brings the app forward.
+    .onOpenURL { url in session.log.event("open_url", ["url": url.absoluteString]) }
     .onChange(of: pickerItem) { _, item in
       guard let item else { return }
       // The player comes up here, as for Files: with a set already loaded the source stays `.file`, so the

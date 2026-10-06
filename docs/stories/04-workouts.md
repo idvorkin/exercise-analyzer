@@ -682,3 +682,20 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Issues:** [#53](https://github.com/idvorkin/exercise-analyzer/issues/53)
 
 ---
+
+### User Story 069:
+
+- **Summary:** Another app can open Exercise Analyzer
+- **Status:** implemented in 80c2fcd; verified on the simulator that iOS routes `exerciseanalyzer://` to this app (the built Info.plist declares it; `simctl openurl` offers *Open in "Exercise Analyzer"*); the `open_url` line and the tap from Grabber Native still to be checked on the phone
+- **Issues:** context-grabber [#142](https://github.com/idvorkin/context-grabber/issues/142)
+
+#### Use Case:
+- **As a** lifter whose home screen is Grabber Native
+- **I want to** tap *Exercise Analyzer* there and land in this app
+- **so that** the camera is one tap from where I already am, not a hunt through the home screen
+
+#### Acceptance Criteria:
+- **Scenario:** The link
+- **Given:** this app is installed on the phone
+- **When:** another app opens `exerciseanalyzer://`
+- **Then:** this app comes to the front where it was, and the session log has an `open_url` line with the link
