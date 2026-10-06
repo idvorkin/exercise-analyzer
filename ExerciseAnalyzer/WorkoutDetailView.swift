@@ -184,7 +184,9 @@ private struct WorkoutPageView: View {
           }
         }
         .setDeletionDialog($deleting) { onDelete?($0) }
-        .setByHandSheet($editing) { onKeepByHand?($0, $1, $2) }
+        .setByHandSheet(
+          $editing, onSave: { onKeepByHand?($0, $1, $2) },
+          onDelete: onDelete.map { delete in { delete($0) } })
         .sheet(item: $weighing) { entry in
           let row = timeline.rows.first { $0.id == entry.id }
           BellWeightSheet(kg: row?.kg, inherited: row?.kgInherited ?? false) { onSetBellKg?(entry, $0) }
