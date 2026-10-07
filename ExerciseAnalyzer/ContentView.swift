@@ -125,9 +125,10 @@ struct ContentView: View {
     }
     .setDeletionDialog($deleting) { session.delete(set: $0, from: "review") }
     // Story 070, step 3: the sets recorded before recordings went to Photos by themselves, asked about once.
-    .confirmationDialog(
-      "Save \(session.photosBacklog.count) recordings to Photos?", isPresented: $session.photosExportPrompt,
-      titleVisibility: .visible
+    // An alert, not a confirmation dialog: iOS 26+ draws the dialog as a popover that hides its cancel button,
+    // so "Not now" never showed and a tap outside closed it without deferring.
+    .alert(
+      "Save \(session.photosBacklog.count) recordings to Photos?", isPresented: $session.photosExportPrompt
     ) {
       Button("Save them") { session.answerPhotosExport(save: true) }
       Button("Not now", role: .cancel) { session.answerPhotosExport(save: false) }
