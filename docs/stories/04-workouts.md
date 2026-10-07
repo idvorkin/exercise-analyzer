@@ -704,3 +704,51 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Given:** this app is installed on the phone
 - **When:** another app opens `exerciseanalyzer://`
 - **Then:** this app comes to the front where it was, and the session log has an `open_url` line with the link
+
+---
+
+### User Story 070:
+
+- **Summary:** My sets and workouts are on every device I am signed into: the phone records, the iPad shows the same history
+- **Status:** planned 2026-10-07 (design C below, Igor: "I need that"); step 1 (the iCloud container) in progress; nothing on a device yet
+- **Why:** Igor, 2026-10-07, the day the iPad got the app (#53): "now that we're multi-device, we need to build that sync feature, right?" and "I need that". The phone is where sets are filmed and typed; the iPad is where they are looked at (story 067, #53): the history has to be the same on both.
+
+#### Use Case:
+- **As a** lifter who films on the phone and reviews on the iPad
+- **I want to** open Workouts on the iPad and see every set and workout the phone has, with their pictures, counts and heart rate, and play their clips
+- **so that** the iPad is a window on the same history, not a second one
+
+#### Acceptance Criteria:
+- **Scenario:** A set filmed on the phone shows on the iPad
+- **Given:** I recorded a set of 10 swings on the phone, and the iPad is signed into the same iCloud account with the app installed
+- **When:** I open Workouts on the iPad, within a minute on Wi-Fi
+- **Then:** the set is in its day with the same count, pictures, score and time; opening it plays the clip from Photos (downloading from iCloud first if it must, story 031's "Downloading from iCloud") with the same reps and gallery; the set's analysis is read, not re-run
+
+- **Scenario:** Typed sets and workouts travel too
+- **Given:** a workout on the wrist with two sets typed by hand (059) ended an hour ago
+- **When:** I open Workouts on the iPad
+- **Then:** the day shows the workout line ("8:41 AM · 49 min · ♥ 137") and the typed sets as the phone does, and the workout's page draws its heart rate and sets
+
+- **Scenario:** An edit on one device reaches the other
+- **Given:** on the iPad I set a set's bell weight to 24 kg, and on the phone I kept a set by hand as 9 pull-ups
+- **When:** I look at the other device
+- **Then:** each change is there; the last change to a set wins when both devices changed the same set
+
+- **Scenario:** A delete reaches the other device
+- **Given:** I removed a set from Workouts on the phone
+- **When:** I open the iPad
+- **Then:** the set is gone there too, its pictures and analysis with it; the clip stays in Photos as the phone's own delete leaves it
+
+- **Scenario:** Recordings go to Photos
+- **Given:** I record a set on the phone
+- **When:** its analysis lands
+- **Then:** the clip is saved to Photos by itself, as "Save to Photos" does today, so iCloud Photos carries it to the iPad; the 49 sets recorded before this story whose clips live only in the app are saved to Photos once, on the first launch of the build that has this
+
+- **Scenario:** Offline, and back
+- **Given:** the gym has no signal
+- **When:** I record sets and end the workout, then come home
+- **Then:** nothing waits on the network at the gym, and the iPad has the sets once both devices have been online
+
+- **Notes:** Design C, picked 2026-10-07 over A (iCloud Drive carrying the clips too: ~1.2 GB and two devices writing index.json) and B (CloudKit records: the right shape, 5+ sessions). What moves by iCloud Drive is small: per set its row, analysis.json and pictures (~2.5 MB, ~270 MB for the 109 sets); clips (18 MB each) move by iCloud Photos, which already carries them, and a set names its clip by the asset's cloud identifier (`PHCloudIdentifier`), the same on every device, mapped back to a local identifier on each. The container `iCloud.com.idvorkin.exerciseanalyzer` holds `sets/<id>/` (row.json, analysis.json, the rep pictures) and `workouts/<id>.json`, each written by the device that made or last changed it, never by two: the index each device shows is the merge of what it reads, so there is no shared index file to conflict. Deletes are tombstones (`deleted.json` in the set's folder). The steps: (1) the container and entitlement, a `SyncStore` that mirrors every new or changed set and workout into it (phone); (2) the iPad reads the container (`NSMetadataQuery`), merges rows into its Recents index, downloads a set's files on open; (3) cloud identifiers for Photos clips, recordings to Photos by default, the one-time export; (4) edits and deletes both ways; (5) the one-time upload of the history. The phone keeps writing its own Documents as today; the container is a copy, so an iCloud outage costs nothing but freshness.
+
+- **Issues:** [#209](https://github.com/idvorkin/exercise-analyzer/issues/209); [#53](https://github.com/idvorkin/exercise-analyzer/issues/53) the iPad it serves
