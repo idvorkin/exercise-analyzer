@@ -41,4 +41,13 @@ final class PhotosExportEntryTests: XCTestCase {
     XCTAssertEqual(set.source, .photos(identifier: "p2"))
     XCTAssertNil(set.cloudIdentifier)
   }
+
+  func testAnAssetExportedWhileTheSetWasOpenLastsUntilTheSetPointsElsewhere() {
+    var set = entry(.file(name: "clip.mov"))
+    set.exportedAsset = "p1"
+    set.setSource(.file(name: "clip.mov"))
+    XCTAssertEqual(set.exportedAsset, "p1")
+    set.setSource(.photos(identifier: "p1"))
+    XCTAssertNil(set.exportedAsset)
+  }
 }

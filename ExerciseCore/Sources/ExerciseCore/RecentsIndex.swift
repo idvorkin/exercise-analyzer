@@ -59,6 +59,9 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   /// ponytail: sets from before step 3 carry no mark and are exported, copies included. Upgrade: mark them by
   /// matching `originalName` and duration against the Photos library.
   public var photosCopy: Bool? = nil
+  /// The Photos asset the exporter wrote from the in-app clip while the set was open (story 070, step 3): the
+  /// next run points the set at it instead of saving the clip again. Gone once the set points elsewhere.
+  public var exportedAsset: String? = nil
 
   public init(
     id: String, analyzedAt: Date, recordedAt: Date?, duration: Double, repCount: Int, bestScore: Int?,
@@ -116,10 +119,13 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
     return false
   }
 
-  /// Points the set at another clip. A cloud identifier named the old asset, so it goes; the next mirror names
-  /// the new one (story 070, step 3).
+  /// Points the set at another clip. A cloud identifier and an exported asset were of the old clip, so they go;
+  /// the next mirror names the new one (story 070, step 3).
   public mutating func setSource(_ new: Source) {
-    if new != source { cloudIdentifier = nil }
+    if new != source {
+      cloudIdentifier = nil
+      exportedAsset = nil
+    }
     source = new
   }
 

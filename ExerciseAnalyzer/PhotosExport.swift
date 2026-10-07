@@ -114,11 +114,20 @@ final class PhotosExporter {
       guard let current = recents.entry(id: entry.id), let url = exportableClip(current) else { continue }
       let started = Date()
       let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+      if let asset = current.exportedAsset, RecentsStore.photosAssetExists(identifier: asset) {
+        recents.markSavedToPhotos(id: entry.id, identifier: asset)
+        log(
+          "photos_export",
+          ["id": entry.id, "bytes": bytes, "ms": 0, "reason": reason, "left": left, "new": isNew(entry), "asset": asset])
+        continue
+      }
+      let modified = Self.modified(url)
       do {
         guard let identifier = try await VideoFile.saveToPhotos(url) else { throw VideoFile.VideoFileError.exportFailed("no asset") }
-        // ponytail: a set opened while its clip was being written keeps its in-app clip, and the asset just made
-        // stays in Photos beside it (seconds wide, so rare). Upgrade: hold the open until the save lands.
+        // The set was opened while its clip was being written: it keeps its clip until it is left, and the next
+        // run points it at this asset rather than writing another, unless its clip changed meanwhile (a trim).
         guard verdict(entry.id) != .skip else {
+          if Self.modified(url) == modified { recents.update(id: entry.id) { $0.exportedAsset = identifier } }
           log("photos_export_skipped", ["id": entry.id, "reason": reason, "asset": identifier])
           continue
         }
@@ -133,5 +142,9 @@ final class PhotosExporter {
         return
       }
     }
+  }
+
+  private static func modified(_ url: URL) -> Date? {
+    (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
   }
 }

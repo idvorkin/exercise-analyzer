@@ -71,6 +71,7 @@ final class RecentsStore: ObservableObject {
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
       source: source, thumbnail: nil, exercise: pipeline.exercise, originalName: originalName,
       analysisVersion: AnalysisVersion.current, models: models, clipStartedAt: clipStartedAt)
+    let newClip = clipURL.map { !ownsClip($0, id: id) } ?? false
     let saved = try RecentsSave.save(
       root: root, index: RecentsIndex(entries: entries), id: id, source: source,
       originalName: originalName, duration: duration
@@ -83,6 +84,7 @@ final class RecentsStore: ObservableObject {
       entry.repCount = fresh.repCount
       entry.bestScore = fresh.bestScore
       entry.setSource(source)
+      if newClip { entry.exportedAsset = nil }
       if photosCopy { entry.photosCopy = true }
       entry.exercise = pipeline.exercise
       entry.originalName = originalName ?? entry.originalName
@@ -359,6 +361,10 @@ final class RecentsStore: ObservableObject {
             seconds: Date().timeIntervalSince(started)))
       }
     }
+  }
+
+  static func photosAssetExists(identifier: String) -> Bool {
+    PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject != nil
   }
 
   static func photosAssetDate(identifier: String) -> Date? {
