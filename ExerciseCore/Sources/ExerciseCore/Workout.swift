@@ -152,10 +152,12 @@ public struct StoredWorkout: Codable, Hashable, Identifiable, Sendable {
   /// Sets and reps as the wrist counted them at End; Workouts counts the day's sets itself.
   public var sets: Int
   public var reps: Int
+  /// The device whose row this is in the iCloud container (story 070); nil for this device's own (`RecentEntry.device`).
+  public var device: String? = nil
 
   public init(
     id: String = UUID().uuidString, start: Date, end: Date, heartRateAverage: Int? = nil, heartRateMax: Int? = nil,
-    sets: Int = 0, reps: Int = 0
+    sets: Int = 0, reps: Int = 0, device: String? = nil
   ) {
     self.id = id
     self.start = start
@@ -164,6 +166,7 @@ public struct StoredWorkout: Codable, Hashable, Identifiable, Sendable {
     self.heartRateMax = heartRateMax
     self.sets = sets
     self.reps = reps
+    self.device = device
   }
 
   public var duration: TimeInterval { end.timeIntervalSince(start) }
