@@ -180,10 +180,9 @@ struct WatchContentView: View {
         }
       }
       .accessibilityLabel("Heart rate \(workout.heartRate.map(String.init) ?? "unknown")")
-      Text("\(workout.sets) set\(workout.sets == 1 ? "" : "s") · \(workout.reps) reps")
-        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
       // The sets by exercise with the drawings, as the phone's Today line reads mid-workout (#206, #192; Igor:
-      // "show sets and exercises completed like I see it on the workouts view … just those coarse details").
+      // "show sets and exercises completed like I see it on the workouts view … just those coarse details"),
+      // and nothing else: "6 sets · 47 reps" went ("drop n sets reps, the icons are enough").
       if !workout.exerciseOrder.isEmpty {
         HStack(spacing: 8) {
           ForEach(workout.exerciseOrder) { kind in

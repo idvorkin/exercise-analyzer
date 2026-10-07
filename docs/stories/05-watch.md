@@ -16,8 +16,8 @@ state and is not in the table.
 | disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status had the recorder rolling; in a workout, the workout head in place of the art | Start workout (green), Retry; in a workout, "+ Set by hand" under Retry and End workout and Discard at the bottom in place of Start workout | 018, 048, 059 |
 | background | phone-in-background art, the unlock-and-open instruction; in a workout, the workout head in place of the art | Start workout (green), "Send a reminder to the phone" (no Record: it would die silently); in a workout, "+ Set by hand" under the reminder and End workout and Discard at the bottom in place of Start workout | 018, 048, 059 |
 | idle | "Phone ready", exercise picker, rest length picker, the rest count while resting, the last-set line (or "Analyzing…" while the pass runs) | Start workout (green), Record (red), Preview (below it) | 017, 041, 045, 046, 047, 048 |
-| workoutStart | a workout before its first set: WORKOUT in green over the session clock (counting up by itself), "♥ 96 BPM", "0 sets · 0 reps"; no figure art, no Start workout | Record (red), Preview, "+ Set by hand" under Preview, the pickers; End workout and Discard below the pickers | 048, 059 |
-| workout | between sets the head is the rest: "REST · 1:30" in orange over the rest count, large, white until the rest length and orange after; then "♥ 128 BPM · 42:13" with the session clock small and green, "6 sets · 47 reps", the last-set line and the pickers as idle; no second rest line | Record (red), Preview, "+ Set by hand" under Preview (a Crown turn below the first screen), the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048, 050, 059 |
+| workoutStart | a workout before its first set: WORKOUT in green over the session clock (counting up by itself), "♥ 96 BPM", no sets line yet; no figure art, no Start workout | Record (red), Preview, "+ Set by hand" under Preview, the pickers; End workout and Discard below the pickers | 048, 059 |
+| workout | between sets the head is the rest: "REST · 1:30" in orange over the rest count, large, white until the rest length and orange after; then "♥ 128 BPM · 42:13" with the session clock small and green, the sets by exercise with their drawings ("[swing] 6"), the last-set line and the pickers as idle; no second rest line | Record (red), Preview, "+ Set by hand" under Preview (a Crown turn below the first screen), the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048, 050, 059 |
 | setByHand | the count page over the workout page: the exercise ("Kettlebell Swing ⌄"), one large number starting at the last set's count (9), − and + either side (44 pt), the sheet's close button | the exercise (opens the list), Save (green), Cancel; the Crown steps the count by one, 1…200 | 059 |
 | setByHandExercise | the count page's exercise list over it: every exercise, a green check on the current one, the sheet's close button | an exercise (sets it and closes the list) | 059 (#154) |
 | workoutEnd | the bottom of the workout page: the exercise picker's tail, then "End writes one workout to Health" under the buttons | End workout (green), Discard (red, asks first) | 048 |
@@ -544,7 +544,7 @@ the first frame (story 001).
 - **Scenario:** Starting the workout
 - **Given:** the watch app open, on any of its idle pages (phone ready, phone in the background, or not connected)
 - **When:** I tap Start workout (the first time: Health asks once to share workouts and read heart rate)
-- **Then:** the page heads with WORKOUT, the clock counting from now, the heart rate as soon as the sensor reports it, and "0 sets · 0 reps"; Start workout is gone and Record and Preview sit below the head
+- **Then:** the page heads with WORKOUT, the clock counting from now, the heart rate as soon as the sensor reports it, and no sets line until the first set; Start workout is gone and Record and Preview sit below the head
 
 - **Scenario:** The phone shows the workout too
 - **Given:** a workout running on the wrist and the phone app open
@@ -554,7 +554,7 @@ the first frame (story 001).
 - **Scenario:** The sets by exercise on the wrist (#206)
 - **Given:** a workout running on the wrist, three swing sets filmed and two get-up sets typed
 - **When:** I read the workout page
-- **Then:** under "5 sets · 34 reps" a line reads "[swing] 3 [get-up] 2", each exercise's drawing then its sets, in the order they first appeared, as the phone's Today header does mid-workout (#192); no reps per exercise, and the line is absent before the first set; it survives a restart with the rest of the tally (#190) (Igor, 2026-10-06, by voice: "show sets and exercises completed like I see it on the workouts view"; "just those coarse details are fine")
+- **Then:** under the heart rate a line reads "[swing] 3 [get-up] 2", each exercise's drawing then its sets, and no "5 sets · 34 reps" line (Igor, 2026-10-06: "drop n sets reps, the icons are enough"), in the order they first appeared, as the phone's Today header does mid-workout (#192); no reps per exercise, and the line is absent before the first set; it survives a restart with the rest of the tally (#190) (Igor, 2026-10-06, by voice: "show sets and exercises completed like I see it on the workouts view"; "just those coarse details are fine")
 
 - **Scenario:** Ending the workout
 - **Given:** a workout with sets in it
@@ -646,7 +646,7 @@ the first frame (story 001).
 - **Scenario:** Saving the set
 - **Given:** the count page reads 8 swings, in a workout of 6 sets and 47 reps
 - **When:** I tap Save
-- **Then:** the wrist is back on the workout page reading "7 sets · 55 reps" at once, the last-set line reads "8 reps · Kettlebell Swing · by hand", and the rest count starts from the save as Done starts it (046)
+- **Then:** the wrist is back on the workout page with "[swing] 7" in its sets line at once, the last-set line reads "8 reps · Kettlebell Swing · by hand", and the rest count starts from the save as Done starts it (046)
 
 - **Scenario:** Cancelling
 - **Given:** the count page is open
