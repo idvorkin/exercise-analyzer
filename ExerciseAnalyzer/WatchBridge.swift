@@ -16,8 +16,18 @@ final class WatchBridge: NSObject, ObservableObject {
   var onEvent: ((String, [String: Any]) -> Void)?
   /// The watch just became reachable (a raised wrist): push a fresh status without waiting to be asked.
   var onReachable: (() -> Void)?
-  /// A set typed on the wrist (story 059), queued user info like the watch's log lines; may arrive more than once.
-  var onHandSet: ((HandSet) -> Void)?
+  /// A set typed on the wrist (story 059) and the road it came by: "watch" (its queued user info), "watch_context"
+  /// or "stored_context" (the wrist's application context as it arrives or as stored at launch, #197) or
+  /// "watch_inbox" (dug out of a transfer WatchConnectivity never delivered). Called once per id across launches.
+  var onHandSet: ((HandSet, String) -> Void)?
+  /// Ids of typed sets already taken by any road, newest last, kept across launches: the context and the Inbox
+  /// carry a set again after a relaunch, and one deleted on the phone must stay deleted.
+  private var typedSetsTaken = UserDefaults.standard.stringArray(forKey: WatchBridge.typedSetsTakenKey) ?? []
+  private static let typedSetsTakenKey = "watchTypedSetsTaken"
+  /// The ids found in stuck transfers, never trimmed: the transfers stay in the Inbox and are read every launch.
+  private var inboxSetsTaken = UserDefaults.standard.stringArray(forKey: WatchBridge.inboxSetsTakenKey) ?? []
+  private static let inboxSetsTakenKey = "watchInboxRecovered"
+  private var lastInboxRun = Date.distantPast
   @Published private(set) var reachable = false
   /// The last command, status, heartbeat or scene message from the watch (#142); not published, as heartbeats
   /// arrive every second.
@@ -173,10 +183,65 @@ extension WatchBridge: WCSessionDelegate {
       "state": state.rawValue, "paired": session.isPaired, "app_installed": session.isWatchAppInstalled,
       "reachable": session.isReachable, "error": error.map { "\($0)" } ?? "",
     ]
+    let context = session.receivedApplicationContext
     Task { @MainActor in
       self.reachable = session.isReachable
       self.onEvent?("watch_session", fields)
+      self.takeTypedSets(from: context, via: "stored_context")
     }
+  }
+
+  /// The wrist's application context (#197): its last typed sets, each taken once; the queued user info is the
+  /// usual road and this one covers the transfers WatchConnectivity holds and never delivers.
+  nonisolated func session(_ session: WCSession, didReceiveApplicationContext context: [String: Any]) {
+    Task { @MainActor in self.takeTypedSets(from: context, via: "watch_context") }
+  }
+
+  private func takeTypedSets(from context: [String: Any], via road: String) {
+    guard let payloads = context[HandSet.contextKey] as? [Data] else { return }
+    for data in payloads {
+      guard let set = try? JSONDecoder().decode(HandSet.self, from: data) else { continue }
+      take(set, via: road)
+    }
+  }
+
+  /// Hands a typed set on once per id across launches; false when it was taken before.
+  @discardableResult
+  private func take(_ set: HandSet, via road: String) -> Bool {
+    guard let onHandSet else { return false }
+    let fresh = !typedSetsTaken.contains(set.id) && !inboxSetsTaken.contains(set.id)
+    if road == "watch_inbox", !inboxSetsTaken.contains(set.id) {
+      inboxSetsTaken.append(set.id)
+      UserDefaults.standard.set(inboxSetsTaken, forKey: Self.inboxSetsTakenKey)
+    } else if fresh {
+      typedSetsTaken = Array((typedSetsTaken + [set.id]).suffix(200))
+      UserDefaults.standard.set(typedSetsTaken, forKey: Self.typedSetsTakenKey)
+    }
+    guard fresh else { return false }
+    onHandSet(set, road)
+    return true
+  }
+
+  /// Typed sets inside transfers WatchConnectivity received and never handed over (#197: twelve found on
+  /// 2026-10-07, two of them sets from 2026-10-05). Each is taken once across launches; the count of stuck
+  /// transfers goes to the log so the stall's frequency is known. Called at launch and whenever the app comes back.
+  func recoverInbox() {
+    guard Date().timeIntervalSince(lastInboxRun) > 5 else { return }
+    lastInboxRun = Date()
+    guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+    let files = HandSet.stuckTransfers(under: documents)
+    guard !files.isEmpty else { return }
+    var recovered = 0
+    for url in files {
+      guard let data = try? Data(contentsOf: url) else { continue }
+      for set in HandSet.typedSets(inStuckTransfer: data) {
+        if take(set, via: "watch_inbox") { recovered += 1 }
+      }
+    }
+    let oldest = (try? files[0].resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+    onEvent?(
+      "watch_inbox",
+      ["stuck": files.count, "recovered": recovered, "oldest_days": oldest.map { Int(-$0.timeIntervalSinceNow / 86400) } ?? -1])
   }
 
   nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
@@ -212,7 +277,7 @@ extension WatchBridge: WCSessionDelegate {
   /// and so do sets typed on the wrist (059).
   nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
     if let set = HandSet(userInfo: userInfo) {
-      Task { @MainActor in self.onHandSet?(set) }
+      Task { @MainActor in self.take(set, via: "watch") }
       return
     }
     // A set that arrived and could not be read would be lost without a word (#197).

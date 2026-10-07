@@ -305,7 +305,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     watch.onRetry = { [weak self] in self?.answerRetry(via: "queued") }
     WorkoutMirror.shared.onStatusWanted = { [weak self] in self?.answerRetry(via: "workout") }
     // A set typed on the wrist (059): a Workouts entry with no clip, once per id however often it arrives.
-    watch.onHandSet = { [weak self] set in self?.addByHand(set, from: "watch") }
+    watch.onHandSet = { [weak self] set, road in self?.addByHand(set, from: road) }
+    watch.recoverInbox()
     WorkoutMirror.shared.$live.map { $0 != nil }.removeDuplicates().dropFirst().receive(on: DispatchQueue.main)
       .sink { [weak self] _ in self?.updateKeepAwake() }.store(in: &cancellables)
     watch.onExercise = { [weak self] mode in
@@ -380,6 +381,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self?.updateKeepAwake()
           self?.pushWatchStatus(force: true)
           WorkoutMirror.shared.requestAuthorizationIfNeeded()  // a workout that arrived in the background (048)
+          if name == UIApplication.didBecomeActiveNotification { self?.watch.recoverInbox() }  // #197
         }
       }
     }
