@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 022:
 
 - **Summary:** Report a problem in five seconds with the evidence attached
-- **Status:** implemented in [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [d92c62f](https://github.com/idvorkin/exercise-analyzer/commit/d92c62f); verified on the phone (every issue from #25 on came through it)
+- **Status:** implemented in [adc537a](https://github.com/idvorkin/exercise-analyzer/commit/adc537a), [d92c62f](https://github.com/idvorkin/exercise-analyzer/commit/d92c62f); verified on the phone (every issue from #25 on came through it); "Log it and another" (#212) in [8a40d31](https://github.com/idvorkin/exercise-analyzer/commit/8a40d31) (PR #213), verified on the simulator (`bug_again` smoke check: two reports from one capture, both with screenshot and frame; the sheet screenshotted on the iPhone 17 and iPad mini simulators), not on the phone yet
 
 #### Use Case:
 - **As a** lifter who just saw a wrong count
