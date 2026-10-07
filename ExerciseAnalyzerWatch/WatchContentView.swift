@@ -195,6 +195,10 @@ struct WatchContentView: View {
           }
         }
         .padding(.top, 2)
+      } else if workout.sets > 0 {
+        // Sets with no exercise to draw (a name the watch does not know, a tally saved before #206) still show.
+        Text("\(workout.sets) set\(workout.sets == 1 ? "" : "s") · \(workout.reps) reps")
+          .font(.caption).monospacedDigit().foregroundStyle(.secondary)
       }
     }
     .padding(.bottom, 4)
