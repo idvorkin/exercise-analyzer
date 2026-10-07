@@ -184,10 +184,9 @@ struct WatchContentView: View {
         .font(.caption).monospacedDigit().foregroundStyle(.secondary)
       // The sets by exercise with the drawings, as the phone's Today line reads mid-workout (#206, #192; Igor:
       // "show sets and exercises completed like I see it on the workouts view … just those coarse details").
-      let done = ExerciseKind.allCases.filter { workout.exerciseSets[$0, default: 0] > 0 }
-      if !done.isEmpty {
+      if !workout.exerciseOrder.isEmpty {
         HStack(spacing: 8) {
-          ForEach(done) { kind in
+          ForEach(workout.exerciseOrder) { kind in
             HStack(spacing: 2) {
               ExerciseGlyph(kind: kind, size: 16)
               Text("\(workout.exerciseSets[kind, default: 0])").font(.caption.bold()).monospacedDigit()
