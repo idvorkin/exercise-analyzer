@@ -162,6 +162,21 @@ final class RecentsStore: ObservableObject {
     try? persistIndex()
   }
 
+  /// Rows other devices put in the iCloud container (story 070, step 2), as `RecentsIndex.merge` takes them: a
+  /// removed set's folder goes with it; the files of added and changed sets are the caller's to copy in.
+  func mergeRemote(_ rows: [RecentEntry], tombstones: Set<String>, me: String) -> SyncMergeResult {
+    var index = RecentsIndex(entries: entries)
+    let result = index.merge(remote: rows, tombstones: tombstones, me: me)
+    guard result.changed else { return result }
+    for id in result.removedIDs {
+      removedIDs.insert(id)
+      try? FileManager.default.removeItem(at: folder(for: id))
+    }
+    entries = index.entries
+    try? persistIndex()
+    return result
+  }
+
   /// After a local recording is saved to Photos: point at the asset and drop the in-app copy.
   func markSavedToPhotos(id: String, identifier: String) {
     guard var entry = entry(id: id) else { return }

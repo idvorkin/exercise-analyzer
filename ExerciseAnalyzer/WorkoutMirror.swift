@@ -181,6 +181,16 @@ final class WorkoutMirror: NSObject, ObservableObject {
     return deletion
   }
 
+  /// Workouts other devices put in the iCloud container (story 070, step 2), as `WorkoutIndex.merge` takes them.
+  func mergeRemote(_ rows: [StoredWorkout], tombstones: Set<String>, me: String) -> SyncMergeResult {
+    var merged = index
+    let result = merged.merge(remote: rows, tombstones: tombstones, me: me)
+    guard result.changed else { return result }
+    index = merged
+    try? index.save(root: root)
+    return result
+  }
+
   /// Test hook (#123): the simulator has no watch, so SWING_LIVE_WORKOUT=<minutes> pretends a workout began
   /// that many minutes ago; the phone never starts a workout itself.
   func seedLiveFromEnvironment() {

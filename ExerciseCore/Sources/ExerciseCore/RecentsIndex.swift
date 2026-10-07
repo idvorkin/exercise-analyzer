@@ -7,8 +7,8 @@
 
 import Foundation
 
-public struct RecentEntry: Codable, Identifiable, Sendable {
-  public enum Source: Codable, Sendable {
+public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
+  public enum Source: Codable, Equatable, Sendable {
     case photos(identifier: String)
     case file(name: String)
     /// Typed on the wrist (story 059): no clip anywhere. Rows from before it never carry it.
@@ -46,6 +46,10 @@ public struct RecentEntry: Codable, Identifiable, Sendable {
   /// The bell's weight in kg as the lifter set it (story 066, #102); nil when never set. A set without one shows
   /// the weight of the last set of its exercise before it in the same workout (`WorkoutTimeline`).
   public var bellKg: Int? = nil
+  /// The device that made or last changed the set (story 070): the one that writes its folder in the iCloud
+  /// container. Nil for a set of this device's own from before sync, or one never mirrored; set on rows read
+  /// from another device (`SyncOwnership`).
+  public var device: String? = nil
 
   public init(
     id: String, analyzedAt: Date, recordedAt: Date?, duration: Double, repCount: Int, bestScore: Int?,
