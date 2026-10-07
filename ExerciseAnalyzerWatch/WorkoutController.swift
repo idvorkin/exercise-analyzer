@@ -70,9 +70,11 @@ final class WorkoutController: NSObject, ObservableObject {
     heartRate = workout.heartRate
     heartRateAverage = 128
     heartRateMax = 156
-    guard screenshot != .workoutStart else { return }  // before the first set: 0 sets · 0 reps
+    guard screenshot != .workoutStart else { return }  // before the first set: no sets line yet
     sets = 6
     reps = 47
+    exerciseSets = [.kettlebellSwing: 6]
+    exerciseOrder = [.kettlebellSwing]
   }
 
   // MARK: - Start, End, Discard
