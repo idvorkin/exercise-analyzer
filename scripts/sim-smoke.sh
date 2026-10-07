@@ -218,6 +218,25 @@ check_live_workout() {
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   unstash  # the check's own workout goes; the simulator's sets and workouts come back
 }
+check_bug_again() {  # #212: two reports from one shake ("Log it and another") both carry the screenshot and the frame
+  reset_mode
+  local docs; docs=$(dirname "$LOGS")
+  local before; before=$(wc -l < "$docs/bugs.jsonl" 2>/dev/null || echo 0)
+  SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/swing-sample-4reps.mp4" SIMCTL_CHILD_SWING_BUG="first of two|second of two" \
+    xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
+  wait_for bug_report 60 || echo "      (timed out waiting for the reports)"
+  sleep 2
+  local f; f=$(newest_log)
+  if [ "$(wc -l < "$docs/bugs.jsonl")" -eq $((before + 2)) ] &&
+    tail -2 "$docs/bugs.jsonl" | jq -se '
+      length == 2 and .[0].note == "first of two" and .[1].note == "second of two" and
+      all(.[]; (.screenshot | type) == "string" and (.frame | type) == "string" and .log != null)
+    ' >/dev/null &&
+    [ "$(jq -s '[.[] | select(.type=="bug_report")] | length' "$f")" = "2" ]; then
+    echo "ok    bug_again: two reports from one capture, both with screenshot and frame"
+  else echo "FAIL  bug_again: $f"; fail=1; fi
+  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+}
 # ONLY=<substring> runs just the matching checks (e.g. ONLY=trim).
 run() { if [ -z "${ONLY:-}" ] || [[ "$*" == *"${ONLY}"* ]]; then "$@"; fi; }
 run check swing-sample-4reps kettlebell-swing 4 90
@@ -232,4 +251,5 @@ run check_clip_switch mode
 run check_clip_switch photos
 run check_clip_switch trim
 run check_live_workout
+run check_bug_again
 exit $fail

@@ -1100,12 +1100,21 @@ struct ContentView: View {
     let env = ProcessInfo.processInfo.environment
     workouts.seedLiveFromEnvironment()  // SWING_LIVE_WORKOUT=<minutes>: a running workout without a watch (#123)
     if let note = env["SWING_BUG"], !note.isEmpty {
-      // Test hook: file a report 8 s after launch (after the clip is up), screenshot and frame included.
+      // Test hook: file a report 8 s after launch (after the clip is up), screenshot and frame included. Notes
+      // separated by | are filed one after the other from the one capture, as "Log it and another" files them (#212).
       Task {
         try? await Task.sleep(for: .seconds(8))
         session.captureBugScreenshot()
         try? await Task.sleep(for: .seconds(1))
-        session.reportBug(note: note)
+        for part in note.split(separator: "|") { session.reportBug(note: String(part)) }
+      }
+    }
+    if env["SWING_SHOW_BUG_SHEET"] == "1" {
+      // Test hook (#212): the report sheet up 8 s after launch, for a screenshot of its buttons.
+      Task {
+        try? await Task.sleep(for: .seconds(8))
+        session.captureBugScreenshot()
+        showBugReport = true
       }
     }
     // Test hook (#53): turn the screen sideways, as the simulator's Rotate would (an iPad in landscape).
