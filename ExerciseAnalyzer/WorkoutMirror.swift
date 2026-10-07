@@ -183,8 +183,11 @@ final class WorkoutMirror: NSObject, ObservableObject {
 
   /// Workouts other devices put in the iCloud container (story 070, step 2), as `WorkoutIndex.merge` takes them.
   func mergeRemote(_ rows: [StoredWorkout], tombstones: Set<String>, me: String) -> SyncMergeResult {
-    let result = index.merge(remote: rows, tombstones: tombstones, me: me)
-    if result.changed { try? index.save(root: root) }
+    var merged = index
+    let result = merged.merge(remote: rows, tombstones: tombstones, me: me)
+    guard result.changed else { return result }
+    index = merged
+    try? index.save(root: root)
     return result
   }
 
