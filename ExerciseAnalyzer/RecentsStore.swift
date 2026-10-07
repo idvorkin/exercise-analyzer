@@ -269,14 +269,52 @@ final class RecentsStore: ObservableObject {
       let url = folder(for: entry.id).appendingPathComponent(name)
       return FileManager.default.fileExists(atPath: url.path) ? url : nil
     case .photos(let identifier):
-      return await Self.photosClipURL(identifier: identifier)
+      return await Self.photosClipURL(identifier: identifier, cloudIdentifier: entry.cloudIdentifier)
     case .byHand:
       return nil
     }
   }
 
-  static func photosClipURL(identifier: String) async -> URL? {
-    await fetchPhotosClip(identifier: identifier).url
+  /// The in-app clip file of a set whose clip lives only here, when it is there.
+  func clipFileURL(for entry: RecentEntry) -> URL? {
+    guard case .file(let name) = entry.source else { return nil }
+    let url = folder(for: entry.id).appendingPathComponent(name)
+    return FileManager.default.fileExists(atPath: url.path) ? url : nil
+  }
+
+  /// Cloud identifiers found for sets' Photos assets (story 070), one index write.
+  func setCloudIdentifiers(_ found: [String: String]) {
+    guard !found.isEmpty else { return }
+    entries = entries.map { entry in
+      guard let local = entry.photosIdentifier, let cloud = found[local] else { return entry }
+      var copy = entry
+      copy.cloudIdentifier = cloud
+      return copy
+    }
+    try? persistIndex()
+  }
+
+  static func photosClipURL(identifier: String, cloudIdentifier: String? = nil) async -> URL? {
+    await fetchPhotosClip(identifier: identifier, cloudIdentifier: cloudIdentifier).url
+  }
+
+  /// This device's identifier for an asset another device named by its cloud identifier (story 070): nil when
+  /// iCloud Photos has not brought the asset here yet, or there is no account.
+  static func localIdentifier(cloud: String) -> String? {
+    let mappings = PHPhotoLibrary.shared().localIdentifierMappings(for: [PHCloudIdentifier(stringValue: cloud)])
+    return mappings.values.first.flatMap { try? $0.get() }
+  }
+
+  /// The cloud identifiers of this device's assets, by local identifier; an asset iCloud has no identifier for
+  /// (no account, or gone) is left out.
+  static func cloudIdentifiers(for locals: [String]) -> [String: String] {
+    guard !locals.isEmpty else { return [:] }
+    let mappings = PHPhotoLibrary.shared().cloudIdentifierMappings(forLocalIdentifiers: locals)
+    var found: [String: String] = [:]
+    for (local, result) in mappings {
+      if let cloud = try? result.get() { found[local] = cloud.stringValue }
+    }
+    return found
   }
 
   /// What a Photos fetch came back with: the playable URL, whether iCloud had to send the clip first, how long it
@@ -289,9 +327,15 @@ final class RecentsStore: ObservableObject {
     var seconds: Double = 0
   }
 
-  static func fetchPhotosClip(identifier: String, progress: (@MainActor (Double) -> Void)? = nil) async -> PhotosFetch {
-    guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject
-    else { return PhotosFetch(error: "not in Photos") }
+  static func fetchPhotosClip(
+    identifier: String, cloudIdentifier: String? = nil, progress: (@MainActor (Double) -> Void)? = nil
+  ) async -> PhotosFetch {
+    var found = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject
+    // Another device's identifier means nothing here: its cloud identifier finds the same asset (story 070).
+    if found == nil, let cloudIdentifier, let local = localIdentifier(cloud: cloudIdentifier) {
+      found = PHAsset.fetchAssets(withLocalIdentifiers: [local], options: nil).firstObject
+    }
+    guard let asset = found else { return PhotosFetch(error: "not in Photos") }
     let started = Date()
     let options = PHVideoRequestOptions()
     options.isNetworkAccessAllowed = true

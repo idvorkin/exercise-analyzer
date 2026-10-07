@@ -48,6 +48,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
   let recents = RecentsStore()
   /// The iCloud copy of Recents and the workouts for the other devices (story 070).
   private var sync: SyncStore?
+  /// Recordings into Photos by themselves, and the backlog once approved (story 070, step 3).
+  private var exporter: PhotosExporter?
+  /// The one-time ask about the sets recorded before step 3, whose clips live only here.
+  @Published var photosExportPrompt = false
+  private var refreshing = false
   /// Both models and their compute plans behind one readiness gate (#52 step 4); kicks loading on creation.
   let models: ModelSet
 
@@ -180,7 +185,30 @@ final class VideoPoseSession: NSObject, ObservableObject {
     canCancelAnalysis = false
     activity = .idle
     liveInferenceEnabled = true
-    return clipOperations.begin(entryID: entryID, origin: origin)
+    let operation = clipOperations.begin(entryID: entryID, origin: origin)
+    exportClips(reason: "set_left", excluding: entryID)  // the set left behind goes to Photos (070, step 3)
+    return operation
+  }
+
+  /// Saves to Photos the clips of sets not on screen (story 070, step 3): never during the launch refresh, which
+  /// reads sets from their files, and never the set that is open, whose trim may still be undone.
+  private func exportClips(reason: String, excluding current: String? = nil) {
+    guard !refreshing, source != .camera else { return }  // not under the camera's live pass; the next trigger will
+
+    exporter?.run(reason: reason, excluding: current ?? currentEntryID)
+  }
+
+  /// The one-time ask's numbers: the sets whose clip lives only here, and their size.
+  var photosBacklog: PhotosExporter.Backlog { exporter?.backlog(excluding: currentEntryID) ?? .init() }
+
+  func answerPhotosExport(save: Bool) {
+    log.event("ui", ["action": "photos_export_prompt", "choice": save ? "save" : "not_now", "count": photosBacklog.count])
+    if save {
+      exporter?.approve()
+      exportClips(reason: "approved")
+    } else {
+      exporter?.deferAsking()
+    }
   }
 
   private func beginCurrentOperation() -> Operation {
@@ -299,6 +327,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     WorkoutLiveActivity.shared.install(mirror: .shared, recents: recents)
     // Every set and workout mirrored into the iCloud container for the iPad (story 070, step 1).
     sync = SyncStore(recents: recents, workouts: .shared) { [weak self] type, fields in self?.log.event(type, fields) }
+    exporter = PhotosExporter(recents: recents) { [weak self] type, fields in self?.log.event(type, fields) }
     CrashReports.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     CrashReports.shared.reportSignalLogs { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
@@ -386,6 +415,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self?.pushWatchStatus(force: true)
           WorkoutMirror.shared.requestAuthorizationIfNeeded()  // a workout that arrived in the background (048)
           if name == UIApplication.didBecomeActiveNotification { self?.watch.recoverInbox() }  // #197
+          if name == UIApplication.willResignActiveNotification { self?.exportClips(reason: "background") }  // 070
         }
       }
     }
@@ -403,6 +433,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }.store(in: &cancellables)
     Task {
       await refreshStaleEntries()
+      // Step 3 of story 070: the clips of sets left behind go to Photos; the backlog is asked about once.
+      if let exporter, exporter.shouldAsk(excluding: currentEntryID) {
+        photosExportPrompt = true
+        log.event("photos_export_prompt", ["count": exporter.backlog(excluding: currentEntryID).count])
+      }
+      exportClips(reason: "launch")
       // Test hook: SWING_DEBUG_RUN=1 starts an instrumented run once the gallery has caught up (simulator runs
       // can't tap the UI).
       if ProcessInfo.processInfo.environment["SWING_DEBUG_RUN"] == "1" { await startInstrumentedRun() }
@@ -415,6 +451,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// through the models again from its clip instead, one set at a time in the background (Igor, 2026-09-13:
   /// "force the rerun"), so the gallery does not wait for each set to be opened.
   private func refreshStaleEntries() async {
+    refreshing = true
+    defer { refreshing = false }
     // The models load after init (the detector's model_loaded lands about a second in); judged before that, every
     // set looks made with this build's models and nothing re-runs (the first forced-rerun build did exactly that).
     let plans = models.outstandingPlans
@@ -826,7 +864,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       if case .photos(let identifier) = entry.source {
         // An old set may live only in iCloud: show the download rather than a tap that seems to do nothing (#35).
         activity = .working("Loading from Photos", progress: nil)
-        let fetch = await RecentsStore.fetchPhotosClip(identifier: identifier) { fraction in
+        let fetch = await RecentsStore.fetchPhotosClip(identifier: identifier, cloudIdentifier: entry.cloudIdentifier) { fraction in
           guard self.isCurrent(operation) else { return }
           self.activity = .working("Downloading from iCloud", progress: fraction)
         }

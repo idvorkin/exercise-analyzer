@@ -12,6 +12,7 @@ import Combine
 import CryptoKit
 import ExerciseCore
 import Foundation
+import Photos
 
 @MainActor
 final class SyncStore {
@@ -83,6 +84,7 @@ final class SyncStore {
       return
     }
     let me = Self.deviceID
+    nameCloudIdentifiers(me: me)
     var jobs: [Job] = []
     var seen: Set<String> = []
     for entry in recents.entries {
@@ -137,6 +139,21 @@ final class SyncStore {
         }
       }
     }
+  }
+
+  /// Ids Photos could not name this session (no iCloud, the asset gone): not asked again until the next launch.
+  private var unnamed: Set<String> = []
+
+  /// Step 3: this device's sets in Photos get the asset's cloud identifier on their row, what another device
+  /// opens the clip by once iCloud Photos has carried it over. Asked once per set.
+  private func nameCloudIdentifiers(me: String) {
+    let locals = recents.entries.filter { SyncOwnership.isMine($0.device, me: me) && $0.cloudIdentifier == nil }
+      .compactMap(\.photosIdentifier).filter { !unnamed.contains($0) }
+    guard !locals.isEmpty else { return }
+    let found = RecentsStore.cloudIdentifiers(for: locals)
+    unnamed.formUnion(locals.filter { found[$0] == nil })
+    log("photos_cloud_ids", ["asked": locals.count, "named": found.count])
+    recents.setCloudIdentifiers(found)
   }
 
   // MARK: Reading (step 2)

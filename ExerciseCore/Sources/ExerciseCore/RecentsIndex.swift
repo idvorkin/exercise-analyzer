@@ -50,6 +50,10 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   /// container. Nil for a set of this device's own from before sync, or one never mirrored; set on rows read
   /// from another device (`SyncOwnership`).
   public var device: String? = nil
+  /// The Photos asset's cloud identifier (`PHCloudIdentifier`), the same on every device signed into the
+  /// account, for a clip in Photos (story 070, step 3); `source`'s identifier is local to the device that set
+  /// it. Filled by the owner when it mirrors the set; another device maps it to its own identifier on open.
+  public var cloudIdentifier: String? = nil
 
   public init(
     id: String, analyzedAt: Date, recordedAt: Date?, duration: Double, repCount: Int, bestScore: Int?,

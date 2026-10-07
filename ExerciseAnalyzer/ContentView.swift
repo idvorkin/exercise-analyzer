@@ -124,6 +124,18 @@ struct ContentView: View {
       Text("Nothing was saved to Photos. Delete the recording, or keep it to look at?")
     }
     .setDeletionDialog($deleting) { session.delete(set: $0, from: "review") }
+    // Story 070, step 3: the sets recorded before recordings went to Photos by themselves, asked about once.
+    .confirmationDialog(
+      "Save \(session.photosBacklog.count) recordings to Photos?", isPresented: $session.photosExportPrompt,
+      titleVisibility: .visible
+    ) {
+      Button("Save them") { session.answerPhotosExport(save: true) }
+      Button("Not now", role: .cancel) { session.answerPhotosExport(save: false) }
+    } message: {
+      Text(
+        "\(ByteCountFormatter.string(fromByteCount: Int64(session.photosBacklog.bytes), countStyle: .file)) of sets recorded before this version live only in the app. In Photos, iCloud carries them to the iPad; their counts and pictures stay here either way."
+      )
+    }
     // A Photos clip was just trimmed to its set: offer the replace right away instead of leaving it to the
     // Save button (#90). Replace is story 011's save: the trimmed clip goes in, iOS asks once to delete the
     // original, Undo trim brings it back.
