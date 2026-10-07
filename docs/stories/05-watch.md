@@ -651,7 +651,7 @@ the first frame (story 001).
 - **Scenario:** A typed set the phone never got (#197)
 - **Given:** I saved a set on the wrist and the phone's WatchConnectivity took the transfer but never handed it to the app (two of 05 Oct's sets, found lying in the phone's Inbox two days later with ten log lines back to 14 Sep)
 - **When:** the phone app is next open with the watch in reach, or merely opens
-- **Then:** the set is in Workouts anyway, once: the wrist's application context carries its last eight typed sets and the phone takes each new id from it (`set_by_hand` where: watch_context), and at launch and on coming back the phone reads the sets out of the stuck transfers themselves (where: watch_inbox, `watch_inbox` counts them); the phone keeps the ids it took by any road across launches, so a set deleted since is not brought back
+- **Then:** the set is in Workouts anyway, once: the wrist's application context carries its last eight typed sets and the phone takes each new id from it (`set_by_hand` where: watch_context as it arrives, stored_context from the one stored at launch), and at launch and on coming back the phone reads the sets out of the stuck transfers themselves (where: watch_inbox, `watch_inbox` counts them); the phone keeps the ids it took by any road across launches, so a set deleted since is not brought back
 
 - **Scenario:** Cancelling
 - **Given:** the count page is open

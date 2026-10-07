@@ -377,7 +377,7 @@ final class PhoneLink: NSObject, ObservableObject {
     do {
       try session.updateApplicationContext([HandSet.contextKey: payloads])
     } catch {
-      logEvent("context_failed", ["message": "\(error)"])
+      logEvent("typed_context_failed", ["message": "\(error)"])
     }
   }
 

@@ -17,13 +17,16 @@ final class WatchBridge: NSObject, ObservableObject {
   /// The watch just became reachable (a raised wrist): push a fresh status without waiting to be asked.
   var onReachable: (() -> Void)?
   /// A set typed on the wrist (story 059) and the road it came by: "watch" (its queued user info), "watch_context"
-  /// (the wrist's application context, #197) or "watch_inbox" (dug out of a transfer WatchConnectivity never
-  /// delivered). Called once per id across launches.
+  /// or "stored_context" (the wrist's application context as it arrives or as stored at launch, #197) or
+  /// "watch_inbox" (dug out of a transfer WatchConnectivity never delivered). Called once per id across launches.
   var onHandSet: ((HandSet, String) -> Void)?
   /// Ids of typed sets already taken by any road, newest last, kept across launches: the context and the Inbox
   /// carry a set again after a relaunch, and one deleted on the phone must stay deleted.
   private var typedSetsTaken = UserDefaults.standard.stringArray(forKey: WatchBridge.typedSetsTakenKey) ?? []
   private static let typedSetsTakenKey = "watchTypedSetsTaken"
+  /// The ids found in stuck transfers, never trimmed: the transfers stay in the Inbox and are read every launch.
+  private var inboxSetsTaken = UserDefaults.standard.stringArray(forKey: WatchBridge.inboxSetsTakenKey) ?? []
+  private static let inboxSetsTakenKey = "watchInboxRecovered"
   private var lastInboxRun = Date.distantPast
   @Published private(set) var reachable = false
   /// The last command, status, heartbeat or scene message from the watch (#142); not published, as heartbeats
@@ -205,9 +208,16 @@ extension WatchBridge: WCSessionDelegate {
   /// Hands a typed set on once per id across launches; false when it was taken before.
   @discardableResult
   private func take(_ set: HandSet, via road: String) -> Bool {
-    guard let onHandSet, !typedSetsTaken.contains(set.id) else { return false }
-    typedSetsTaken = Array((typedSetsTaken + [set.id]).suffix(200))
-    UserDefaults.standard.set(typedSetsTaken, forKey: Self.typedSetsTakenKey)
+    guard let onHandSet else { return false }
+    let fresh = !typedSetsTaken.contains(set.id) && !inboxSetsTaken.contains(set.id)
+    if road == "watch_inbox", !inboxSetsTaken.contains(set.id) {
+      inboxSetsTaken.append(set.id)
+      UserDefaults.standard.set(inboxSetsTaken, forKey: Self.inboxSetsTakenKey)
+    } else if fresh {
+      typedSetsTaken = Array((typedSetsTaken + [set.id]).suffix(200))
+      UserDefaults.standard.set(typedSetsTaken, forKey: Self.typedSetsTakenKey)
+    }
+    guard fresh else { return false }
     onHandSet(set, road)
     return true
   }
