@@ -350,7 +350,7 @@ final class PhoneLink: NSObject, ObservableObject {
     let set = HandSet(exercise: exercise, reps: HandSet.clamp(reps), at: Date().timeIntervalSince1970)
     handSet = set
     lastTyped = set
-    workout.setAnalyzed(reps: set.reps)
+    workout.setAnalyzed(reps: set.reps, exercise: exercise)
     rest.setEnded()
     // Two sets once left the wrist and never reached the phone (#197): the queue's length at the save and the
     // transfer's end (`set_by_hand_sent`) say whether the set left at all.

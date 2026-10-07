@@ -218,6 +218,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				5A1A00000000000000000030 /* ExerciseAnalyzerWatch */,
+				5C1A0000000000000000005F /* Shared */,
 			);
 			name = ExerciseAnalyzerWatch;
 			packageProductDependencies = (
