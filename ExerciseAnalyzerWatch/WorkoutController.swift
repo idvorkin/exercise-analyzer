@@ -30,6 +30,9 @@ final class WorkoutController: NSObject, ObservableObject {
   /// sets typed by hand (059).
   @Published private(set) var sets = 0
   @Published private(set) var reps = 0
+  /// The sets above by exercise, for the page's "[swing] 3 · [get-up] 10" (#206): a filmed set's exercise is the
+  /// phone's name for it, a typed set's the one picked on the count page.
+  @Published private(set) var exerciseSets: [ExerciseKind: Int] = [:]
   /// The phone's `LastSet.at` of the newest filmed set counted above: a set counts once, also when the phone
   /// says it again to an app that restarted and no longer knows what it had heard (#190).
   private var countedSetAt = 0.0
@@ -131,6 +134,7 @@ final class WorkoutController: NSObject, ObservableObject {
       heartRateMax = nil
       sets = 0
       reps = 0
+      exerciseSets = [:]
       countedSetAt = 0
       discarding = false
       activityOpen = false
@@ -177,6 +181,7 @@ final class WorkoutController: NSObject, ObservableObject {
         let tally = Self.savedTally(startedAt: start)
         self.sets = tally.sets
         self.reps = tally.reps
+        self.exerciseSets = tally.exerciseSets
         self.countedSetAt = tally.countedSetAt
         self.discarding = false
         self.activityOpen = false
@@ -202,16 +207,24 @@ final class WorkoutController: NSObject, ObservableObject {
   /// counts on from (#190).
   private func saveTally() {
     guard let startedAt, !fixed else { return }
+    let byExercise = Dictionary(uniqueKeysWithValues: exerciseSets.map { ($0.key.rawValue, $0.value) })
     UserDefaults.standard.set(
-      ["startedAt": startedAt.timeIntervalSince1970, "sets": sets, "reps": reps, "countedSetAt": countedSetAt],
+      ["startedAt": startedAt.timeIntervalSince1970, "sets": sets, "reps": reps, "countedSetAt": countedSetAt,
+       "exerciseSets": byExercise],
       forKey: Self.tallyKey)
   }
 
-  private static func savedTally(startedAt: Date) -> (sets: Int, reps: Int, countedSetAt: Double) {
+  private static func savedTally(startedAt: Date)
+    -> (sets: Int, reps: Int, exerciseSets: [ExerciseKind: Int], countedSetAt: Double)
+  {
     guard let saved = UserDefaults.standard.dictionary(forKey: tallyKey),
       let at = saved["startedAt"] as? Double, abs(at - startedAt.timeIntervalSince1970) < 2
-    else { return (0, 0, 0) }
-    return (saved["sets"] as? Int ?? 0, saved["reps"] as? Int ?? 0, saved["countedSetAt"] as? Double ?? 0)
+    else { return (0, 0, [:], 0) }
+    var byExercise: [ExerciseKind: Int] = [:]
+    for (raw, count) in saved["exerciseSets"] as? [String: Int] ?? [:] {
+      if let kind = ExerciseKind(rawValue: raw) { byExercise[kind] = count }
+    }
+    return (saved["sets"] as? Int ?? 0, saved["reps"] as? Int ?? 0, byExercise, saved["countedSetAt"] as? Double ?? 0)
   }
 
   /// End writes one HKWorkout; Discard writes nothing. Both end the session; the delegate finishes the job.
@@ -253,14 +266,15 @@ final class WorkoutController: NSObject, ObservableObject {
     guard let startedAt, last.at >= startedAt.timeIntervalSince1970, last.at > countedSetAt else { return }
     guard phase == .running else { return }
     countedSetAt = last.at
-    setAnalyzed(reps: last.reps)
+    setAnalyzed(reps: last.reps, exercise: ExerciseKind.allCases.first { $0.definition.name == last.exercise })
   }
 
   /// A set typed by hand on the wrist (059), or the phone's count from above.
-  func setAnalyzed(reps count: Int) {
+  func setAnalyzed(reps count: Int, exercise: ExerciseKind?) {
     guard phase == .running else { return }
     sets += 1
     reps += count
+    if let exercise { exerciseSets[exercise, default: 0] += 1 }
     saveTally()
     sendWire()
   }

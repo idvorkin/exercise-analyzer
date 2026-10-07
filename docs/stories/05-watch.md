@@ -551,6 +551,11 @@ the first frame (story 001).
 - **When:** I look at the phone
 - **Then:** a green strip under the count reads "Workout 42:10 · ♥ 128 · 6 sets" (the sets recorded since Start), and Workouts' Today header carries "Since 9:02 AM · ♥ 128 · on the watch" by the lifter sign (#185)
 
+- **Scenario:** The sets by exercise on the wrist (#206)
+- **Given:** a workout running on the wrist, three swing sets filmed and two get-up sets typed
+- **When:** I read the workout page
+- **Then:** under "5 sets · 34 reps" a line reads "[swing] 3 [get-up] 2", each exercise's drawing then its sets, in the phone's order of exercises, as the phone's Today header reads mid-workout (#192); no reps per exercise, and the line is absent before the first set; it survives a restart with the rest of the tally (#190) (Igor, 2026-10-06, by voice: "show sets and exercises completed like I see it on the workouts view"; "just those coarse details are fine")
+
 - **Scenario:** Ending the workout
 - **Given:** a workout with sets in it
 - **When:** I scroll to the bottom of the workout page and tap End workout
