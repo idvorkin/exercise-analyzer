@@ -46,6 +46,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// Shake reports' files and old-log pruning (BugReport.swift).
   private let bugReporter: BugReporter
   let recents = RecentsStore()
+  /// The iCloud copy of Recents and the workouts for the other devices (story 070).
+  private var sync: SyncStore?
   /// Both models and their compute plans behind one readiness gate (#52 step 4); kicks loading on creation.
   let models: ModelSet
 
@@ -295,6 +297,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     WorkoutLiveActivity.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     // The workout on the lock screen and in the Dynamic Island (#161), its sets by exercise from this store (#181).
     WorkoutLiveActivity.shared.install(mirror: .shared, recents: recents)
+    // Every set and workout mirrored into the iCloud container for the iPad (story 070, step 1).
+    sync = SyncStore(recents: recents, workouts: .shared) { [weak self] type, fields in self?.log.event(type, fields) }
     CrashReports.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     CrashReports.shared.reportSignalLogs { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
