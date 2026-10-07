@@ -34,21 +34,21 @@ final class SyncStore {
     self.workouts = workouts
     self.log = log
     ledger = UserDefaults.standard.dictionary(forKey: Self.ledgerKey) as? [String: String] ?? [:]
-    // SWING_SYNC_DIR=<path> (simulator, docs/TESTING.md): a plain folder stands in for the container, which
-    // the simulator has no iCloud account for; a second simulator can read the same folder (step 2).
-    if let dir = ProcessInfo.processInfo.environment["SWING_SYNC_DIR"] {
-      attach(URL(fileURLWithPath: dir, isDirectory: true))
-      return
-    }
-    // `url(forUbiquityContainerIdentifier:)` can block for a while the first time: never on the main thread.
-    Task.detached(priority: .utility) {
-      let url = FileManager.default.url(forUbiquityContainerIdentifier: Self.containerID)
-      await MainActor.run { self.attach(url) }
-    }
     recents.$entries.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in self?.mirrorChanges() }
       .store(in: &cancellables)
     workouts.$index.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in self?.mirrorChanges() }
       .store(in: &cancellables)
+    // SWING_SYNC_DIR=<path> (simulator, docs/TESTING.md): a plain folder stands in for the container, which
+    // the simulator has no iCloud account for; a second simulator can read the same folder (step 2).
+    if let dir = ProcessInfo.processInfo.environment["SWING_SYNC_DIR"] {
+      attach(URL(fileURLWithPath: dir, isDirectory: true))
+    } else {
+      // `url(forUbiquityContainerIdentifier:)` can block for a while the first time: never on the main thread.
+      Task.detached(priority: .utility) {
+        let url = FileManager.default.url(forUbiquityContainerIdentifier: Self.containerID)
+        await MainActor.run { self.attach(url) }
+      }
+    }
   }
 
   private func attach(_ url: URL?) {
@@ -146,7 +146,6 @@ final class SyncStore {
       try? fm.removeItem(at: dir.appendingPathComponent("deleted.json"))
       var files = 1
       var bytes = row.count
-      try write(row, to: dir.appendingPathComponent("row.json"))
       // The set's own files, copied when the container lacks them or has an older one.
       let names = (try? fm.contentsOfDirectory(atPath: folder.path)) ?? []
       for name in names where name == "analysis.json" || name.hasSuffix(".jpg") {
@@ -162,6 +161,7 @@ final class SyncStore {
         files += 1
         bytes += (try? from.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
       }
+      try write(row, to: dir.appendingPathComponent("row.json"))
       return (files, bytes)
     case .workout(let id, let row, _):
       let dir = container.appendingPathComponent("workouts", isDirectory: true)
