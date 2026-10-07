@@ -27,6 +27,15 @@ final class PhoneLink: NSObject, ObservableObject {
     didSet { UserDefaults.standard.set(try? JSONEncoder().encode(lastTyped), forKey: Self.lastTypedKey) }
   }
   private static let lastTypedKey = "lastTypedSet"
+  /// The last few sets typed here, sent in the application context as the second road (#197): the phone takes
+  /// each once by id, so repeats cost nothing.
+  private var typedRecent: [HandSet] = UserDefaults.standard.data(forKey: PhoneLink.typedRecentKey)
+    .flatMap { try? JSONDecoder().decode([HandSet].self, from: $0) } ?? []
+  {
+    didSet { UserDefaults.standard.set(try? JSONEncoder().encode(typedRecent), forKey: Self.typedRecentKey) }
+  }
+  private static let typedRecentKey = "typedSetsRecent"
+  static let typedRecentCount = 8
   /// Last face.json write, and whether its failure is already logged (once per spell, story 043).
   private var lastFaceWrite = Date.distantPast
   private var faceWriteFailedLogged = false
@@ -360,8 +369,16 @@ final class PhoneLink: NSObject, ObservableObject {
       ["id": set.id, "exercise": exercise.rawValue, "reps": set.reps, "reachable": reachable,
        "outstanding": session.outstandingUserInfoTransfers.count, "activation": session.activationState.rawValue])
     WKInterfaceDevice.current().play(.success)
+    typedRecent = Array((typedRecent + [set]).suffix(Self.typedRecentCount))
     guard session.activationState == .activated else { return }
     session.transferUserInfo(set.userInfo)
+    // The second road (#197): the context holds the last few typed sets, delivered whenever the link is up.
+    let payloads = typedRecent.compactMap { try? JSONEncoder().encode($0) }
+    do {
+      try session.updateApplicationContext([HandSet.contextKey: payloads])
+    } catch {
+      logEvent("context_failed", ["message": "\(error)"])
+    }
   }
 
   private func apply(_ message: [String: Any], via channel: String) {

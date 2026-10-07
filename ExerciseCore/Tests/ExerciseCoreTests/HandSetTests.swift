@@ -100,6 +100,18 @@ final class HandSetTests: XCTestCase {
     XCTAssertEqual(HandSet.start(mode: "auto", analyzed: none, byHand: nil).reps, 1)
   }
 
+  /// #197: a transfer WatchConnectivity received on 2026-10-05 and never delivered, copied from the phone's
+  /// Documents/Inbox; the set's JSON sits verbatim inside it. A log line's transfer holds no set.
+  func testATypedSetIsReadOutOfAStuckTransfer() throws {
+    let url = try XCTUnwrap(Bundle.module.url(forResource: "watch-inbox-typed-set", withExtension: "bin", subdirectory: "Fixtures"))
+    let sets = HandSet.typedSets(inStuckTransfer: try Data(contentsOf: url))
+    XCTAssertEqual(sets.map(\.id), ["A065AD9D-E337-482E-867C-D7BD06BC18BF"])
+    XCTAssertEqual(sets.first?.reps, 10)
+    XCTAssertEqual(sets.first?.exercise, .kettlebellSwing)
+    XCTAssertEqual(sets.first?.at ?? 0, 1791215137.6, accuracy: 0.1)
+    XCTAssertEqual(HandSet.typedSets(inStuckTransfer: Data("watch_log heartbeat_failed".utf8)), [])
+  }
+
   func testTheSetCrossesAsUserInfo() throws {
     let set = HandSet(id: "abc", exercise: swing, reps: 8, at: 1234.5)
     XCTAssertEqual(HandSet(userInfo: set.userInfo), set)

@@ -644,6 +644,10 @@ the first frame (story 001).
 - **Then:** it reads 8, one rep per click or tap with a tick of haptic each; it stops at 1 and at 200, and the − and + are 44 pt targets
 
 - **Scenario:** Saving the set
+- **Scenario:** A typed set the phone never got (#197)
+- **Given:** I saved a set on the wrist and the phone's WatchConnectivity took the transfer but never handed it to the app (two of 05 Oct's sets, found lying in the phone's Inbox two days later with ten log lines back to 14 Sep)
+- **When:** the phone app is next open with the watch in reach, or merely opens
+- **Then:** the set is in Workouts anyway, once: the wrist's application context carries its last eight typed sets and the phone takes each new id from it (`set_by_hand` where: watch_context), and at launch and on coming back the phone reads the sets out of the stuck transfers themselves (where: watch_inbox, `watch_inbox` counts them); a set deleted since is not brought back
 - **Given:** the count page reads 8 swings, in a workout of 6 sets and 47 reps
 - **When:** I tap Save
 - **Then:** the wrist is back on the workout page with "[swing] 7" in its sets line at once, the last-set line reads "8 reps · Kettlebell Swing · by hand", and the rest count starts from the save as Done starts it (046)

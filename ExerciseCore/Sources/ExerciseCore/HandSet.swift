@@ -69,6 +69,44 @@ public struct HandSet: Codable, Equatable, Sendable {
     return [Self.userInfoKey: data]
   }
 
+  /// The key the watch's application context carries its last typed sets under (#197): a second road for a
+  /// set, beside the queued user info, as the phone's status has (#189).
+  public static let contextKey = "typed_sets"
+
+  /// Typed sets inside a WatchConnectivity transfer the phone received and never delivered (#197): the file
+  /// under `Documents/Inbox/com.apple.watchconnectivity/…/userinfo-transfer-object-data` keeps the set's JSON
+  /// verbatim after the `set_by_hand` key, so a scan for it needs nothing of the file's own format.
+  /// ponytail: that format is WatchConnectivity's own and undocumented; the context road above is the one that
+  /// is promised, this is the net under it for the twelve transfers found stuck on 2026-10-07.
+  public static func typedSets(inStuckTransfer data: Data) -> [HandSet] {
+    guard let text = String(data: data, encoding: .isoLatin1) else { return [] }
+    var sets: [HandSet] = []
+    var search = text.startIndex
+    while let key = text.range(of: userInfoKey, range: search..<text.endIndex) {
+      search = key.upperBound
+      guard let open = text.range(of: "{\"", range: key.upperBound..<text.endIndex),
+        let close = text.range(of: "}", range: open.lowerBound..<text.endIndex)
+      else { continue }
+      let json = String(text[open.lowerBound..<close.upperBound])
+      if let set = try? JSONDecoder().decode(HandSet.self, from: Data(json.utf8)) { sets.append(set) }
+      search = close.upperBound
+    }
+    return sets
+  }
+
+  /// The transfers WatchConnectivity holds undelivered under the app's Documents (#197), oldest first.
+  public static func stuckTransfers(under documents: URL) -> [URL] {
+    let inbox = documents.appendingPathComponent("Inbox/com.apple.watchconnectivity", isDirectory: true)
+    guard let files = FileManager.default.enumerator(at: inbox, includingPropertiesForKeys: [.contentModificationDateKey])
+    else { return [] }
+    var found: [(URL, Date)] = []
+    for case let url as URL in files where url.lastPathComponent == "userinfo-transfer-object-data" {
+      let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+      found.append((url, date))
+    }
+    return found.sorted { $0.1 < $1.1 }.map(\.0)
+  }
+
   /// Nil for any other user info (the watch's log lines share the channel).
   public init?(userInfo: [String: Any]) {
     guard let data = userInfo[Self.userInfoKey] as? Data, let set = try? JSONDecoder().decode(HandSet.self, from: data)
