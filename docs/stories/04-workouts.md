@@ -710,7 +710,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 070:
 
 - **Summary:** My sets and workouts are on every device I am signed into: the phone records, the iPad shows the same history
-- **Status:** planned 2026-10-07 (design C below, Igor: "I need that"); step 1 (the iCloud container) in progress; nothing on a device yet
+- **Status:** planned 2026-10-07 (design C below, Igor: "I need that"); step 1, the phone's mirror into the container, in [da3631c](https://github.com/idvorkin/exercise-analyzer/commit/da3631c) (the entitlement) and [eb307c5](https://github.com/idvorkin/exercise-analyzer/commit/eb307c5) (`SyncStore`), verified on the simulator against a plain folder (`SWING_SYNC_DIR`: 21 sets, 255 files, 15 MB in 4 s); not on a device, the App ID lacks the iCloud capability until Xcode has an account to add it with; steps 2–5 not started
 - **Why:** Igor, 2026-10-07, the day the iPad got the app (#53): "now that we're multi-device, we need to build that sync feature, right?" and "I need that". The phone is where sets are filmed and typed; the iPad is where they are looked at (story 067, #53): the history has to be the same on both.
 
 #### Use Case:
