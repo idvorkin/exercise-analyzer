@@ -144,6 +144,12 @@ final class WorkoutMirror: NSObject, ObservableObject {
   func delete(_ session: StoredWorkout) async -> WorkoutDeletion {
     let parts = index.removeSession(session)
     var deletion = WorkoutDeletion(rows: parts.count)
+    // Another device's workout deleted here: its tombstone is this device's to write (070, step 4).
+    let theirs = parts.filter { !SyncOwnership.isMine($0.device, me: SyncStore.deviceID) }
+    if !theirs.isEmpty {
+      for part in theirs { removedRemote[part.id] = Date() }
+      UserDefaults.standard.set(removedRemote, forKey: Self.removedRemoteKey)
+    }
     for part in parts {
       try? FileManager.default.removeItem(
         at: root.appendingPathComponent("workouts", isDirectory: true).appendingPathComponent(part.id, isDirectory: true))
@@ -181,14 +187,25 @@ final class WorkoutMirror: NSObject, ObservableObject {
     return deletion
   }
 
-  /// Workouts other devices put in the iCloud container (story 070, step 2), as `WorkoutIndex.merge` takes them.
-  func mergeRemote(_ rows: [StoredWorkout], tombstones: Set<String>, me: String) -> SyncMergeResult {
+  /// Workouts other devices put in the iCloud container and the ones deleted there (story 070, steps 2 and 4),
+  /// as `WorkoutIndex.merge` takes them. Merged into a copy: the published index moves only when something did.
+  func mergeRemote(_ rows: [StoredWorkout], tombstones: [String: Date], me: String) -> SyncMergeResult {
     var merged = index
     let result = merged.merge(remote: rows, tombstones: tombstones, me: me)
     guard result.changed else { return result }
     index = merged
     try? index.save(root: root)
     return result
+  }
+
+  private static let removedRemoteKey = "workoutsRemovedRemote"
+  /// Other devices' workouts deleted here, with when, until SyncStore has written their tombstones (step 4).
+  private(set) var removedRemote: [String: Date] =
+    UserDefaults.standard.dictionary(forKey: removedRemoteKey) as? [String: Date] ?? [:]
+
+  func clearRemovedRemote(_ ids: [String]) {
+    for id in ids { removedRemote[id] = nil }
+    UserDefaults.standard.set(removedRemote, forKey: Self.removedRemoteKey)
   }
 
   /// Test hook (#123): the simulator has no watch, so SWING_LIVE_WORKOUT=<minutes> pretends a workout began

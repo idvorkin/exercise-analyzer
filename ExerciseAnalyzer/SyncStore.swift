@@ -4,9 +4,11 @@
 //  of the others' (#209). One folder per set, written only by the device that made or last changed it (its id
 //  is stamped on the row), so no file is ever written from two devices: `sets/<id>/row.json` (the Recents
 //  entry), its `analysis.json` and rep pictures, or `deleted.json` once it is gone; `workouts/<id>.json` per
-//  workout. Step 1 is the mirror out; step 2 reads the other devices' rows into this device's indexes and copies
-//  their files in. The clip itself travels by iCloud Photos (step 3). The device's own Documents stay the source
-//  of truth; the container is a copy, so an iCloud outage costs nothing but freshness.
+//  workout, `workouts/<id>.deleted.json` once it is gone. Step 1 is the mirror out; step 2 reads the other
+//  devices' rows into this device's indexes and copies their files in; step 4 lets a change or a delete made
+//  here to another device's set travel back (the row is re-stamped as this device's, the delete gets a dated
+//  tombstone), the later change winning. The clip itself travels by iCloud Photos (step 3). The device's own
+//  Documents stay the source of truth; the container is a copy, so an iCloud outage costs nothing but freshness.
 
 import Combine
 import CryptoKit
@@ -108,9 +110,13 @@ final class SyncStore {
       let print = Self.fingerprint(data)
       if ledger[id] != print { jobs.append(.workout(id: workout.id, row: data, print: print)) }
     }
+    let now = Date()
     for id in ledger.keys where !seen.contains(id) && ledger[id] != "deleted" {
-      jobs.append(.tombstone(id: id))
+      jobs.append(.tombstone(id: id, at: now))
     }
+    // Other devices' sets and workouts deleted here (step 4): their tombstones, dated when the delete happened.
+    for (id, at) in recents.removedRemote { jobs.append(.tombstone(id: id, at: at)) }
+    for (id, at) in workouts.removedRemote { jobs.append(.tombstone(id: "workout:" + id, at: at)) }
     guard !jobs.isEmpty else { return }
     mirroring = true
     let log = log
@@ -130,6 +136,9 @@ final class SyncStore {
       }
       await MainActor.run {
         for (id, print) in done { self.ledger[id] = print }
+        let doneIDs = Set(done.map(\.0))
+        self.recents.clearRemovedRemote(self.recents.removedRemote.keys.filter { doneIDs.contains($0) })
+        self.workouts.clearRemovedRemote(self.workouts.removedRemote.keys.filter { doneIDs.contains("workout:" + $0) })
         UserDefaults.standard.set(self.ledger, forKey: Self.ledgerKey)
         log("sync_mirrored", ["jobs": jobs.count, "done": done.count, "files": files, "bytes": bytes])
         self.mirroring = false
@@ -216,14 +225,8 @@ final class SyncStore {
     Task.detached(priority: .utility) { [container] in
       let found = Self.scan(container)
       await MainActor.run {
-        // A workout the owner removed is a file gone from the container; only a listing that exists can say so.
-        var workoutTombstones: Set<String> = []
-        if let present = found.workoutIDs {
-          workoutTombstones = Set(
-            self.workouts.index.workouts.filter { !SyncOwnership.isMine($0.device, me: me) && !present.contains($0.id) }.map(\.id))
-        }
         let sets = self.recents.mergeRemote(found.sets, tombstones: found.setTombstones, me: me)
-        let workouts = self.workouts.mergeRemote(found.workouts, tombstones: workoutTombstones, me: me)
+        let workouts = self.workouts.mergeRemote(found.workouts, tombstones: found.workoutTombstones, me: me)
         let theirs = self.recents.entries.filter { !SyncOwnership.isMine($0.device, me: me) }
           .map { (from: container.appendingPathComponent("sets/\($0.id)", isDirectory: true), to: self.recents.folder(for: $0.id)) }
         Task.detached(priority: .utility) {
@@ -251,23 +254,23 @@ final class SyncStore {
 
   private struct Found: Sendable {
     var sets: [RecentEntry] = []
-    var setTombstones: Set<String> = []
+    /// Sets any device deleted, by id, with when (`deleted.json`'s deletedAt).
+    var setTombstones: [String: Date] = [:]
     var workouts: [StoredWorkout] = []
-    /// Every workout id the container holds, downloaded or still a placeholder; nil when the folder is not there.
-    var workoutIDs: Set<String>?
+    var workoutTombstones: [String: Date] = [:]
   }
 
   /// Off the main thread: what the container holds. A file iCloud has not brought down yet is a `.<name>.icloud`
-  /// placeholder, counted as present but unread.
+  /// placeholder, left for the next pass. A set's tombstone is `deleted.json` in its folder, a workout's is
+  /// `workouts/<id>.deleted.json`; both say when.
   private nonisolated static func scan(_ container: URL) -> Found {
     let fm = FileManager.default
     var found = Found()
     let sets = container.appendingPathComponent("sets", isDirectory: true)
     for id in (try? fm.contentsOfDirectory(atPath: sets.path)) ?? [] where !id.hasPrefix(".") {
       let dir = sets.appendingPathComponent(id, isDirectory: true)
-      let names = Set((try? fm.contentsOfDirectory(atPath: dir.path)) ?? [])
-      if names.contains("deleted.json") || names.contains(".deleted.json.icloud") {
-        found.setTombstones.insert(id)
+      if let at = deletedAt(dir.appendingPathComponent("deleted.json")) {
+        found.setTombstones[id] = at
         continue
       }
       guard let data = try? read(dir.appendingPathComponent("row.json")),
@@ -276,23 +279,28 @@ final class SyncStore {
       found.sets.append(row)
     }
     let workouts = container.appendingPathComponent("workouts", isDirectory: true)
-    if let names = try? fm.contentsOfDirectory(atPath: workouts.path) {
-      found.workoutIDs = []
-      for name in names {
-        if name.hasPrefix("."), name.hasSuffix(".icloud") {
-          found.workoutIDs?.insert(String(name.dropFirst().dropLast(".json.icloud".count)))
-          continue
+    for name in (try? fm.contentsOfDirectory(atPath: workouts.path)) ?? [] where name.hasSuffix(".json") {
+      if name.hasSuffix(".deleted.json") {
+        if let at = deletedAt(workouts.appendingPathComponent(name)) {
+          found.workoutTombstones[String(name.dropLast(".deleted.json".count))] = at
         }
-        guard name.hasSuffix(".json") else { continue }
-        let id = String(name.dropLast(".json".count))
-        found.workoutIDs?.insert(id)
-        guard let data = try? read(workouts.appendingPathComponent(name)),
-          let row = try? JSONDecoder().decode(StoredWorkout.self, from: data), row.id == id
-        else { continue }
-        found.workouts.append(row)
+        continue
       }
+      let id = String(name.dropLast(".json".count))
+      guard let data = try? read(workouts.appendingPathComponent(name)),
+        let row = try? JSONDecoder().decode(StoredWorkout.self, from: data), row.id == id
+      else { continue }
+      found.workouts.append(row)
     }
     return found
+  }
+
+  /// When a tombstone says its set or workout was deleted; nil for no tombstone, or one not downloaded yet.
+  private nonisolated static func deletedAt(_ url: URL) -> Date? {
+    guard let data = try? read(url), let stone = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let seconds = stone["deletedAt"] as? Double
+    else { return nil }
+    return Date(timeIntervalSince1970: seconds)
   }
 
   /// Off the main thread: another device's set files into the set's own folder here, those missing or older.
@@ -347,13 +355,13 @@ final class SyncStore {
   private enum Job: Sendable {
     case set(id: String, row: Data, folder: URL, print: String)
     case workout(id: String, row: Data, print: String)
-    case tombstone(id: String)
+    case tombstone(id: String, at: Date)
 
     var ledgerID: String {
       switch self {
       case .set(let id, _, _, _): id
       case .workout(let id, _, _): "workout:" + id
-      case .tombstone(let id): id
+      case .tombstone(let id, _): id
       }
     }
 
@@ -397,17 +405,19 @@ final class SyncStore {
       try fm.createDirectory(at: dir, withIntermediateDirectories: true)
       try write(row, to: dir.appendingPathComponent("\(id).json"))
       return (1, row.count)
-    case .tombstone(let id):
+    case .tombstone(let id, let at):
+      let stone = Data("{\"deletedAt\":\(at.timeIntervalSince1970)}".utf8)
       if id.hasPrefix("workout:") {
-        let url = container.appendingPathComponent("workouts/\(id.dropFirst(8)).json")
-        try remove(url)
-        return (0, 0)
+        let dir = container.appendingPathComponent("workouts", isDirectory: true)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        try write(stone, to: dir.appendingPathComponent("\(id.dropFirst(8)).deleted.json"))
+        try remove(dir.appendingPathComponent("\(id.dropFirst(8)).json"))
+        return (1, stone.count)
       }
       let dir = container.appendingPathComponent("sets/\(id)", isDirectory: true)
       let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
       for name in names { try remove(dir.appendingPathComponent(name)) }
       try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-      let stone = Data("{\"deletedAt\":\(Date().timeIntervalSince1970)}".utf8)
       try write(stone, to: dir.appendingPathComponent("deleted.json"))
       return (1, stone.count)
     }

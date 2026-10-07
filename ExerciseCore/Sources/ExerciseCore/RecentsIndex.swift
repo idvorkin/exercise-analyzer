@@ -62,6 +62,12 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   /// The Photos asset the exporter wrote from the in-app clip while the set was open (story 070, step 3): the
   /// next run points the set at it instead of saving the clip again. Gone once the set points elsewhere.
   public var exportedAsset: String? = nil
+  /// When a device last changed the row (a count kept by hand, a bell weight, a re-analysis): the later change
+  /// wins when two devices changed the same set (story 070, step 4). Nil for a row never changed since it was
+  /// made: `analyzedAt` stands in (`changedAt`).
+  public var modifiedAt: Date? = nil
+
+  public var changedAt: Date { modifiedAt ?? analyzedAt }
 
   public init(
     id: String, analyzedAt: Date, recordedAt: Date?, duration: Double, repCount: Int, bestScore: Int?,
