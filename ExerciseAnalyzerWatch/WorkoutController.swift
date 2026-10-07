@@ -30,7 +30,7 @@ final class WorkoutController: NSObject, ObservableObject {
   /// sets typed by hand (059).
   @Published private(set) var sets = 0
   @Published private(set) var reps = 0
-  /// The sets above by exercise, for the page's "[swing] 3 · [get-up] 10" (#206): a filmed set's exercise is the
+  /// The sets above by exercise, for the page's "[swing] 3 [get-up] 2" (#206): a filmed set's exercise is the
   /// phone's name for it, a typed set's the one picked on the count page.
   @Published private(set) var exerciseSets: [ExerciseKind: Int] = [:]
   /// The exercises above in the order they first appeared, as the phone's Today header orders them (#206).
