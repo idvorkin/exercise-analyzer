@@ -58,7 +58,7 @@ final class RecentsStore: ObservableObject {
   func save(
     id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,
     clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil, models: [String] = [],
-    clipStartedAt: Date? = nil
+    clipStartedAt: Date? = nil, photosCopy: Bool = false
   ) throws {
     // A pass that was under way when its set was deleted must not bring it back (#111, the 2026-09-19 review):
     // the launch refresh and a re-run save by id minutes after they started. Nor may it put a video back over
@@ -82,7 +82,8 @@ final class RecentsStore: ObservableObject {
       entry.duration = duration
       entry.repCount = fresh.repCount
       entry.bestScore = fresh.bestScore
-      entry.source = source
+      entry.setSource(source)
+      if photosCopy { entry.photosCopy = true }
       entry.exercise = pipeline.exercise
       entry.originalName = originalName ?? entry.originalName
       entry.analysisVersion = AnalysisVersion.current
@@ -183,7 +184,7 @@ final class RecentsStore: ObservableObject {
     if case .file(let name) = entry.source {
       try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name))
     }
-    entry.source = .photos(identifier: identifier)
+    entry.setSource(.photos(identifier: identifier))
     entries = entries.map { $0.id == id ? entry : $0 }
     try? persistIndex()
   }

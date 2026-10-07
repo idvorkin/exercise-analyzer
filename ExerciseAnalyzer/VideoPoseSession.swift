@@ -38,6 +38,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
   enum Origin: Sendable {
     case photos(identifier: String)
     case file
+    /// The picker's copy of a Photos video, picked without library access: kept as a file, not exported (070).
+    case photosCopy
     case recording
   }
 
@@ -186,16 +188,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
     activity = .idle
     liveInferenceEnabled = true
     let operation = clipOperations.begin(entryID: entryID, origin: origin)
-    exportClips(reason: "set_left", excluding: entryID)  // the set left behind goes to Photos (070, step 3)
+    exporter?.run(reason: "set_left")  // the set left behind goes to Photos (070, step 3)
     return operation
   }
 
-  /// Saves to Photos the clips of sets not on screen (story 070, step 3): never during the launch refresh, which
-  /// reads sets from their files, and never the set that is open, whose trim may still be undone.
-  private func exportClips(reason: String, excluding current: String? = nil) {
-    guard !refreshing, source != .camera else { return }  // not under the camera's live pass; the next trigger will
-
-    exporter?.run(reason: reason, excluding: current ?? currentEntryID)
+  /// Asked by the exporter before each clip (story 070, step 3): the run ends under the camera's live pass and
+  /// the launch refresh, which reads sets from their files, and leaves the set that is open or opening, whose
+  /// trim may still be undone.
+  private func exportVerdict(id: String) -> PhotosExporter.Verdict {
+    if refreshing || source == .camera { return .stop }
+    return id == (clipOperations.current?.entryID ?? currentEntryID) ? .skip : .save
   }
 
   /// The one-time ask's numbers: the sets whose clip lives only here, and their size.
@@ -205,7 +207,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     log.event("ui", ["action": "photos_export_prompt", "choice": save ? "save" : "not_now", "count": photosBacklog.count])
     if save {
       exporter?.approve()
-      exportClips(reason: "approved")
+      exporter?.run(reason: "approved")
     } else {
       exporter?.deferAsking()
     }
@@ -327,7 +329,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
     WorkoutLiveActivity.shared.install(mirror: .shared, recents: recents)
     // Every set and workout mirrored into the iCloud container for the iPad (story 070, step 1).
     sync = SyncStore(recents: recents, workouts: .shared) { [weak self] type, fields in self?.log.event(type, fields) }
-    exporter = PhotosExporter(recents: recents) { [weak self] type, fields in self?.log.event(type, fields) }
+    exporter = PhotosExporter(recents: recents) { [weak self] id in
+      self?.exportVerdict(id: id) ?? .stop
+    } log: { [weak self] type, fields in
+      self?.log.event(type, fields)
+    }
     CrashReports.shared.onEvent = { [weak self] type, fields in self?.log.event(type, fields) }
     CrashReports.shared.reportSignalLogs { [weak self] type, fields in self?.log.event(type, fields) }
     watch.onCommand = { [weak self] command in self?.handleWatch(command) }
@@ -415,7 +421,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
           self?.pushWatchStatus(force: true)
           WorkoutMirror.shared.requestAuthorizationIfNeeded()  // a workout that arrived in the background (048)
           if name == UIApplication.didBecomeActiveNotification { self?.watch.recoverInbox() }  // #197
-          if name == UIApplication.willResignActiveNotification { self?.exportClips(reason: "background") }  // 070
+          if name == UIApplication.willResignActiveNotification { self?.exporter?.run(reason: "background") }  // 070
         }
       }
     }
@@ -438,7 +444,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         photosExportPrompt = true
         log.event("photos_export_prompt", ["count": exporter.backlog(excluding: currentEntryID).count])
       }
-      exportClips(reason: "launch")
+      exporter?.run(reason: "launch")
       // Test hook: SWING_DEBUG_RUN=1 starts an instrumented run once the gallery has caught up (simulator runs
       // can't tap the UI).
       if ProcessInfo.processInfo.environment["SWING_DEBUG_RUN"] == "1" { await startInstrumentedRun() }
@@ -848,7 +854,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
       return
     }
     log.event("import", ["path": "picker_copy", "seconds": CACurrentMediaTime() - started])
-    let copied = beginOperation(entryID: operation.entryID, origin: .file)
+    let copied = beginOperation(entryID: operation.entryID, origin: .photosCopy)
     load(url: movie.url, recordedAt: Self.fileDate(movie.url), operation: copied)
   }
 
@@ -1036,9 +1042,14 @@ final class VideoPoseSession: NSObject, ObservableObject {
     }
     let id = operation.entryID
     let source: RecentEntry.Source
+    var photosCopy = false
     switch operation.origin {
     case .photos(let identifier) where trimmedURL == nil:
       source = .photos(identifier: identifier)
+    case .photos, .photosCopy:
+      // A trimmed Photos clip not (yet) replacing its original, or the picker's copy: the video is in Photos.
+      source = .file(name: "clip." + clipURL.pathExtension)
+      photosCopy = true
     default:
       source = .file(name: "clip." + clipURL.pathExtension)
     }
@@ -1047,7 +1058,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
         id: id, source: source, recordedAt: currentRecordedAt ?? Date(), duration: duration,
         pipeline: pipeline, clipURL: clipURL, thumbnail: setThumbnail(pipeline, id: id),
         originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil, models: models.names,
-        clipStartedAt: currentClipStartedAt)
+        clipStartedAt: currentClipStartedAt, photosCopy: photosCopy)
       currentEntryID = id
       loadHeartRate()  // the set has a folder now, so a series read before the save can be kept
       log.event("recents_saved", ["id": id, "reps": pipeline.reps.count, "in_photos": source.isPhotos])

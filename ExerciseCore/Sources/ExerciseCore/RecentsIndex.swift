@@ -54,6 +54,11 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   /// account, for a clip in Photos (story 070, step 3); `source`'s identifier is local to the device that set
   /// it. Filled by the owner when it mirrors the set; another device maps it to its own identifier on open.
   public var cloudIdentifier: String? = nil
+  /// The in-app clip is a copy of a video already in Photos (a trim whose replace was declined, the picker's copy
+  /// without library access), so it does not go to Photos by itself (story 070, step 3). Nil when not a copy.
+  /// ponytail: sets from before step 3 carry no mark and are exported, copies included. Upgrade: mark them by
+  /// matching `originalName` and duration against the Photos library.
+  public var photosCopy: Bool? = nil
 
   public init(
     id: String, analyzedAt: Date, recordedAt: Date?, duration: Double, repCount: Int, bestScore: Int?,
@@ -109,6 +114,19 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   public var isInPhotos: Bool {
     if case .photos = source { return true }
     return false
+  }
+
+  /// Points the set at another clip. A cloud identifier named the old asset, so it goes; the next mirror names
+  /// the new one (story 070, step 3).
+  public mutating func setSource(_ new: Source) {
+    if new != source { cloudIdentifier = nil }
+    source = new
+  }
+
+  /// The clip lives only in the app: an in-app file that is not a copy of a Photos video (story 070, step 3).
+  public var clipOnlyInApp: Bool {
+    guard case .file = source else { return false }
+    return photosCopy != true
   }
 }
 
