@@ -47,6 +47,8 @@ struct BugReportSheet: View {
   @State private var note = ""
   @FocusState private var noteFocused: Bool
 
+  private var noteEmpty: Bool { note.trimmingCharacters(in: .whitespaces).isEmpty }
+
   var body: some View {
     NavigationStack {
       Form {
@@ -65,12 +67,20 @@ struct BugReportSheet: View {
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-        ToolbarItem(placement: .confirmationAction) {
+        ToolbarItemGroup(placement: .confirmationAction) {
+          // #212: the next bug without another shake. The report is saved as Log it saves it, with the shake's
+          // screenshot and frame (BugReporter keeps them until the next shake), and the sheet empties for the next.
+          Button("Log it and another") {
+            session.reportBug(note: note)
+            note = ""
+            noteFocused = true
+          }
+          .disabled(noteEmpty)
           Button("Log it") {
             session.reportBug(note: note)
             dismiss()
           }
-          .disabled(note.trimmingCharacters(in: .whitespaces).isEmpty)
+          .disabled(noteEmpty)
         }
       }
       .onAppear { noteFocused = true }
@@ -121,7 +131,9 @@ final class BugReporter {
     return f
   }()
 
-  /// Writes the captured screenshot and frame under Documents/bugs/<stamp>/ and returns their relative paths.
+  /// Writes the captured screenshot and frame under Documents/bugs/<stamp>/ and returns their relative paths. The
+  /// images stay until the next `capture`: a report that follows from the same sheet ("Log it and another", #212)
+  /// is about the same moment and carries them too.
   private func saveImages(stamp: String) -> [String: String] {
     var saved: [String: String] = [:]
     let folder = documents.appendingPathComponent("bugs", isDirectory: true).appendingPathComponent(stamp, isDirectory: true)
@@ -139,8 +151,6 @@ final class BugReporter {
         log.event("error", ["where": "bug_images", "message": "\(error)"])
       }
     }
-    screenshot = nil
-    frame = nil
     return saved
   }
 

@@ -165,7 +165,8 @@ read from the environment (pass them through `simctl` as `SIMCTL_CHILD_<name>`):
 | `SWING_INTERRUPT_READER=<frame>` | fail the first pass at that frame with `readerFailed("Operation Interrupted")`, like a backgrounded decoder (#57) |
 | `SWING_MODE=<exercise\|auto>` | switch exercise 2 s after an interrupted pass, proving a mode switch re-runs the clip (#57); launch-only, persists no default, and every smoke check resets the mode default first |
 | `SWING_OPEN_RECENT=1` | reopen the newest Recents entry |
-| `SWING_BUG=text` | file a bug report on launch |
+| `SWING_BUG=text` | file a bug report 8 s after launch; `first\|second` files two from the one capture, as "Log it and another" does (#212), and the `bug_again` smoke check reads both lines of bugs.jsonl for the screenshot and frame |
+| `SWING_SHOW_BUG_SHEET=1` | open the report sheet 8 s after launch, for a screenshot of its buttons (#212) |
 | `SWING_SHOW_GALLERY=1` | open the rep gallery sheet on launch (gallery screenshots, #61) |
 | `SWING_LANDSCAPE=1` | turn the screen to landscape on launch (the iPad split, #53; there is no Simulator.app to rotate it). iPadOS's windowed mode refuses it (`ui landscape_failed`): build with `INFOPLIST_KEY_UIRequiresFullScreen=YES` on the `xcodebuild` line for the check, never in the project. The screenshot comes out sideways |
 | `SWING_SHOW_SEEK_CONTROLS=1` | raise the frame-step stacks 4 s after launch, as a middle hold would, for a screenshot (030) |

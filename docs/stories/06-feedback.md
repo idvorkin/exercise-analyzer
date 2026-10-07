@@ -22,7 +22,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I shake the phone, type "rep 3 isn't a rep" and send
 - **Then:** the report is stored with the clip name, the playhead time and the session log's name, and shows up as a GitHub issue after the developer pulls logs
 
-- **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41) a shake from the Workouts sheet replaced that sheet with the report; the report now opens over it
+- **Scenario:** Several problems from one shake
+- **Given:** the report sheet is up and I have typed the first problem
+- **When:** I tap "Log it and another", next to "Log it"
+- **Then:** the report is saved as "Log it" saves it, with the shake's screenshot and frame, and the sheet is empty again for the next problem, which I type and send without shaking again (#212)
+
+- **Issues:** [#41](https://github.com/idvorkin/exercise-analyzer/issues/41) a shake from the Workouts sheet replaced that sheet with the report; the report now opens over it; [#212](https://github.com/idvorkin/exercise-analyzer/issues/212) "Log it and another"
 
 ---
 
