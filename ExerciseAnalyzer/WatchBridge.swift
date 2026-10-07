@@ -215,13 +215,23 @@ extension WatchBridge: WCSessionDelegate {
       Task { @MainActor in self.onHandSet?(set) }
       return
     }
+    // A set that arrived and could not be read would be lost without a word (#197).
+    if let payload = userInfo[HandSet.userInfoKey] {
+      let message = "set_by_hand user info undecodable: \(type(of: payload)), \((payload as? Data)?.count ?? -1) bytes"
+      Task { @MainActor in self.onEvent?("error", ["where": "hand_set", "message": message]) }
+      return
+    }
     // The wrist's Retry, queued (#189): it gets here when a message could not. Not through `handle`, which
     // takes a command as proof the watch app is in front, and this one may be minutes old.
     if userInfo["retry"] != nil {
       Task { @MainActor in self.onRetry?() }
       return
     }
-    guard let type = userInfo["watch_log"] as? String else { return }
+    guard let type = userInfo["watch_log"] as? String else {
+      let keys = userInfo.keys.sorted().joined(separator: ",")
+      Task { @MainActor in self.onEvent?("watch_user_info_unknown", ["keys": keys]) }
+      return
+    }
     var fields = userInfo
     fields.removeValue(forKey: "watch_log")
     Task { @MainActor in self.onEvent?("watch_" + type, fields) }

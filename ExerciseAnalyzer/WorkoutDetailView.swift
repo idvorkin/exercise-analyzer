@@ -184,7 +184,9 @@ private struct WorkoutPageView: View {
           }
         }
         .setDeletionDialog($deleting) { onDelete?($0) }
-        .setByHandSheet($editing) { onKeepByHand?($0, $1, $2) }
+        .setByHandSheet(
+          $editing, onSave: { onKeepByHand?($0, $1, $2) },
+          onDelete: onDelete)
         .sheet(item: $weighing) { entry in
           let row = timeline.rows.first { $0.id == entry.id }
           BellWeightSheet(kg: row?.kg, inherited: row?.kgInherited ?? false) { onSetBellKg?(entry, $0) }
@@ -235,10 +237,15 @@ private struct WorkoutPageView: View {
 
   @ViewBuilder private func setRow(number: Int, row: WorkoutTimeline.SetRow) -> some View {
     if row.byHand {
-      // Typed on the wrist (059): no video to open; a long press changes it (#156) or removes it, asking
-      // first (056).
-      SetTimelineRow(number: number, row: row, thumbnail: nil)
-        .contextMenu {
+      // Typed on the wrist (059): no video to open, so a tap opens "Set exercise and reps" (#203; Igor: "how do I
+      // edit what I did and count"); a long press offers the same (#156) or removes it, asking first (056).
+      Button {
+        if onKeepByHand != nil, let entry = sets.first(where: { $0.id == row.id }) { editing = entry }
+      } label: {
+        SetTimelineRow(number: number, row: row, thumbnail: nil)
+      }
+      .buttonStyle(.plain)
+      .contextMenu {
           if let entry = sets.first(where: { $0.id == row.id }) {
             if onKeepByHand != nil { Button("Set exercise and reps…") { editing = entry } }
             if onSetBellKg != nil { Button("Set the bell's weight…") { weighing = entry } }
@@ -582,7 +589,8 @@ private struct SetTimelineRow: View {
           Text("rest \(WorkoutPageView.minutes(rest))").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
         }
       }
-      if !row.byHand { Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.tertiary) }
+      // A chevron says a filmed set opens; a pencil says a typed one edits (#203).
+      Image(systemName: row.byHand ? "pencil" : "chevron.right").font(.caption.bold()).foregroundStyle(.tertiary)
     }
     .padding(.horizontal, 12)
     .frame(minHeight: 60)

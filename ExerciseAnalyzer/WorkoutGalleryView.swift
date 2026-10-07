@@ -497,10 +497,18 @@ struct DayHeader: View {
       // A folded day says what was done (#129; Igor: "show an icon like 8x8 swings, 3xTGUs"): sets ×
       // reps per exercise with its drawing, "8×8 [swing] · 5×2 [get-up]", a range when the sets differ. A
       // workout day reads the same (#185; Igor: "look like days … with little icons").
+      // While the workout runs the day counts sets only, drawing first: "[swing] 3 · [get-up] 10" (#192;
+      // Igor: "instead of 3x10, I want icon 3; icon 10").
+      let running = day.live != nil
       let items = ForEach(day.exercises) { exercise in
         HStack(spacing: 3) {
-          Text(exercise.setsByReps).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
-          ExerciseGlyph(kind: exercise.kind, size: 18)
+          if running {
+            ExerciseGlyph(kind: exercise.kind, size: 18)
+            Text("\(exercise.sets.count)").font(.subheadline.bold()).monospacedDigit()
+          } else {
+            Text(exercise.setsByReps).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+            ExerciseGlyph(kind: exercise.kind, size: 18)
+          }
         }
         .fixedSize()
       }
@@ -645,14 +653,22 @@ struct SetByHandSheet: View {
   /// "Add a set at 10:42 AM" when the set is new, from a tap on the workout's chart (#178).
   var title = "Set exercise and reps"
   let onSave: (ExerciseKind, Int) -> Void
+  /// Removes a typed set from the sheet itself (#204; Igor: "the set exercise and rep scheme probably needs a
+  /// delete button"), after the usual "Delete?" (056). Nil hides the button; a filmed set keeps its long press.
+  var onDelete: (() -> Void)? = nil
   @State private var exercise: ExerciseKind
   @State private var reps: Int
+  @State private var deleting: RecentEntry?
   @Environment(\.dismiss) private var dismiss
 
-  init(entry: RecentEntry, title: String = "Set exercise and reps", onSave: @escaping (ExerciseKind, Int) -> Void) {
+  init(
+    entry: RecentEntry, title: String = "Set exercise and reps", onSave: @escaping (ExerciseKind, Int) -> Void,
+    onDelete: (() -> Void)? = nil
+  ) {
     self.entry = entry
     self.title = title
     self.onSave = onSave
+    self.onDelete = onDelete
     _exercise = State(initialValue: entry.exerciseKind)
     _reps = State(initialValue: HandSet.clamp(entry.repCount == 0 ? HandSet.defaultReps : entry.repCount))
   }
@@ -703,12 +719,24 @@ struct SetByHandSheet: View {
           }
           .buttonStyle(.borderedProminent)
           .tint(.green)
+          if entry.isByHand, onDelete != nil {
+            Button(role: .destructive) {
+              deleting = entry
+            } label: {
+              Text("Remove from Workouts…").font(.headline).frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+          }
         }
         .padding()
       }
       .navigationTitle(title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+      .setDeletionDialog($deleting) { _ in
+        onDelete?()
+        dismiss()
+      }
     }
   }
 
@@ -725,11 +753,12 @@ struct SetByHandSheet: View {
 
 extension View {
   /// The by-hand sheet for a set, from a card's or a row's long-press (#156, #157).
-  func setByHandSheet(_ entry: Binding<RecentEntry?>, onSave: @escaping (RecentEntry, ExerciseKind, Int) -> Void)
-    -> some View
-  {
+  func setByHandSheet(
+    _ entry: Binding<RecentEntry?>, onSave: @escaping (RecentEntry, ExerciseKind, Int) -> Void,
+    onDelete: ((RecentEntry) -> Void)? = nil
+  ) -> some View {
     sheet(item: entry) { set in
-      SetByHandSheet(entry: set) { onSave(set, $0, $1) }
+      SetByHandSheet(entry: set, onSave: { onSave(set, $0, $1) }, onDelete: onDelete.map { delete in { delete(set) } })
     }
   }
 

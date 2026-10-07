@@ -36,15 +36,28 @@ public struct HandSet: Codable, Equatable, Sendable {
   /// picker's choice (`mode`, "auto" or a raw value), or in Auto the phone's last set's exercise (swing when it
   /// has none); the last set's count, 10 with none.
   public static func start(mode: String, analyzed: LastSet?, byHand: HandSet?) -> (exercise: ExerciseKind, reps: Int) {
-    if let byHand { return (byHand.exercise, clamp(byHand.reps)) }
-    let last: (exercise: ExerciseKind?, reps: Int)?
-    if let analyzed {
-      last = (ExerciseKind.allCases.first { $0.definition.name == analyzed.exercise }, analyzed.reps)
+    let exercise: ExerciseKind
+    let lastReps: Int?
+    if let byHand {
+      (exercise, lastReps) = (byHand.exercise, byHand.reps)
     } else {
-      last = nil
+      let last = analyzed.map { set in
+        (exercise: ExerciseKind.allCases.first { $0.definition.name == set.exercise }, reps: set.reps)
+      }
+      exercise = ExerciseKind(rawValue: mode) ?? last?.exercise ?? .kettlebellSwing
+      lastReps = last?.reps
     }
-    let exercise = ExerciseKind(rawValue: mode) ?? last?.exercise ?? .kettlebellSwing
-    return (exercise, clamp(last?.reps ?? defaultReps))
+    return (exercise, clamp(usualReps(for: exercise) ?? lastReps ?? defaultReps))
+  }
+
+  /// The count the page opens on for exercises Igor always does the same way (#196: "tgu 5, swing 10, Bulgarian
+  /// and split squats 10 … everything else whatever last"); nil for the rest, which start at the last count.
+  public static func usualReps(for exercise: ExerciseKind) -> Int? {
+    switch exercise {
+    case .turkishGetUp: 5
+    case .kettlebellSwing, .bulgarianSplitSquat, .splitSquat: 10
+    default: nil
+    }
   }
 
   // MARK: - The wire: WCSession user info

@@ -607,7 +607,7 @@ the first frame (story 001).
 ### User Story 059:
 
 - **Summary:** Add a set I forgot to record to the workout, with its count typed on the wrist
-- **Status:** implemented in [0c07704](https://github.com/idvorkin/exercise-analyzer/commit/0c07704), [7a86049](https://github.com/idvorkin/exercise-analyzer/commit/7a86049) (#154, the exercise on the count page); verified on the host (`HandSetTests`), by build (the signed phone and watch apps) and on the watch simulator (`just watch-screens`: setByHand, setByHandExercise); on the phone and the watch since 2026-09-28, Igor's check pending; the page reopens on the last set typed by hand (#183) in [fdc4d11](https://github.com/idvorkin/exercise-analyzer/commit/fdc4d11), verified on the host (`HandSetTests`) and by the watch build, not yet on the watch
+- **Status:** implemented in [0c07704](https://github.com/idvorkin/exercise-analyzer/commit/0c07704), [7a86049](https://github.com/idvorkin/exercise-analyzer/commit/7a86049) (#154, the exercise on the count page); verified on the host (`HandSetTests`), by build (the signed phone and watch apps) and on the watch simulator (`just watch-screens`: setByHand, setByHandExercise); on the phone and the watch since 2026-09-28, Igor's check pending; the page reopens on the last set typed by hand (#183) in [fdc4d11](https://github.com/idvorkin/exercise-analyzer/commit/fdc4d11), verified on the host (`HandSetTests`) and by the watch build, not yet on the watch; a tap on a typed set opens the sheet (#203) in [29b4899](https://github.com/idvorkin/exercise-analyzer/commit/29b4899) and Remove from Workouts on its sheet (#204) in [b1422e2](https://github.com/idvorkin/exercise-analyzer/commit/b1422e2), by build; the count page opens on the exercise's usual count (#196) in [b65936b](https://github.com/idvorkin/exercise-analyzer/commit/b65936b), verified on the host (`HandSetTests`) and by build; the lost-set log events (#197) in [0b07c08](https://github.com/idvorkin/exercise-analyzer/commit/0b07c08), by build; none seen on a screen
 - **Why:** Igor, 2026-09-25, from the phone: "Let's add a watch button. Rep happened if I forgot to record." Decided 2026-09-26: a watch button adds one unrecorded set to the running workout, its count typed on the wrist, no video, no score, marked "by hand" in Workouts.
 
 #### Use Case:
@@ -620,7 +620,7 @@ the first frame (story 001).
 - **Given:** a workout is running on the wrist (048), the camera is not live, and I just did 8 swings without recording them
 - **When:** I turn the Crown past Preview and tap "+ Set by hand", a full-width button under Preview and above
   the pickers (Record and Preview stay where they are; Igor's pick, 2026-09-26)
-- **Then:** a count page opens with the exercise on top (the last set I typed on the wrist; with none typed, the exercise picker's choice, or the last set's exercise when the picker is on Auto, Kettlebell Swing with no set yet), one large number in the middle starting at that set's count (10 when there is none), a − and a + either side of it, and Save (green) and Cancel under it
+- **Then:** a count page opens with the exercise on top (the last set I typed on the wrist; with none typed, the exercise picker's choice, or the last set's exercise when the picker is on Auto, Kettlebell Swing with no set yet), one large number in the middle starting at the exercise's usual count when it has one (get-ups 5; swings, Bulgarian and split squats 10; #196, Igor: "tgu 5 swing 10, Bulgarian and split squats 10, everything else whatever last"), else that set's count (10 when there is none), a − and a + either side of it, and Save (green) and Cancel under it; picking an exercise with a usual count in the list sets the number to it
 
 - **Scenario:** Typed sets between filmed ones (#183)
 - **Given:** I typed 9 pull-ups by hand, then filmed a set of split squats, or the watch app relaunched since
@@ -651,7 +651,7 @@ the first frame (story 001).
 - **Scenario:** The set on the phone's workout page
 - **Given:** the set was saved on the wrist and the phone app is open on the running workout's page (053)
 - **When:** I read the page
-- **Then:** the set's row sits at the time of the save with "8 [swing]" and a "by hand" tag in place of the picture and the score capsule, and a thin mark at that time on the heart-rate chart; the heart numbers come from Health as for any set; tapping its row opens nothing (there is no video), a tap on its mark opens "Set exercise and reps" (#178, story 053), a long press offers "Set exercise and reps…" (062) and "Remove from Workouts…" (056); the green strip and the day header count it among the sets and reps
+- **Then:** the set's row sits at the time of the save with "8 [swing]" and a "by hand" tag in place of the picture and the score capsule, and a thin mark at that time on the heart-rate chart; the heart numbers come from Health as for any set; the row ends in a pencil, not a chevron, and a tap on it opens "Set exercise and reps" (there is no video; #203, Igor: "how do I edit what I did and count on the screen when there's manual workouts"), as does a tap on its mark (#178, story 053) and its long press (062), which also offers "Remove from Workouts…" (056); the sheet of a typed set has "Remove from Workouts…" under Save, which asks "Delete?" as the long press does and then closes the sheet (#204, Igor: "the set exercise and rep scheme probably needs a delete button"); the green strip and the day header count it among the sets and reps (the header only the sets while the workout runs, #192, story 012)
 
 - **Scenario:** The set in the day list
 - **Given:** the same set
@@ -683,7 +683,8 @@ the first frame (story 001).
   Save, `set_by_hand` (with `duplicate`) on the phone ([DEBUGGING.md](../DEBUGGING.md)).
 
 - **Issues:** [#136](https://github.com/idvorkin/exercise-analyzer/issues/136),
-  [#154](https://github.com/idvorkin/exercise-analyzer/issues/154) (choose the exercise on the count page)
+  [#154](https://github.com/idvorkin/exercise-analyzer/issues/154) (choose the exercise on the count page),
+  [#196](https://github.com/idvorkin/exercise-analyzer/issues/196) (the usual counts), [#203](https://github.com/idvorkin/exercise-analyzer/issues/203) (tap to edit on the phone), [#204](https://github.com/idvorkin/exercise-analyzer/issues/204) (Remove on the sheet), [#197](https://github.com/idvorkin/exercise-analyzer/issues/197) (two typed sets never reached the phone, 2026-10-05: `watch_set_by_hand` carries the queue's length, `watch_set_by_hand_sent` the transfer's end, and the phone logs a set it cannot read; cause open)
 
 ---
 

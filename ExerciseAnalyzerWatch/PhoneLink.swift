@@ -352,10 +352,16 @@ final class PhoneLink: NSObject, ObservableObject {
     lastTyped = set
     workout.setAnalyzed(reps: set.reps)
     rest.setEnded()
-    logEvent("set_by_hand", ["id": set.id, "exercise": exercise.rawValue, "reps": set.reps, "reachable": reachable])
+    // Two sets once left the wrist and never reached the phone (#197): the queue's length at the save and the
+    // transfer's end (`set_by_hand_sent`) say whether the set left at all.
+    let session = WCSession.default
+    logEvent(
+      "set_by_hand",
+      ["id": set.id, "exercise": exercise.rawValue, "reps": set.reps, "reachable": reachable,
+       "outstanding": session.outstandingUserInfoTransfers.count, "activation": session.activationState.rawValue])
     WKInterfaceDevice.current().play(.success)
-    guard WCSession.default.activationState == .activated else { return }
-    WCSession.default.transferUserInfo(set.userInfo)
+    guard session.activationState == .activated else { return }
+    session.transferUserInfo(set.userInfo)
   }
 
   private func apply(_ message: [String: Any], via channel: String) {
@@ -504,5 +510,16 @@ extension PhoneLink: WCSessionDelegate {
 
   nonisolated func session(_ session: WCSession, didReceiveApplicationContext context: [String: Any]) {
     Task { @MainActor in self.apply(context, via: "context") }
+  }
+
+  /// A queued set's transfer ended (#197): only sets are logged, so a log line's own transfer never logs again.
+  nonisolated func session(_ session: WCSession, didFinish transfer: WCSessionUserInfoTransfer, error: Error?) {
+    guard let set = HandSet(userInfo: transfer.userInfo) else { return }
+    let outstanding = session.outstandingUserInfoTransfers.count
+    Task { @MainActor in
+      self.logEvent(
+        "set_by_hand_sent",
+        ["id": set.id, "error": error.map { "\($0)" } ?? "", "outstanding": outstanding, "reachable": self.reachable])
+    }
   }
 }
