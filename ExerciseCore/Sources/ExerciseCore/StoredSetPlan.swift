@@ -36,6 +36,9 @@ public enum StoredSetPlan {
   public static let autoRedetectThreshold = 70
   /// Files from before the model set was recorded were analyzed by the pose model alone.
   public static let legacyPoseModels = ["yolo26n-pose"]
+  /// A recording kept from its live track before its offline pass landed (#200). No build runs a model by this
+  /// name, so opening the set or the launch refresh sends it back to its video, the pass it was waiting for.
+  public static let liveTrackModels = ["live-track"]
 
   /// What to do with a stored set: a set that lacks a model this build runs goes back to its video; a set the
   /// analyzer moved past replays its stored poses as its own exercise (a stale set wins over a re-detect, so a

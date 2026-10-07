@@ -223,6 +223,15 @@ final class WorkoutTests: XCTestCase {
     XCTAssertEqual(workout.duration, 58 * 60)
   }
 
+  /// #201: a row whose end is before its start (a skewed clock, a damaged file) covers nothing, and asking does not
+  /// trap the way building `start...end` does.
+  func testAnInvertedWorkoutCoversNothing() {
+    let workout = StoredWorkout(start: date(16, 10), end: date(16, 9, 2))
+    XCTAssertFalse(workout.contains(date(16, 9, 18)))
+    XCTAssertFalse(workout.contains(date(16, 10)))
+    XCTAssertFalse(workout.contains(date(16, 9, 2)))
+  }
+
   func testWireDecodesWithoutTheOptionalHeartRate() throws {
     let data = Data(#"{"startedAt":1789000000,"sets":0,"reps":0,"ending":false,"discarded":false}"#.utf8)
     let wire = try JSONDecoder().decode(WorkoutWire.self, from: data)

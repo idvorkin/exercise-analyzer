@@ -93,6 +93,16 @@ final class RecentsSaveTests: XCTestCase {
     XCTAssertEqual(try fm.contentsOfDirectory(atPath: root.path).sorted(), ["index.json", "old"])
   }
 
+  /// Undo trim on an in-app set (#199): the trim's save writes the trimmed clip over the set's own clip.mov, so the
+  /// original stashed beside it before the trim is what Undo restores; the save must carry it across untouched.
+  func testATrimResaveReplacesTheClipAndKeepsTheStashedOriginal() throws {
+    _ = try save(seed())
+    let dir = root.appendingPathComponent("old")
+    XCTAssertEqual(try Data(contentsOf: dir.appendingPathComponent("clip.mov")), Data("new".utf8))
+    XCTAssertEqual(try Data(contentsOf: dir.appendingPathComponent("original.mov")), Data("original.mov".utf8))
+    XCTAssertEqual(RecentsIndex.load(root: root).entries.first?.originalBackup, "original.mov")
+  }
+
   func testPhotosDuplicateIsRetiredOnlyAfterCommitAndKeepsBackup() throws {
     let index = try seed(photos: true)
     XCTAssertThrowsError(try save(index, id: "new", fail: .installed))

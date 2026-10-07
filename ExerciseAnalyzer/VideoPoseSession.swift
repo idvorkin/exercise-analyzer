@@ -723,6 +723,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     guard isCurrent(operation) else { return }
     let origin = operation.origin
     stopCamera()
+    dropUndoStash()
     untrimmed = nil
     canUndoTrim = false
     guard models.predictor != nil else {
@@ -946,14 +947,48 @@ final class VideoPoseSession: NSObject, ObservableObject {
     return Dictionary(grouping: weights) { $0 }.max { $0.value.count < $1.value.count }?.key
   }
 
-  /// Writes the current clip and analysis into Recents (new entry, or updates the open one after a trim).
-  private func rememberCurrent(clipURL: URL, operation: Operation) {
-    guard isCurrent(operation) else { return }
+  /// The card cut from the whole frame (#110). A stored set opened and saved again (a trim) has no new cut:
+  /// its stored picture stays, and only a set with neither falls back to a rep's still.
+  private func setThumbnail(_ pipeline: AnalysisPipeline, id: String) -> UIImage? {
+    let firstRep = pipeline.reps.first
+    return pipeline.cardImage.map { UIImage(cgImage: $0) }
+      ?? recents.entry(id: id).flatMap { recents.thumbnailImage(for: $0) }
+      ?? (pipeline.exercise.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
+        ?? firstRep?.checkpoints.first?.image).map { UIImage(cgImage: $0) }
+  }
+
+  /// A finished recording goes into Recents as soon as its clip is whole, with its live count (#200), whatever the
+  /// session is doing by then: a watch Start for the next set, a Recents tap or a Cancel supersedes the
+  /// recording's operation, and every later step of its trim and pass returns without saving. Stored under
+  /// `StoredSetPlan.liveTrackModels`, so if the pass never lands, opening the set or the launch refresh sends it
+  /// back to its video; when the pass lands it updates this same entry.
+  private func keepRecording(
+    id: String, clipURL: URL, live: AnalysisPipeline, recordedAt: Date, duration: Double, clipStartedAt: Date?,
+    onScreen: Bool
+  ) {
+    do {
+      try recents.save(
+        id: id, source: .file(name: "clip." + clipURL.pathExtension), recordedAt: recordedAt, duration: duration,
+        pipeline: live, clipURL: clipURL, thumbnail: setThumbnail(live, id: id),
+        originalName: clipURL.lastPathComponent, models: StoredSetPlan.liveTrackModels, clipStartedAt: clipStartedAt)
+      log.event(
+        "recording_kept",
+        ["id": id, "live_reps": live.reps.count, "clip": clipURL.lastPathComponent, "on_screen": onScreen])
+    } catch {
+      log.event("error", ["where": "recording_kept", "id": id, "message": "\(error)"])
+    }
+  }
+
+  /// Writes the current clip and analysis into Recents (new entry, or updates the open one after a trim). True when
+  /// the save landed.
+  @discardableResult
+  private func rememberCurrent(clipURL: URL, operation: Operation) -> Bool {
+    guard isCurrent(operation) else { return false }
     // The clip was deleted while its pass ran (#111): with no entry id left, saving would store it again as a
     // new set.
     guard !clipDeleted else {
       log.event("remember_skipped", ["reason": "clip deleted"])
-      return
+      return false
     }
     let id = operation.entryID
     let source: RecentEntry.Source
@@ -963,25 +998,19 @@ final class VideoPoseSession: NSObject, ObservableObject {
     default:
       source = .file(name: "clip." + clipURL.pathExtension)
     }
-    // The card cut from the whole frame (#110). A stored set opened and saved again (a trim) has no new cut:
-    // its stored picture stays, and only a set with neither falls back to a rep's still.
-    let firstRep = pipeline.reps.first
-    let thumbnail =
-      pipeline.cardImage.map { UIImage(cgImage: $0) }
-      ?? recents.entry(id: id).flatMap { recents.thumbnailImage(for: $0) }
-      ?? (pipeline.exercise.definition.galleryOrder.lazy.compactMap { firstRep?.positions[$0.id]?.image }.first
-        ?? firstRep?.checkpoints.first?.image).map { UIImage(cgImage: $0) }
     do {
       try recents.save(
         id: id, source: source, recordedAt: currentRecordedAt ?? Date(), duration: duration,
-        pipeline: pipeline, clipURL: clipURL, thumbnail: thumbnail,
+        pipeline: pipeline, clipURL: clipURL, thumbnail: setThumbnail(pipeline, id: id),
         originalName: trimmedURL == nil ? currentFileURL?.lastPathComponent : nil, models: models.names,
         clipStartedAt: currentClipStartedAt)
       currentEntryID = id
       loadHeartRate()  // the set has a folder now, so a series read before the save can be kept
       log.event("recents_saved", ["id": id, "reps": pipeline.reps.count, "in_photos": source.isPhotos])
+      return true
     } catch {
       log.event("error", ["where": "recents", "message": "\(error)"])
+      return false
     }
   }
 
@@ -1380,6 +1409,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     clipDeleted = false
     if !keepUndo {
       // Any other clip coming in ends the trim's undo (#27); a stashed original stays with its set in Workouts.
+      dropUndoStash()
       untrimmed = nil
       canUndoTrim = false
       replacedOriginalID = nil
@@ -2390,26 +2420,27 @@ final class VideoPoseSession: NSObject, ObservableObject {
         "live_fps": fps, "live_bells_dropped": liveBellsDropped,
         "paused_s": pausedTime, "segments": closing.count + 1,
       ])
+    // Until the set is in Recents (keepRecording below) finishing and joining run to the end even when another
+    // operation has taken over (#200); only the screen updates (status, progress) wait on `isCurrent`.
     Task {
       let finished = await recorder.finish()
-      guard isCurrent(operation) else { return }
       // Segments closed by a pause or a rotation may still be finishing (finishWriting takes 100–300 ms):
       // wait for each, in order, so Done right after Pause never reads an empty list and loses the set
       // (the 2026-09-15 review).
       var segments: [URL] = []
       for task in closing { if let url = await task.value { segments.append(url) } }
-      guard isCurrent(operation) else { return }
       if let url = finished ?? recorder.partialURL {
         if finished == nil {
-          statusMessage = "Recording was cut short, keeping what was captured"
+          if isCurrent(operation) { statusMessage = "Recording was cut short, keeping what was captured" }
           log.event("recording_partial", ["url": url.lastPathComponent, "duration_s": recordedDuration])
         }
         segments.append(url)
       }
       guard !segments.isEmpty else {
+        log.event("error", ["where": "recorder", "message": "finish returned no file"])
+        guard isCurrent(operation) else { return }
         statusMessage = "Nothing recorded"
         lastSetPassEnded("nothing recorded")
-        log.event("error", ["where": "recorder", "message": "finish returned no file"])
         activity = .idle
         return
       }
@@ -2422,34 +2453,36 @@ final class VideoPoseSession: NSObject, ObservableObject {
             self.activity = .working("Joining segments", progress: progress)
           }
         }
-        activity = .working("Joining \(segments.count) segments", progress: 0)
+        if isCurrent(operation) { activity = .working("Joining \(segments.count) segments", progress: 0) }
         let started = Date()
         do {
           // Same display size throughout: a passthrough join (seconds, no quality loss); a rotation across a
           // pause changes the size and still takes the re-encoding stitch.
           let passthrough = await VideoFile.sameDisplaySize(segments)
-          guard isCurrent(operation) else { return }
           if passthrough {
             clipURL = try await VideoFile.join(segments, progress: progress)
           } else {
             clipURL = try await VideoFile.stitch(segments, progress: progress)
           }
-          guard isCurrent(operation) else { return }
           log.event("stitch", ["segments": segments.count, "elapsed_s": Date().timeIntervalSince(started), "clip": clipURL.lastPathComponent, "passthrough": passthrough])
         } catch {
-          guard isCurrent(operation) else { return }
           log.event("error", ["where": "stitch", "message": "\(error)"])
-          statusMessage = "Couldn't join the segments; keeping the last one"
+          if isCurrent(operation) { statusMessage = "Couldn't join the segments; keeping the last one" }
           clipURL = segments[segments.count - 1]
         }
       }
+      // ponytail: a paused or rotated set has wall-clock time missing between its segments, so clip time is
+      // not first frame + playhead any more and it gets no heart rate. Upgrade: keep each segment's start.
+      let startedAt = segments.count == 1 && !hadPause ? clipStartedAt : nil
+      keepRecording(
+        id: operation.entryID, clipURL: clipURL, live: livePipeline, recordedAt: stoppedAt,
+        duration: recordedDuration, clipStartedAt: startedAt, onScreen: isCurrent(operation))
+      guard isCurrent(operation) else { return }
       currentFileURL = clipURL
       currentOrigin = .recording
       currentEntryID = operation.entryID
       currentRecordedAt = stoppedAt
-      // ponytail: a paused or rotated set has wall-clock time missing between its segments, so clip time is
-      // not first frame + playhead any more and it gets no heart rate. Upgrade: keep each segment's start.
-      currentClipStartedAt = segments.count == 1 && !hadPause ? clipStartedAt : nil
+      currentClipStartedAt = startedAt
       canSave = true
       await trim(url: clipURL, using: livePipeline, thenAnalyze: true, operation: operation)
     }
@@ -2464,17 +2497,53 @@ final class VideoPoseSession: NSObject, ObservableObject {
     let pipeline: AnalysisPipeline
     let frames: [FrameRecord]
     let origin: Origin
+    /// The set whose folder holds `url` as its stashed original (an in-app set's own clip, #199); nil otherwise.
+    var stashedFor: String? = nil
   }
   private var untrimmed: Untrimmed?
   @Published private(set) var canUndoTrim = false
+
+  /// The undo is ending: an in-app set's stash served only it (#199), so it goes rather than sit as a second
+  /// full-size copy beside the trimmed clip. A Photos replace's stash is kept (it is not marked `stashedFor`).
+  private func dropUndoStash() {
+    if let id = untrimmed?.stashedFor { recents.dropBackup(id: id) }
+  }
 
   func trimToReps() {
     guard let url = trimmedURL ?? currentFileURL, source == .file else { return }
     let operation = beginCurrentOperation()
     let current = pipeline
-    untrimmed = Untrimmed(url: url, pipeline: current, frames: extractedFrames, origin: currentOrigin)
-    untrimmedClipStartedAt = currentClipStartedAt
-    Task { await trim(url: url, using: current, thenAnalyze: false, operation: operation) }
+    let frames = extractedFrames
+    let origin = currentOrigin
+    let clipStartedAt = currentClipStartedAt
+    Task {
+      guard isCurrent(operation) else { return }
+      let id = operation.entryID
+      if let kept = untrimmed, kept.stashedFor == id {
+        // Trimmed again: Undo still goes back to the stashed original.
+      } else if recents.ownsClip(url, id: id) {
+        // An in-app set's clip is its own Recents file, which the trim's save replaces (#199): keep a copy in the
+        // set's folder for Undo, as a Photos replace does (the save carries the folder's other files across).
+        activity = .working("Keeping a copy of the original", progress: nil)
+        do {
+          let name = try recents.stashOriginal(id: id, from: url)
+          untrimmed = Untrimmed(
+            url: recents.folder(for: id).appendingPathComponent(name), pipeline: current, frames: frames,
+            origin: origin, stashedFor: id)
+          log.event("trim_stash", ["id": id, "clip": url.lastPathComponent])
+        } catch {
+          statusMessage = "Couldn't keep a copy of the original, so the clip was not trimmed"
+          log.event("error", ["where": "trim_stash", "message": "\(error)"])
+          activity = .idle
+          return
+        }
+        untrimmedClipStartedAt = clipStartedAt
+      } else {
+        untrimmed = Untrimmed(url: url, pipeline: current, frames: frames, origin: origin)
+        untrimmedClipStartedAt = clipStartedAt
+      }
+      await trim(url: url, using: current, thenAnalyze: false, operation: operation)
+    }
   }
 
   /// Puts the untrimmed clip and its analysis back (the trimmed file is dropped). If the save already replaced
@@ -2514,11 +2583,36 @@ final class VideoPoseSession: NSObject, ObservableObject {
       return
     }
     let restored = beginOperation(entryID: operation.entryID, origin: before.origin)
+    if let id = before.stashedFor {
+      // The stash is the only copy of the original (#199): play and save a scratch copy of it, and drop the stash
+      // only once the set's folder holds the original again.
+      let ext = before.url.pathExtension.isEmpty ? "mov" : before.url.pathExtension
+      let copy = FileManager.default.temporaryDirectory.appendingPathComponent("untrimmed-\(UUID().uuidString).\(ext)")
+      do {
+        try FileManager.default.copyItem(at: before.url, to: copy)
+      } catch {
+        statusMessage = "Couldn't restore the original: \(error.localizedDescription)"
+        log.event("error", ["where": "trim_undo_stash", "message": "\(error)"])
+        return
+      }
+      let scratch = Untrimmed(url: copy, pipeline: before.pipeline, frames: before.frames, origin: before.origin)
+      let name = recents.entry(id: id)?.originalName
+      if finishUndo(before: scratch, operation: restored) {
+        recents.dropBackup(id: id)
+        // The save named the set after the scratch copy, and the session would trim that tmp file next: point
+        // both back at the set's own clip, so a second trim stashes again.
+        recents.update(id: id) { $0.originalName = name }
+        currentFileURL = recents.folder(for: id).appendingPathComponent("clip." + copy.pathExtension)
+      }
+      return
+    }
     finishUndo(before: before, operation: restored)
   }
 
-  private func finishUndo(before: Untrimmed, operation: Operation) {
-    guard isCurrent(operation) else { return }
+  /// True once the set is saved with the untrimmed clip again.
+  @discardableResult
+  private func finishUndo(before: Untrimmed, operation: Operation) -> Bool {
+    guard isCurrent(operation) else { return false }
     untrimmed = nil
     canUndoTrim = false
     let dropped = trimmedURL
@@ -2532,9 +2626,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
     analysisInterrupted = false
     statusMessage = "Trim undone"
     log.event("trim_undo", ["dropped": dropped?.lastPathComponent ?? ""])
-    rememberCurrent(clipURL: before.url, operation: operation)
+    let saved = rememberCurrent(clipURL: before.url, operation: operation)
     if let dropped { try? FileManager.default.removeItem(at: dropped) }
     play()
+    return saved
   }
 
   private func trim(url: URL, using analyzed: AnalysisPipeline, thenAnalyze: Bool, operation: Operation) async {

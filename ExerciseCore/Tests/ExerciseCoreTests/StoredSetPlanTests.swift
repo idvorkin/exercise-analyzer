@@ -167,6 +167,21 @@ final class RerunPlanTests: XCTestCase {
       mode: .auto, storedExercise: .turkishGetUp, detection: detection(.kettlebellSwing, 99))
     XCTAssertEqual(plan, .rerunFromClip(exercise: .turkishGetUp, reason: .rerunModels))
   }
+
+  /// A recording kept from its live track because its offline pass was superseded (#200) goes back to its video,
+  /// with any build's models and in any mode, as the exercise the live pass counted.
+  func testLiveTrackSetRerunsFromClip() {
+    for models in [poseOnly, withDetector] {
+      for mode in [ExerciseMode.auto, .fixed(.pistolSquat)] {
+        XCTAssertEqual(
+          StoredSetPlan.decide(
+            storedVersion: current, storedModels: StoredSetPlan.liveTrackModels, currentVersion: current,
+            currentModels: models, mode: mode, storedExercise: .kettlebellSwing,
+            detection: detection(.kettlebellSwing, 99)),
+          .rerunFromClip(exercise: .kettlebellSwing, reason: .rerunModels))
+      }
+    }
+  }
 }
 
 /// analyzeExtracted: fixed mode analyzes the stored exercise when there is one (#42); Auto takes the

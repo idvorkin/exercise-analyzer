@@ -9,7 +9,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 009:
 
 - **Summary:** Keep only the set, losslessly and fast
-- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`); the set switch (#52) in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified on the host and the simulator; the implausible count (#141) in [638f3e8](https://github.com/idvorkin/exercise-analyzer/commit/638f3e8), verified on the host; on the phone since 2026-09-26, Igor's check pending (HDR, Photos undo)
+- **Status:** implemented in [93cb349](https://github.com/idvorkin/exercise-analyzer/commit/93cb349), [6902937](https://github.com/idvorkin/exercise-analyzer/commit/6902937), [8309c6f](https://github.com/idvorkin/exercise-analyzer/commit/8309c6f); verified on the simulator (the `trim` check of `just test-sim`); the set switch (#52) in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified on the host and the simulator; the implausible count (#141) in [638f3e8](https://github.com/idvorkin/exercise-analyzer/commit/638f3e8), verified on the host; on the phone since 2026-09-26, Igor's check pending (HDR, Photos undo); the in-app set's undo (#199) in [d5ed484](https://github.com/idvorkin/exercise-analyzer/commit/d5ed484), written on Linux, not yet built or run on any rung
 
 #### Use Case:
 - **As a** lifter who leaves the camera running while setting up
@@ -21,6 +21,11 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Given:** a recording with 25 s of setup before the first rep
 - **When:** I tap Trim
 - **Then:** the clip starts about 5 s before the first rep and ends about 5 s after the last, plays from its first frame, keeps HDR, and the cut takes under a second; an Undo button restores the untrimmed clip
+
+- **Scenario:** Undoing a trim of a set opened from Workouts
+- **Given:** I opened a recording from Workouts that was never saved to Photos and tapped Trim to reps
+- **When:** I tap Undo trim
+- **Then:** the untrimmed clip plays again and the Workouts entry holds it, from a copy kept in the set's folder before the cut (`trim_stash`); the copy goes once the undo is done or another clip opens
 
 - **Scenario:** Switching sets during trim or undo
 - **Given:** set A is trimming or restoring its original from Photos
@@ -35,7 +40,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Notes:** Implausible means more seconds of recording per counted rep than `TrimPolicy` allows: 5 for swings, 25 for squats and pull-ups, 120 for get-ups. Against the 57 automatic trims in the phone logs to 2026-09-24 it skips the five 1-rep miscounts (swings 1 in 25.8, 28.4 and 41.8 s; Bulgarians 1 in 38.0 and 58.8 s) and one normal count (96FEBD60, 9 swings in a 70.6 s recording paused on the wrist, 7.8 s a rep). Of the 53 fixture tracks with a saved count, it flags only the two 1-rep swing miscounts (9F8F947D, FFCBDDAB).
 
-- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set; [#141](https://github.com/idvorkin/exercise-analyzer/issues/141) a wrong count trimmed the real set away before the save
+- **Issues:** [#27](https://github.com/idvorkin/exercise-analyzer/issues/27) undo must not outlive the clip it trimmed; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set; [#141](https://github.com/idvorkin/exercise-analyzer/issues/141) a wrong count trimmed the real set away before the save; [#199](https://github.com/idvorkin/exercise-analyzer/issues/199) Undo trim on an in-app set lost the original (the trim's save overwrote the set's own clip)
 
 ---
 
