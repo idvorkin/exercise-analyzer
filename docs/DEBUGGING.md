@@ -75,7 +75,8 @@ the numbers, then fix. Never ship a second guessed fix. Examples that paid off: 
 1. **On the phone**: shake (or Report a problem on the start panel). The moment of the shake is captured: a window
    snapshot and, in playback, the clip's frame at the playhead. "Log it" writes a `bug_report` event, a line in
    `Documents/bugs.jsonl` (note, context, `log` file name, `session_t_ms`, `screenshot`, `frame`), and the images
-   under `Documents/bugs/<stamp>/`.
+   under `Documents/bugs/<stamp>/`. "Log it and another" writes the same and empties the sheet; every report until
+   the next shake carries that shake's images (#212).
 2. **Monitor while Igor tests**: `just bugs-check` copies only `bugs.jsonl` and exits 1 when a report is not yet an
    issue. The agent watches it through `scripts/bugs-monitor.sh`, which polls every minute and prints one line per
    new report, once (silent otherwise), armed as a persistent `Monitor`:
