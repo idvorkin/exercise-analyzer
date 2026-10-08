@@ -260,14 +260,22 @@ check_photos_export() {  # 070 step 3: once approved, clips of sets not on scree
   plutil -replace photosExportApproved -bool true "$prefs"
   restart_prefs
   local docs; docs=$(dirname "$LOGS")
-  local before; before=$(jq '[.[] | select(.source.file != null)] | length' "$docs/recents/index.json")
-  xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null  # nothing open: every in-app clip is due
+  local index="$docs/recents/index.json"
+  # The sample clips were opened, so their sets are imports (originalName), which stay in the app (#229): all but
+  # the oldest become recordings, which go to Photos by themselves; the oldest stays an import (none with one set).
+  local kept; kept=$(jq -r '[.[] | select(.source.file != null)]
+    | if length > 1 then min_by(.recordedAt // .analyzedAt).id else "" end' "$index")
+  jq --arg kept "$kept" 'map(if .source.file != null and .id != $kept then del(.originalName) else . end)' \
+    "$index" > "$index.new" && mv "$index.new" "$index"
+  local before; before=$(jq --arg kept "$kept" '[.[] | select(.source.file != null and .id != $kept)] | length' "$index")
+  xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null  # nothing open: every recording's clip is due
   wait_for photos_export 120 || echo "      (timed out waiting for the first export)"
   sleep 15
   local f; f=$(newest_log)
-  local exported left
+  local exported left imported
   exported=$(jq -s '[.[] | select(.type=="photos_export")] | length' "$f")
-  left=$(jq '[.[] | select(.source.file != null)] | length' "$docs/recents/index.json")
+  left=$(jq --arg kept "$kept" '[.[] | select(.source.file != null and .id != $kept)] | length' "$index")
+  imported=$(jq --arg kept "$kept" '[.[] | select(.source.file != null and .id == $kept)] | length' "$index")
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   # The newest set is now in the simulator's Photos: it opens from there, its stored analysis read, not re-run.
   previous_log=$(newest_log)
@@ -275,10 +283,11 @@ check_photos_export() {  # 070 step 3: once approved, clips of sets not on scree
   wait_for recents_open 60 || echo "      (timed out waiting for the reopened set)"
   local g; g=$(newest_log)
   if [ "$before" -gt 0 ] && [ "$exported" -eq "$before" ] && [ "$left" -eq 0 ] &&
+    { [ -z "$kept" ] || [ "$imported" -eq 1 ]; } &&
     ! jq -se 'any(.[]; .type=="photos_export_failed")' "$f" >/dev/null &&
     jq -se '([.[] | select(.type=="photos_fetch")][-1] | .found == true) and any(.[]; .type=="recents_open")' "$g" >/dev/null; then
-    echo "ok    photos_export: $exported clips into Photos, none left in the app, the newest set reopened from Photos"
-  else echo "FAIL  photos_export: before=$before exported=$exported left=$left, $f $g"; fail=1; fi
+    echo "ok    photos_export: $exported recordings into Photos, none left in the app, ${imported:-0} import kept, the newest set reopened from Photos"
+  else echo "FAIL  photos_export: before=$before exported=$exported left=$left imported=$imported kept=$kept, $f $g"; fail=1; fi
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   plutil -remove photosExportApproved "$prefs" 2>/dev/null || true
   restart_prefs
