@@ -194,7 +194,11 @@ final class RecentsStore: ObservableObject {
   /// suggestions' Ignored tab so it is not offered as a new set.
   func keepByHand(id: String, exercise: ExerciseKind, reps: Int) {
     guard let entry = entry(id: id) else { return }
-    if let identifier = entry.photosIdentifier { PhotosSuggestions.ignore(identifier: identifier) }
+    if let identifier = entry.photosIdentifier {
+      PhotosSuggestions.ignore(identifier: identifier)
+      // Another device's set: the asset is known here by this device's identifier (#222).
+      if let cloud = entry.cloudIdentifier, let local = Self.localIdentifier(cloud: cloud) { PhotosSuggestions.ignore(identifier: local) }
+    }
     var kept = entry.keptByHand(exercise: exercise, reps: reps)
     Self.touch(&kept)
     entries = entries.map { $0.id == id ? kept : $0 }
@@ -364,6 +368,14 @@ final class RecentsStore: ObservableObject {
     return mappings.values.first.flatMap { try? $0.get() }
   }
 
+  /// This device's identifiers for assets other devices named by cloud identifier (#222): the ones iCloud Photos
+  /// has brought here. One Photos call for the lot.
+  static func localIdentifiers(forCloud clouds: [String]) -> [String] {
+    guard !clouds.isEmpty else { return [] }
+    let mappings = PHPhotoLibrary.shared().localIdentifierMappings(for: clouds.map { PHCloudIdentifier(stringValue: $0) })
+    return mappings.values.compactMap { try? $0.get() }
+  }
+
   /// The cloud identifiers of this device's assets, by local identifier; an asset iCloud has no identifier for
   /// (no account, or gone) is left out.
   static func cloudIdentifiers(for locals: [String]) -> [String: String] {
@@ -384,6 +396,9 @@ final class RecentsStore: ObservableObject {
     var inCloud = false
     var error: String?
     var seconds: Double = 0
+    /// This device's identifier for the asset that answered: the owner's own, or the one its cloud identifier
+    /// mapped to here (#222), for whatever acts on the asset next (a replace, the suggestions).
+    var localIdentifier: String?
   }
 
   static func fetchPhotosClip(
@@ -395,6 +410,7 @@ final class RecentsStore: ObservableObject {
       found = PHAsset.fetchAssets(withLocalIdentifiers: [local], options: nil).firstObject
     }
     guard let asset = found else { return PhotosFetch(error: "not in Photos") }
+    let local = asset.localIdentifier
     let started = Date()
     let options = PHVideoRequestOptions()
     options.isNetworkAccessAllowed = true
@@ -414,7 +430,7 @@ final class RecentsStore: ObservableObject {
           returning: PhotosFetch(
             url: (avAsset as? AVURLAsset)?.url, inCloud: inCloud,
             error: (info?[PHImageErrorKey] as? Error).map { "\($0)" },
-            seconds: Date().timeIntervalSince(started)))
+            seconds: Date().timeIntervalSince(started), localIdentifier: local))
       }
     }
   }

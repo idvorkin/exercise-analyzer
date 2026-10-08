@@ -874,6 +874,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     Task {
       guard isCurrent(operation) else { return }
       let url: URL?
+      // Another device's set names its asset by the owner's identifier; what acts on the asset here (a replace,
+      // the suggestions) needs this device's (#222), learnt from the fetch.
+      var localPhotosID = photosID(entry)
       if case .photos(let identifier) = entry.source {
         // An old set may live only in iCloud: show the download rather than a tap that seems to do nothing (#35).
         activity = .working("Loading from Photos", progress: nil)
@@ -889,6 +892,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
             "error": fetch.error ?? "",
           ])
         url = fetch.url
+        if let local = fetch.localIdentifier { localPhotosID = local }
       } else {
         url = await recents.clipURL(for: entry)
       }
@@ -901,12 +905,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       guard let pipeline = recents.loadPipeline(for: entry) else {
         statusMessage = "Stored analysis unreadable; re-analyzing"
-        load(url: url, recordedAt: entry.recordedAt, operation: operation)
+        // The re-analysis saves the set under the operation's origin: this device's identifier, not the owner's.
+        let renamed = entry.isInPhotos && localPhotosID != photosID(entry)
+        load(
+          url: url, recordedAt: entry.recordedAt,
+          operation: renamed ? beginOperation(entryID: entry.id, origin: .photos(identifier: localPhotosID)) : operation)
         return
       }
       currentFileURL = url
       trimmedURL = nil
-      currentOrigin = entry.isInPhotos ? .photos(identifier: photosID(entry)) : .file
+      currentOrigin = entry.isInPhotos ? .photos(identifier: localPhotosID) : .file
       currentEntryID = entry.id
       currentRecordedAt = entry.recordedAt
       currentClipStartedAt = entry.clipStartedAt
