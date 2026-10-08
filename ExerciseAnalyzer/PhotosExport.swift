@@ -8,6 +8,7 @@
 
 import ExerciseCore
 import Foundation
+import Photos
 
 @MainActor
 final class PhotosExporter {
@@ -116,22 +117,35 @@ final class PhotosExporter {
       else { continue }
       let started = Date()
       let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-      if let asset = current.exportedAsset, RecentsStore.photosAssetExists(identifier: asset) {
-        recents.markSavedToPhotos(id: entry.id, identifier: asset)
-        log(
-          "photos_export",
-          ["id": entry.id, "bytes": bytes, "ms": 0, "reason": reason, "left": left, "new": isNew(entry), "asset": asset])
-        continue
+      // An asset from an earlier run (the set was open, or Photos could not be read back then): pointed at when it
+      // is there, waited for while Photos cannot be read, saved again only when it is really gone.
+      if let asset = current.exportedAsset {
+        switch PhotosExportDecision.remembered(
+          assetFound: RecentsStore.photosAssetExists(identifier: asset), canRead: Self.canReadPhotos)
+        {
+        case .point:
+          recents.markSavedToPhotos(id: entry.id, identifier: asset)
+          log(
+            "photos_export",
+            ["id": entry.id, "bytes": bytes, "ms": 0, "reason": reason, "left": left, "new": isNew(entry), "asset": asset])
+          continue
+        case .wait:
+          log("photos_export_skipped", ["id": entry.id, "reason": reason, "asset": asset, "why": "unreadable"])
+          continue
+        case .forget:
+          recents.update(id: entry.id) { $0.exportedAsset = nil }
+        }
       }
       let modified = Self.modified(url)
       do {
         guard let identifier = try await VideoFile.saveToPhotos(url) else { throw VideoFile.VideoFileError.exportFailed("no asset") }
         // The set may have moved on while its clip was being written (the 2026-10-07 review): opened, it keeps its
         // clip until it is left and the next run points it at this asset; trimmed or kept by hand, the asset is of
-        // a clip that is gone and nothing may point at it; still the same clip and closed, it points at the asset.
+        // a clip that is gone and nothing may point at it; still the same clip and closed, it points at the asset,
+        // unless Photos cannot read the asset back (add-only access): then the clip stays, the only playable copy.
         switch PhotosExportDecision.afterSave(
           entry: recents.entry(id: entry.id), clip: name, clipChanged: Self.modified(url) != modified,
-          open: verdict(entry.id) == .skip)
+          open: verdict(entry.id) == .skip, readable: RecentsStore.photosAssetExists(identifier: identifier))
         {
         case .orphaned:
           log("photos_export_orphaned", ["id": entry.id, "reason": reason, "asset": identifier])
@@ -155,5 +169,12 @@ final class PhotosExporter {
 
   private static func modified(_ url: URL) -> Date? {
     (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+  }
+
+  /// Photos can be read (the suggestions' access), so a fetch that finds nothing means the asset is gone; under
+  /// add-only access a fetch finds nothing whether or not the asset is there.
+  private static var canReadPhotos: Bool {
+    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    return status == .authorized || status == .limited
   }
 }

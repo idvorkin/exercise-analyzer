@@ -1,7 +1,8 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-//  Story 070, step 3: the exporter's decision once an asset exists (the 2026-10-07 Codex review, finding 1): a
-//  set that moved on while its clip was saved is left alone, never pointed at the old clip's asset.
+//  Story 070, step 3: the exporter's decisions once an asset exists (the 2026-10-07 Codex review, findings 1 and
+//  3): a set that moved on while its clip was saved is left alone, an asset that cannot be read back is remembered
+//  rather than the clip being lost, and a remembered asset is never saved a second time.
 
 import XCTest
 
@@ -14,25 +15,38 @@ final class PhotosExportDecisionTests: XCTestCase {
       bestScore: 80, source: source, thumbnail: nil, exercise: .kettlebellSwing, originalName: nil)
   }
 
-  func testTheSameClipClosedPointsAtTheAsset() {
-    XCTAssertEqual(
-      PhotosExportDecision.afterSave(entry: entry(.file(name: "clip.mov")), clip: "clip.mov", clipChanged: false, open: false), .point)
+  private func decide(_ now: RecentEntry?, clipChanged: Bool = false, open: Bool = false, readable: Bool = true)
+    -> PhotosExportDecision.AfterSave
+  {
+    PhotosExportDecision.afterSave(entry: now, clip: "clip.mov", clipChanged: clipChanged, open: open, readable: readable)
+  }
+
+  func testTheSameClipClosedAndReadablePointsAtTheAsset() {
+    XCTAssertEqual(decide(entry(.file(name: "clip.mov"))), .point)
   }
 
   func testASetOpenedMeanwhileKeepsItsClipAndRemembersTheAsset() {
-    XCTAssertEqual(
-      PhotosExportDecision.afterSave(entry: entry(.file(name: "clip.mov")), clip: "clip.mov", clipChanged: false, open: true), .remember)
+    XCTAssertEqual(decide(entry(.file(name: "clip.mov")), open: true), .remember)
+  }
+
+  func testAnAssetThatCannotBeReadBackIsRememberedNotPointedAt() {
+    // Add-only Photos access: the asset exists but a fetch finds nothing; the clip must stay playable here.
+    XCTAssertEqual(decide(entry(.file(name: "clip.mov")), readable: false), .remember)
   }
 
   func testASetThatMovedOnWhileItsClipSavedIsLeftAlone() {
     // Trimmed (the clip file changed), kept by hand (no clip), deleted (no entry), or pointed at another file.
-    let same = entry(.file(name: "clip.mov"))
-    XCTAssertEqual(PhotosExportDecision.afterSave(entry: same, clip: "clip.mov", clipChanged: true, open: false), .orphaned)
-    XCTAssertEqual(PhotosExportDecision.afterSave(entry: entry(.byHand, reps: 9), clip: "clip.mov", clipChanged: false, open: false), .orphaned)
-    XCTAssertEqual(PhotosExportDecision.afterSave(entry: nil, clip: "clip.mov", clipChanged: false, open: false), .orphaned)
-    XCTAssertEqual(
-      PhotosExportDecision.afterSave(entry: entry(.file(name: "trimmed.mov")), clip: "clip.mov", clipChanged: false, open: false), .orphaned)
+    XCTAssertEqual(decide(entry(.file(name: "clip.mov")), clipChanged: true), .orphaned)
+    XCTAssertEqual(decide(entry(.byHand, reps: 9)), .orphaned)
+    XCTAssertEqual(decide(nil), .orphaned)
+    XCTAssertEqual(decide(entry(.file(name: "trimmed.mov"))), .orphaned)
     // Trimmed and opened: still orphaned, the open set's clip is not the one saved.
-    XCTAssertEqual(PhotosExportDecision.afterSave(entry: same, clip: "clip.mov", clipChanged: true, open: true), .orphaned)
+    XCTAssertEqual(decide(entry(.file(name: "clip.mov")), clipChanged: true, open: true), .orphaned)
+  }
+
+  func testARememberedAssetIsSavedAgainOnlyWhenPhotosCanBeReadAndItIsGone() {
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: true, canRead: true), .point)
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: false, canRead: false), .wait)
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: false, canRead: true), .forget)
   }
 }
