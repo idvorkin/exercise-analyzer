@@ -344,7 +344,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     watch.onRetry = { [weak self] in self?.answerRetry(via: "queued") }
     WorkoutMirror.shared.onStatusWanted = { [weak self] in self?.answerRetry(via: "workout") }
     // A set typed on the wrist (059): a Workouts entry with no clip, once per id however often it arrives.
-    watch.onHandSet = { [weak self] set, road in self?.addByHand(set, from: road) }
+    watch.onHandSet = { [weak self] set, road in self?.addByHand(set, from: road) ?? false }
     watch.recoverInbox()
     WorkoutMirror.shared.$live.map { $0 != nil }.removeDuplicates().dropFirst().receive(on: DispatchQueue.main)
       .sink { [weak self] _ in self?.updateKeepAwake() }.store(in: &cancellables)
@@ -1300,12 +1300,22 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// A set typed by hand: on the wrist (059) or from a tap on a workout's chart (#178). Once per id however often
   /// it arrives.
-  func addByHand(_ set: HandSet, from place: String) {
-    let added = recents.add(set)
+  /// False only when the index could not be written: the set is not in, and the watch bridge must not count it as
+  /// taken (the 2026-10-07 review). A repeat delivery is in already and counts as taken.
+  @discardableResult
+  func addByHand(_ set: HandSet, from place: String) -> Bool {
+    let added: Bool
+    do {
+      added = try recents.add(set)
+    } catch {
+      log.event("error", ["where": "set_by_hand", "id": set.id, "message": "\(error)"])
+      return false
+    }
     log.event(
       "set_by_hand",
       ["id": set.id, "exercise": set.exercise.rawValue, "reps": set.reps, "at": set.at, "duplicate": !added,
        "where": place])
+    return true
   }
 
   /// The bell's weight the lifter tapped for a set (066), with the detector's colour reading beside it when the set

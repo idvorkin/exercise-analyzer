@@ -172,12 +172,19 @@ final class RecentsStore: ObservableObject {
   }
 
   /// A set typed on the wrist (story 059): an entry with no folder and no files. False for an id already here
-  /// or removed since launch: a repeat delivery is one set.
-  func add(_ set: HandSet) -> Bool {
+  /// or removed since launch: a repeat delivery is one set. Throws when the index could not be written, the set
+  /// not added, so the caller does not count it as taken (the 2026-10-07 review).
+  func add(_ set: HandSet) throws -> Bool {
     var index = RecentsIndex(entries: entries)
     guard !removedIDs.contains(set.id), index.add(set) else { return false }
+    let before = entries
     entries = index.entries
-    try? persistIndex()
+    do {
+      try persistIndex()
+    } catch {
+      entries = before
+      throw error
+    }
     return true
   }
 
