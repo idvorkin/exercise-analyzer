@@ -224,9 +224,10 @@ final class RecentsStore: ObservableObject {
     return result
   }
 
-  /// After a local recording is saved to Photos: point at the asset and drop the in-app copy.
+  /// After a local recording is saved to Photos: point at the asset and drop the in-app copy. A set kept by hand
+  /// has no clip to point anywhere and stays as it is (the 2026-10-07 review).
   func markSavedToPhotos(id: String, identifier: String) {
-    guard var entry = entry(id: id) else { return }
+    guard var entry = entry(id: id), !entry.isByHand else { return }
     if case .file(let name) = entry.source {
       try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name))
     }

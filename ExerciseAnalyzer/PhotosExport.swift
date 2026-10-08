@@ -111,7 +111,9 @@ final class PhotosExporter {
       case .skip: continue
       case .save: break
       }
-      guard let current = recents.entry(id: entry.id), let url = exportableClip(current) else { continue }
+      guard let current = recents.entry(id: entry.id), case .file(let name) = current.source,
+        let url = exportableClip(current)
+      else { continue }
       let started = Date()
       let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
       if let asset = current.exportedAsset, RecentsStore.photosAssetExists(identifier: asset) {
@@ -124,18 +126,25 @@ final class PhotosExporter {
       let modified = Self.modified(url)
       do {
         guard let identifier = try await VideoFile.saveToPhotos(url) else { throw VideoFile.VideoFileError.exportFailed("no asset") }
-        // The set was opened while its clip was being written: it keeps its clip until it is left, and the next
-        // run points it at this asset rather than writing another, unless its clip changed meanwhile (a trim).
-        guard verdict(entry.id) != .skip else {
-          if Self.modified(url) == modified { recents.update(id: entry.id) { $0.exportedAsset = identifier } }
+        // The set may have moved on while its clip was being written (the 2026-10-07 review): opened, it keeps its
+        // clip until it is left and the next run points it at this asset; trimmed or kept by hand, the asset is of
+        // a clip that is gone and nothing may point at it; still the same clip and closed, it points at the asset.
+        switch PhotosExportDecision.afterSave(
+          entry: recents.entry(id: entry.id), clip: name, clipChanged: Self.modified(url) != modified,
+          open: verdict(entry.id) == .skip)
+        {
+        case .orphaned:
+          log("photos_export_orphaned", ["id": entry.id, "reason": reason, "asset": identifier])
+        case .remember:
+          recents.update(id: entry.id) { $0.exportedAsset = identifier }
           log("photos_export_skipped", ["id": entry.id, "reason": reason, "asset": identifier])
-          continue
+        case .point:
+          recents.markSavedToPhotos(id: entry.id, identifier: identifier)
+          log(
+            "photos_export",
+            ["id": entry.id, "bytes": bytes, "ms": Int(Date().timeIntervalSince(started) * 1000), "reason": reason, "left": left,
+             "new": isNew(entry)])
         }
-        recents.markSavedToPhotos(id: entry.id, identifier: identifier)
-        log(
-          "photos_export",
-          ["id": entry.id, "bytes": bytes, "ms": Int(Date().timeIntervalSince(started) * 1000), "reason": reason, "left": left,
-           "new": isNew(entry)])
       } catch {
         failed.insert(entry.id)
         log("photos_export_failed", ["id": entry.id, "reason": reason, "message": "\(error)"])
