@@ -482,12 +482,20 @@ final class SyncStore {
     if let error = coordinationError ?? copyError.map({ $0 as NSError }) { throw error }
   }
 
+  /// Removes a file; one already gone counts as removed, any other failure is thrown so the job is tried again
+  /// next pass instead of being written down as done (the 2026-10-07 review).
   private nonisolated static func remove(_ url: URL) throws {
     var coordinationError: NSError?
+    var removeError: Error?
     NSFileCoordinator().coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { target in
-      try? FileManager.default.removeItem(at: target)
+      do {
+        try FileManager.default.removeItem(at: target)
+      } catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
+      } catch {
+        removeError = error
+      }
     }
-    if let error = coordinationError { throw error }
+    if let error = coordinationError ?? removeError.map({ $0 as NSError }) { throw error }
   }
 
   private static let encoder: JSONEncoder = {
