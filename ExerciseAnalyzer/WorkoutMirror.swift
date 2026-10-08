@@ -21,10 +21,13 @@ final class WorkoutMirror: NSObject, ObservableObject {
   var onEvent: ((String, [String: Any]) -> Void)?
   /// The wrist's Retry came through the workout session (#189): say the status again.
   var onStatusWanted: (() -> Void)?
+  /// A workout's heart-rate series was written to its folder: the sync store mirrors it (#225).
+  var onHeartRateSaved: (() -> Void)?
 
   private let store = HKHealthStore()
   private var session: HKWorkoutSession?
-  private let root: URL
+  /// Documents; `folder(for:)` is a workout's folder under `workouts/`. Read off the main actor by the sync store.
+  let root: URL
   private var lastDataLogged = Date.distantPast
   private var authorizationRequested = false
   private var statusFailedLogged = false
@@ -105,7 +108,7 @@ final class WorkoutMirror: NSObject, ObservableObject {
   /// to drop"): what `Documents/workouts/<id>/` holds, then Health's answer for the workout and the three
   /// minutes after it, kept when it is fuller. The running workout (id "live") is read but never kept.
   func heartRate(for workout: StoredWorkout) async -> HeartRateSeries? {
-    let folder = root.appendingPathComponent("workouts", isDirectory: true).appendingPathComponent(workout.id, isDirectory: true)
+    let folder = folder(for: workout.id)
     let stored = HeartRateSeries.load(from: folder)
     let read = await heartRate(from: workout.start.addingTimeInterval(-60), to: workout.end.addingTimeInterval(180))
     onEvent?(
@@ -115,8 +118,14 @@ final class WorkoutMirror: NSObject, ObservableObject {
     if workout.id != Self.liveID {
       try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       try? read.save(to: folder)
+      onHeartRateSaved?()
     }
     return read
+  }
+
+  /// `Documents/workouts/<id>/`: the workout's heart-rate series lives there.
+  nonisolated func folder(for id: String) -> URL {
+    root.appendingPathComponent("workouts", isDirectory: true).appendingPathComponent(id, isDirectory: true)
   }
 
   /// The id the page of 053 gives the running workout, shown as a span up to now.

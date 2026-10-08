@@ -19,7 +19,9 @@ final class WatchBridge: NSObject, ObservableObject {
   /// A set typed on the wrist (story 059) and the road it came by: "watch" (its queued user info), "watch_context"
   /// or "stored_context" (the wrist's application context as it arrives or as stored at launch, #197) or
   /// "watch_inbox" (dug out of a transfer WatchConnectivity never delivered). Called once per id across launches.
-  var onHandSet: ((HandSet, String) -> Void)?
+  /// Hands a typed set to the session; false when it could not be kept (the index write failed), so the id is
+  /// not counted as taken.
+  var onHandSet: ((HandSet, String) -> Bool)?
   /// Ids of typed sets already taken by any road, newest last, kept across launches: the context and the Inbox
   /// carry a set again after a relaunch, and one deleted on the phone must stay deleted.
   private var typedSetsTaken = UserDefaults.standard.stringArray(forKey: WatchBridge.typedSetsTakenKey) ?? []
@@ -210,6 +212,9 @@ extension WatchBridge: WCSessionDelegate {
   private func take(_ set: HandSet, via road: String) -> Bool {
     guard let onHandSet else { return false }
     let fresh = !typedSetsTaken.contains(set.id) && !inboxSetsTaken.contains(set.id)
+    // The id is written down as taken only once the set is in the index on disk (the 2026-10-07 review): a
+    // failed write leaves it to the next delivery instead of refusing it for good on every road.
+    if fresh, !onHandSet(set, road) { return false }
     if road == "watch_inbox", !inboxSetsTaken.contains(set.id) {
       inboxSetsTaken.append(set.id)
       UserDefaults.standard.set(inboxSetsTaken, forKey: Self.inboxSetsTakenKey)
@@ -217,9 +222,7 @@ extension WatchBridge: WCSessionDelegate {
       typedSetsTaken = Array((typedSetsTaken + [set.id]).suffix(200))
       UserDefaults.standard.set(typedSetsTaken, forKey: Self.typedSetsTakenKey)
     }
-    guard fresh else { return false }
-    onHandSet(set, road)
-    return true
+    return fresh
   }
 
   /// Typed sets inside transfers WatchConnectivity received and never handed over (#197: twelve found on

@@ -38,7 +38,13 @@ struct WorkoutGalleryView: View {
     return f
   }()
 
-  private var knownPhotosIDs: Set<String> { Set(store.entries.compactMap(\.photosIdentifier)) }
+  /// The Photos assets already analyzed, by this device's identifiers: this device's sets name theirs; another
+  /// device's set names the owner's, which means nothing here, so its cloud identifier is mapped back (#222).
+  private var knownPhotosIDs: Set<String> {
+    let mine = store.entries.compactMap(\.photosIdentifier)
+    let theirs = store.entries.filter { !SyncOwnership.isMine($0.device, me: SyncStore.deviceID) }.compactMap(\.cloudIdentifier)
+    return Set(mine + RecentsStore.localIdentifiers(forCloud: theirs))
+  }
 
   /// Older than a week: the days that start folded.
   private static func isOld(_ day: Date) -> Bool {

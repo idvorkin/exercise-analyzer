@@ -194,10 +194,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Asked by the exporter before each clip (story 070, step 3): the run ends under the camera's live pass and
   /// the launch refresh, which reads sets from their files, and leaves the set that is open or opening, whose
-  /// trim may still be undone.
-  private func exportVerdict(id: String) -> PhotosExporter.Verdict {
+  /// trim may still be undone. Leaving the app from a set is leaving the set (#223): its clip is saved too, kept
+  /// here until the set is left in the app, unless a trim can still be undone.
+  private func exportVerdict(id: String, reason: String) -> PhotosExporter.Verdict {
     if refreshing || source == .camera { return .stop }
-    return id == (clipOperations.current?.entryID ?? currentEntryID) ? .skip : .save
+    guard id == (clipOperations.current?.entryID ?? currentEntryID) else { return .save }
+    return reason == "background" && !canUndoTrim ? .keep : .skip
   }
 
   /// The one-time ask's numbers: the sets whose clip lives only here, and their size.
@@ -279,7 +281,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
           ])
         if read.samples.count > kept {
           self.heartRate = read
-          if let folder { try? read.save(to: folder) }
+          if let folder {
+            try? read.save(to: folder)
+            self.sync?.mirrorChanges()  // the fuller series goes up with the set (#225)
+          }
         }
         guard read.isAwaitingSamples(until: spanEnd, now: Date()) else { return }
         try? await Task.sleep(for: .seconds(20))
@@ -329,8 +334,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     WorkoutLiveActivity.shared.install(mirror: .shared, recents: recents)
     // Every set and workout mirrored into the iCloud container for the iPad (story 070, step 1).
     sync = SyncStore(recents: recents, workouts: .shared) { [weak self] type, fields in self?.log.event(type, fields) }
-    exporter = PhotosExporter(recents: recents) { [weak self] id in
-      self?.exportVerdict(id: id) ?? .stop
+    exporter = PhotosExporter(recents: recents) { [weak self] id, reason in
+      self?.exportVerdict(id: id, reason: reason) ?? .stop
     } log: { [weak self] type, fields in
       self?.log.event(type, fields)
     }
@@ -344,7 +349,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
     watch.onRetry = { [weak self] in self?.answerRetry(via: "queued") }
     WorkoutMirror.shared.onStatusWanted = { [weak self] in self?.answerRetry(via: "workout") }
     // A set typed on the wrist (059): a Workouts entry with no clip, once per id however often it arrives.
-    watch.onHandSet = { [weak self] set, road in self?.addByHand(set, from: road) }
+    watch.onHandSet = { [weak self] set, road in self?.addByHand(set, from: road) ?? false }
     watch.recoverInbox()
     WorkoutMirror.shared.$live.map { $0 != nil }.removeDuplicates().dropFirst().receive(on: DispatchQueue.main)
       .sink { [weak self] _ in self?.updateKeepAwake() }.store(in: &cancellables)
@@ -869,6 +874,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
     Task {
       guard isCurrent(operation) else { return }
       let url: URL?
+      // Another device's set names its asset by the owner's identifier; what acts on the asset here (a replace,
+      // the suggestions) needs this device's (#222), learnt from the fetch.
+      var localPhotosID = photosID(entry)
       if case .photos(let identifier) = entry.source {
         // An old set may live only in iCloud: show the download rather than a tap that seems to do nothing (#35).
         activity = .working("Loading from Photos", progress: nil)
@@ -884,6 +892,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
             "error": fetch.error ?? "",
           ])
         url = fetch.url
+        if let local = fetch.localIdentifier { localPhotosID = local }
       } else {
         url = await recents.clipURL(for: entry)
       }
@@ -896,12 +905,16 @@ final class VideoPoseSession: NSObject, ObservableObject {
       }
       guard let pipeline = recents.loadPipeline(for: entry) else {
         statusMessage = "Stored analysis unreadable; re-analyzing"
-        load(url: url, recordedAt: entry.recordedAt, operation: operation)
+        // The re-analysis saves the set under the operation's origin: this device's identifier, not the owner's.
+        let renamed = entry.isInPhotos && localPhotosID != photosID(entry)
+        load(
+          url: url, recordedAt: entry.recordedAt,
+          operation: renamed ? beginOperation(entryID: entry.id, origin: .photos(identifier: localPhotosID)) : operation)
         return
       }
       currentFileURL = url
       trimmedURL = nil
-      currentOrigin = entry.isInPhotos ? .photos(identifier: photosID(entry)) : .file
+      currentOrigin = entry.isInPhotos ? .photos(identifier: localPhotosID) : .file
       currentEntryID = entry.id
       currentRecordedAt = entry.recordedAt
       currentClipStartedAt = entry.clipStartedAt
@@ -1300,12 +1313,22 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// A set typed by hand: on the wrist (059) or from a tap on a workout's chart (#178). Once per id however often
   /// it arrives.
-  func addByHand(_ set: HandSet, from place: String) {
-    let added = recents.add(set)
+  /// False only when the index could not be written: the set is not in, and the watch bridge must not count it as
+  /// taken (the 2026-10-07 review). A repeat delivery is in already and counts as taken.
+  @discardableResult
+  func addByHand(_ set: HandSet, from place: String) -> Bool {
+    let added: Bool
+    do {
+      added = try recents.add(set)
+    } catch {
+      log.event("error", ["where": "set_by_hand", "id": set.id, "message": "\(error)"])
+      return false
+    }
     log.event(
       "set_by_hand",
       ["id": set.id, "exercise": set.exercise.rawValue, "reps": set.reps, "at": set.at, "duplicate": !added,
        "where": place])
+    return true
   }
 
   /// The bell's weight the lifter tapped for a set (066), with the detector's colour reading beside it when the set

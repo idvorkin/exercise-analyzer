@@ -16,7 +16,8 @@ final class RecentsStore: ObservableObject {
   /// What was wrong with index.json at launch, if anything; the session logs it.
   let indexDamage: IndexDamage?
 
-  private let root: URL
+  /// The recents directory; `folder(for:)` is a set's folder under it. Read off the main actor by the sync store.
+  let root: URL
 
   /// `root` is the recents directory itself; nil keeps Documents/recents. A caller-supplied root exists so the
   /// index flow is host-testable — the entry metadata lives in ExerciseCore (RecentsIndex) and its tests run
@@ -172,12 +173,19 @@ final class RecentsStore: ObservableObject {
   }
 
   /// A set typed on the wrist (story 059): an entry with no folder and no files. False for an id already here
-  /// or removed since launch: a repeat delivery is one set.
-  func add(_ set: HandSet) -> Bool {
+  /// or removed since launch: a repeat delivery is one set. Throws when the index could not be written, the set
+  /// not added, so the caller does not count it as taken (the 2026-10-07 review).
+  func add(_ set: HandSet) throws -> Bool {
     var index = RecentsIndex(entries: entries)
     guard !removedIDs.contains(set.id), index.add(set) else { return false }
+    let before = entries
     entries = index.entries
-    try? persistIndex()
+    do {
+      try persistIndex()
+    } catch {
+      entries = before
+      throw error
+    }
     return true
   }
 
@@ -186,7 +194,11 @@ final class RecentsStore: ObservableObject {
   /// suggestions' Ignored tab so it is not offered as a new set.
   func keepByHand(id: String, exercise: ExerciseKind, reps: Int) {
     guard let entry = entry(id: id) else { return }
-    if let identifier = entry.photosIdentifier { PhotosSuggestions.ignore(identifier: identifier) }
+    if let identifier = entry.photosIdentifier {
+      PhotosSuggestions.ignore(identifier: identifier)
+      // Another device's set: the asset is known here by this device's identifier (#222).
+      if let cloud = entry.cloudIdentifier, let local = Self.localIdentifier(cloud: cloud) { PhotosSuggestions.ignore(identifier: local) }
+    }
     var kept = entry.keptByHand(exercise: exercise, reps: reps)
     Self.touch(&kept)
     entries = entries.map { $0.id == id ? kept : $0 }
@@ -224,9 +236,10 @@ final class RecentsStore: ObservableObject {
     return result
   }
 
-  /// After a local recording is saved to Photos: point at the asset and drop the in-app copy.
+  /// After a local recording is saved to Photos: point at the asset and drop the in-app copy. A set kept by hand
+  /// has no clip to point anywhere and stays as it is (the 2026-10-07 review).
   func markSavedToPhotos(id: String, identifier: String) {
-    guard var entry = entry(id: id) else { return }
+    guard var entry = entry(id: id), !entry.isByHand else { return }
     if case .file(let name) = entry.source {
       try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name))
     }
@@ -355,6 +368,14 @@ final class RecentsStore: ObservableObject {
     return mappings.values.first.flatMap { try? $0.get() }
   }
 
+  /// This device's identifiers for assets other devices named by cloud identifier (#222): the ones iCloud Photos
+  /// has brought here. One Photos call for the lot.
+  static func localIdentifiers(forCloud clouds: [String]) -> [String] {
+    guard !clouds.isEmpty else { return [] }
+    let mappings = PHPhotoLibrary.shared().localIdentifierMappings(for: clouds.map { PHCloudIdentifier(stringValue: $0) })
+    return mappings.values.compactMap { try? $0.get() }
+  }
+
   /// The cloud identifiers of this device's assets, by local identifier; an asset iCloud has no identifier for
   /// (no account, or gone) is left out.
   static func cloudIdentifiers(for locals: [String]) -> [String: String] {
@@ -375,6 +396,9 @@ final class RecentsStore: ObservableObject {
     var inCloud = false
     var error: String?
     var seconds: Double = 0
+    /// This device's identifier for the asset that answered: the owner's own, or the one its cloud identifier
+    /// mapped to here (#222), for whatever acts on the asset next (a replace, the suggestions).
+    var localIdentifier: String?
   }
 
   static func fetchPhotosClip(
@@ -386,6 +410,7 @@ final class RecentsStore: ObservableObject {
       found = PHAsset.fetchAssets(withLocalIdentifiers: [local], options: nil).firstObject
     }
     guard let asset = found else { return PhotosFetch(error: "not in Photos") }
+    let local = asset.localIdentifier
     let started = Date()
     let options = PHVideoRequestOptions()
     options.isNetworkAccessAllowed = true
@@ -405,7 +430,7 @@ final class RecentsStore: ObservableObject {
           returning: PhotosFetch(
             url: (avAsset as? AVURLAsset)?.url, inCloud: inCloud,
             error: (info?[PHImageErrorKey] as? Error).map { "\($0)" },
-            seconds: Date().timeIntervalSince(started)))
+            seconds: Date().timeIntervalSince(started), localIdentifier: local))
       }
     }
   }
