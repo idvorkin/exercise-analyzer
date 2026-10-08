@@ -9,6 +9,7 @@
 import ExerciseCore
 import Foundation
 import Photos
+import UIKit
 
 @MainActor
 final class PhotosExporter {
@@ -16,12 +17,14 @@ final class PhotosExporter {
   private static let deferredUntilKey = "photosExportDeferredUntil"
   private static let sinceKey = "photosExportSince"
 
-  /// What the session says about one set, asked before each clip: save it, leave it (it is open), or end the run
-  /// (the camera is live or the launch refresh is reading sets); the next trigger picks up what is left.
-  enum Verdict { case save, skip, stop }
+  /// What the session says about one set, asked before each clip with the run's reason: save it, save it but keep
+  /// its clip (the set on screen as the app goes to the background: the asset is remembered, the set points at it
+  /// once left, #223), leave it (it is open), or end the run (the camera is live or the launch refresh is reading
+  /// sets); the next trigger picks up what is left.
+  enum Verdict { case save, keep, skip, stop }
 
   private let recents: RecentsStore
-  private let verdict: (String) -> Verdict
+  private let verdict: (String, String) -> Verdict
   private let log: (String, [String: Any]) -> Void
   private var running = false
   /// A trigger that came during a run: its reason, run once more when the run ends.
@@ -38,7 +41,7 @@ final class PhotosExporter {
   }
 
   init(
-    recents: RecentsStore, verdict: @escaping (String) -> Verdict, log: @escaping (String, [String: Any]) -> Void
+    recents: RecentsStore, verdict: @escaping (String, String) -> Verdict, log: @escaping (String, [String: Any]) -> Void
   ) {
     self.recents = recents
     self.verdict = verdict
@@ -93,8 +96,11 @@ final class PhotosExporter {
     }
     guard !due.isEmpty else { return }
     running = true
+    // The background trigger's save must not be cut short by the suspension that follows it (#223).
+    let task = UIApplication.shared.beginBackgroundTask(withName: "photos_export")
     Task {
       await save(due, reason: reason)
+      UIApplication.shared.endBackgroundTask(task)
       running = false
       if let reason = again {
         again = nil
@@ -107,10 +113,10 @@ final class PhotosExporter {
     var left = due.count
     for entry in due {
       left -= 1
-      switch verdict(entry.id) {
+      switch verdict(entry.id, reason) {
       case .stop: return
       case .skip: continue
-      case .save: break
+      case .save, .keep: break
       }
       guard let current = recents.entry(id: entry.id), case .file(let name) = current.source,
         let url = exportableClip(current)
@@ -143,9 +149,10 @@ final class PhotosExporter {
         // clip until it is left and the next run points it at this asset; trimmed or kept by hand, the asset is of
         // a clip that is gone and nothing may point at it; still the same clip and closed, it points at the asset,
         // unless Photos cannot read the asset back (add-only access): then the clip stays, the only playable copy.
+        let now = verdict(entry.id, reason)
         switch PhotosExportDecision.afterSave(
           entry: recents.entry(id: entry.id), clip: name, clipChanged: Self.modified(url) != modified,
-          open: verdict(entry.id) == .skip, readable: RecentsStore.photosAssetExists(identifier: identifier))
+          open: now == .skip || now == .keep, readable: RecentsStore.photosAssetExists(identifier: identifier))
         {
         case .orphaned:
           log("photos_export_orphaned", ["id": entry.id, "reason": reason, "asset": identifier])

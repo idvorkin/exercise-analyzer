@@ -742,7 +742,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** Recordings go to Photos
 - **Given:** I record a set on the phone
 - **When:** I leave the set (the next set, the camera, the app to the background) or launch the app again
-- **Then:** the clip has been saved to Photos by itself, as "Save to Photos" does, so iCloud Photos carries it to the iPad; while the set is on screen it stays in the app, so Undo trim still works, and nothing is written while the camera is live; a clip that is a copy of a video already in Photos (a trim whose replace I declined, a pick without library access) is not saved again; the set's counts and pictures stay in the app either way
+- **Then:** the clip has been saved to Photos by itself, as "Save to Photos" does, so iCloud Photos carries it to the iPad; while the set is on screen it stays in the app, so Undo trim still works (leaving the app from the set saves its clip too, unless a trim can still be undone; the set points at the asset once I leave it in the app), and nothing is written while the camera is live; a clip that is a copy of a video already in Photos (a trim whose replace I declined, a pick without library access) is not saved again; the set's counts and pictures stay in the app either way
 
 - **Scenario:** The sets from before go to Photos once
 - **Given:** 49 sets recorded before this build have their clips only in the app

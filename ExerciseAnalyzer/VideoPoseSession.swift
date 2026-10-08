@@ -194,10 +194,12 @@ final class VideoPoseSession: NSObject, ObservableObject {
 
   /// Asked by the exporter before each clip (story 070, step 3): the run ends under the camera's live pass and
   /// the launch refresh, which reads sets from their files, and leaves the set that is open or opening, whose
-  /// trim may still be undone.
-  private func exportVerdict(id: String) -> PhotosExporter.Verdict {
+  /// trim may still be undone. Leaving the app from a set is leaving the set (#223): its clip is saved too, kept
+  /// here until the set is left in the app, unless a trim can still be undone.
+  private func exportVerdict(id: String, reason: String) -> PhotosExporter.Verdict {
     if refreshing || source == .camera { return .stop }
-    return id == (clipOperations.current?.entryID ?? currentEntryID) ? .skip : .save
+    guard id == (clipOperations.current?.entryID ?? currentEntryID) else { return .save }
+    return reason == "background" && !canUndoTrim ? .keep : .skip
   }
 
   /// The one-time ask's numbers: the sets whose clip lives only here, and their size.
@@ -332,8 +334,8 @@ final class VideoPoseSession: NSObject, ObservableObject {
     WorkoutLiveActivity.shared.install(mirror: .shared, recents: recents)
     // Every set and workout mirrored into the iCloud container for the iPad (story 070, step 1).
     sync = SyncStore(recents: recents, workouts: .shared) { [weak self] type, fields in self?.log.event(type, fields) }
-    exporter = PhotosExporter(recents: recents) { [weak self] id in
-      self?.exportVerdict(id: id) ?? .stop
+    exporter = PhotosExporter(recents: recents) { [weak self] id, reason in
+      self?.exportVerdict(id: id, reason: reason) ?? .stop
     } log: { [weak self] type, fields in
       self?.log.event(type, fields)
     }
