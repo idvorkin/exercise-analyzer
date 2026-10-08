@@ -228,8 +228,16 @@ final class SyncStore {
     reading = true
     let me = Self.deviceID
     let log = log
+    let deleted = recents.deleted
+    let recentsRoot = recents.root
     Task.detached(priority: .utility) { [container] in
       let found = Self.scan(container)
+      // The other devices' files go in before their rows are shown (the 2026-10-07 review): a set tapped before
+      // its analysis arrived would be re-analyzed here instead of read.
+      let theirs = found.sets.filter {
+        !SyncOwnership.isMine($0.device, me: me) && found.setTombstones[$0.id] == nil && deleted[$0.id] == nil
+      }.map { (from: container.appendingPathComponent("sets/\($0.id)", isDirectory: true), to: recentsRoot.appendingPathComponent($0.id, isDirectory: true)) }
+      let copied = Self.copyFiles(theirs)
       await MainActor.run {
         // A delete made here whose tombstone is not written yet keeps its row out all the same.
         let sets = self.recents.mergeRemote(
@@ -253,26 +261,20 @@ final class SyncStore {
           rewrite = true
         }
         if rewrite { self.mirrorChanges() }
-        let theirs = self.recents.entries.filter { !SyncOwnership.isMine($0.device, me: me) }
-          .map { (from: container.appendingPathComponent("sets/\($0.id)", isDirectory: true), to: self.recents.folder(for: $0.id)) }
-        Task.detached(priority: .utility) {
-          let copied = Self.copyFiles(theirs)
-          await MainActor.run {
-            if sets.changed || workouts.changed || copied.files > 0 || waiting > 0 || copied.waiting > 0 {
-              log(
-                "sync_read",
-                [
-                  "sets": found.sets.count, "added": sets.added, "updated": sets.updated, "removed": sets.removed,
-                  "workouts_added": workouts.added, "workouts_updated": workouts.updated, "workouts_removed": workouts.removed,
-                  "files": copied.files, "bytes": copied.bytes, "waiting": waiting + copied.waiting,
-                ])
-            }
-            self.reading = false
-            if self.readAgain {
-              self.readAgain = false
-              self.readContainer()
-            }
-          }
+        let stillWaiting = waiting + copied.waiting + found.waitingSets
+        if sets.changed || workouts.changed || copied.files > 0 || stillWaiting > 0 {
+          log(
+            "sync_read",
+            [
+              "sets": found.sets.count, "added": sets.added, "updated": sets.updated, "removed": sets.removed,
+              "workouts_added": workouts.added, "workouts_updated": workouts.updated, "workouts_removed": workouts.removed,
+              "files": copied.files, "bytes": copied.bytes, "waiting": stillWaiting,
+            ])
+        }
+        self.reading = false
+        if self.readAgain {
+          self.readAgain = false
+          self.readContainer()
         }
       }
     }
@@ -282,13 +284,16 @@ final class SyncStore {
     var sets: [RecentEntry] = []
     /// Sets any device deleted, by id, with when (`deleted.json`'s deletedAt).
     var setTombstones: [String: Date] = [:]
+    /// Rows held back because their analysis is not down yet: read next pass.
+    var waitingSets = 0
     var workouts: [StoredWorkout] = []
     var workoutTombstones: [String: Date] = [:]
   }
 
   /// Off the main thread: what the container holds. A file iCloud has not brought down yet is a `.<name>.icloud`
   /// placeholder, left for the next pass. A set's tombstone is `deleted.json` in its folder, a workout's is
-  /// `workouts/<id>.deleted.json`; both say when.
+  /// `workouts/<id>.deleted.json`; both say when. A set whose analysis is not down yet is not a set to show yet
+  /// (the 2026-10-07 review): its row waits for the next pass, the analysis is asked for.
   private nonisolated static func scan(_ container: URL) -> Found {
     let fm = FileManager.default
     var found = Found()
@@ -302,6 +307,12 @@ final class SyncStore {
       guard let data = try? read(dir.appendingPathComponent("row.json")),
         let row = try? JSONDecoder().decode(RecentEntry.self, from: data), row.id == id
       else { continue }
+      let analysis = dir.appendingPathComponent("analysis.json")
+      if !row.isByHand, !fm.fileExists(atPath: analysis.path) {
+        found.waitingSets += 1
+        try? fm.startDownloadingUbiquitousItem(at: analysis)
+        continue
+      }
       found.sets.append(row)
     }
     let workouts = container.appendingPathComponent("workouts", isDirectory: true)

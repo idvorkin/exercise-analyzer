@@ -16,7 +16,8 @@ final class RecentsStore: ObservableObject {
   /// What was wrong with index.json at launch, if anything; the session logs it.
   let indexDamage: IndexDamage?
 
-  private let root: URL
+  /// The recents directory; `folder(for:)` is a set's folder under it. Read off the main actor by the sync store.
+  let root: URL
 
   /// `root` is the recents directory itself; nil keeps Documents/recents. A caller-supplied root exists so the
   /// index flow is host-testable — the entry metadata lives in ExerciseCore (RecentsIndex) and its tests run
