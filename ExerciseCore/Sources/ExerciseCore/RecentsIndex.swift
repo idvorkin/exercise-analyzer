@@ -140,6 +140,11 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
     guard case .file = source else { return false }
     return photosCopy != true
   }
+
+  /// A recording made here whose clip lives only in the app: what goes to Photos by itself. An imported file
+  /// (`originalName`) stays: its original is in the library already, most likely (Igor, 2026-10-08: the 13
+  /// imported clips among the 49 in-app ones would have been duplicates).
+  public var recordedOnlyInApp: Bool { clipOnlyInApp && originalName == nil }
 }
 
 /// What deleting a set says before it does it (#111; Igor asked for it to differ by whether the video is "on

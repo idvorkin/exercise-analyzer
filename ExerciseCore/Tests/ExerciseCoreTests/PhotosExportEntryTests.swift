@@ -23,6 +23,16 @@ final class PhotosExportEntryTests: XCTestCase {
     XCTAssertFalse(entry(.byHand).clipOnlyInApp)
   }
 
+  func testOnlyARecordingMadeHereGoesToPhotosByItself() {
+    XCTAssertTrue(entry(.file(name: "clip.mov")).recordedOnlyInApp)
+    var imported = entry(.file(name: "clip.mov"))
+    imported.originalName = "clip.mov"
+    XCTAssertTrue(imported.clipOnlyInApp)
+    XCTAssertFalse(imported.recordedOnlyInApp)
+    XCTAssertFalse(entry(.photos(identifier: "p1")).recordedOnlyInApp)
+    XCTAssertFalse(entry(.byHand).recordedOnlyInApp)
+  }
+
   func testARowFromBeforeTheMarkIsExported() throws {
     let data = try JSONEncoder().encode(entry(.file(name: "clip.mov")))
     var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])

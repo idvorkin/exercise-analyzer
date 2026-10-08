@@ -339,16 +339,43 @@ enum VideoFile {
     }
   }
 
-  /// Saves the clip to Photos and returns the new asset's local identifier.
+  /// The album the app's clips go into (Igor, 2026-10-08), made when first needed. Nil without read access:
+  /// albums cannot be found under add-only access, and making one per save would litter the library.
+  static let albumName = "Exercise Analyzer"
+
+  /// Saves the clip to Photos, in the app's album, and returns the new asset's local identifier.
   static func saveToPhotos(_ url: URL) async throws -> String? {
     let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
     guard status == .authorized || status == .limited else { throw VideoFileError.photosDenied }
+    let album = try await album()
     var identifier: String?
     try await PHPhotoLibrary.shared().performChanges {
       let request = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
       identifier = request?.placeholderForCreatedAsset?.localIdentifier
+      if let album, let placeholder = request?.placeholderForCreatedAsset,
+        let change = PHAssetCollectionChangeRequest(for: album)
+      {
+        change.addAssets([placeholder] as NSArray)
+      }
     }
     return identifier
+  }
+
+  private static func album() async throws -> PHAssetCollection? {
+    let read = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    guard read == .authorized || read == .limited else { return nil }
+    let options = PHFetchOptions()
+    options.predicate = NSPredicate(format: "title = %@", albumName)
+    if let found = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: options).firstObject {
+      return found
+    }
+    var placeholder: PHObjectPlaceholder?
+    try await PHPhotoLibrary.shared().performChanges {
+      placeholder = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: albumName)
+        .placeholderForCreatedAssetCollection
+    }
+    guard let id = placeholder?.localIdentifier else { return nil }
+    return PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject
   }
 }
 

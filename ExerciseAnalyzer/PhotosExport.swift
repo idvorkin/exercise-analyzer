@@ -84,7 +84,7 @@ final class PhotosExporter {
   private func isNew(_ entry: RecentEntry) -> Bool { (entry.recordedAt ?? entry.analyzedAt) >= since }
 
   private func exportableClip(_ entry: RecentEntry) -> URL? {
-    entry.clipOnlyInApp ? recents.clipFileURL(for: entry) : nil
+    entry.recordedOnlyInApp ? recents.clipFileURL(for: entry) : nil
   }
 
   /// Saves the clips due: every new recording, and the backlog once approved, each only while the session says
