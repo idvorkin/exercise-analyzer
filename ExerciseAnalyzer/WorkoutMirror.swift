@@ -144,6 +144,12 @@ final class WorkoutMirror: NSObject, ObservableObject {
   func delete(_ session: StoredWorkout) async -> WorkoutDeletion {
     let parts = index.removeSession(session)
     var deletion = WorkoutDeletion(rows: parts.count)
+    // Their tombstones, dated now, for SyncStore to write (070, step 4).
+    if !parts.isEmpty {
+      let now = Date()
+      for part in parts { deleted[part.id] = now }
+      UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
+    }
     for part in parts {
       try? FileManager.default.removeItem(
         at: root.appendingPathComponent("workouts", isDirectory: true).appendingPathComponent(part.id, isDirectory: true))
@@ -181,14 +187,26 @@ final class WorkoutMirror: NSObject, ObservableObject {
     return deletion
   }
 
-  /// Workouts other devices put in the iCloud container (story 070, step 2), as `WorkoutIndex.merge` takes them.
-  func mergeRemote(_ rows: [StoredWorkout], tombstones: Set<String>, me: String) -> SyncMergeResult {
+  /// Workouts other devices put in the iCloud container and the ones deleted there (story 070, steps 2 and 4),
+  /// as `WorkoutIndex.merge` takes them. Merged into a copy: the published index moves only when something did.
+  func mergeRemote(_ rows: [StoredWorkout], tombstones: [String: Date], me: String) -> SyncMergeResult {
     var merged = index
     let result = merged.merge(remote: rows, tombstones: tombstones, me: me)
     guard result.changed else { return result }
     index = merged
     try? index.save(root: root)
     return result
+  }
+
+  private static let deletedKey = "workoutsRemovedRemote"
+  /// Workouts deleted here, this device's and others', with when, until SyncStore has written their tombstones
+  /// (step 4), dated from this.
+  private(set) var deleted: [String: Date] =
+    UserDefaults.standard.dictionary(forKey: deletedKey) as? [String: Date] ?? [:]
+
+  func clearDeleted(_ ids: [String]) {
+    for id in ids { deleted[id] = nil }
+    UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
   }
 
   /// Test hook (#123): the simulator has no watch, so SWING_LIVE_WORKOUT=<minutes> pretends a workout began

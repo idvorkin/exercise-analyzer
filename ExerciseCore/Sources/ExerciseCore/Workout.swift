@@ -154,6 +154,10 @@ public struct StoredWorkout: Codable, Hashable, Identifiable, Sendable {
   public var reps: Int
   /// The device whose row this is in the iCloud container (story 070); nil for this device's own (`RecentEntry.device`).
   public var device: String? = nil
+  /// When a device last changed the row; nil for one never changed since it ended (`end` stands in, `changedAt`).
+  public var modifiedAt: Date? = nil
+
+  public var changedAt: Date { modifiedAt ?? end }
 
   public init(
     id: String = UUID().uuidString, start: Date, end: Date, heartRateAverage: Int? = nil, heartRateMax: Int? = nil,

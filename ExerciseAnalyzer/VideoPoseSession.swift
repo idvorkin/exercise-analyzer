@@ -468,9 +468,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
       "recents_refresh_wait",
       ["predictor": predictor != nil, "waited_ms": Int(Date().timeIntervalSince(waitStarted) * 1000), "plans": plans,
        "models": models.names])
-    // A set typed on the wrist has no poses and no clip: nothing to re-read or re-run (059).
+    // A set typed on the wrist has no poses and no clip: nothing to re-read or re-run (059). Another device's
+    // set is its owner's to re-analyze; the new row arrives by sync (070, step 4).
     let stale = recents.entries.filter {
-      !$0.isByHand && (recents.isStale($0) || !Set(models.names).isSubset(of: storedModels($0)))
+      !$0.isByHand && SyncOwnership.isMine($0.device, me: SyncStore.deviceID)
+        && (recents.isStale($0) || !Set(models.names).isSubset(of: storedModels($0)))
     }
     guard !stale.isEmpty else {
       log.event("recents_refresh_start", ["count": 0, "version": AnalysisVersion.current, "models": models.names])

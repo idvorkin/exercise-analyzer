@@ -1,8 +1,10 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-//  Story 070, step 2: how rows read from the iCloud container merge into a device's own indexes. Every row in
-//  the container carries the id of the device that made or last changed it, and that device alone writes it; a
-//  device merges only rows that are not its own, and a remote row never displaces a set this device owns.
+//  Story 070, steps 2 and 4: how rows read from the iCloud container merge into a device's own indexes. Every row
+//  in the container carries the id of the device that made or last changed it, and that device alone writes it;
+//  a device merges only rows that are not its own. The later change wins: a remote row replaces ours when it
+//  was changed after ours was, whoever owns it, and a tombstone removes a set unless ours was changed after the
+//  delete.
 
 import Foundation
 
@@ -26,27 +28,29 @@ public struct SyncMergeResult: Equatable, Sendable {
 }
 
 extension RecentsIndex {
-  /// Rows other devices wrote and the ids they deleted. A new id is added; the row of a set another device owns
-  /// replaces ours when it differs; a tombstone removes such a set. A set this device owns is untouched, as are
-  /// its own rows read back. A row with no device is from a build before this and waits for its owner to
-  /// rewrite it: taken as is, it would read as ours. Newest first, as `load` keeps it.
-  public mutating func merge(remote rows: [RecentEntry], tombstones: Set<String>, me: String) -> SyncMergeResult {
+  /// Rows other devices wrote and the sets any device deleted, with when. A new id is added unless a tombstone
+  /// is as new as the row; a row changed after ours replaces it; a tombstone as new as our row removes the set,
+  /// our own included. Our own rows read back are skipped, as is a row with no device, from a build before
+  /// this, which waits for its owner to rewrite it: taken as is, it would read as ours. Newest first, as `load`
+  /// keeps it.
+  public mutating func merge(remote rows: [RecentEntry], tombstones: [String: Date], me: String) -> SyncMergeResult {
     var result = SyncMergeResult()
     var byID = Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     for row in rows where row.device != nil && row.device != me {
+      if let deletedAt = tombstones[row.id], deletedAt >= row.changedAt { continue }
       if let have = byID[row.id] {
-        guard !SyncOwnership.isMine(have.device, me: me), have != row else { continue }
+        guard row.changedAt > have.changedAt, have != row else { continue }
         byID[row.id] = row
         result.updated += 1
         result.changedIDs.append(row.id)
-      } else if !tombstones.contains(row.id) {
+      } else {
         byID[row.id] = row
         result.added += 1
         result.changedIDs.append(row.id)
       }
     }
-    for id in tombstones {
-      guard let have = byID[id], !SyncOwnership.isMine(have.device, me: me) else { continue }
+    for (id, deletedAt) in tombstones {
+      guard let have = byID[id], deletedAt >= have.changedAt else { continue }
       byID[id] = nil
       result.removed += 1
       result.removedIDs.append(id)
@@ -57,25 +61,25 @@ extension RecentsIndex {
 }
 
 extension WorkoutIndex {
-  /// The same for workouts: a workout another device owns follows that device's row, and goes when its id is
-  /// among `tombstones` (a workout file the owner removed). This device's own workouts are untouched.
-  public mutating func merge(remote rows: [StoredWorkout], tombstones: Set<String>, me: String) -> SyncMergeResult {
+  /// The same for workouts.
+  public mutating func merge(remote rows: [StoredWorkout], tombstones: [String: Date], me: String) -> SyncMergeResult {
     var result = SyncMergeResult()
     var byID = Dictionary(workouts.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     for row in rows where row.device != nil && row.device != me {
+      if let deletedAt = tombstones[row.id], deletedAt >= row.changedAt { continue }
       if let have = byID[row.id] {
-        guard !SyncOwnership.isMine(have.device, me: me), have != row else { continue }
+        guard row.changedAt > have.changedAt, have != row else { continue }
         byID[row.id] = row
         result.updated += 1
         result.changedIDs.append(row.id)
-      } else if !tombstones.contains(row.id) {
+      } else {
         byID[row.id] = row
         result.added += 1
         result.changedIDs.append(row.id)
       }
     }
-    for id in tombstones {
-      guard let have = byID[id], !SyncOwnership.isMine(have.device, me: me) else { continue }
+    for (id, deletedAt) in tombstones {
+      guard let have = byID[id], deletedAt >= have.changedAt else { continue }
       byID[id] = nil
       result.removed += 1
       result.removedIDs.append(id)

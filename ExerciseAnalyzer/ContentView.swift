@@ -1159,10 +1159,12 @@ struct ContentView: View {
         }
         // Test hook (#111): 4 s after the set opens, what a tap on the trash does ("prompt": the dialog is up
         // for a screenshot) or what its red button does ("confirm": the set is deleted, `set_deleted` logs).
+        // Both hooks fall back to the set asked for when its clip is not here to open (another device's set on
+        // the sync rung, story 070): the delete and the weight work from the workout's page without a clip too.
         if let delete = env["SWING_DELETE_SET"] {
           Task { @MainActor in
             try? await Task.sleep(for: .seconds(4))
-            guard let current = session.currentEntry else { return }
+            guard let current = session.currentEntry ?? session.recents.entry(id: entry.id) else { return }
             if delete == "confirm" { session.delete(set: current, from: "hook") } else { deleting = current }
           }
         }
@@ -1171,7 +1173,7 @@ struct ContentView: View {
         if let weight = env["SWING_SET_BELL_KG"] {
           Task { @MainActor in
             try? await Task.sleep(for: .seconds(4))
-            guard let current = session.currentEntry else { return }
+            guard let current = session.currentEntry ?? session.recents.entry(id: entry.id) else { return }
             if let kg = Int(weight) { session.setBellKg(kg, for: current, from: "hook") } else { weighingLoadedSet = current }
           }
         }

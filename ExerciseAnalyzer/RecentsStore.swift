@@ -30,7 +30,14 @@ final class RecentsStore: ObservableObject {
     try? RecentsSave.recover(root: self.root)
     var index = RecentsIndex.load(root: self.root)
     indexDamage = index.damage
-    if index.backfill(root: self.root) { try? index.save(root: self.root) }
+    let loaded = index.entries
+    if index.backfill(root: self.root) {
+      for i in index.entries.indices
+      where index.entries[i] != loaded[i] && SyncOwnership.isMine(index.entries[i].device, me: SyncStore.deviceID) {
+        Self.touch(&index.entries[i])
+      }
+      try? index.save(root: self.root)
+    }
     entries = index.entries
     // An in-app set's stash serves only an undo in this run (#199): one found at launch was left by a crash or a
     // kill mid-trim. A Photos replace's stash sits on a Photos entry and stays.
@@ -92,6 +99,7 @@ final class RecentsStore: ObservableObject {
       entry.models = models
       entry.clipStartedAt = clipStartedAt ?? entry.clipStartedAt
       if thumbnail != nil { entry.thumbnail = "thumbnail.jpg" }
+      Self.touch(&entry)
       return entry
     } writeFiles: { dir in
       if case .file(let name) = source {
@@ -118,12 +126,45 @@ final class RecentsStore: ObservableObject {
         try data.write(to: dir.appendingPathComponent("thumbnail.jpg"), options: .atomic)
       }
     }
-    removedIDs.formUnion(Set(entries.map(\.id)).subtracting(saved.entries.map(\.id)))
+    let retired = Set(entries.map(\.id)).subtracting(saved.entries.map(\.id))
+    removedIDs.formUnion(retired)
+    noteDeleted(Array(retired))
     entries = saved.entries
   }
 
   /// Ids removed since launch: `save` refuses them. In memory only, a relaunch has no pass under way.
   private var removedIDs: Set<String> = []
+
+  /// A change made here (story 070, step 4): the row is this device's from now on, and the later change wins
+  /// when another device changed the same set.
+  static func touch(_ entry: inout RecentEntry) {
+    entry.modifiedAt = Date()
+    entry.device = SyncStore.deviceID
+  }
+
+  private static let deletedKey = "recentsRemovedRemote"
+  /// Sets deleted here, this device's and others', with when, until SyncStore has written their tombstones
+  /// (step 4), dated from this. Kept across launches: a tombstone never written would let the set come back on
+  /// the next read, and SyncStore's read keeps them out meanwhile.
+  private(set) var deleted: [String: Date] =
+    UserDefaults.standard.dictionary(forKey: deletedKey) as? [String: Date] ?? [:]
+
+  private func noteDeleted(_ ids: [String]) {
+    guard !ids.isEmpty else { return }
+    let now = Date()
+    for id in ids { deleted[id] = now }
+    UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
+  }
+
+  func clearDeleted(_ ids: [String]) {
+    for id in ids { deleted[id] = nil }
+    UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
+  }
+
+  /// Sets whose delete lost to a later change on another device: they come back by sync and save again.
+  func undelete(_ ids: [String]) {
+    removedIDs.subtract(ids)
+  }
 
   struct RemovedSetError: Error, CustomStringConvertible {
     let id: String
@@ -146,7 +187,8 @@ final class RecentsStore: ObservableObject {
   func keepByHand(id: String, exercise: ExerciseKind, reps: Int) {
     guard let entry = entry(id: id) else { return }
     if let identifier = entry.photosIdentifier { PhotosSuggestions.ignore(identifier: identifier) }
-    let kept = entry.keptByHand(exercise: exercise, reps: reps)
+    var kept = entry.keptByHand(exercise: exercise, reps: reps)
+    Self.touch(&kept)
     entries = entries.map { $0.id == id ? kept : $0 }
     try? FileManager.default.removeItem(at: folder(for: id))
     try? persistIndex()
@@ -160,14 +202,16 @@ final class RecentsStore: ObservableObject {
 
   func remove(id: String) {
     removedIDs.insert(id)
+    if entry(id: id) != nil { noteDeleted([id]) }
     entries.removeAll { $0.id == id }
     try? FileManager.default.removeItem(at: folder(for: id))
     try? persistIndex()
   }
 
-  /// Rows other devices put in the iCloud container (story 070, step 2), as `RecentsIndex.merge` takes them: a
-  /// removed set's folder goes with it; the files of added and changed sets are the caller's to copy in.
-  func mergeRemote(_ rows: [RecentEntry], tombstones: Set<String>, me: String) -> SyncMergeResult {
+  /// Rows other devices put in the iCloud container and the sets deleted there (story 070, steps 2 and 4), as
+  /// `RecentsIndex.merge` takes them: a removed set's folder goes with it; the files of added and changed sets
+  /// are the caller's to copy in.
+  func mergeRemote(_ rows: [RecentEntry], tombstones: [String: Date], me: String) -> SyncMergeResult {
     var index = RecentsIndex(entries: entries)
     let result = index.merge(remote: rows, tombstones: tombstones, me: me)
     guard result.changed else { return result }
@@ -186,7 +230,8 @@ final class RecentsStore: ObservableObject {
     if case .file(let name) = entry.source {
       try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name))
     }
-    entry.setSource(.photos(identifier: identifier))
+    entry.setSource(.photos(identifier: identifier))  // a new asset: named again by the mirror
+    Self.touch(&entry)
     entries = entries.map { $0.id == id ? entry : $0 }
     try? persistIndex()
   }
@@ -224,6 +269,7 @@ final class RecentsStore: ObservableObject {
       guard entry.id == id else { return entry }
       var copy = entry
       change(&copy)
+      if copy != entry { Self.touch(&copy) }
       return copy
     }
     try? persistIndex()
@@ -292,6 +338,7 @@ final class RecentsStore: ObservableObject {
       guard let local = entry.photosIdentifier, let cloud = found[local] else { return entry }
       var copy = entry
       copy.cloudIdentifier = cloud
+      Self.touch(&copy)
       return copy
     }
     try? persistIndex()
