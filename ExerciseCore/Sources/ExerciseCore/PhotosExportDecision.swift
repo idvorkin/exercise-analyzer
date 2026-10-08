@@ -28,16 +28,17 @@ public enum PhotosExportDecision {
 
   /// Before saving a set that remembers an asset from an earlier run.
   public enum Remembered: Equatable {
-    /// The asset is there: point at it, no second copy.
+    /// The asset is there and the set is closed: point at it, no second copy.
     case point
-    /// Photos cannot be read (add-only access, or none yet): the asset may well be there; wait, never save again.
+    /// The asset is there but the set is open (its clip stays until it is left, #223), or Photos cannot be read
+    /// (add-only access, or none yet) and the asset may well be there: wait, never save again.
     case wait
     /// Photos can be read and the asset is gone (deleted by hand): forget it and save the clip again.
     case forget
   }
 
-  public static func remembered(assetFound: Bool, canRead: Bool) -> Remembered {
-    if assetFound { return .point }
+  public static func remembered(assetFound: Bool, canRead: Bool, open: Bool) -> Remembered {
+    if assetFound { return open ? .wait : .point }
     return canRead ? .forget : .wait
   }
 }

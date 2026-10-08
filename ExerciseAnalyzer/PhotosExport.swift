@@ -31,6 +31,10 @@ final class PhotosExporter {
   private var again: String?
   /// Sets whose save failed this session: left for the next launch rather than retried on every trigger.
   private var failed: Set<String> = []
+  /// The run's background task (#223), `.invalid` once ended; `expired` when iOS took the time back, so the run
+  /// stops at the next clip.
+  private var backgroundTask = UIBackgroundTaskIdentifier.invalid
+  private var expired = false
   /// Recordings from this moment on are saved without asking; the first launch of the build sets it.
   private let since: Date
 
@@ -97,10 +101,16 @@ final class PhotosExporter {
     guard !due.isEmpty else { return }
     running = true
     // The background trigger's save must not be cut short by the suspension that follows it (#223).
-    let task = UIApplication.shared.beginBackgroundTask(withName: "photos_export")
+    expired = false
+    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "photos_export") { [weak self] in
+      MainActor.assumeIsolated {
+        self?.expired = true
+        self?.endBackgroundTask()
+      }
+    }
     Task {
       await save(due, reason: reason)
-      UIApplication.shared.endBackgroundTask(task)
+      endBackgroundTask()
       running = false
       if let reason = again {
         again = nil
@@ -109,11 +119,22 @@ final class PhotosExporter {
     }
   }
 
+  private func endBackgroundTask() {
+    guard backgroundTask != .invalid else { return }
+    UIApplication.shared.endBackgroundTask(backgroundTask)
+    backgroundTask = .invalid
+  }
+
   private func save(_ due: [RecentEntry], reason: String) async {
     var left = due.count
     for entry in due {
       left -= 1
-      switch verdict(entry.id, reason) {
+      if expired {
+        log("photos_export_skipped", ["id": entry.id, "reason": reason, "why": "expired"])
+        return
+      }
+      let first = verdict(entry.id, reason)
+      switch first {
       case .stop: return
       case .skip: continue
       case .save, .keep: break
@@ -124,11 +145,11 @@ final class PhotosExporter {
       let started = Date()
       let bytes = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
       // An asset from an earlier run (the set was open, or Photos could not be read back then): pointed at when it
-      // is there, waited for while Photos cannot be read, saved again only when it is really gone.
+      // is there and the set is closed, waited for while the set is open or Photos cannot be read, saved again only
+      // when it is really gone.
       if let asset = current.exportedAsset {
-        switch PhotosExportDecision.remembered(
-          assetFound: RecentsStore.photosAssetExists(identifier: asset), canRead: Self.canReadPhotos)
-        {
+        let found = RecentsStore.photosAssetExists(identifier: asset)
+        switch PhotosExportDecision.remembered(assetFound: found, canRead: Self.canReadPhotos, open: first == .keep) {
         case .point:
           recents.markSavedToPhotos(id: entry.id, identifier: asset)
           log(
@@ -136,7 +157,7 @@ final class PhotosExporter {
             ["id": entry.id, "bytes": bytes, "ms": 0, "reason": reason, "left": left, "new": isNew(entry), "asset": asset])
           continue
         case .wait:
-          log("photos_export_skipped", ["id": entry.id, "reason": reason, "asset": asset, "why": "unreadable"])
+          log("photos_export_skipped", ["id": entry.id, "reason": reason, "asset": asset, "why": found ? "open" : "unreadable"])
           continue
         case .forget:
           recents.update(id: entry.id) { $0.exportedAsset = nil }

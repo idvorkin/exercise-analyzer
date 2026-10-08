@@ -45,8 +45,15 @@ final class PhotosExportDecisionTests: XCTestCase {
   }
 
   func testARememberedAssetIsSavedAgainOnlyWhenPhotosCanBeReadAndItIsGone() {
-    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: true, canRead: true), .point)
-    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: false, canRead: false), .wait)
-    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: false, canRead: true), .forget)
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: true, canRead: true, open: false), .point)
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: false, canRead: false, open: false), .wait)
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: false, canRead: true, open: false), .forget)
+  }
+
+  func testAnOpenSetIsNeverPointedAtItsRememberedAsset() {
+    // The set on screen as the app goes to the background a second time (#223): its clip stays until it is left.
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: true, canRead: true, open: true), .wait)
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: false, canRead: false, open: true), .wait)
+    XCTAssertEqual(PhotosExportDecision.remembered(assetFound: false, canRead: true, open: true), .forget)
   }
 }
