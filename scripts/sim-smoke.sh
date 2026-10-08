@@ -253,7 +253,11 @@ run check_clip_switch trim
 check_photos_export() {  # 070 step 3: once approved, clips of sets not on screen go to Photos, and a set reopens from there
   reset_mode
   xcrun simctl privacy "$SIM" grant photos "$BUNDLE" >/dev/null 2>&1 || true
-  xcrun simctl spawn "$SIM" defaults write "$BUNDLE" photosExportApproved -bool true
+  # A spawn defaults write never changes a key the app already persisted (docs/TESTING.md): edit its plist, app terminated.
+  local prefs; prefs="$(xcrun simctl get_app_container "$SIM" "$BUNDLE" data)/Library/Preferences/$BUNDLE.plist"
+  xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
+  [ -f "$prefs" ] || { mkdir -p "$(dirname "$prefs")"; plutil -create xml1 "$prefs"; }
+  plutil -replace photosExportApproved -bool true "$prefs"
   local docs; docs=$(dirname "$LOGS")
   local before; before=$(jq '[.[] | select(.source.file != null)] | length' "$docs/recents/index.json")
   xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null  # nothing open: every in-app clip is due
@@ -275,7 +279,7 @@ check_photos_export() {  # 070 step 3: once approved, clips of sets not on scree
     echo "ok    photos_export: $exported clips into Photos, none left in the app, the newest set reopened from Photos"
   else echo "FAIL  photos_export: before=$before exported=$exported left=$left, $f $g"; fail=1; fi
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
-  xcrun simctl spawn "$SIM" defaults delete "$BUNDLE" photosExportApproved 2>/dev/null || true
+  plutil -remove photosExportApproved "$prefs" 2>/dev/null || true
 }
 run check_live_workout
 run check_bug_again
