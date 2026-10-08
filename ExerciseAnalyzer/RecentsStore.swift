@@ -58,7 +58,7 @@ final class RecentsStore: ObservableObject {
   func save(
     id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,
     clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil, models: [String] = [],
-    clipStartedAt: Date? = nil
+    clipStartedAt: Date? = nil, photosCopy: Bool = false
   ) throws {
     // A pass that was under way when its set was deleted must not bring it back (#111, the 2026-09-19 review):
     // the launch refresh and a re-run save by id minutes after they started. Nor may it put a video back over
@@ -71,6 +71,7 @@ final class RecentsStore: ObservableObject {
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
       source: source, thumbnail: nil, exercise: pipeline.exercise, originalName: originalName,
       analysisVersion: AnalysisVersion.current, models: models, clipStartedAt: clipStartedAt)
+    let newClip = clipURL.map { !ownsClip($0, id: id) } ?? false
     let saved = try RecentsSave.save(
       root: root, index: RecentsIndex(entries: entries), id: id, source: source,
       originalName: originalName, duration: duration
@@ -82,7 +83,9 @@ final class RecentsStore: ObservableObject {
       entry.duration = duration
       entry.repCount = fresh.repCount
       entry.bestScore = fresh.bestScore
-      entry.source = source
+      entry.setSource(source)
+      if newClip { entry.exportedAsset = nil }
+      if photosCopy { entry.photosCopy = true }
       entry.exercise = pipeline.exercise
       entry.originalName = originalName ?? entry.originalName
       entry.analysisVersion = AnalysisVersion.current
@@ -183,7 +186,7 @@ final class RecentsStore: ObservableObject {
     if case .file(let name) = entry.source {
       try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name))
     }
-    entry.source = .photos(identifier: identifier)
+    entry.setSource(.photos(identifier: identifier))
     entries = entries.map { $0.id == id ? entry : $0 }
     try? persistIndex()
   }
@@ -269,14 +272,52 @@ final class RecentsStore: ObservableObject {
       let url = folder(for: entry.id).appendingPathComponent(name)
       return FileManager.default.fileExists(atPath: url.path) ? url : nil
     case .photos(let identifier):
-      return await Self.photosClipURL(identifier: identifier)
+      return await Self.photosClipURL(identifier: identifier, cloudIdentifier: entry.cloudIdentifier)
     case .byHand:
       return nil
     }
   }
 
-  static func photosClipURL(identifier: String) async -> URL? {
-    await fetchPhotosClip(identifier: identifier).url
+  /// The in-app clip file of a set whose clip lives only here, when it is there.
+  func clipFileURL(for entry: RecentEntry) -> URL? {
+    guard case .file(let name) = entry.source else { return nil }
+    let url = folder(for: entry.id).appendingPathComponent(name)
+    return FileManager.default.fileExists(atPath: url.path) ? url : nil
+  }
+
+  /// Cloud identifiers found for sets' Photos assets (story 070), one index write.
+  func setCloudIdentifiers(_ found: [String: String]) {
+    guard !found.isEmpty else { return }
+    entries = entries.map { entry in
+      guard let local = entry.photosIdentifier, let cloud = found[local] else { return entry }
+      var copy = entry
+      copy.cloudIdentifier = cloud
+      return copy
+    }
+    try? persistIndex()
+  }
+
+  static func photosClipURL(identifier: String, cloudIdentifier: String? = nil) async -> URL? {
+    await fetchPhotosClip(identifier: identifier, cloudIdentifier: cloudIdentifier).url
+  }
+
+  /// This device's identifier for an asset another device named by its cloud identifier (story 070): nil when
+  /// iCloud Photos has not brought the asset here yet, or there is no account.
+  static func localIdentifier(cloud: String) -> String? {
+    let mappings = PHPhotoLibrary.shared().localIdentifierMappings(for: [PHCloudIdentifier(stringValue: cloud)])
+    return mappings.values.first.flatMap { try? $0.get() }
+  }
+
+  /// The cloud identifiers of this device's assets, by local identifier; an asset iCloud has no identifier for
+  /// (no account, or gone) is left out.
+  static func cloudIdentifiers(for locals: [String]) -> [String: String] {
+    guard !locals.isEmpty else { return [:] }
+    let mappings = PHPhotoLibrary.shared().cloudIdentifierMappings(forLocalIdentifiers: locals)
+    var found: [String: String] = [:]
+    for (local, result) in mappings {
+      if let cloud = try? result.get() { found[local] = cloud.stringValue }
+    }
+    return found
   }
 
   /// What a Photos fetch came back with: the playable URL, whether iCloud had to send the clip first, how long it
@@ -289,9 +330,15 @@ final class RecentsStore: ObservableObject {
     var seconds: Double = 0
   }
 
-  static func fetchPhotosClip(identifier: String, progress: (@MainActor (Double) -> Void)? = nil) async -> PhotosFetch {
-    guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject
-    else { return PhotosFetch(error: "not in Photos") }
+  static func fetchPhotosClip(
+    identifier: String, cloudIdentifier: String? = nil, progress: (@MainActor (Double) -> Void)? = nil
+  ) async -> PhotosFetch {
+    var found = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject
+    // Another device's identifier means nothing here: its cloud identifier finds the same asset (story 070).
+    if found == nil, let cloudIdentifier, let local = localIdentifier(cloud: cloudIdentifier) {
+      found = PHAsset.fetchAssets(withLocalIdentifiers: [local], options: nil).firstObject
+    }
+    guard let asset = found else { return PhotosFetch(error: "not in Photos") }
     let started = Date()
     let options = PHVideoRequestOptions()
     options.isNetworkAccessAllowed = true
@@ -314,6 +361,10 @@ final class RecentsStore: ObservableObject {
             seconds: Date().timeIntervalSince(started)))
       }
     }
+  }
+
+  static func photosAssetExists(identifier: String) -> Bool {
+    PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject != nil
   }
 
   static func photosAssetDate(identifier: String) -> Date? {
