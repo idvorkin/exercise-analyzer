@@ -258,6 +258,7 @@ check_photos_export() {  # 070 step 3: once approved, clips of sets not on scree
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   [ -f "$prefs" ] || { mkdir -p "$(dirname "$prefs")"; plutil -create xml1 "$prefs"; }
   plutil -replace photosExportApproved -bool true "$prefs"
+  restart_prefs
   local docs; docs=$(dirname "$LOGS")
   local before; before=$(jq '[.[] | select(.source.file != null)] | length' "$docs/recents/index.json")
   xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null  # nothing open: every in-app clip is due
@@ -280,6 +281,13 @@ check_photos_export() {  # 070 step 3: once approved, clips of sets not on scree
   else echo "FAIL  photos_export: before=$before exported=$exported left=$left, $f $g"; fail=1; fi
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   plutil -remove photosExportApproved "$prefs" 2>/dev/null || true
+  restart_prefs
+}
+# The simulator's cfprefsd keeps an app's domain cached after the app quits: a plist edited behind it is not read
+# at the next launch, and its next save writes the cached keys back. Restarting it makes it read the file again.
+restart_prefs() {
+  xcrun simctl spawn "$SIM" launchctl kill SIGTERM system/com.apple.cfprefsd.xpc.daemon >/dev/null 2>&1 || true
+  sleep 1
 }
 run check_live_workout
 run check_bug_again
