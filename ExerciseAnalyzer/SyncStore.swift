@@ -56,6 +56,7 @@ final class SyncStore {
       .store(in: &cancellables)
     workouts.$index.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in self?.mirrorChanges() }
       .store(in: &cancellables)
+    workouts.onHeartRateSaved = { [weak self] in self?.mirrorChanges() }  // a fuller series, no row change (#225)
     // SWING_SYNC_DIR=<path> (simulator, docs/TESTING.md): a plain folder stands in for the container, which
     // the simulator has no iCloud account for; a second simulator can read the same folder (step 2).
     if let dir = ProcessInfo.processInfo.environment["SWING_SYNC_DIR"] {
@@ -93,9 +94,12 @@ final class SyncStore {
       var stamped = entry
       stamped.device = me
       guard let data = try? Self.encoder.encode(stamped) else { continue }
-      let print = Self.fingerprint(data)
+      let folder = recents.folder(for: entry.id)
+      // The heart-rate series is written after the row (more samples as they arrive): its size is part of the
+      // print so a fuller one goes up (#225).
+      let print = Self.fingerprint(data, heartRate: folder.appendingPathComponent(HeartRateSeries.fileName))
       if ledger[entry.id] != print {
-        jobs.append(.set(id: entry.id, row: data, folder: recents.folder(for: entry.id), print: print))
+        jobs.append(.set(id: entry.id, row: data, folder: folder, print: print))
       }
     }
     for workout in workouts.index.workouts {
@@ -104,8 +108,9 @@ final class SyncStore {
       var stamped = workout
       stamped.device = me
       guard let data = try? Self.encoder.encode(stamped) else { continue }
-      let print = Self.fingerprint(data)
-      if ledger[id] != print { jobs.append(.workout(id: workout.id, row: data, print: print)) }
+      let folder = workouts.folder(for: workout.id)
+      let print = Self.fingerprint(data, heartRate: folder.appendingPathComponent(HeartRateSeries.fileName))
+      if ledger[id] != print { jobs.append(.workout(id: workout.id, row: data, folder: folder, print: print)) }
     }
     // Sets and workouts deleted here, this device's and others' (step 4): their tombstones, dated when the
     // delete happened.
@@ -229,7 +234,9 @@ final class SyncStore {
     let me = Self.deviceID
     let log = log
     let deleted = recents.deleted
+    let deletedWorkouts = workouts.deleted
     let recentsRoot = recents.root
+    let workoutsRoot = workouts.root
     Task.detached(priority: .utility) { [container] in
       let found = Self.scan(container)
       // The other devices' files go in before their rows are shown (the 2026-10-07 review): a set tapped before
@@ -237,7 +244,14 @@ final class SyncStore {
       let theirs = found.sets.filter {
         !SyncOwnership.isMine($0.device, me: me) && found.setTombstones[$0.id] == nil && deleted[$0.id] == nil
       }.map { (from: container.appendingPathComponent("sets/\($0.id)", isDirectory: true), to: recentsRoot.appendingPathComponent($0.id, isDirectory: true)) }
-      let copied = Self.copyFiles(theirs)
+      var copied = Self.copyFiles(theirs)
+      let theirWorkouts = found.workouts.filter {
+        !SyncOwnership.isMine($0.device, me: me) && found.workoutTombstones[$0.id] == nil && deletedWorkouts[$0.id] == nil
+      }.map(\.id)
+      let heartRates = Self.copyWorkoutHeartRates(theirWorkouts, from: container, to: workoutsRoot)
+      copied.files += heartRates.files
+      copied.bytes += heartRates.bytes
+      copied.waiting += heartRates.waiting
       await MainActor.run {
         // A delete made here whose tombstone is not written yet keeps its row out all the same.
         let sets = self.recents.mergeRemote(
@@ -351,12 +365,12 @@ final class SyncStore {
       for name in (try? fm.contentsOfDirectory(atPath: pair.from.path)) ?? [] {
         if name.hasPrefix("."), name.hasSuffix(".icloud") {
           let real = String(name.dropFirst().dropLast(".icloud".count))
-          guard real == "analysis.json" || real.hasSuffix(".jpg") else { continue }
+          guard travels(real) else { continue }
           waiting += 1
           try? fm.startDownloadingUbiquitousItem(at: pair.from.appendingPathComponent(real))
           continue
         }
-        guard name == "analysis.json" || name.hasSuffix(".jpg") else { continue }
+        guard travels(name) else { continue }
         let from = pair.from.appendingPathComponent(name)
         let to = pair.to.appendingPathComponent(name)
         if let have = try? to.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
@@ -379,6 +393,45 @@ final class SyncStore {
     return (files, bytes, waiting)
   }
 
+  /// Off the main thread: the other devices' workouts' heart-rate series (`workouts/<id>.heartrate.json`) into
+  /// `Documents/workouts/<id>/` here, those missing or older (#225). A placeholder is asked for.
+  private nonisolated static func copyWorkoutHeartRates(_ ids: [String], from container: URL, to root: URL)
+    -> (files: Int, bytes: Int, waiting: Int)
+  {
+    let fm = FileManager.default
+    var files = 0
+    var bytes = 0
+    var waiting = 0
+    let dir = container.appendingPathComponent("workouts", isDirectory: true)
+    for id in ids {
+      let from = dir.appendingPathComponent(workoutHeartRateName(id))
+      if fm.fileExists(atPath: dir.appendingPathComponent("." + workoutHeartRateName(id) + ".icloud").path) {
+        waiting += 1
+        try? fm.startDownloadingUbiquitousItem(at: from)
+        continue
+      }
+      guard fm.fileExists(atPath: from.path) else { continue }
+      let folder = root.appendingPathComponent("workouts", isDirectory: true).appendingPathComponent(id, isDirectory: true)
+      let to = folder.appendingPathComponent(HeartRateSeries.fileName)
+      if let have = try? to.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+        let theirs = try? from.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+        have >= theirs
+      {
+        continue
+      }
+      do {
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? fm.removeItem(at: to)
+        try fm.copyItem(at: from, to: to)
+        files += 1
+        bytes += (try? from.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+      } catch {
+        continue
+      }
+    }
+    return (files, bytes, waiting)
+  }
+
   private nonisolated static func read(_ url: URL) throws -> Data {
     var coordinationError: NSError?
     var result: Result<Data, Error>?
@@ -391,23 +444,44 @@ final class SyncStore {
 
   private enum Job: Sendable {
     case set(id: String, row: Data, folder: URL, print: String)
-    case workout(id: String, row: Data, print: String)
+    case workout(id: String, row: Data, folder: URL, print: String)
     case tombstone(id: String, at: Date)
 
     var ledgerID: String {
       switch self {
       case .set(let id, _, _, _): id
-      case .workout(let id, _, _): "workout:" + id
+      case .workout(let id, _, _, _): "workout:" + id
       case .tombstone(let id, _): id
       }
     }
 
     var print: String {
       switch self {
-      case .set(_, _, _, let print), .workout(_, _, let print): print
+      case .set(_, _, _, let print), .workout(_, _, _, let print): print
       case .tombstone: "deleted"
       }
     }
+  }
+
+  /// The files of a set's folder that travel with its row: the analysis, the rep pictures and the heart-rate
+  /// series (#225). The clip does not; it goes by iCloud Photos.
+  private nonisolated static func travels(_ name: String) -> Bool {
+    name == "analysis.json" || name == HeartRateSeries.fileName || name.hasSuffix(".jpg")
+  }
+
+  /// The container's copy of a workout's heart-rate series, beside its row.
+  private nonisolated static func workoutHeartRateName(_ id: String) -> String { "\(id).heartrate.json" }
+
+  /// Copies `from` over `to` when `to` is missing or older; false when nothing was copied.
+  private nonisolated static func copyIfNewer(_ from: URL, to: URL) throws -> Bool {
+    if let have = try? to.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+      let theirs = try? from.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+      have >= theirs
+    {
+      return false
+    }
+    try copy(from, to: to)
+    return true
   }
 
   /// Off the main thread: the files of one job, through a file coordinator as iCloud Drive wants. Nil for a
@@ -423,27 +497,27 @@ final class SyncStore {
       var bytes = row.count
       // The set's own files, copied when the container lacks them or has an older one.
       let names = (try? fm.contentsOfDirectory(atPath: folder.path)) ?? []
-      for name in names where name == "analysis.json" || name.hasSuffix(".jpg") {
+      for name in names where travels(name) {
         let from = folder.appendingPathComponent(name)
-        let to = dir.appendingPathComponent(name)
-        if let have = try? to.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-          let mine = try? from.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-          have >= mine
-        {
-          continue
-        }
-        try copy(from, to: to)
+        guard try copyIfNewer(from, to: dir.appendingPathComponent(name)) else { continue }
         files += 1
         bytes += (try? from.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
       }
       try write(row, to: dir.appendingPathComponent("row.json"))
       return (files, bytes)
-    case .workout(let id, let row, _):
+    case .workout(let id, let row, let folder, _):
       let dir = container.appendingPathComponent("workouts", isDirectory: true)
       try fm.createDirectory(at: dir, withIntermediateDirectories: true)
       try? fm.removeItem(at: dir.appendingPathComponent("\(id).deleted.json"))
+      var files = 1
+      var bytes = row.count
+      let heartRate = folder.appendingPathComponent(HeartRateSeries.fileName)
+      if fm.fileExists(atPath: heartRate.path), try copyIfNewer(heartRate, to: dir.appendingPathComponent(workoutHeartRateName(id))) {
+        files += 1
+        bytes += (try? heartRate.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+      }
       try write(row, to: dir.appendingPathComponent("\(id).json"))
-      return (1, row.count)
+      return (files, bytes)
     case .tombstone(let id, let at):
       let stone = Data("{\"deletedAt\":\(at.timeIntervalSince1970)}".utf8)
       if id.hasPrefix("workout:") {
@@ -456,6 +530,7 @@ final class SyncStore {
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         try write(stone, to: dir.appendingPathComponent("\(id.dropFirst(8)).deleted.json"))
         try remove(dir.appendingPathComponent("\(id.dropFirst(8)).json"))
+        try remove(dir.appendingPathComponent(workoutHeartRateName(String(id.dropFirst(8)))))
         return (1, stone.count)
       }
       let dir = container.appendingPathComponent("sets/\(id)", isDirectory: true)
@@ -515,7 +590,12 @@ final class SyncStore {
     return encoder
   }()
 
-  private static func fingerprint(_ data: Data) -> String {
-    SHA256.hash(data: data).prefix(8).map { String(format: "%02x", $0) }.joined()
+  /// The row's print, with the heart-rate file's size when there is one, so a fuller series re-mirrors (#225).
+  private static func fingerprint(_ data: Data, heartRate: URL) -> String {
+    var hashed = data
+    if let size = try? heartRate.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+      hashed.append(Data("|hr:\(size)".utf8))
+    }
+    return SHA256.hash(data: hashed).prefix(8).map { String(format: "%02x", $0) }.joined()
   }
 }

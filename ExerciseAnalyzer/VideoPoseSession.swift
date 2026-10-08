@@ -279,7 +279,10 @@ final class VideoPoseSession: NSObject, ObservableObject {
           ])
         if read.samples.count > kept {
           self.heartRate = read
-          if let folder { try? read.save(to: folder) }
+          if let folder {
+            try? read.save(to: folder)
+            self.sync?.mirrorChanges()  // the fuller series goes up with the set (#225)
+          }
         }
         guard read.isAwaitingSamples(until: spanEnd, now: Date()) else { return }
         try? await Task.sleep(for: .seconds(20))
