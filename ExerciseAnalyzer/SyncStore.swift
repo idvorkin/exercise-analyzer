@@ -88,9 +88,7 @@ final class SyncStore {
     let me = Self.deviceID
     nameCloudIdentifiers(me: me)
     var jobs: [Job] = []
-    var seen: Set<String> = []
     for entry in recents.entries {
-      seen.insert(entry.id)
       guard SyncOwnership.isMine(entry.device, me: me) else { continue }
       var stamped = entry
       stamped.device = me
@@ -102,7 +100,6 @@ final class SyncStore {
     }
     for workout in workouts.index.workouts {
       let id = "workout:" + workout.id
-      seen.insert(id)
       guard SyncOwnership.isMine(workout.device, me: me) else { continue }
       var stamped = workout
       stamped.device = me
@@ -110,23 +107,24 @@ final class SyncStore {
       let print = Self.fingerprint(data)
       if ledger[id] != print { jobs.append(.workout(id: workout.id, row: data, print: print)) }
     }
-    let now = Date()
-    for id in ledger.keys where !seen.contains(id) && ledger[id] != "deleted" {
-      jobs.append(.tombstone(id: id, at: now))
-    }
-    // Other devices' sets and workouts deleted here (step 4): their tombstones, dated when the delete happened.
-    for (id, at) in recents.removedRemote { jobs.append(.tombstone(id: id, at: at)) }
-    for (id, at) in workouts.removedRemote { jobs.append(.tombstone(id: "workout:" + id, at: at)) }
+    // Sets and workouts deleted here, this device's and others' (step 4): their tombstones, dated when the
+    // delete happened.
+    for (id, at) in recents.deleted { jobs.append(.tombstone(id: id, at: at)) }
+    for (id, at) in workouts.deleted { jobs.append(.tombstone(id: "workout:" + id, at: at)) }
     guard !jobs.isEmpty else { return }
     mirroring = true
     let log = log
     Task.detached(priority: .utility) { [jobs, container] in
       var done: [(String, String)] = []
+      var skipped: [String] = []
       var files = 0
       var bytes = 0
       for job in jobs {
         do {
-          let written = try Self.perform(job, in: container)
+          guard let written = try Self.perform(job, in: container) else {
+            skipped.append(job.ledgerID)
+            continue
+          }
           files += written.files
           bytes += written.bytes
           done.append((job.ledgerID, job.print))
@@ -136,11 +134,13 @@ final class SyncStore {
       }
       await MainActor.run {
         for (id, print) in done { self.ledger[id] = print }
-        let doneIDs = Set(done.map(\.0))
-        self.recents.clearRemovedRemote(self.recents.removedRemote.keys.filter { doneIDs.contains($0) })
-        self.workouts.clearRemovedRemote(self.workouts.removedRemote.keys.filter { doneIDs.contains("workout:" + $0) })
+        let doneIDs = Set(done.map(\.0) + skipped)
+        self.recents.clearDeleted(self.recents.deleted.keys.filter { doneIDs.contains($0) })
+        self.workouts.clearDeleted(self.workouts.deleted.keys.filter { doneIDs.contains("workout:" + $0) })
         UserDefaults.standard.set(self.ledger, forKey: Self.ledgerKey)
-        log("sync_mirrored", ["jobs": jobs.count, "done": done.count, "files": files, "bytes": bytes])
+        log(
+          "sync_mirrored",
+          ["jobs": jobs.count, "done": done.count, "skipped": skipped.count, "files": files, "bytes": bytes])
         self.mirroring = false
         if self.again {
           self.again = false
@@ -225,8 +225,28 @@ final class SyncStore {
     Task.detached(priority: .utility) { [container] in
       let found = Self.scan(container)
       await MainActor.run {
-        let sets = self.recents.mergeRemote(found.sets, tombstones: found.setTombstones, me: me)
-        let workouts = self.workouts.mergeRemote(found.workouts, tombstones: found.workoutTombstones, me: me)
+        // A delete made here whose tombstone is not written yet keeps its row out all the same.
+        let sets = self.recents.mergeRemote(
+          found.sets, tombstones: found.setTombstones.merging(self.recents.deleted, uniquingKeysWith: max), me: me)
+        let workouts = self.workouts.mergeRemote(
+          found.workouts, tombstones: found.workoutTombstones.merging(self.workouts.deleted, uniquingKeysWith: max), me: me)
+        // A tombstone older than a change of ours (written before our row reached the deleting device): the row
+        // is written again, which takes the tombstone away.
+        var rewrite = false
+        for (id, at) in found.setTombstones {
+          guard let entry = self.recents.entry(id: id), SyncOwnership.isMine(entry.device, me: me), entry.changedAt > at
+          else { continue }
+          self.ledger[id] = nil
+          rewrite = true
+        }
+        for (id, at) in found.workoutTombstones {
+          guard let workout = self.workouts.index.workouts.first(where: { $0.id == id }),
+            SyncOwnership.isMine(workout.device, me: me), workout.changedAt > at
+          else { continue }
+          self.ledger["workout:" + id] = nil
+          rewrite = true
+        }
+        if rewrite { self.mirrorChanges() }
         let theirs = self.recents.entries.filter { !SyncOwnership.isMine($0.device, me: me) }
           .map { (from: container.appendingPathComponent("sets/\($0.id)", isDirectory: true), to: self.recents.folder(for: $0.id)) }
         Task.detached(priority: .utility) {
@@ -373,8 +393,9 @@ final class SyncStore {
     }
   }
 
-  /// Off the main thread: the files of one job, through a file coordinator as iCloud Drive wants.
-  private nonisolated static func perform(_ job: Job, in container: URL) throws -> (files: Int, bytes: Int) {
+  /// Off the main thread: the files of one job, through a file coordinator as iCloud Drive wants. Nil for a
+  /// tombstone not written because the row there was changed after the delete: that change wins.
+  private nonisolated static func perform(_ job: Job, in container: URL) throws -> (files: Int, bytes: Int)? {
     let fm = FileManager.default
     switch job {
     case .set(let id, let row, let folder, _):
@@ -409,12 +430,22 @@ final class SyncStore {
       let stone = Data("{\"deletedAt\":\(at.timeIntervalSince1970)}".utf8)
       if id.hasPrefix("workout:") {
         let dir = container.appendingPathComponent("workouts", isDirectory: true)
+        if let data = try? read(dir.appendingPathComponent("\(id.dropFirst(8)).json")),
+          let row = try? JSONDecoder().decode(StoredWorkout.self, from: data), row.changedAt > at
+        {
+          return nil
+        }
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         try write(stone, to: dir.appendingPathComponent("\(id.dropFirst(8)).deleted.json"))
         try remove(dir.appendingPathComponent("\(id.dropFirst(8)).json"))
         return (1, stone.count)
       }
       let dir = container.appendingPathComponent("sets/\(id)", isDirectory: true)
+      if let data = try? read(dir.appendingPathComponent("row.json")),
+        let row = try? JSONDecoder().decode(RecentEntry.self, from: data), row.changedAt > at
+      {
+        return nil
+      }
       let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
       for name in names { try remove(dir.appendingPathComponent(name)) }
       try fm.createDirectory(at: dir, withIntermediateDirectories: true)

@@ -79,6 +79,31 @@ final class SyncMergeTests: XCTestCase {
     XCTAssertTrue(empty.entries.isEmpty)
   }
 
+  func testADeleteMadeHereKeepsTheRowOutBeforeItsTombstoneIsWritten() {
+    // The phone's set deleted here at 200: the container still holds its row, and no tombstone yet. The delete
+    // made here, unioned into the container's tombstones, keeps it out.
+    let container: [String: Date] = ["other": t0.addingTimeInterval(50)]
+    let deletedHere: [String: Date] = ["a": t0.addingTimeInterval(200)]
+    let tombstones = container.merging(deletedHere, uniquingKeysWith: max)
+    var index = RecentsIndex()
+    XCTAssertEqual(
+      index.merge(remote: [entry("a", device: phone, modified: 1_000_100)], tombstones: tombstones, me: me), SyncMergeResult())
+    XCTAssertTrue(index.entries.isEmpty)
+    // The phone changed it after the delete: that change wins, and the set comes back.
+    let result = index.merge(remote: [entry("a", device: phone, modified: 1_000_300)], tombstones: tombstones, me: me)
+    XCTAssertEqual(result.added, 1)
+    XCTAssertEqual(index.entries.map(\.id), ["a"])
+  }
+
+  func testARowChangedAfterItsTombstoneIsTakenOverIt() {
+    var index = RecentsIndex(entries: [entry("a", reps: 10, device: phone, modified: 1_000_100)])
+    let result = index.merge(
+      remote: [entry("a", reps: 12, device: phone, modified: 1_000_300)], tombstones: ["a": t0.addingTimeInterval(200)], me: me)
+    XCTAssertEqual(result.updated, 1)
+    XCTAssertEqual(result.removed, 0)
+    XCTAssertEqual(index.entries.first?.repCount, 12)
+  }
+
   func testWorkoutsMergeTheSameWay() {
     let day = Date(timeIntervalSince1970: 1_700_000_000)
     let mine = StoredWorkout(id: "m", start: day, end: day.addingTimeInterval(3600), sets: 3)

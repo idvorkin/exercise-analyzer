@@ -30,7 +30,14 @@ final class RecentsStore: ObservableObject {
     try? RecentsSave.recover(root: self.root)
     var index = RecentsIndex.load(root: self.root)
     indexDamage = index.damage
-    if index.backfill(root: self.root) { try? index.save(root: self.root) }
+    let loaded = index.entries
+    if index.backfill(root: self.root) {
+      for i in index.entries.indices
+      where index.entries[i] != loaded[i] && SyncOwnership.isMine(index.entries[i].device, me: SyncStore.deviceID) {
+        Self.touch(&index.entries[i])
+      }
+      try? index.save(root: self.root)
+    }
     entries = index.entries
     // An in-app set's stash serves only an undo in this run (#199): one found at launch was left by a crash or a
     // kill mid-trim. A Photos replace's stash sits on a Photos entry and stays.
@@ -119,7 +126,9 @@ final class RecentsStore: ObservableObject {
         try data.write(to: dir.appendingPathComponent("thumbnail.jpg"), options: .atomic)
       }
     }
-    removedIDs.formUnion(Set(entries.map(\.id)).subtracting(saved.entries.map(\.id)))
+    let retired = Set(entries.map(\.id)).subtracting(saved.entries.map(\.id))
+    removedIDs.formUnion(retired)
+    noteDeleted(Array(retired))
     entries = saved.entries
   }
 
@@ -133,15 +142,23 @@ final class RecentsStore: ObservableObject {
     entry.device = SyncStore.deviceID
   }
 
-  private static let removedRemoteKey = "recentsRemovedRemote"
-  /// Sets of other devices deleted here, with when, until SyncStore has written their tombstones (step 4).
-  /// Kept across launches: a tombstone never written would let the set come back on the next read.
-  private(set) var removedRemote: [String: Date] =
-    UserDefaults.standard.dictionary(forKey: removedRemoteKey) as? [String: Date] ?? [:]
+  private static let deletedKey = "recentsRemovedRemote"
+  /// Sets deleted here, this device's and others', with when, until SyncStore has written their tombstones
+  /// (step 4), dated from this. Kept across launches: a tombstone never written would let the set come back on
+  /// the next read, and SyncStore's read keeps them out meanwhile.
+  private(set) var deleted: [String: Date] =
+    UserDefaults.standard.dictionary(forKey: deletedKey) as? [String: Date] ?? [:]
 
-  func clearRemovedRemote(_ ids: [String]) {
-    for id in ids { removedRemote[id] = nil }
-    UserDefaults.standard.set(removedRemote, forKey: Self.removedRemoteKey)
+  private func noteDeleted(_ ids: [String]) {
+    guard !ids.isEmpty else { return }
+    let now = Date()
+    for id in ids { deleted[id] = now }
+    UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
+  }
+
+  func clearDeleted(_ ids: [String]) {
+    for id in ids { deleted[id] = nil }
+    UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
   }
 
   struct RemovedSetError: Error, CustomStringConvertible {
@@ -180,11 +197,7 @@ final class RecentsStore: ObservableObject {
 
   func remove(id: String) {
     removedIDs.insert(id)
-    // Another device's set deleted here: its tombstone is this device's to write (step 4).
-    if let entry = entry(id: id), !SyncOwnership.isMine(entry.device, me: SyncStore.deviceID) {
-      removedRemote[id] = Date()
-      UserDefaults.standard.set(removedRemote, forKey: Self.removedRemoteKey)
-    }
+    if entry(id: id) != nil { noteDeleted([id]) }
     entries.removeAll { $0.id == id }
     try? FileManager.default.removeItem(at: folder(for: id))
     try? persistIndex()
@@ -320,6 +333,7 @@ final class RecentsStore: ObservableObject {
       guard let local = entry.photosIdentifier, let cloud = found[local] else { return entry }
       var copy = entry
       copy.cloudIdentifier = cloud
+      Self.touch(&copy)
       return copy
     }
     try? persistIndex()

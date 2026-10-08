@@ -144,11 +144,11 @@ final class WorkoutMirror: NSObject, ObservableObject {
   func delete(_ session: StoredWorkout) async -> WorkoutDeletion {
     let parts = index.removeSession(session)
     var deletion = WorkoutDeletion(rows: parts.count)
-    // Another device's workout deleted here: its tombstone is this device's to write (070, step 4).
-    let theirs = parts.filter { !SyncOwnership.isMine($0.device, me: SyncStore.deviceID) }
-    if !theirs.isEmpty {
-      for part in theirs { removedRemote[part.id] = Date() }
-      UserDefaults.standard.set(removedRemote, forKey: Self.removedRemoteKey)
+    // Their tombstones, dated now, for SyncStore to write (070, step 4).
+    if !parts.isEmpty {
+      let now = Date()
+      for part in parts { deleted[part.id] = now }
+      UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
     }
     for part in parts {
       try? FileManager.default.removeItem(
@@ -198,14 +198,15 @@ final class WorkoutMirror: NSObject, ObservableObject {
     return result
   }
 
-  private static let removedRemoteKey = "workoutsRemovedRemote"
-  /// Other devices' workouts deleted here, with when, until SyncStore has written their tombstones (step 4).
-  private(set) var removedRemote: [String: Date] =
-    UserDefaults.standard.dictionary(forKey: removedRemoteKey) as? [String: Date] ?? [:]
+  private static let deletedKey = "workoutsRemovedRemote"
+  /// Workouts deleted here, this device's and others', with when, until SyncStore has written their tombstones
+  /// (step 4), dated from this.
+  private(set) var deleted: [String: Date] =
+    UserDefaults.standard.dictionary(forKey: deletedKey) as? [String: Date] ?? [:]
 
-  func clearRemovedRemote(_ ids: [String]) {
-    for id in ids { removedRemote[id] = nil }
-    UserDefaults.standard.set(removedRemote, forKey: Self.removedRemoteKey)
+  func clearDeleted(_ ids: [String]) {
+    for id in ids { deleted[id] = nil }
+    UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
   }
 
   /// Test hook (#123): the simulator has no watch, so SWING_LIVE_WORKOUT=<minutes> pretends a workout began
