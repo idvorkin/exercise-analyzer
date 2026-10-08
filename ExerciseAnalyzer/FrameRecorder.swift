@@ -339,9 +339,11 @@ enum VideoFile {
     }
   }
 
-  /// The album the app's clips go into (Igor, 2026-10-08), made when first needed. Nil without read access:
-  /// albums cannot be found under add-only access, and making one per save would litter the library.
+  /// The album the app's clips go into (Igor, 2026-10-08), made when first needed and remembered by identifier,
+  /// so a renamed album is still the one. Nil without full read access: albums cannot be found under add-only or
+  /// limited access, and making one per save would litter the library.
   static let albumName = "Exercise Analyzer"
+  private static let albumIDKey = "photosAlbumID"
 
   /// Saves the clip to Photos, in the app's album, and returns the new asset's local identifier.
   static func saveToPhotos(_ url: URL) async throws -> String? {
@@ -363,10 +365,16 @@ enum VideoFile {
 
   private static func album() async throws -> PHAssetCollection? {
     let read = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    guard read == .authorized || read == .limited else { return nil }
+    guard read == .authorized else { return nil }
+    if let id = UserDefaults.standard.string(forKey: albumIDKey),
+      let remembered = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject
+    {
+      return remembered
+    }
     let options = PHFetchOptions()
     options.predicate = NSPredicate(format: "title = %@", albumName)
     if let found = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: options).firstObject {
+      UserDefaults.standard.set(found.localIdentifier, forKey: albumIDKey)
       return found
     }
     var placeholder: PHObjectPlaceholder?
@@ -374,8 +382,11 @@ enum VideoFile {
       placeholder = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: albumName)
         .placeholderForCreatedAssetCollection
     }
-    guard let id = placeholder?.localIdentifier else { return nil }
-    return PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject
+    guard let id = placeholder?.localIdentifier,
+      let created = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject
+    else { return nil }
+    UserDefaults.standard.set(created.localIdentifier, forKey: albumIDKey)
+    return created
   }
 }
 
