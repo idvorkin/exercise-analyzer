@@ -117,11 +117,14 @@ final class SyncStore {
     Task.detached(priority: .utility) { [jobs, container] in
       var done: [(String, String)] = []
       var skipped: [String] = []
+      var stones: [(id: String, at: Date)] = []
       var files = 0
       var bytes = 0
       for job in jobs {
         do {
-          guard let written = try Self.perform(job, in: container) else {
+          let written = try Self.perform(job, in: container)
+          if case .tombstone(let id, let at) = job { stones.append((id, at)) }
+          guard let written else {
             skipped.append(job.ledgerID)
             continue
           }
@@ -134,10 +137,12 @@ final class SyncStore {
       }
       await MainActor.run {
         for (id, print) in done { self.ledger[id] = print }
-        let doneIDs = Set(done.map(\.0) + skipped)
-        self.recents.clearDeleted(self.recents.deleted.keys.filter { doneIDs.contains($0) })
-        self.recents.undelete(skipped.filter { !$0.hasPrefix("workout:") })
-        self.workouts.clearDeleted(self.workouts.deleted.keys.filter { doneIDs.contains("workout:" + $0) })
+        let sets = stones.filter { self.recents.deleted[$0.id] == $0.at }.map(\.id)
+        self.recents.clearDeleted(sets)
+        self.recents.undelete(sets.filter(skipped.contains))
+        self.workouts.clearDeleted(
+          stones.filter { $0.id.hasPrefix("workout:") }.map { (id: String($0.id.dropFirst(8)), at: $0.at) }
+            .filter { self.workouts.deleted[$0.id] == $0.at }.map(\.id))
         UserDefaults.standard.set(self.ledger, forKey: Self.ledgerKey)
         log(
           "sync_mirrored",
@@ -425,6 +430,7 @@ final class SyncStore {
     case .workout(let id, let row, _):
       let dir = container.appendingPathComponent("workouts", isDirectory: true)
       try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+      try? fm.removeItem(at: dir.appendingPathComponent("\(id).deleted.json"))
       try write(row, to: dir.appendingPathComponent("\(id).json"))
       return (1, row.count)
     case .tombstone(let id, let at):
