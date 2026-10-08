@@ -161,6 +161,11 @@ final class RecentsStore: ObservableObject {
     UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
   }
 
+  /// Sets whose delete lost to a later change on another device: they come back by sync and save again.
+  func undelete(_ ids: [String]) {
+    removedIDs.subtract(ids)
+  }
+
   struct RemovedSetError: Error, CustomStringConvertible {
     let id: String
     var description: String { "set \(id) was deleted while this pass ran; not saved" }

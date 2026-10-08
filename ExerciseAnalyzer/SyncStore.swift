@@ -136,6 +136,7 @@ final class SyncStore {
         for (id, print) in done { self.ledger[id] = print }
         let doneIDs = Set(done.map(\.0) + skipped)
         self.recents.clearDeleted(self.recents.deleted.keys.filter { doneIDs.contains($0) })
+        self.recents.undelete(skipped.filter { !$0.hasPrefix("workout:") })
         self.workouts.clearDeleted(self.workouts.deleted.keys.filter { doneIDs.contains("workout:" + $0) })
         UserDefaults.standard.set(self.ledger, forKey: Self.ledgerKey)
         log(
