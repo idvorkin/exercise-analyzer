@@ -521,6 +521,12 @@ struct ContentView: View {
 
   /// Where a text's letters begin in its own frame (its first baseline less the face's cap height): SwiftUI has
   /// no alignment on letter tops, so the top line's `.top` guides are set to it.
+  /// The HUD's icon buttons (watch mode, zoom to me, the eye): a size up and a 44 pt target on the iPad, where
+  /// the picture is wide and the icons were lost in it (#233, #234; Igor: "make the top targets a little bit
+  /// bigger on the iPad only for the Zoom and video preview").
+  private static let hudIconFont: Font = UIDevice.current.userInterfaceIdiom == .pad ? .title : .title3
+  private static let hudIconSide: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 44 : 0
+
   private static func capTop(_ font: UIFont) -> (ViewDimensions) -> CGFloat {
     { $0[.firstTextBaseline] - font.capHeight }
   }
@@ -629,20 +635,23 @@ struct ContentView: View {
           Button {
             session.setWatchMode(true, from: "phone")
           } label: {
-            Image(systemName: "applewatch").font(.title3)
+            Image(systemName: "applewatch").font(Self.hudIconFont)
+              .frame(minWidth: Self.hudIconSide, minHeight: Self.hudIconSide).contentShape(Rectangle())
           }
           .accessibilityLabel("Watch mode: big digits on the phone, control from the wrist")
         }
         Button {
           meView.toggle()
         } label: {
-          Image(systemName: meView ? "person.crop.square.fill" : "person.crop.square").font(.title3)
+          Image(systemName: meView ? "person.crop.square.fill" : "person.crop.square").font(Self.hudIconFont)
+            .frame(minWidth: Self.hudIconSide, minHeight: Self.hudIconSide).contentShape(Rectangle())
         }
         .accessibilityLabel(meView ? "Show whole frame" : "Zoom to me")
         Button {
           overlayModeRaw = overlayMode.next.rawValue
         } label: {
-          Image(systemName: overlayMode.symbol).font(.title3)
+          Image(systemName: overlayMode.symbol).font(Self.hudIconFont)
+            .frame(minWidth: Self.hudIconSide, minHeight: Self.hudIconSide).contentShape(Rectangle())
         }
         .accessibilityLabel(overlayMode.next.label)
       }
