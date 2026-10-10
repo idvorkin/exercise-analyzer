@@ -20,6 +20,12 @@ final class PhoneLink: NSObject, ObservableObject {
   /// The last set typed here (story 059): the last-set line shows it while it is newer than the phone's
   /// `lastSet`; the next set that rolls clears it, as the phone clears its own.
   @Published private(set) var handSet: HandSet?
+  /// Workout only, no videos (071, #236; Igor: "not going to record videos for a while"): the wrist offers no
+  /// Record or Preview and stops waiting on the phone until it is turned off. Kept across launches; the phone
+  /// hears it through the application context.
+  @Published private(set) var noVideos = UserDefaults.standard.bool(forKey: PhoneLink.noVideosKey)
+  private static let noVideosKey = "noVideos"
+  static let noVideosContextKey = "no_videos"
   /// The last set typed here, kept through filmed sets and relaunches: the count page reopens on it (#183).
   private(set) var lastTyped: HandSet? = UserDefaults.standard.data(forKey: PhoneLink.lastTypedKey)
     .flatMap { try? JSONDecoder().decode(HandSet.self, from: $0) }
@@ -187,6 +193,7 @@ final class PhoneLink: NSObject, ObservableObject {
       receivedAt = fixed.reachable ? Date() : nil
       preview = fixed.preview
       if let endedAt = state.restEndedAt { rest.fixEnded(at: endedAt) }
+      noVideos = state == .noVideos
       return
     }
     // A workout still running from before this launch (#190) is picked up once the session is activated:
@@ -372,10 +379,26 @@ final class PhoneLink: NSObject, ObservableObject {
     typedRecent = Array((typedRecent + [set]).suffix(Self.typedRecentCount))
     guard session.activationState == .activated else { return }
     session.transferUserInfo(set.userInfo)
-    // The second road (#197): the context holds the last few typed sets, delivered whenever the link is up.
+    sendContext()
+  }
+
+  /// No videos for a while, or videos again (071): logged either way, kept, and told to the phone by context.
+  func setNoVideos(_ on: Bool) {
+    guard screenshot == nil, on != noVideos else { return }
+    noVideos = on
+    UserDefaults.standard.set(on, forKey: Self.noVideosKey)
+    WKInterfaceDevice.current().play(.click)
+    logEvent("no_videos", ["on": on])
+    guard WCSession.default.activationState == .activated else { return }
+    sendContext()
+  }
+
+  /// The application context, whole each time (a context replaces the last): the last few typed sets, the
+  /// second road of #197, delivered whenever the link is up; and the no-videos mode (071).
+  private func sendContext() {
     let payloads = typedRecent.compactMap { try? JSONEncoder().encode($0) }
     do {
-      try session.updateApplicationContext([HandSet.contextKey: payloads])
+      try WCSession.default.updateApplicationContext([HandSet.contextKey: payloads, Self.noVideosContextKey: noVideos])
     } catch {
       logEvent("typed_context_failed", ["message": "\(error)"])
     }

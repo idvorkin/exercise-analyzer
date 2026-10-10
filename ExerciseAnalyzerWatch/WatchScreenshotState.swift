@@ -23,6 +23,8 @@ enum WatchScreenshotState: String, CaseIterable {
   case setByHand
   /// The same count page with its exercise list open over it (#154).
   case setByHandExercise
+  /// No videos for a while (071, #236): the idle page without Record, Preview or any word about the phone.
+  case noVideos
 
   /// The fixed workout the controller presents: 42:10 in, 128 bpm (141 while a set runs); nil for no workout.
   var workout: (elapsed: TimeInterval, heartRate: Int)? {
@@ -59,7 +61,7 @@ enum WatchScreenshotState: String, CaseIterable {
       status.phoneActive = false
       status.lastSet = LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62, at: Date().timeIntervalSince1970)
       return (status, true, nil)
-    case .idle:
+    case .idle, .noVideos:
       return (.idle, true, nil)
     case .live:
       let status = WatchStatus(

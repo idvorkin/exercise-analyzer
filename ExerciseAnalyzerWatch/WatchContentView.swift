@@ -48,7 +48,26 @@ struct WatchContentView: View {
       ScrollView {
         VStack(spacing: 8) {
           if workout.running { workoutHeader }
-          if !phone.showsAsLive {
+          if phone.noVideos {
+            // Workout only, no videos (071, #236): nothing about the phone, no Record, no Preview; the workout,
+            // the sets typed by hand and the rest are the wrist's own.
+            if !workout.running {
+              Image(systemName: "video.slash").font(.largeTitle).foregroundStyle(.secondary)
+            }
+            Text("No videos for a while: workout only").font(.caption).multilineTextAlignment(.center)
+              .foregroundStyle(.secondary)
+            if let hand = phone.handSet, hand.isNewer(than: status.lastSet) {
+              Text("Last set").font(.caption2).foregroundStyle(.secondary)
+              Text("\(hand.reps) reps · \(hand.exercise.definition.name) · by hand")
+                .font(.headline).monospacedDigit()
+            }
+            startWorkoutButton
+            setByHandButton
+            if !workout.running { restStatus }
+            restPicker
+            exercisePicker
+            noVideosToggle
+          } else if !phone.showsAsLive {
             if !workout.running {
               Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
             }
@@ -66,6 +85,7 @@ struct WatchContentView: View {
               Label(phone.retrying ? "Trying…" : "Retry", systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
             }
             setByHandButton  // the set waits for the phone (059)
+            noVideosToggle
           } else if !status.phoneActive {
             if !workout.running {
               Image(systemName: "iphone.gen3").font(.largeTitle).foregroundStyle(.secondary)
@@ -77,6 +97,7 @@ struct WatchContentView: View {
               Label("Send a reminder to the phone", systemImage: "bell").frame(maxWidth: .infinity)
             }
             setByHandButton
+            noVideosToggle
           } else {
             if !workout.running {
               Image(systemName: "figure.strengthtraining.traditional").font(.largeTitle).foregroundStyle(.secondary)
@@ -113,6 +134,7 @@ struct WatchContentView: View {
             if !workout.running { restStatus }  // inside a workout the head carries the rest (050)
             restPicker
             exercisePicker
+            noVideosToggle
           }
           if workout.running { workoutEndButtons.id("workout-end") }
           if let error = phone.lastError ?? workout.lastError {
@@ -137,6 +159,16 @@ struct WatchContentView: View {
         }
       }
     }
+  }
+
+  /// No videos for a while (071, #236; Igor: "not going to record videos for a while"): under the pickers on
+  /// every idle page; orange while on, when it reads "Videos again".
+  private var noVideosToggle: some View {
+    Button { phone.setNoVideos(!phone.noVideos) } label: {
+      Label(phone.noVideos ? "Videos again" : "No videos for a while", systemImage: phone.noVideos ? "video" : "video.slash")
+        .frame(maxWidth: .infinity)
+    }
+    .tint(phone.noVideos ? .orange : nil)
   }
 
   /// A set done without Record (059): only inside a workout, which it belongs to; the count page does the rest.

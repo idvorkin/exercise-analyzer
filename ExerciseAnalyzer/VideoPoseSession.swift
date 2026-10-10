@@ -91,6 +91,9 @@ final class VideoPoseSession: NSObject, ObservableObject {
   @Published private(set) var bellDetectorOn = ModelSet.bellDetectorEnabled
   /// Which exercise the lifter chose (or Auto), and the exercise currently being analyzed.
   @Published private(set) var exerciseMode: ExerciseMode
+  /// The wrist said no videos for a while (071, #236): shown over Live, which still works; nothing else changes
+  /// here, the mode is the watch's.
+  @Published private(set) var noVideos = false
   @Published private(set) var exercise: ExerciseKind = .kettlebellSwing
   @Published private(set) var detection: ExerciseDetection?
   @Published var rate: Float = 1.0 {
@@ -358,6 +361,11 @@ final class VideoPoseSession: NSObject, ObservableObject {
       self.log.event("ui", ["action": "exercise", "from": "watch", "mode": mode])
       self.setExerciseMode(ExerciseMode(storageValue: mode))
       self.pushWatchStatus(force: true)
+    }
+    watch.onNoVideos = { [weak self] on, road in
+      guard let self, on != self.noVideos else { return }
+      self.noVideos = on
+      self.log.event("no_videos_mode", ["on": on, "via": road])
     }
     // Idle heartbeat: the watch marks a status stale after 8 s, and only a recording session pushes on its own.
     Timer.publish(every: 3, on: .main, in: .common).autoconnect().sink { [weak self] _ in

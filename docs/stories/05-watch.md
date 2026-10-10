@@ -29,6 +29,7 @@ state and is not in the table.
 | answersLost | as recording, with an orange "PHONE NOT ANSWERING · TAPS STILL REACH IT" capsule in place of the framing hint (the phone reads reachable but has not answered past the wake grace, #137) | as recording: Pause · Camera · Done · Cancel still send | 018 |
 | paused | "PAUSED · FEET CUT OFF" capsule, the count and the time frozen, the picture still refreshing | orange Resume · Camera · Done · Cancel; second page: Cancel, the watch-mode toggle | 040 |
 | done | "Phone ready", a "Last set" caption over "9 reps · Kettlebell Swing · 0:48", the rest counting up ("Rest 0:35", orange past the length) | Start workout (green), Record (clears the rest), Preview, the rest and exercise pickers | 045, 046 |
+| noVideos | video-slash art, "No videos for a while: workout only"; nothing about the phone (no art, no "Not connected", no "Last heard"); the last set typed by hand when newer than the phone's; in a workout, the workout head in place of the art | Start workout (green), "+ Set by hand" in a workout, the rest and exercise pickers, "Videos again" (orange); no Record, no Preview, no Retry, no reminder; End workout and Discard in a workout | 071 |
 
 The rule behind the table (Igor, 2026-09-13, after the picture page lost its controls in #74): the framing loop
 needs the picture, the in-frame hint, Camera, Done and Cancel on the camera-live page, inside the safe area,
@@ -779,6 +780,39 @@ the first frame (story 001).
   `live_activity` (action: start, end with reason ended / discarded / replaced, deferred, disabled, failed).
 
 - **Issues:** [#161](https://github.com/idvorkin/exercise-analyzer/issues/161), [#153](https://github.com/idvorkin/exercise-analyzer/issues/153) (the report it was split from), [#181](https://github.com/idvorkin/exercise-analyzer/issues/181) and [#182](https://github.com/idvorkin/exercise-analyzer/issues/182) the rest-first layout
+
+---
+
+### User Story 071:
+
+- **Summary:** Tell the watch I am not recording videos for a while, and it runs the workout without them
+- **Status:** built 2026-10-10 (#236); verified by the phone and watch simulator builds and `just watch-screens` (noVideos); not on the wrist yet
+- **Why:** Igor, 2026-10-08, from the phone (#236, dictated: "Add no phone button to say for a while no phone use palmed"), explained 2026-10-10: "a mode for 'not recording videos for a while': workout tracking only, without videos (on the watch and phone), that he can turn back on when he wants". Some sessions the phone stays in the bag: the wrist should not keep waiting for it or offering Record.
+
+#### Use Case:
+- **As a** lifter who is training without the camera today
+- **I want to** tell the watch once that there are no videos for a while
+- **so that** the wrist is a workout tracker (the workout, sets by hand, rest, heart rate) and stops talking about the phone, until I turn videos back on
+
+#### Acceptance Criteria:
+- **Scenario:** No videos for a while
+- **Given:** the watch app is on any idle page (phone ready, phone in the background, or not connected)
+- **When:** I turn the Crown to the bottom and tap "No videos for a while"
+- **Then:** the page shows the video-slash art and "No videos for a while: workout only", with Start workout, the rest and exercise pickers and, in a workout, "+ Set by hand"; nothing about the phone (no "Not connected", no "Last heard", no Retry or reminder), no Record, no Preview; the button reads "Videos again" in orange; the phone's log carries `watch_no_videos on true` and, when the phone hears of it, `no_videos_mode on true`
+
+- **Scenario:** It stays until I say otherwise
+- **Given:** the mode is on and the watch app relaunched, or the phone came within reach
+- **When:** I look at the watch
+- **Then:** it is still in the no-videos page; sets typed by hand reach the phone as they always do (the queued user info and the context), and the phone's Workouts shows "No videos for a while, from the watch: workout only" over Live, which still records if I tap it there
+
+- **Scenario:** Videos again
+- **Given:** the mode is on
+- **When:** I tap "Videos again"
+- **Then:** the idle page comes back as the phone's state has it (Record, Preview and the phone's status), `watch_no_videos on false` is logged, and the phone's line over Live goes
+
+- **Notes:** The mode is the watch's (`PhoneLink.noVideos`, kept in its defaults), told to the phone in the application context beside the typed sets (a context is whole each time, so both keys go together); the phone (`VideoPoseSession.noVideos`) only shows and logs it. The watch keeps pinging the phone in the mode (cheap, and the sets ride the usual roads), it just says nothing about the answers. Screenshot state `noVideos`.
+
+- **Issues:** [#236](https://github.com/idvorkin/exercise-analyzer/issues/236)
 
 ---
 

@@ -13,6 +13,8 @@ final class WatchBridge: NSObject, ObservableObject {
   var onCommand: ((WatchCommand) -> Void)?
   /// Exercise picked on the watch: "auto" or an ExerciseKind raw value.
   var onExercise: ((String) -> Void)?
+  /// The wrist's no-videos mode (071, #236), from its application context: on or off, and the road it came by.
+  var onNoVideos: ((Bool, String) -> Void)?
   var onEvent: ((String, [String: Any]) -> Void)?
   /// The watch just became reachable (a raised wrist): push a fresh status without waiting to be asked.
   var onReachable: (() -> Void)?
@@ -200,6 +202,7 @@ extension WatchBridge: WCSessionDelegate {
   }
 
   private func takeTypedSets(from context: [String: Any], via road: String) {
+    if let noVideos = context["no_videos"] as? Bool { onNoVideos?(noVideos, road) }
     guard let payloads = context[HandSet.contextKey] as? [Data] else { return }
     for data in payloads {
       guard let set = try? JSONDecoder().decode(HandSet.self, from: data) else { continue }
