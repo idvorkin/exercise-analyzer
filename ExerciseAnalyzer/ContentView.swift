@@ -43,6 +43,7 @@ struct ContentView: View {
   @Environment(\.horizontalSizeClass) private var sizeClass
   @State private var lastClockLog = Date.distantPast
   @State private var showBugReport = false
+  @State private var showSyncStatus = false
   @State private var showGallery = false
   /// The clip copied for the share sheet, while the sheet is up (#162).
   @State private var sharing: SharedClip?
@@ -115,6 +116,9 @@ struct ContentView: View {
         showBugReport = true
       })
     .sheet(isPresented: $showBugReport) { BugReportSheet(session: session) }
+    .sheet(isPresented: $showSyncStatus) {
+      if let sync = session.sync { SyncStatusView(sync: sync) } else { Text("No sync store").padding() }
+    }
     .confirmationDialog(
       "No reps found in this recording", isPresented: $session.emptyRecordingPrompt, titleVisibility: .visible
     ) {
@@ -320,6 +324,7 @@ struct ContentView: View {
       Button { Task { await session.startInstrumentedRun() } } label: {
         Label("Instrumented run", systemImage: "waveform.path.ecg")
       }
+      Button { showSyncStatus = true } label: { Label("Sync status", systemImage: "gearshape") }
       Button { openURL(URL(string: "https://github.com/idvorkin/exercise-analyzer")!) } label: {
         Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
       }
