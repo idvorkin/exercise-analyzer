@@ -21,8 +21,8 @@ final class PhoneLink: NSObject, ObservableObject {
   /// `lastSet`; the next set that rolls clears it, as the phone clears its own.
   @Published private(set) var handSet: HandSet?
   /// Workout only, no videos (071, #236; Igor: "not going to record videos for a while"): the wrist offers no
-  /// Record or Preview and stops waiting on the phone until it is turned off. Kept across launches; the phone
-  /// hears it through the application context.
+  /// Record or Preview and keeps pinging the phone but shows nothing about it until it is turned off. Kept
+  /// across launches; the phone hears it through the application context.
   @Published private(set) var noVideos = UserDefaults.standard.bool(forKey: PhoneLink.noVideosKey)
   private static let noVideosKey = "noVideos"
   static let noVideosContextKey = "no_videos"

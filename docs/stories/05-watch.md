@@ -29,7 +29,7 @@ state and is not in the table.
 | answersLost | as recording, with an orange "PHONE NOT ANSWERING · TAPS STILL REACH IT" capsule in place of the framing hint (the phone reads reachable but has not answered past the wake grace, #137) | as recording: Pause · Camera · Done · Cancel still send | 018 |
 | paused | "PAUSED · FEET CUT OFF" capsule, the count and the time frozen, the picture still refreshing | orange Resume · Camera · Done · Cancel; second page: Cancel, the watch-mode toggle | 040 |
 | done | "Phone ready", a "Last set" caption over "9 reps · Kettlebell Swing · 0:48", the rest counting up ("Rest 0:35", orange past the length) | Start workout (green), Record (clears the rest), Preview, the rest and exercise pickers | 045, 046 |
-| noVideos | video-slash art, "No videos for a while: workout only"; nothing about the phone (no art, no "Not connected", no "Last heard"); the last set typed by hand when newer than the phone's; in a workout, the workout head in place of the art | Start workout (green), "+ Set by hand" in a workout, the rest and exercise pickers, "Videos again" (orange); no Record, no Preview, no Retry, no reminder; End workout and Discard in a workout | 071 |
+| noVideos | video-slash art, "No videos for a while: workout only"; nothing about the phone (no art, no "Not connected", no "Last heard"); the last set typed by hand when newer than the phone's; in a workout, the workout head in place of the art | Start workout (green), "+ Set by hand" in a workout (its count page picks the exercise), the rest picker, "Videos again" (orange); no Record, no Preview, no Retry, no reminder, no exercise picker, no phone error; End workout and Discard in a workout | 071 |
 
 The rule behind the table (Igor, 2026-09-13, after the picture page lost its controls in #74): the framing loop
 needs the picture, the in-frame hint, Camera, Done and Cancel on the camera-live page, inside the safe area,
@@ -798,7 +798,7 @@ the first frame (story 001).
 - **Scenario:** No videos for a while
 - **Given:** the watch app is on any idle page (phone ready, phone in the background, or not connected)
 - **When:** I turn the Crown to the bottom and tap "No videos for a while"
-- **Then:** the page shows the video-slash art and "No videos for a while: workout only", with Start workout, the rest and exercise pickers and, in a workout, "+ Set by hand"; nothing about the phone (no "Not connected", no "Last heard", no Retry or reminder), no Record, no Preview; the button reads "Videos again" in orange; the phone's log carries `watch_no_videos on true` and, when the phone hears of it, `no_videos_mode on true`
+- **Then:** the page shows the video-slash art and "No videos for a while: workout only", with Start workout, the rest picker and, in a workout, "+ Set by hand" (its count page picks the exercise); nothing about the phone (no "Not connected", no "Last heard", no Retry or reminder, no phone error), no Record, no Preview; the button reads "Videos again" in orange; the phone's log carries `watch_no_videos on true` and, when the phone hears of it, `no_videos_mode on true`
 
 - **Scenario:** It stays until I say otherwise
 - **Given:** the mode is on and the watch app relaunched, or the phone came within reach
@@ -810,7 +810,7 @@ the first frame (story 001).
 - **When:** I tap "Videos again"
 - **Then:** the idle page comes back as the phone's state has it (Record, Preview and the phone's status), `watch_no_videos on false` is logged, and the phone's line over Live goes
 
-- **Notes:** The mode is the watch's (`PhoneLink.noVideos`, kept in its defaults), told to the phone in the application context beside the typed sets (a context is whole each time, so both keys go together); the phone (`VideoPoseSession.noVideos`) only shows and logs it. The watch keeps pinging the phone in the mode (cheap, and the sets ride the usual roads), it just says nothing about the answers. Screenshot state `noVideos`.
+- **Notes:** The mode is the watch's (`PhoneLink.noVideos`, kept in its defaults), told to the phone in the application context beside the typed sets (a context is whole each time, so both keys go together); the phone (`VideoPoseSession.noVideos`) only shows and logs it. The watch keeps pinging the phone in the mode (cheap, and the sets ride the usual roads), it just says nothing about the answers: the error line shows only the workout's errors. No exercise picker: it is the phone's choice and talks to the phone, so with the phone in the bag a pick would fail; the exercise is picked on the count page (#154), which opens on the last set typed. Screenshot state `noVideos`.
 
 - **Issues:** [#236](https://github.com/idvorkin/exercise-analyzer/issues/236)
 

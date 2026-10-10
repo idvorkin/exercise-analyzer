@@ -50,7 +50,7 @@ struct WatchContentView: View {
           if workout.running { workoutHeader }
           if phone.noVideos {
             // Workout only, no videos (071, #236): nothing about the phone, no Record, no Preview; the workout,
-            // the sets typed by hand and the rest are the wrist's own.
+            // the sets typed by hand and the rest are the wrist's own; the count page picks the exercise (#154).
             if !workout.running {
               Image(systemName: "video.slash").font(.largeTitle).foregroundStyle(.secondary)
             }
@@ -65,7 +65,6 @@ struct WatchContentView: View {
             setByHandButton
             if !workout.running { restStatus }
             restPicker
-            exercisePicker
             noVideosToggle
           } else if !phone.showsAsLive {
             if !workout.running {
@@ -137,7 +136,7 @@ struct WatchContentView: View {
             noVideosToggle
           }
           if workout.running { workoutEndButtons.id("workout-end") }
-          if let error = phone.lastError ?? workout.lastError {
+          if let error = phone.noVideos ? workout.lastError : phone.lastError ?? workout.lastError {
             Text(error).font(.caption2).foregroundStyle(.red).multilineTextAlignment(.center)
           }
         }
