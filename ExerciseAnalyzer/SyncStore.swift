@@ -97,7 +97,8 @@ final class SyncStore: ObservableObject {
   private var mirroring = false
   private var again = false
   private var reading = false
-  private var readAgain = false
+  /// A pass asked for while one runs, with the query's latest not-downloaded count.
+  private var readAgain: Int?
   private var query: NSMetadataQuery?
   private var poll: Timer?
   private var cancellables: Set<AnyCancellable> = []
@@ -418,6 +419,7 @@ final class SyncStore: ObservableObject {
       switch item.value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String {
       case NSMetadataUbiquitousItemDownloadingStatusCurrent?, NSMetadataUbiquitousItemDownloadingStatusDownloaded?:
         counts.downloaded += 1
+        downloadsAsked.remove(url)
       case NSMetadataUbiquitousItemDownloadingStatusNotDownloaded?:
         counts.notDownloaded += 1
         if !downloadsAsked.contains(url) { toAsk.append(url) }
@@ -463,7 +465,12 @@ final class SyncStore: ObservableObject {
     }
     if !toAsk.isEmpty {
       Task.detached(priority: .utility) {
-        for url in toAsk { try? FileManager.default.startDownloadingUbiquitousItem(at: url) }
+        var refused: [URL] = []
+        for url in toAsk {
+          do { try FileManager.default.startDownloadingUbiquitousItem(at: url) } catch { refused.append(url) }
+        }
+        guard !refused.isEmpty else { return }
+        await MainActor.run { [refused] in self.downloadsAsked.subtract(refused) }
       }
     }
     readContainer(queryNotDownloaded: counts.notDownloaded)
@@ -481,7 +488,7 @@ final class SyncStore: ObservableObject {
   func readContainer(queryNotDownloaded: Int = 0) {
     guard let container else { return }
     guard !reading else {
-      readAgain = true
+      readAgain = queryNotDownloaded
       return
     }
     reading = true
@@ -561,9 +568,9 @@ final class SyncStore: ObservableObject {
             "failed": failures.count, "devices": Self.devicesText(self.status.devices, me: me), "ms": ms,
           ])
         self.reading = false
-        if self.readAgain {
-          self.readAgain = false
-          self.readContainer()
+        if let queryNotDownloaded = self.readAgain {
+          self.readAgain = nil
+          self.readContainer(queryNotDownloaded: queryNotDownloaded)
         }
       }
     }
