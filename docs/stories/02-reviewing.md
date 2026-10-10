@@ -375,7 +375,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 067:
 
 - **Summary:** On an iPad held sideways, the reps stand beside the picture
-- **Status:** implemented in [2bba572](https://github.com/idvorkin/exercise-analyzer/commit/2bba572); verified by an iPad Pro 13-inch simulator screenshot (`SWING_LANDSCAPE=1`, a full-screen build); no real iPad yet
+- **Status:** implemented in [2bba572](https://github.com/idvorkin/exercise-analyzer/commit/2bba572); verified by an iPad Pro 13-inch simulator screenshot (`SWING_LANDSCAPE=1`, a full-screen build); on Igor's iPad since 2026-10-08; the HUD's icon buttons a size up with 44 pt targets on the iPad (#233, #234), built 2026-10-10, by simulator build, not yet seen on the iPad
 
 #### Use Case:
 - **As a** lifter looking back over a set on an iPad
@@ -399,9 +399,14 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I look at the screen
 - **Then:** the gallery is under the picture as before (the camera has none)
 
+- **Scenario:** Bigger targets on the iPad (#233, #234)
+- **Given:** a set is open on the iPad
+- **When:** I reach for Zoom to me or the eye (video only / video and skeleton) at the top of the picture
+- **Then:** the icons are a size larger than on the phone and each answers a tap anywhere in a 44 pt square (Igor, 2026-10-10: "make the top targets a little bit bigger on the iPad only for the Zoom and video preview"); the phone's HUD is unchanged
+
 - **Notes:** Viewing only (Igor, 2026-10-01: "viewing only not about recording"): recording on an iPad (#53's step 4)
   is not built. The side is an iPad in the regular width size class with the screen wider than tall (a
   large iPhone sideways is regular width too, and stays as it is), so an iPad window in split
   view narrow enough to be compact keeps the phone layout.
 
-- **Issues:** [#53](https://github.com/idvorkin/exercise-analyzer/issues/53)
+- **Issues:** [#53](https://github.com/idvorkin/exercise-analyzer/issues/53); [#233](https://github.com/idvorkin/exercise-analyzer/issues/233), [#234](https://github.com/idvorkin/exercise-analyzer/issues/234) bigger targets
