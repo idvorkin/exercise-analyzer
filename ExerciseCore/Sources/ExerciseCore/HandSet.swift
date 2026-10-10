@@ -51,10 +51,11 @@ public struct HandSet: Codable, Equatable, Sendable {
   }
 
   /// The count the page opens on for exercises Igor always does the same way (#196: "tgu 5, swing 10, Bulgarian
-  /// and split squats 10 … everything else whatever last"); nil for the rest, which start at the last count.
+  /// and split squats 10 … everything else whatever last"; get-ups became 2 on 2026-10-08, #235: "Tgu manual
+  /// default to 2"); nil for the rest, which start at the last count.
   public static func usualReps(for exercise: ExerciseKind) -> Int? {
     switch exercise {
-    case .turkishGetUp: 5
+    case .turkishGetUp: 2
     case .kettlebellSwing, .bulgarianSplitSquat, .splitSquat: 10
     default: nil
     }

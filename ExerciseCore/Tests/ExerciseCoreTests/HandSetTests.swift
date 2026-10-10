@@ -72,10 +72,11 @@ final class HandSetTests: XCTestCase {
   }
 
   /// #196 (Igor: "tgu 5, swing 10, Bulgarian and split squats 10, everything else whatever last"): the usual
-  /// count wins over the last set's, typed or filmed; the other exercises start at the last count.
+  /// count wins over the last set's, typed or filmed; the other exercises start at the last count. Get-ups
+  /// open on 2 since #235 ("Tgu manual default to 2").
   func testTheUsualExercisesOpenOnTheirUsualCount() {
     let analyzed = LastSet(reps: 3, exercise: getUp.definition.name, seconds: 90, at: 1000)
-    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: nil) == (getUp, 5))
+    XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: nil) == (getUp, 2))
     XCTAssertTrue(HandSet.start(mode: swing.rawValue, analyzed: analyzed, byHand: nil) == (swing, 10))
     let typed = HandSet(exercise: .splitSquat, reps: 7, at: 900)
     XCTAssertTrue(HandSet.start(mode: "auto", analyzed: analyzed, byHand: typed) == (.splitSquat, 10))
