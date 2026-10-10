@@ -519,14 +519,14 @@ struct ContentView: View {
     return base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: 34) } ?? base
   }()
 
-  /// Where a text's letters begin in its own frame (its first baseline less the face's cap height): SwiftUI has
-  /// no alignment on letter tops, so the top line's `.top` guides are set to it.
   /// The HUD's icon buttons (watch mode, zoom to me, the eye): a size up and a 44 pt target on the iPad, where
   /// the picture is wide and the icons were lost in it (#233, #234; Igor: "make the top targets a little bit
   /// bigger on the iPad only for the Zoom and video preview").
   private static let hudIconFont: Font = UIDevice.current.userInterfaceIdiom == .pad ? .title : .title3
   private static let hudIconSide: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 44 : 0
 
+  /// Where a text's letters begin in its own frame (its first baseline less the face's cap height): SwiftUI has
+  /// no alignment on letter tops, so the top line's `.top` guides are set to it.
   private static func capTop(_ font: UIFont) -> (ViewDimensions) -> CGFloat {
     { $0[.firstTextBaseline] - font.capHeight }
   }
