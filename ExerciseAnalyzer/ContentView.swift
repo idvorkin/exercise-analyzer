@@ -336,16 +336,23 @@ struct ContentView: View {
 
   /// The camera, one large red target pinned under the log (gym-first).
   private var liveButton: some View {
-    Button {
-      session.log.event("ui", ["action": "live", "from": "log"])
-      session.startCamera(position: session.cameraPosition)
-    } label: {
-      Label("Live", systemImage: "record.circle")
-        .font(.title3.bold())
-        .frame(maxWidth: .infinity, minHeight: 52)
+    VStack(spacing: 4) {
+      // The wrist said no videos for a while (071, #236): the phone says so over Live, which still works.
+      if session.noVideos {
+        Label("No videos for a while, from the watch: workout only", systemImage: "video.slash")
+          .font(.caption.weight(.semibold)).foregroundStyle(.orange)
+      }
+      Button {
+        session.log.event("ui", ["action": "live", "from": "log"])
+        session.startCamera(position: session.cameraPosition)
+      } label: {
+        Label("Live", systemImage: "record.circle")
+          .font(.title3.bold())
+          .frame(maxWidth: .infinity, minHeight: 52)
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(.red)
     }
-    .buttonStyle(.borderedProminent)
-    .tint(.red)
     .padding(.horizontal, 16)
     .padding(.vertical, 8)
     .background(.bar)
