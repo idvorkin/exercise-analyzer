@@ -68,9 +68,10 @@ final class WorkoutMirror: NSObject, ObservableObject {
   }
 
   /// The mirrored session needs this app authorized to share workouts too; asked once, when a workout first
-  /// arrives, so the camera remote never prompts on its own.
-  func requestAuthorizationIfNeeded() {
-    guard HKHealthStore.isHealthDataAvailable(), session != nil, !authorizationRequested else { return }
+  /// arrives, so the camera remote never prompts on its own. A workout page asks too (`forReading`): on the
+  /// iPad the workouts come by sync (070), no session ever arrives, and Health was never asked (#239).
+  func requestAuthorizationIfNeeded(forReading: Bool = false) {
+    guard HKHealthStore.isHealthDataAvailable(), session != nil || forReading, !authorizationRequested else { return }
     guard store.authorizationStatus(for: .workoutType()) == .notDetermined else { return }
     guard UIApplication.shared.applicationState == .active else { return }  // retried on the next foreground
     authorizationRequested = true
@@ -88,6 +89,12 @@ final class WorkoutMirror: NSObject, ObservableObject {
     guard HKHealthStore.isHealthDataAvailable() else { return nil }
     let inLive = live.map { end >= $0.startDate } ?? false
     guard inLive || index.workouts.contains(where: { $0.start <= end && $0.end >= start }) else { return nil }
+    // Never asked (the iPad, #239): ask now, from the page, and read nothing until Health has answered; the
+    // query would only log "Authorization not determined" on every page. The synced series draws meanwhile.
+    guard store.authorizationStatus(for: .workoutType()) != .notDetermined else {
+      requestAuthorizationIfNeeded(forReading: true)
+      return nil
+    }
     let type = HKQuantityType(.heartRate)
     let query = HKSampleQueryDescriptor(
       predicates: [.quantitySample(type: type, predicate: HKQuery.predicateForSamples(withStart: start, end: end))],
