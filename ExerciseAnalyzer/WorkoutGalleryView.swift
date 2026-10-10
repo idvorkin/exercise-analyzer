@@ -344,6 +344,9 @@ struct WorkoutDay: Identifiable {
   /// A day the wrist ran a workout on (048): its workout lines are how in, the day does not fold (#163).
   var hasWorkout: Bool { !workouts.isEmpty || live != nil }
 
+  /// Every set of the day on video (#242): the diamond on its line, the day to demo.
+  var allOnVideo: Bool { RecentEntry.allOnVideo(exercises.flatMap(\.sets)) }
+
   /// The day's sets that fall in none of its workouts, by exercise (#163): a workout day shows only these under
   /// its workout lines, the rest are on the workout's page. A set belongs to a workout as it does there (053).
   var outsideWorkouts: [ExerciseSets] {
@@ -488,7 +491,14 @@ struct DayHeader: View {
       // "Today" and "Yesterday" carry their date under the word, not beside it, where it squeezed the day's
       // drawings (#186).
       VStack(alignment: .leading, spacing: 0) {
-        Text(title).font(.title3.bold())
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(title).font(.title3.bold())
+          // Every set on video (#242; Igor: "when I wanna demo it, I can show the right one").
+          if day.allOnVideo {
+            Image(systemName: "diamond.fill").font(.caption).foregroundStyle(.cyan)
+              .accessibilityLabel("Every set on video")
+          }
+        }
         if title == "Today" || title == "Yesterday" {
           Text(dateLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }

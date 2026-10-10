@@ -145,6 +145,13 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   /// (`originalName`) stays: its original is in the library already, most likely (Igor, 2026-10-08: the 13
   /// imported clips among the 49 in-app ones would have been duplicates).
   public var recordedOnlyInApp: Bool { clipOnlyInApp && originalName == nil }
+
+  /// A day with every set on video (#242; Igor: "add a diamond to a workout that has all its videos … when I
+  /// wanna demo it, I can show the right one"): at least one set, none of them by hand. A day of only a wrist
+  /// workout has nothing to show.
+  public static func allOnVideo(_ sets: [RecentEntry]) -> Bool {
+    !sets.isEmpty && sets.allSatisfy { !$0.isByHand }
+  }
 }
 
 /// What deleting a set says before it does it (#111; Igor asked for it to differ by whether the video is "on
