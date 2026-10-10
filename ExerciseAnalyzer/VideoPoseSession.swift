@@ -48,8 +48,7 @@ final class VideoPoseSession: NSObject, ObservableObject {
   /// Shake reports' files and old-log pruning (BugReport.swift).
   private let bugReporter: BugReporter
   let recents = RecentsStore()
-  /// The iCloud copy of Recents and the workouts for the other devices (story 070).
-  /// The iCloud mirror and reader (story 070); the Sync status screen watches it (#231).
+  /// The iCloud copy of Recents and the workouts for the other devices (story 070), watched by the Sync status screen (#231).
   private(set) var sync: SyncStore?
   /// Recordings into Photos by themselves, and the backlog once approved (story 070, step 3).
   private var exporter: PhotosExporter?

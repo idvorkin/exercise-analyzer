@@ -466,7 +466,7 @@ final class SyncStore: ObservableObject {
         for url in toAsk { try? FileManager.default.startDownloadingUbiquitousItem(at: url) }
       }
     }
-    readContainer(waiting: counts.notDownloaded)
+    readContainer(queryNotDownloaded: counts.notDownloaded)
   }
 
   /// "sets/<id>/row.json" or "workouts/<id>.json": the file's path under the container's Documents.
@@ -477,9 +477,8 @@ final class SyncStore: ObservableObject {
   }
 
   /// One pass over the container: the other devices' rows and tombstones into the indexes, then their sets'
-  /// files (analysis, pictures) into the sets' own folders when missing or older. Logs `sync_read` when anything
-  /// changed or is still on its way.
-  func readContainer(waiting: Int = 0) {
+  /// files (analysis, pictures) into the sets' own folders when missing or older. Logs `sync_read` on every pass.
+  func readContainer(queryNotDownloaded: Int = 0) {
     guard let container else { return }
     guard !reading else {
       readAgain = true
@@ -487,7 +486,7 @@ final class SyncStore: ObservableObject {
     }
     reading = true
     let started = Date()
-    note("sync_read_start", ["waiting": waiting])
+    note("sync_read_start", ["query_not_downloaded": queryNotDownloaded])
     let me = Self.deviceID
     let deleted = recents.deleted
     let deletedWorkouts = workouts.deleted
@@ -538,7 +537,7 @@ final class SyncStore: ObservableObject {
           rewrite = true
         }
         if rewrite { self.mirrorChanges() }
-        let stillWaiting = waiting + copied.waiting + found.waitingSets + found.rowsWaiting
+        let stillWaiting = found.waitingSets + copied.waiting
         // What the container holds per device, this one included; the pass is logged even when nothing changed.
         var perDevice: [String: (sets: Int, workouts: Int)] = [:]
         for row in found.sets { perDevice[row.device ?? "unstamped", default: (0, 0)].sets += 1 }
@@ -549,7 +548,7 @@ final class SyncStore: ObservableObject {
         self.status.lastRead = SyncStatus.Pass(
           at: Date(),
           summary:
-            "sets \(found.sets.count) (+\(sets.added) ~\(sets.updated) -\(sets.removed)), workouts \(found.workouts.count) (+\(workouts.added) ~\(workouts.updated) -\(workouts.removed)), files \(copied.files), waiting \(stillWaiting), failed \(failures.count), \(ms) ms"
+            "sets \(found.sets.count) (+\(sets.added) ~\(sets.updated) -\(sets.removed)), workouts \(found.workouts.count) (+\(workouts.added) ~\(workouts.updated) -\(workouts.removed)), files \(copied.files), waiting \(stillWaiting), rows waiting \(found.rowsWaiting), rows missing \(found.rowsMissing), query not downloaded \(queryNotDownloaded), failed \(failures.count), \(ms) ms"
         )
         self.note(
           "sync_read",
@@ -558,6 +557,7 @@ final class SyncStore: ObservableObject {
             "workouts": found.workouts.count, "workouts_added": workouts.added, "workouts_updated": workouts.updated,
             "workouts_removed": workouts.removed, "tombstones": found.setTombstones.count + found.workoutTombstones.count,
             "files": copied.files, "bytes": copied.bytes, "waiting": stillWaiting, "rows_waiting": found.rowsWaiting,
+            "rows_missing": found.rowsMissing, "query_not_downloaded": queryNotDownloaded,
             "failed": failures.count, "devices": Self.devicesText(self.status.devices, me: me), "ms": ms,
           ])
         self.reading = false
@@ -599,6 +599,8 @@ final class SyncStore: ObservableObject {
     var waitingSets = 0
     /// Rows iCloud has not brought down yet (a `.row.json.icloud` placeholder): asked for, read next pass.
     var rowsWaiting = 0
+    /// Set folders with no row at all: a tombstone not down yet, or this device's mirror still writing the set.
+    var rowsMissing = 0
     var workouts: [StoredWorkout] = []
     var workoutTombstones: [String: Date] = [:]
     /// Rows and tombstones that are here but could not be read or decoded.
@@ -628,6 +630,9 @@ final class SyncStore: ObservableObject {
       let row: RecentEntry
       do {
         row = try JSONDecoder().decode(RecentEntry.self, from: read(rowURL))
+      } catch let error where isNoSuchFile(error) {
+        found.rowsMissing += 1
+        continue
       } catch {
         found.problems.append(Failure(step: "row", path: "sets/\(id)/row.json", error: error))
         continue
@@ -670,6 +675,15 @@ final class SyncStore: ObservableObject {
       found.workouts.append(row)
     }
     return found
+  }
+
+  private nonisolated static func isNoSuchFile(_ error: Error) -> Bool {
+    let error = error as NSError
+    switch error.domain {
+    case NSCocoaErrorDomain: return error.code == NSFileReadNoSuchFileError || error.code == NSFileNoSuchFileError
+    case NSPOSIXErrorDomain: return error.code == Int(ENOENT)
+    default: return false
+    }
   }
 
   /// When a tombstone says its set or workout was deleted; nil for no tombstone, or one not downloaded yet.
