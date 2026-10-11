@@ -147,7 +147,8 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
 
   private var elevatedRecently: Bool {
     guard !elevatedFlags.isEmpty else { return false }
-    return Double(elevatedFlags.filter { $0 }.count) / Double(elevatedFlags.count) >= thresholds.elevatedRecentlyFraction
+    return Double(elevatedFlags.filter { $0 }.count) / Double(elevatedFlags.count)
+      >= thresholds.elevatedRecentlyFraction
   }
 
   /// Records the bench box from a frame the detector ran on.
@@ -160,7 +161,8 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     return [BodySide.left, .right].filter { side in
       let i = side.ankle.rawValue
       guard i < pose.xyn.count, i < pose.conf.count, pose.conf[i] > BodySkeleton.visibleThreshold else { return false }
-      let x = CGFloat(pose.xyn[i].x), y = CGFloat(pose.xyn[i].y)
+      let x = CGFloat(pose.xyn[i].x)
+      let y = CGFloat(pose.xyn[i].y)
       return x >= box.minX && x <= box.maxX && y >= box.minY - CGFloat(thresholds.benchTopMargin)
         && y <= box.minY + box.height * CGFloat(thresholds.benchTopShare)
     }
@@ -225,10 +227,12 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     let legLength = bodyHeight ?? currentHeight
     frameCounter += 1
     if frameCounter % 15 == 0 {
-      trace?(String(format: "%.2fs %@ ear %.0f top %@ height %.0f elevated %.2f front %@", time, machine.phase, earY,
-        standingEarY.map { String(format: "%.0f", $0) } ?? "-", legLength,
-        elevatedFlags.isEmpty ? 0 : Double(elevatedFlags.filter { $0 }.count) / Double(elevatedFlags.count),
-        legs.workingLeg.map { "\($0)" } ?? "-"))
+      trace?(
+        String(
+          format: "%.2fs %@ ear %.0f top %@ height %.0f elevated %.2f front %@", time, machine.phase, earY,
+          standingEarY.map { String(format: "%.0f", $0) } ?? "-", legLength,
+          elevatedFlags.isEmpty ? 0 : Double(elevatedFlags.filter { $0 }.count) / Double(elevatedFlags.count),
+          legs.workingLeg.map { "\($0)" } ?? "-"))
     }
     let frame = SingleLegFrame(pose: pose, time: time, earY: earY, metrics: m)
     frameHistory.append(frame)
@@ -239,7 +243,9 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     if rearKnee > 0 { metrics.minRearKnee = min(metrics.minRearKnee, rearKnee) }
     metrics.maxSpine = max(metrics.maxSpine, spine)
     machine.framesInPhase += 1
-    if machine.phase != Self.standing, let leftKnee = skeleton.point(.leftKnee), let rightKnee = skeleton.point(.rightKnee) {
+    if machine.phase != Self.standing, let leftKnee = skeleton.point(.leftKnee),
+      let rightKnee = skeleton.point(.rightKnee)
+    {
       dipKneeFrames += 1
       if Double(abs(leftKnee.x - rightKnee.x)) < legLength * thresholds.kneesTogetherFraction { dipKneesTogether += 1 }
     }
@@ -261,7 +267,10 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
       if elevatedRecently, setUp, machine.canTransition, let top = standingEarY,
         earY > top + legLength * thresholds.descendFraction
       {
-        trace?(String(format: "%.2fs descending: ear %.0f > top %.0f + %.0f", time, earY, top, legLength * thresholds.descendFraction))
+        trace?(
+          String(
+            format: "%.2fs descending: ear %.0f > top %.0f + %.0f", time, earY, top,
+            legLength * thresholds.descendFraction))
         repStartTime = time
         dipKneeFrames = 0
         dipKneesTogether = 0
@@ -343,7 +352,10 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
         // was wrong: 79271425 learned it in the walk-in, 0.39 L above where the lifter stood near the camera, and
         // the setup dip's rep waited in ascending through the whole set (0 counted). The turn is the new top.
         guard turn.earY < top + legLength * thresholds.turnCountsFraction else {
-          trace?(String(format: "%.2fs not a rep: turned down at ear %.0f, %.2f L short of top %.0f", time, turn.earY, (turn.earY - top) / legLength, top))
+          trace?(
+            String(
+              format: "%.2fs not a rep: turned down at ear %.0f, %.2f L short of top %.0f", time, turn.earY,
+              (turn.earY - top) / legLength, top))
           machine.transition(to: Self.standing)
           standingEarY = turn.earY
           standingFrame = turn
@@ -359,7 +371,10 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
       }
       // A hinge with the feet together, not a split squat: the dumbbells put down (#172). Back to standing uncounted.
       if let end, dipKneeFrames > 0, Double(dipKneesTogether) / Double(dipKneeFrames) > thresholds.hingeShare {
-        trace?(String(format: "%.2fs not a rep: knees together in %.2f of the dip", time, Double(dipKneesTogether) / Double(dipKneeFrames)))
+        trace?(
+          String(
+            format: "%.2fs not a rep: knees together in %.2f of the dip", time,
+            Double(dipKneesTogether) / Double(dipKneeFrames)))
         machine.transition(to: Self.standing)
         standingEarY = end.earY
         standingFrame = end
@@ -370,7 +385,10 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
         return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil)
       }
       if let end {
-        trace?(String(format: "%.2fs rep %d done: ear %.0f at %.2fs, top %.0f", time, machine.repCount + 1, end.earY, end.time, top))
+        trace?(
+          String(
+            format: "%.2fs rep %d done: ear %.0f at %.2fs, top %.0f", time, machine.repCount + 1, end.earY, end.time,
+            top))
         if let bottom = bottomCandidate {
           let target = bottom.earY - (bottom.earY - top) * 0.5
           if let closest = frameHistory.filter({ $0.time > bottom.time && $0.time <= end.time })

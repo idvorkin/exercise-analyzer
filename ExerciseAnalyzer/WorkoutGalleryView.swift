@@ -46,13 +46,15 @@ struct WorkoutGalleryView: View {
   /// device's set names the owner's, which means nothing here, so its cloud identifier is mapped back (#222).
   private var knownPhotosIDs: Set<String> {
     let mine = store.entries.compactMap(\.photosIdentifier)
-    let theirs = store.entries.filter { !SyncOwnership.isMine($0.device, me: SyncStore.deviceID) }.compactMap(\.cloudIdentifier)
+    let theirs = store.entries.filter { !SyncOwnership.isMine($0.device, me: SyncStore.deviceID) }.compactMap(
+      \.cloudIdentifier)
     return Set(mine + RecentsStore.localIdentifiers(forCloud: theirs))
   }
 
   /// Older than a week: the days that start folded.
   private static func isOld(_ day: Date) -> Bool {
-    let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
+    let weekAgo =
+      Calendar.current.date(byAdding: .day, value: -7, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
     return day < weekAgo
   }
 
@@ -61,7 +63,8 @@ struct WorkoutGalleryView: View {
     // workout lines open the page, and only the sets outside every workout sit under them.
     guard !day.hasWorkout else { return false }
     return foldAllForScreenshot
-      || DayFolds(stored: foldsStored).isFolded(Self.dayKey.string(from: day.date), olderThanAWeek: Self.isOld(day.date))
+      || DayFolds(stored: foldsStored).isFolded(
+        Self.dayKey.string(from: day.date), olderThanAWeek: Self.isOld(day.date))
   }
 
   /// The dialog's line (065): what goes, and that the sets stay.
@@ -84,66 +87,72 @@ struct WorkoutGalleryView: View {
   /// The log, the app's home (story 058): the root of ContentView's navigation, which pushes a workout's page,
   /// a set and the camera over it.
   var body: some View {
-      Group {
-        if days.isEmpty && suggestions.clips.isEmpty {
-          ContentUnavailableView(
-            "No workouts yet", systemImage: "figure.strengthtraining.traditional",
-            description: Text("Record a set or open a video and it shows up here, grouped by day."))
-        } else {
-          ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
-              // One line about the newest change, with its ✕ (story 072); BugKit's row shows nothing once dismissed.
-              if let onWhatsNew {
-                WhatsNewRow(feed: whatsNew, logger: { type, fields in onEvent?(type, fields.mapValues(\.foundation)) }) {
-                  onWhatsNew()
-                }
-                .padding(.top, 8)
+    Group {
+      if days.isEmpty && suggestions.clips.isEmpty {
+        ContentUnavailableView(
+          "No workouts yet", systemImage: "figure.strengthtraining.traditional",
+          description: Text("Record a set or open a video and it shows up here, grouped by day."))
+      } else {
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 14, pinnedViews: [.sectionHeaders]) {
+            // One line about the newest change, with its ✕ (story 072); BugKit's row shows nothing once dismissed.
+            if let onWhatsNew {
+              WhatsNewRow(feed: whatsNew, logger: { type, fields in onEvent?(type, fields.mapValues(\.foundation)) }) {
+                onWhatsNew()
               }
-              if !suggestions.clips.isEmpty, let onImport {
-                PhotosSuggestionsRow(suggestions: suggestions) { clip in
-                  // An analyzed clip is already a set: open that instead of importing it a second time.
-                  if clip.analyzed, let entry = store.entries.first(where: { $0.photosIdentifier == clip.id }) {
-                    onEvent?("photos_suggestion_open", ["id": entry.id])
-                    onOpen(entry)
-                  } else {
-                    onImport(clip.id, clip.asset.creationDate)
+              .padding(.top, 8)
+            }
+            if !suggestions.clips.isEmpty, let onImport {
+              PhotosSuggestionsRow(suggestions: suggestions) { clip in
+                // An analyzed clip is already a set: open that instead of importing it a second time.
+                if clip.analyzed, let entry = store.entries.first(where: { $0.photosIdentifier == clip.id }) {
+                  onEvent?("photos_suggestion_open", ["id": entry.id])
+                  onOpen(entry)
+                } else {
+                  onImport(clip.id, clip.asset.creationDate)
+                }
+              }
+            } else if suggestions.status == .notDetermined, onImport != nil {
+              Button {
+                suggestions.requestAccess()
+              } label: {
+                Label("Show recent videos from Photos", systemImage: "photo.on.rectangle")
+                  .font(.subheadline)
+              }
+              .buttonStyle(.bordered)
+              .padding(.top, 8)
+            }
+            ForEach(days) { day in
+              let folded = isFolded(day)
+              Section {
+                if !folded {
+                  ForEach(day.hasWorkout ? day.outsideWorkouts : day.exercises) { exercise in
+                    ExerciseSetsRow(
+                      group: exercise, store: store,
+                      onOpen: onOpen,
+                      onDelete: { entry in
+                        if let session {
+                          session.delete(set: entry, from: "workouts")
+                        } else {
+                          store.remove(id: entry.id)
+                        }
+                      },
+                      onKeepByHand: { entry, kind, reps in
+                        if let session {
+                          session.keepByHand(set: entry, exercise: kind, reps: reps, from: "workouts")
+                        } else {
+                          store.keepByHand(id: entry.id, exercise: kind, reps: reps)
+                        }
+                        if entry.isInPhotos { suggestions.refresh(known: knownPhotosIDs) }
+                      })
                   }
                 }
-              } else if suggestions.status == .notDetermined, onImport != nil {
-                Button {
-                  suggestions.requestAccess()
-                } label: {
-                  Label("Show recent videos from Photos", systemImage: "photo.on.rectangle")
-                    .font(.subheadline)
-                }
-                .buttonStyle(.bordered)
-                .padding(.top, 8)
-              }
-              ForEach(days) { day in
-                let folded = isFolded(day)
-                Section {
-                  if !folded {
-                    ForEach(day.hasWorkout ? day.outsideWorkouts : day.exercises) { exercise in
-                      ExerciseSetsRow(
-                        group: exercise, store: store,
-                        onOpen: onOpen,
-                        onDelete: { entry in
-                          if let session { session.delete(set: entry, from: "workouts") } else { store.remove(id: entry.id) }
-                        },
-                        onKeepByHand: { entry, kind, reps in
-                          if let session {
-                            session.keepByHand(set: entry, exercise: kind, reps: reps, from: "workouts")
-                          } else {
-                            store.keepByHand(id: entry.id, exercise: kind, reps: reps)
-                          }
-                          if entry.isInPhotos { suggestions.refresh(known: knownPhotosIDs) }
-                        })
-                    }
-                  }
-                } header: {
-                  DayHeader(
-                    day: day, collapsed: folded,
-                    onToggle: day.hasWorkout ? nil : {
+              } header: {
+                DayHeader(
+                  day: day, collapsed: folded,
+                  onToggle: day.hasWorkout
+                    ? nil
+                    : {
                       let key = Self.dayKey.string(from: day.date)
                       let opening = folded
                       onEvent?("workouts_day", ["day": key, "opened": opening])
@@ -154,67 +163,68 @@ struct WorkoutGalleryView: View {
                         foldsStored = folds.stored
                       }
                     },
-                    onOpenWorkout: onOpenWorkout,
-                    onDeleteWorkout: { deletingWorkout = $0 })
-                }
+                  onOpenWorkout: onOpenWorkout,
+                  onDeleteWorkout: { deletingWorkout = $0 })
               }
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 24)
           }
+          .padding(.horizontal, 12)
+          .padding(.bottom, 24)
         }
       }
-      .navigationTitle("Workouts")
-      .navigationBarTitleDisplayMode(.inline)
-      .confirmationDialog(
-        "Delete this workout?",
-        isPresented: Binding(get: { deletingWorkout != nil }, set: { if !$0 { deletingWorkout = nil } }),
-        titleVisibility: .visible, presenting: deletingWorkout
-      ) { workout in
-        Button("Delete workout", role: .destructive) { deleteWorkout(workout) }
-        Button("Keep it", role: .cancel) {}
-      } message: { workout in
-        Text(deletionMessage(workout))
-      }
-      .alert(
-        "Workout deleted", isPresented: Binding(get: { workoutDeletionFailure != nil }, set: { if !$0 { workoutDeletionFailure = nil } })
-      ) {
-        Button("OK", role: .cancel) {}
-      } message: {
-        Text(workoutDeletionFailure ?? "")
-      }
-      .onAppear {
-        suggestions.onEvent = onEvent
-        suggestions.refresh(known: knownPhotosIDs)
-        guard !landedOnLive else { return }
-        landedOnLive = true
-        // Mid-workout, the app opens on the workout (#123; Igor, from the gym: "if I'm in a live workout take me
-        // back to live workout"): the running workout's page, the day list one "‹" behind it.
-        if let live = workouts.liveWorkout {
-          onOpenWorkout(live)
-          onEvent?("ui", ["action": "open_live_workout"])
-        } else if let hook = ProcessInfo.processInfo.environment["SWING_OPEN_WORKOUT"],
-          let workout = workouts.sessions.last
+    }
+    .navigationTitle("Workouts")
+    .navigationBarTitleDisplayMode(.inline)
+    .confirmationDialog(
+      "Delete this workout?",
+      isPresented: Binding(get: { deletingWorkout != nil }, set: { if !$0 { deletingWorkout = nil } }),
+      titleVisibility: .visible, presenting: deletingWorkout
+    ) { workout in
+      Button("Delete workout", role: .destructive) { deleteWorkout(workout) }
+      Button("Keep it", role: .cancel) {}
+    } message: { workout in
+      Text(deletionMessage(workout))
+    }
+    .alert(
+      "Workout deleted",
+      isPresented: Binding(get: { workoutDeletionFailure != nil }, set: { if !$0 { workoutDeletionFailure = nil } })
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(workoutDeletionFailure ?? "")
+    }
+    .onAppear {
+      suggestions.onEvent = onEvent
+      suggestions.refresh(known: knownPhotosIDs)
+      guard !landedOnLive else { return }
+      landedOnLive = true
+      // Mid-workout, the app opens on the workout (#123; Igor, from the gym: "if I'm in a live workout take me
+      // back to live workout"): the running workout's page, the day list one "‹" behind it.
+      if let live = workouts.liveWorkout {
+        onOpenWorkout(live)
+        onEvent?("ui", ["action": "open_live_workout"])
+      } else if let hook = ProcessInfo.processInfo.environment["SWING_OPEN_WORKOUT"],
+        let workout = workouts.sessions.last
+      {
+        // Test hook: open the newest workout's page (053); simulator runs can't tap the line. "set" goes on to
+        // open the workout's first set 2 s later, as a tap on its row would, for "‹ Workout".
+        onOpenWorkout(workout)
+        if hook == "set", let first = WorkoutTimeline(workout: workout, sets: store.entries, heartRate: nil).rows.first,
+          let entry = store.entry(id: first.id)
         {
-          // Test hook: open the newest workout's page (053); simulator runs can't tap the line. "set" goes on to
-          // open the workout's first set 2 s later, as a tap on its row would, for "‹ Workout".
-          onOpenWorkout(workout)
-          if hook == "set", let first = WorkoutTimeline(workout: workout, sets: store.entries, heartRate: nil).rows.first,
-            let entry = store.entry(id: first.id)
-          {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { onOpen(entry) }
-          }
-        }
-        // Test hook (065): delete the newest ended workout as a confirmed long-press would; the simulator can't
-        // long-press.
-        if ProcessInfo.processInfo.environment["SWING_DELETE_WORKOUT"] == "confirm", let newest = workouts.sessions.last {
-          deleteWorkout(newest)
-        }
-        // Test hook: ask for Photos access on open so a simulator run can answer the system dialog.
-        if ProcessInfo.processInfo.environment["SWING_PHOTOS_ACCESS"] == "1", suggestions.status == .notDetermined {
-          suggestions.requestAccess()
+          DispatchQueue.main.asyncAfter(deadline: .now() + 2) { onOpen(entry) }
         }
       }
+      // Test hook (065): delete the newest ended workout as a confirmed long-press would; the simulator can't
+      // long-press.
+      if ProcessInfo.processInfo.environment["SWING_DELETE_WORKOUT"] == "confirm", let newest = workouts.sessions.last {
+        deleteWorkout(newest)
+      }
+      // Test hook: ask for Photos access on open so a simulator run can answer the system dialog.
+      if ProcessInfo.processInfo.environment["SWING_PHOTOS_ACCESS"] == "1", suggestions.status == .notDetermined {
+        suggestions.requestAccess()
+      }
+    }
   }
 }
 
@@ -277,9 +287,17 @@ struct PhotosSuggestionsRow: View {
             .contextMenu {
               // Ignoring is a couch action, so a long-press is enough; an analyzed clip is a set, not a suggestion.
               if clip.state == .new {
-                Button { suggestions.setIgnored(clip, true) } label: { Label("Not a workout clip", systemImage: "eye.slash") }
+                Button {
+                  suggestions.setIgnored(clip, true)
+                } label: {
+                  Label("Not a workout clip", systemImage: "eye.slash")
+                }
               } else if clip.state == .ignored {
-                Button { suggestions.setIgnored(clip, false) } label: { Label("Bring back", systemImage: "arrow.uturn.backward") }
+                Button {
+                  suggestions.setIgnored(clip, false)
+                } label: {
+                  Label("Bring back", systemImage: "arrow.uturn.backward")
+                }
               }
             }
         }
@@ -326,7 +344,8 @@ struct WorkoutDay: Identifiable {
     return last.timeIntervalSince(first) + (lastEntry?.duration ?? 0)
   }
 
-  static func group(_ entries: [RecentEntry], workouts: [StoredWorkout] = [], live: WorkoutWire? = nil) -> [WorkoutDay] {
+  static func group(_ entries: [RecentEntry], workouts: [StoredWorkout] = [], live: WorkoutWire? = nil) -> [WorkoutDay]
+  {
     let calendar = Calendar.current
     let byDay = Dictionary(grouping: entries) { calendar.startOfDay(for: $0.start) }
     let workoutsByDay = Dictionary(grouping: workouts) { calendar.startOfDay(for: $0.start) }
@@ -362,8 +381,9 @@ struct WorkoutDay: Identifiable {
   /// its workout lines, the rest are on the workout's page. A set belongs to a workout as it does there (053).
   var outsideWorkouts: [ExerciseSets] {
     let spans = workouts + (live.map { [WorkoutMirror.soFar($0)] } ?? [])
-    return Self.exercises(of: exercises.flatMap(\.sets).filter { set in !spans.contains { $0.contains(set.span.lowerBound) } }
-      .sorted { $0.start < $1.start })
+    return Self.exercises(
+      of: exercises.flatMap(\.sets).filter { set in !spans.contains { $0.contains(set.span.lowerBound) } }
+        .sorted { $0.start < $1.start })
   }
 }
 
@@ -431,7 +451,8 @@ struct DayHeader: View {
       if let onToggle {
         Button(action: onToggle) { dayLine }
           .buttonStyle(.plain)
-          .accessibilityLabel("\(title), \(collapsed ? spokenExercises : summary), \(collapsed ? "collapsed" : "expanded")")
+          .accessibilityLabel(
+            "\(title), \(collapsed ? spokenExercises : summary), \(collapsed ? "collapsed" : "expanded")")
       } else {
         // A workout day shows its exercises' drawings, so it says them (as a folded day does).
         dayLine.accessibilityElement(children: .combine)
@@ -444,7 +465,9 @@ struct DayHeader: View {
           onOpenWorkout?(line.workout)
         } label: {
           HStack(spacing: 6) {
-            Label { Text(line.text).font(.subheadline).monospacedDigit().multilineTextAlignment(.leading) } icon: {
+            Label {
+              Text(line.text).font(.subheadline).monospacedDigit().multilineTextAlignment(.leading)
+            } icon: {
               // The workout's sign, the same lifter the playback screen's "‹" wears, not a watch (#130; Igor:
               // "don't show watch … whatever we use for workout").
               Image(systemName: "figure.strengthtraining.traditional").font(.caption)
@@ -597,13 +620,17 @@ struct WrappingHStack: Layout {
 
   func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
     for (subview, frame) in zip(subviews, arrange(width: bounds.width, subviews).frames) {
-      subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
+      subview.place(
+        at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
     }
   }
 
   private func arrange(width: CGFloat, _ subviews: Subviews) -> (frames: [CGRect], size: CGSize) {
     var frames: [CGRect] = []
-    var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, widest: CGFloat = 0
+    var x: CGFloat = 0
+    var y: CGFloat = 0
+    var lineHeight: CGFloat = 0
+    var widest: CGFloat = 0
     for subview in subviews {
       let size = subview.sizeThatFits(.unspecified)
       if x > 0, x + size.width > width {
@@ -654,7 +681,10 @@ struct ExerciseSetsRow: View {
                 Button("Set exercise and reps…") { editing = entry }
                 // Asks first, and says whether the video goes too: this used to remove at once, the only copy
                 // of an in-app video with it (#111).
-                Button(entry.isInPhotos || entry.isByHand ? "Remove from Workouts…" : "Delete set and video…", role: .destructive) {
+                Button(
+                  entry.isInPhotos || entry.isByHand ? "Remove from Workouts…" : "Delete set and video…",
+                  role: .destructive
+                ) {
                   deleting = entry
                 }
               }
@@ -714,7 +744,9 @@ struct SetByHandSheet: View {
         VStack(spacing: 20) {
           LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             ForEach(ExerciseKind.allCases) { kind in
-              Button { exercise = kind } label: {
+              Button {
+                exercise = kind
+              } label: {
                 HStack(spacing: 8) {
                   ExerciseGlyph(kind: kind, size: 28)
                   Text(kind.definition.name).font(.subheadline.weight(.semibold)).lineLimit(2)
@@ -768,7 +800,9 @@ struct SetByHandSheet: View {
   }
 
   private func stepButton(_ symbol: String, by step: Int) -> some View {
-    Button { reps = HandSet.clamp(reps + step) } label: {
+    Button {
+      reps = HandSet.clamp(reps + step)
+    } label: {
       Image(systemName: symbol).font(.title.bold()).frame(width: 60, height: 60)
         .background(Color.secondary.opacity(0.2), in: Circle())
     }
@@ -794,7 +828,8 @@ extension View {
   func setDeletionDialog(_ entry: Binding<RecentEntry?>, onConfirm: @escaping (RecentEntry) -> Void) -> some View {
     let prompt = entry.wrappedValue.map(SetDeletionPrompt.init(for:))
     return confirmationDialog(
-      prompt?.title ?? "", isPresented: Binding(get: { entry.wrappedValue != nil }, set: { if !$0 { entry.wrappedValue = nil } }),
+      prompt?.title ?? "",
+      isPresented: Binding(get: { entry.wrappedValue != nil }, set: { if !$0 { entry.wrappedValue = nil } }),
       titleVisibility: .visible, presenting: entry.wrappedValue
     ) { set in
       Button(prompt?.confirm ?? "Delete", role: .destructive) { onConfirm(set) }

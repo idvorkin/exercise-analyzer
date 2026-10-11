@@ -48,9 +48,11 @@ final class SplitSquatAnalyzerTests: XCTestCase {
     for i in 0...Int(keys.last!.t * 30) {
       let t = Double(i) / 30
       let next = keys.firstIndex { $0.t >= t } ?? keys.count - 1
-      let a = keys[max(0, next - 1)], b = keys[next]
+      let a = keys[max(0, next - 1)]
+      let b = keys[next]
       let f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 1
-      let frame = pose(hipHeight: a.hipHeight + (b.hipHeight - a.hipHeight) * f, split: a.split + (b.split - a.split) * f)
+      let frame = pose(
+        hipHeight: a.hipHeight + (b.hipHeight - a.hipHeight) * f, split: a.split + (b.split - a.split) * f)
       count = analyzer.process(pose: frame, time: t, image: { nil }).repCount
     }
     return count
@@ -65,7 +67,9 @@ final class SplitSquatAnalyzerTests: XCTestCase {
   /// The 2026-09-19 review: stand tall with the feet together, step into the split, then do the reps without
   /// ever standing tall again. The hips only come back to the split stance (0.89), never to 1.0 − 0.08.
   func testAStaticSplitSquatCountsAfterStandingTall() {
-    var keys: [(t: Double, hipHeight: Double, split: Double)] = [(0, 1.0, 0.05), (1, 1.0, 0.05), (2, 0.89, 0.9), (3, 0.89, 0.9)]
+    var keys: [(t: Double, hipHeight: Double, split: Double)] = [
+      (0, 1.0, 0.05), (1, 1.0, 0.05), (2, 0.89, 0.9), (3, 0.89, 0.9),
+    ]
     for rep in 0..<3 {
       let start = 3 + Double(rep) * 3
       keys += [(start + 1.2, 0.45, 0.9), (start + 2.4, 0.89, 0.9), (start + 3, 0.89, 0.9)]
@@ -88,17 +92,19 @@ final class SplitSquatAnalyzerTests: XCTestCase {
     let frames = try fixture.frames()
     let pipeline = AnalysisPipeline.analyze(frames: frames, exercise: .splitSquat)
     XCTAssertEqual(pipeline.reps.count, 8)
-    var previousBottom = 20.0 // after the bar pickup, before the first descent
+    var previousBottom = 20.0  // after the bar pickup, before the first descent
     for rep in pipeline.reps {
       let top = try XCTUnwrap(rep.positions["standing"])
       let bottom = try XCTUnwrap(rep.positions["bottom"])
-      let highest = try XCTUnwrap(frames.filter { $0.time > previousBottom && $0.time < bottom.time }
-        .compactMap { frame -> (time: Double, height: Double)? in
-          guard let pose = frame.pose, let stance = BodySkeleton(pose: pose).stance else { return nil }
-          return (frame.time, stance.hipHeight)
-        }.max { $0.height < $1.height })
+      let highest = try XCTUnwrap(
+        frames.filter { $0.time > previousBottom && $0.time < bottom.time }
+          .compactMap { frame -> (time: Double, height: Double)? in
+            guard let pose = frame.pose, let stance = BodySkeleton(pose: pose).stance else { return nil }
+            return (frame.time, stance.hipHeight)
+          }.max { $0.height < $1.height })
       let height = try XCTUnwrap(BodySkeleton(pose: top.pose).stance).hipHeight
-      XCTAssertEqual(height, highest.height, accuracy: 0.005, "rep \(rep.number): checkpoint \(top.time), full top \(highest.time)")
+      XCTAssertEqual(
+        height, highest.height, accuracy: 0.005, "rep \(rep.number): checkpoint \(top.time), full top \(highest.time)")
       previousBottom = bottom.time
     }
   }

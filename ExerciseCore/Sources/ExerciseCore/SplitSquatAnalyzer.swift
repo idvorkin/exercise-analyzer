@@ -120,11 +120,13 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
       return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil)
     }
     guard let leftHip = skeleton.point(.leftHip), let rightHip = skeleton.point(.rightHip),
-      let leftAnkle = skeleton.point(.leftAnkle, minConf: 0.5), let rightAnkle = skeleton.point(.rightAnkle, minConf: 0.5)
+      let leftAnkle = skeleton.point(.leftAnkle, minConf: 0.5),
+      let rightAnkle = skeleton.point(.rightAnkle, minConf: 0.5)
     else { return ExerciseFrameResult(phase: machine.phase, repCount: machine.repCount, metrics: m, completedRep: nil) }
     let height = Double(max(leftAnkle.y, rightAnkle.y) - (leftHip.y + rightHip.y) / 2)
     if let top = standingHeight { m["depth"] = max(0, min(100, (top - height) / (0.5 * legLength) * 100)) }
-    let sample = Sample(pose: pose, time: time, hipHeight: height, uprightness: stance.hipHeight, split: stance.split, metrics: m)
+    let sample = Sample(
+      pose: pose, time: time, hipHeight: height, uprightness: stance.hipHeight, split: stance.split, metrics: m)
     history.append(sample)
     if history.count > 240 { history.removeFirst() }
     machine.framesInPhase += 1
@@ -146,12 +148,17 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
       standingHeight = max(standingHeight ?? height, height)
       if stance.hipHeight >= (standingCandidate?.uprightness ?? -.infinity) { standingCandidate = sample }
       if machine.canTransition, let top = standingHeight, height < top - thresholds.descend * legLength {
-        trace?(String(format: "%.2fs descending: hips %.2f < top %.2f − %.2f", time, height / legLength, top / legLength, thresholds.descend))
+        trace?(
+          String(
+            format: "%.2fs descending: hips %.2f < top %.2f − %.2f", time, height / legLength, top / legLength,
+            thresholds.descend))
         let start = standingCandidate ?? sample
         repStartTime = start.time
         descentTime = time
         machine.storePeak(
-          RepPosition(phase: Self.standing, time: start.time, pose: start.pose, metrics: start.metrics, score: start.hipHeight, image: nil))
+          RepPosition(
+            phase: Self.standing, time: start.time, pose: start.pose, metrics: start.metrics, score: start.hipHeight,
+            image: nil))
         machine.transition(to: Self.descending)
         startOver()
         splitFrames = history.filter { $0.time >= time - 0.5 && $0.split >= thresholds.minSplit }.count
@@ -172,14 +179,22 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
       if machine.canTransition, let low = bottomCandidate, framesRisingAfterBottom >= 3,
         top - low.hipHeight >= thresholds.minDepth * legLength, splitFrames >= 3
       {
-        trace?(String(format: "%.2fs bottom: hips %.2f at %.2fs, sank %.2f, feet %.2f apart, %d split observations", time, low.hipHeight / legLength, low.time, (top - low.hipHeight) / legLength, low.split, splitFrames))
+        trace?(
+          String(
+            format: "%.2fs bottom: hips %.2f at %.2fs, sank %.2f, feet %.2f apart, %d split observations", time,
+            low.hipHeight / legLength, low.time, (top - low.hipHeight) / legLength, low.split, splitFrames))
         machine.storePeak(
-          RepPosition(phase: Self.bottom, time: low.time, pose: low.pose, metrics: low.metrics, score: -low.hipHeight, image: bottomImage))
+          RepPosition(
+            phase: Self.bottom, time: low.time, pose: low.pose, metrics: low.metrics, score: -low.hipHeight,
+            image: bottomImage))
         storeHalfway(phase: Self.descending, from: repStartTime, to: low.time, target: (top + low.hipHeight) / 2)
         machine.transition(to: Self.bottom)
       } else if machine.canTransition, height > top - thresholds.returnSlack * legLength {
         // Standing again without a bottom that counts: a shuffle, a squat with the feet together, a bend.
-        trace?(String(format: "%.2fs abandoned: sank %.2f, feet %.2f apart", time, (top - (bottomCandidate?.hipHeight ?? height)) / legLength, bottomCandidate?.split ?? 0))
+        trace?(
+          String(
+            format: "%.2fs abandoned: sank %.2f, feet %.2f apart", time,
+            (top - (bottomCandidate?.hipHeight ?? height)) / legLength, bottomCandidate?.split ?? 0))
         machine.transition(to: Self.standing)
         machine.currentRepPeaks = [:]
         standingHeight = height
@@ -206,12 +221,15 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
       }
       let back = height > top - thresholds.returnSlack * legLength
       let toppedOut =
-        framesSinkingAfterAscent >= 6 && (ascentPeak?.hipHeight ?? 0) - low.hipHeight >= max(thresholds.minDepth * legLength, (top - low.hipHeight) * 0.8)
+        framesSinkingAfterAscent >= 6
+        && (ascentPeak?.hipHeight ?? 0) - low.hipHeight
+          >= max(thresholds.minDepth * legLength, (top - low.hipHeight) * 0.8)
       if back || toppedOut {
         let end = back ? sample : (ascentPeak ?? sample)
-        trace?(String(
-          format: "%.2fs rep %d done: %@, hips %.2f, top %.2f", time, machine.repCount + 1,
-          back ? "standing again" : "topped out", end.hipHeight / legLength, top / legLength))
+        trace?(
+          String(
+            format: "%.2fs rep %d done: %@, hips %.2f, top %.2f", time, machine.repCount + 1,
+            back ? "standing again" : "topped out", end.hipHeight / legLength, top / legLength))
         storeHalfway(phase: Self.ascending, from: low.time, to: end.time, target: (end.hipHeight + low.hipHeight) / 2)
         completedRep = machine.completeRep(quality: quality())
         machine.transition(to: Self.standing)
@@ -230,11 +248,14 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
 
   /// The frame nearest `target` between two times, stored as `phase`'s position (the way down, the way up).
   private func storeHalfway(phase: String, from: Double, to: Double, target: Double) {
-    guard let closest = history.filter({ $0.time > from && $0.time < to })
-      .min(by: { abs($0.hipHeight - target) < abs($1.hipHeight - target) })
+    guard
+      let closest = history.filter({ $0.time > from && $0.time < to })
+        .min(by: { abs($0.hipHeight - target) < abs($1.hipHeight - target) })
     else { return }
     machine.storePeak(
-      RepPosition(phase: phase, time: closest.time, pose: closest.pose, metrics: closest.metrics, score: closest.hipHeight, image: nil))
+      RepPosition(
+        phase: phase, time: closest.time, pose: closest.pose, metrics: closest.metrics, score: closest.hipHeight,
+        image: nil))
   }
 
   private func quality() -> RepQuality {

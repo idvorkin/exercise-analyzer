@@ -136,7 +136,8 @@ public final class PistolSquatAnalyzer: ExerciseAnalyzer {
         machine.transition(to: Self.bottom)
       }
     case Self.bottom:
-      if machine.canTransition, kneeHistory.count >= 2, kneeHistory[kneeHistory.count - 1] > kneeHistory[kneeHistory.count - 2],
+      if machine.canTransition, kneeHistory.count >= 2,
+        kneeHistory[kneeHistory.count - 1] > kneeHistory[kneeHistory.count - 2],
         workingKnee > thresholds.ascendingKneeThreshold
       {
         machine.transition(to: Self.ascending)

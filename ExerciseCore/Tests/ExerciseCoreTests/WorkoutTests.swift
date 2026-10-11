@@ -20,7 +20,8 @@ final class WorkoutTests: XCTestCase {
     // A 48-minute workout: ticks every 15 min.
     XCTAssertEqual(ElapsedAxis.ticks(window: 0...2880), [0, 900, 1800, 2700])
     XCTAssertEqual(
-      ElapsedAxis.ticks(window: 0...2880).map { ElapsedAxis.label($0, fine: false) }, ["0", "15 min", "30 min", "45 min"])
+      ElapsedAxis.ticks(window: 0...2880).map { ElapsedAxis.label($0, fine: false) },
+      ["0", "15 min", "30 min", "45 min"])
     // Zoomed to 90 s starting 12 min in: ticks every 30 s, labelled with seconds.
     let zoomed = ElapsedAxis.ticks(window: 720...810)
     XCTAssertEqual(zoomed, [720, 750, 780, 810])
@@ -56,7 +57,9 @@ final class WorkoutTests: XCTestCase {
   /// end starts the rest clock; sets from before the workout stay out, and a new set shows at once.
   func testTheGlanceCountsTheWorkoutsSetsByExerciseAndKnowsTheLast() {
     let start = Date(timeIntervalSince1970: 10_000)
-    func set(_ id: String, _ kind: ExerciseKind, reps: Int, at offset: TimeInterval, length: TimeInterval = 30) -> RecentEntry {
+    func set(
+      _ id: String, _ kind: ExerciseKind, reps: Int, at offset: TimeInterval, length: TimeInterval = 30
+    ) -> RecentEntry {
       let begin = start.addingTimeInterval(offset)
       return RecentEntry(
         id: id, analyzedAt: begin.addingTimeInterval(length + 5), recordedAt: begin.addingTimeInterval(length),
@@ -72,8 +75,12 @@ final class WorkoutTests: XCTestCase {
     let glance = WorkoutGlance(heartRate: 140, sets: 3, reps: 24).with(sets: sets, since: start)
     XCTAssertEqual(
       glance.exercises,
-      [ExerciseTally(exercise: .kettlebellSwing, sets: 2, reps: 22), ExerciseTally(exercise: .turkishGetUp, sets: 1, reps: 2)])
-    XCTAssertEqual(glance.last, LastSetTally(exercise: .kettlebellSwing, reps: 12, endedAt: start.addingTimeInterval(630)))
+      [
+        ExerciseTally(exercise: .kettlebellSwing, sets: 2, reps: 22),
+        ExerciseTally(exercise: .turkishGetUp, sets: 1, reps: 2),
+      ])
+    XCTAssertEqual(
+      glance.last, LastSetTally(exercise: .kettlebellSwing, reps: 12, endedAt: start.addingTimeInterval(630)))
     let typed = HandSet(exercise: .pullUp, reps: 8, at: start.addingTimeInterval(700).timeIntervalSince1970).entry
     let next = glance.with(sets: sets + [typed], since: start)
     XCTAssertEqual(next.last?.endedAt, start.addingTimeInterval(700))
@@ -120,7 +127,8 @@ final class WorkoutTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: root) }
     XCTAssertEqual(WorkoutIndex.load(root: root), WorkoutIndex())  // no file yet reads as empty
     let index = WorkoutIndex(workouts: [
-      StoredWorkout(id: "a", start: date(16, 9, 2), end: date(16, 10), heartRateAverage: 128, heartRateMax: 156, sets: 6, reps: 47)
+      StoredWorkout(
+        id: "a", start: date(16, 9, 2), end: date(16, 10), heartRateAverage: 128, heartRateMax: 156, sets: 6, reps: 47)
     ])
     try index.save(root: root)
     XCTAssertEqual(WorkoutIndex.load(root: root), index)
@@ -132,7 +140,8 @@ final class WorkoutTests: XCTestCase {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
     try WorkoutIndex(workouts: [
-      StoredWorkout(id: "a", start: date(16, 9), end: date(16, 10)), StoredWorkout(id: "b", start: date(16, 17), end: date(16, 18)),
+      StoredWorkout(id: "a", start: date(16, 9), end: date(16, 10)),
+      StoredWorkout(id: "b", start: date(16, 17), end: date(16, 18)),
     ]).save(root: root)
     let url = root.appendingPathComponent(WorkoutIndex.fileName)
     var file = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
@@ -142,7 +151,9 @@ final class WorkoutTests: XCTestCase {
     try JSONSerialization.data(withJSONObject: file).write(to: url)
     let loaded = WorkoutIndex.load(root: root)
     XCTAssertEqual(loaded.workouts.map(\.id), ["a"])
-    guard case .droppedRows(1, let kept)? = loaded.damage else { return XCTFail("damage: \(String(describing: loaded.damage))") }
+    guard case .droppedRows(1, let kept)? = loaded.damage else {
+      return XCTFail("damage: \(String(describing: loaded.damage))")
+    }
     XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent(kept).path))
     // A save after the load writes what decoded; the copy still has both rows.
     try loaded.save(root: root)
@@ -170,8 +181,12 @@ final class WorkoutTests: XCTestCase {
   /// #169: workouts under 30 minutes apart are one session; a longer gap starts a new one.
   func testWorkoutsUnderHalfAnHourApartAreOneSession() {
     let index = WorkoutIndex(workouts: [
-      StoredWorkout(id: "b", start: date(16, 7, 48), end: date(16, 7, 50), heartRateAverage: 150, heartRateMax: 170, sets: 1, reps: 8),
-      StoredWorkout(id: "a", start: date(16, 7, 0), end: date(16, 7, 30), heartRateAverage: 120, heartRateMax: 150, sets: 4, reps: 30),
+      StoredWorkout(
+        id: "b", start: date(16, 7, 48), end: date(16, 7, 50), heartRateAverage: 150, heartRateMax: 170, sets: 1,
+        reps: 8),
+      StoredWorkout(
+        id: "a", start: date(16, 7, 0), end: date(16, 7, 30), heartRateAverage: 120, heartRateMax: 150, sets: 4,
+        reps: 30),
       StoredWorkout(id: "c", start: date(16, 7, 51), end: date(16, 7, 54), sets: 1, reps: 5),
       StoredWorkout(id: "evening", start: date(16, 18), end: date(16, 19), sets: 2, reps: 20),
     ])
@@ -188,7 +203,8 @@ final class WorkoutTests: XCTestCase {
     XCTAssertEqual(sessions[1], index.workouts[3])
     // Exactly 30 minutes apart is two sessions.
     let apart = WorkoutIndex(workouts: [
-      StoredWorkout(id: "x", start: date(16, 9), end: date(16, 9, 30)), StoredWorkout(id: "y", start: date(16, 10), end: date(16, 10, 5)),
+      StoredWorkout(id: "x", start: date(16, 9), end: date(16, 9, 30)),
+      StoredWorkout(id: "y", start: date(16, 10), end: date(16, 10, 5)),
     ])
     XCTAssertEqual(apart.sessions().map(\.id), ["x", "y"])
   }
@@ -211,8 +227,10 @@ final class WorkoutTests: XCTestCase {
   /// last) finds the session.
   func testAPageFindsTheSessionItsWorkoutMergedInto() {
     let session = StoredWorkout(id: "a", start: date(16, 7, 0), end: date(16, 7, 54))
-    XCTAssertEqual(WorkoutIdentity(start: date(16, 7, 48)).resolve(live: nil, saved: [session], now: date(16, 8)), session)
-    XCTAssertEqual(WorkoutIdentity(start: date(16, 7, 0)).resolve(live: nil, saved: [session], now: date(16, 8)), session)
+    XCTAssertEqual(
+      WorkoutIdentity(start: date(16, 7, 48)).resolve(live: nil, saved: [session], now: date(16, 8)), session)
+    XCTAssertEqual(
+      WorkoutIdentity(start: date(16, 7, 0)).resolve(live: nil, saved: [session], now: date(16, 8)), session)
     XCTAssertNil(WorkoutIdentity(start: date(16, 8, 30)).resolve(live: nil, saved: [session], now: date(16, 9)))
   }
 

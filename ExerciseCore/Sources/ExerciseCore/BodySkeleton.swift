@@ -9,7 +9,8 @@ import Foundation
 
 /// COCO-17 keypoint order produced by YOLO pose models.
 public enum CocoKeypoint: Int, CaseIterable {
-  case nose = 0, leftEye, rightEye, leftEar, rightEar
+  case nose = 0
+  case leftEye, rightEye, leftEar, rightEar
   case leftShoulder, rightShoulder, leftElbow, rightElbow
   case leftWrist, rightWrist, leftHip, rightHip
   case leftKnee, rightKnee, leftAnkle, rightAnkle
@@ -167,8 +168,10 @@ public struct BodySkeleton {
   public var wristHeight: Double {
     guard let ls = point(.leftShoulder), let rs = point(.rightShoulder) else { return 0 }
     let shoulderMidY = (ls.y + rs.y) / 2
-    let wrists = [point(.leftWrist, minConf: Self.reliableThreshold), point(.rightWrist, minConf: Self.reliableThreshold)]
-      .compactMap { $0 }
+    let wrists = [
+      point(.leftWrist, minConf: Self.reliableThreshold), point(.rightWrist, minConf: Self.reliableThreshold),
+    ]
+    .compactMap { $0 }
     guard let highest = wrists.map(\.y).min() else { return 0 }
     return Double(shoulderMidY - highest)
   }
@@ -255,7 +258,9 @@ extension BodySkeleton {
   public var overheadArmSide: BodySide? {
     var best: (rise: Double, side: BodySide)?
     for side in [BodySide.left, .right] {
-      guard let wrist = point(side.wrist, minConf: Self.reliableThreshold), let shoulder = point(side.shoulder) else { continue }
+      guard let wrist = point(side.wrist, minConf: Self.reliableThreshold), let shoulder = point(side.shoulder) else {
+        continue
+      }
       let rise = Double(shoulder.y - wrist.y)
       if rise > 0, best == nil || rise > best!.rise { best = (rise, side) }
     }
@@ -267,7 +272,9 @@ extension BodySkeleton {
   public var overheadArmAngle: Double? {
     var best: (rise: Double, angle: Double)?
     for side in [BodySide.left, .right] {
-      guard let wrist = point(side.wrist, minConf: Self.reliableThreshold), let shoulder = point(side.shoulder) else { continue }
+      guard let wrist = point(side.wrist, minConf: Self.reliableThreshold), let shoulder = point(side.shoulder) else {
+        continue
+      }
       let rise = Double(shoulder.y - wrist.y)
       guard rise > 0 else { continue }
       let angle = atan2(Double(abs(wrist.x - shoulder.x)), rise) * 180 / .pi

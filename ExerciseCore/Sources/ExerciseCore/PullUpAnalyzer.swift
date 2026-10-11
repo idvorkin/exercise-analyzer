@@ -134,8 +134,10 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
     // simulator's track lost two of five reps to a 0.35 slack), while hands that let go hang a whole torso length
     // under it. So the grip is lost only when every wrist seen is far under the line for a few frames, or none
     // is seen for a second.
-    let wrists = [skeleton.point(.leftWrist, minConf: BodySkeleton.reliableThreshold),
-      skeleton.point(.rightWrist, minConf: BodySkeleton.reliableThreshold)].compactMap { $0.map { Double($0.y) } }
+    let wrists = [
+      skeleton.point(.leftWrist, minConf: BodySkeleton.reliableThreshold),
+      skeleton.point(.rightWrist, minConf: BodySkeleton.reliableThreshold),
+    ].compactMap { $0.map { Double($0.y) } }
     let overhead = wrists.count == 2 && wrists.allSatisfy { $0 < shoulderY - scale * thresholds.gripAboveShoulders }
     if overhead {
       gripping = true
@@ -169,7 +171,9 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
     }
 
     // The bar line and the torso are learned from well-seen frames with the arms long, and held through the top.
-    let sure = [CocoKeypoint.leftWrist, .rightWrist].compactMap { skeleton.point($0, minConf: thresholds.barWristConfidence) }
+    let sure = [CocoKeypoint.leftWrist, .rightWrist].compactMap {
+      skeleton.point($0, minConf: thresholds.barWristConfidence)
+    }
     if overhead, sure.count == 2 {
       let seen = Double(sure[0].y + sure[1].y) / 2
       barY = barY.map { $0 * 0.9 + seen * 0.1 } ?? seen
@@ -193,7 +197,9 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
         let start = history.last { $0.under >= hang - thresholds.returnSlack / 2 } ?? sample
         repStartTime = start.time
         machine.storePeak(
-          RepPosition(phase: Self.hang, time: start.time, pose: start.pose, metrics: start.metrics, score: start.under, image: nil))
+          RepPosition(
+            phase: Self.hang, time: start.time, pose: start.pose, metrics: start.metrics, score: start.under, image: nil
+          ))
         machine.transition(to: Self.pulling)
         topCandidate = nil
         topImage = nil
@@ -211,15 +217,22 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
         topImage = image()
         framesSinkingAfterTop = 0
       }
-      if machine.canTransition, let peak = topCandidate, framesSinkingAfterTop >= 3, hang - peak.under >= thresholds.minRise {
-        trace?(String(format: "%.2fs top: under %.2f at %.2fs, rose %.2f", time, peak.under, peak.time, hang - peak.under))
+      if machine.canTransition, let peak = topCandidate, framesSinkingAfterTop >= 3,
+        hang - peak.under >= thresholds.minRise
+      {
+        trace?(
+          String(format: "%.2fs top: under %.2f at %.2fs, rose %.2f", time, peak.under, peak.time, hang - peak.under))
         machine.storePeak(
-          RepPosition(phase: Self.top, time: peak.time, pose: peak.pose, metrics: peak.metrics, score: -peak.under, image: topImage))
+          RepPosition(
+            phase: Self.top, time: peak.time, pose: peak.pose, metrics: peak.metrics, score: -peak.under,
+            image: topImage))
         storeHalfway(phase: Self.pulling, from: repStartTime, to: peak.time, target: (hang + peak.under) / 2)
         machine.transition(to: Self.top)
       } else if machine.canTransition, under > hang - thresholds.returnSlack {
         // Back at the hang without a top: a shuffle on the bar, feet finding the pegs. Not a rep.
-        trace?(String(format: "%.2fs abandoned: under %.2f, best rise %.2f", time, under, hang - (topCandidate?.under ?? under)))
+        trace?(
+          String(
+            format: "%.2fs abandoned: under %.2f, best rise %.2f", time, under, hang - (topCandidate?.under ?? under)))
         machine.transition(to: Self.hang)
         machine.currentRepPeaks = [:]
         hangUnder = under
@@ -231,7 +244,10 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
       }
     default:  // lowering: back near the hang completes the rep
       if machine.canTransition, let hang = hangUnder, under > hang - thresholds.returnSlack {
-        trace?(String(format: "%.2fs rep %d done: under %.2f > hang %.2f − %.2f", time, machine.repCount + 1, under, hang, thresholds.returnSlack))
+        trace?(
+          String(
+            format: "%.2fs rep %d done: under %.2f > hang %.2f − %.2f", time, machine.repCount + 1, under, hang,
+            thresholds.returnSlack))
         completedRep = complete(at: sample)
         hangUnder = under
       }
@@ -241,11 +257,14 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
 
   /// The frame nearest `target` between two times, stored as `phase`'s position (the way up, the way down).
   private func storeHalfway(phase: String, from: Double, to: Double, target: Double) {
-    guard let closest = history.filter({ $0.time > from && $0.time < to })
-      .min(by: { abs($0.under - target) < abs($1.under - target) })
+    guard
+      let closest = history.filter({ $0.time > from && $0.time < to })
+        .min(by: { abs($0.under - target) < abs($1.under - target) })
     else { return }
     machine.storePeak(
-      RepPosition(phase: phase, time: closest.time, pose: closest.pose, metrics: closest.metrics, score: -closest.under, image: nil))
+      RepPosition(
+        phase: phase, time: closest.time, pose: closest.pose, metrics: closest.metrics, score: -closest.under,
+        image: nil))
   }
 
   private func complete(at end: Sample?) -> RepRecord {
@@ -278,7 +297,8 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
     }
     if feedback.isEmpty { feedback.append("Full pull-up!") }
     return RepQuality(
-      score: max(0, score), metrics: ["top": topUnder, "hangElbow": maxElbow, "rise": (hangUnder ?? topUnder) - topUnder],
+      score: max(0, score),
+      metrics: ["top": topUnder, "hangElbow": maxElbow, "rise": (hangUnder ?? topUnder) - topUnder],
       feedback: feedback)
   }
 }

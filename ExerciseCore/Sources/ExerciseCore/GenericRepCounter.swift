@@ -56,9 +56,13 @@ public struct GenericRepCounter {
 
     var best: (signal: Signal, times: [Double], values: [Double], strength: Double, period: Double)?
     for signal in Signal.allCases {
-      var times: [Double] = [], values: [Double] = []
+      var times: [Double] = []
+      var values: [Double] = []
       for frame in frames {
-        if let v = value(signal, frame: frame, scale: scale) { times.append(frame.time); values.append(v) }
+        if let v = value(signal, frame: frame, scale: scale) {
+          times.append(frame.time)
+          values.append(v)
+        }
       }
       // A candidate needs enough measured samples to hold several periods; the bell only runs when tracked.
       guard times.count >= 10, times.last! - times.first! >= 2 * thresholds.minPeriod else { continue }
@@ -108,7 +112,11 @@ public struct GenericRepCounter {
       // Mirror BodySkeleton.earY without the pixels: ears, else nose.
       let ears = [CocoKeypoint.leftEar, .rightEar].compactMap { xy(pose, $0) }
       let y: Double?
-      if !ears.isEmpty { y = Double(ears.map(\.y).reduce(0, +)) / Double(ears.count) } else { y = xy(pose, .nose).map { Double($0.y) } }
+      if !ears.isEmpty {
+        y = Double(ears.map(\.y).reduce(0, +)) / Double(ears.count)
+      } else {
+        y = xy(pose, .nose).map { Double($0.y) }
+      }
       guard let y else { return nil }
       return -y / scale
     case .hips:
@@ -118,7 +126,9 @@ public struct GenericRepCounter {
       return -(Double(hips.map(\.y).reduce(0, +)) / Double(hips.count)) / scale
     case .wrists:
       guard let pose = frame.pose else { return nil }
-      let wrists = [CocoKeypoint.leftWrist, .rightWrist].compactMap { xy(pose, $0, minConf: BodySkeleton.reliableThreshold) }
+      let wrists = [CocoKeypoint.leftWrist, .rightWrist].compactMap {
+        xy(pose, $0, minConf: BodySkeleton.reliableThreshold)
+      }
       guard !wrists.isEmpty else { return nil }
       return -(Double(wrists.map(\.y).reduce(0, +)) / Double(wrists.count)) / scale
     case .bell:
@@ -141,12 +151,14 @@ public struct GenericRepCounter {
   private static func resampled(times: [Double], values: [Double]) -> (times: [Double], values: [Double]) {
     let step = gridStep(times)
     guard step > 0 else { return (times, values) }
-    var outTimes: [Double] = [], outValues: [Double] = []
+    var outTimes: [Double] = []
+    var outValues: [Double] = []
     var j = 0
     var t = times.first!
     while t <= times.last! {
       while j < times.count - 2 && times[j + 1] < t { j += 1 }
-      let a = times[j], b = times[j + 1]
+      let a = times[j]
+      let b = times[j + 1]
       let f = b == a ? 0 : (t - a) / (b - a)
       outTimes.append(t)
       outValues.append(values[j] + f * (values[j + 1] - values[j]))
@@ -162,7 +174,8 @@ public struct GenericRepCounter {
 
   private static func smooth(_ s: [Double], radius: Int) -> [Double] {
     s.indices.map { i in
-      let lo = max(0, i - radius), hi = min(s.count - 1, i + radius)
+      let lo = max(0, i - radius)
+      let hi = min(s.count - 1, i + radius)
       return s[lo...hi].reduce(0, +) / Double(hi - lo + 1)
     }
   }
@@ -170,33 +183,46 @@ public struct GenericRepCounter {
   private static func range(_ s: [Double]) -> Double {
     let sorted = s.sorted()
     guard !sorted.isEmpty else { return 0 }
-    return sorted[min(sorted.count - 1, Int(Double(sorted.count - 1) * 0.95))] - sorted[Int(Double(sorted.count - 1) * 0.05)]
+    return sorted[min(sorted.count - 1, Int(Double(sorted.count - 1) * 0.95))]
+      - sorted[Int(Double(sorted.count - 1) * 0.05)]
   }
 
   private static func median(_ s: [Double]) -> Double {
     guard !s.isEmpty else { return 0 }
     let sorted = s.sorted()
-    return sorted.count % 2 == 1 ? sorted[sorted.count / 2] : (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2
+    return sorted.count % 2 == 1
+      ? sorted[sorted.count / 2] : (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2
   }
 
   /// Strongest autocorrelation in the period band (Pearson over the overlap, so long lags are not penalized).
-  private static func periodicity(_ s: [Double], step: Double, thresholds: Thresholds) -> (strength: Double, period: Double) {
+  private static func periodicity(
+    _ s: [Double], step: Double, thresholds: Thresholds
+  ) -> (strength: Double, period: Double) {
     guard step > 0 else { return (0, 0) }
     let n = s.count
     let kMin = max(1, Int(ceil(thresholds.minPeriod / step)))
     let kMax = min(Int(floor(thresholds.maxPeriod / step)), n - 2)
     guard kMax > kMin else { return (0, 0) }
     let mean = s.reduce(0, +) / Double(n)
-    var best = 0.0, bestK = kMin
+    var best = 0.0
+    var bestK = kMin
     for k in kMin...kMax {
-      var num = 0.0, d0 = 0.0, d1 = 0.0
+      var num = 0.0
+      var d0 = 0.0
+      var d1 = 0.0
       for i in 0..<(n - k) {
-        let a = s[i] - mean, b = s[i + k] - mean
-        num += a * b; d0 += a * a; d1 += b * b
+        let a = s[i] - mean
+        let b = s[i + k] - mean
+        num += a * b
+        d0 += a * a
+        d1 += b * b
       }
       guard d0 > 0, d1 > 0 else { continue }
       let r = num / (d0 * d1).squareRoot()
-      if r > best { best = r; bestK = k }
+      if r > best {
+        best = r
+        bestK = k
+      }
     }
     return (best, Double(bestK) * step)
   }
@@ -204,12 +230,14 @@ public struct GenericRepCounter {
   /// Peak-to-peak cycles: local maxima clearing the median by the hysteresis fraction, consecutive peaks kept
   /// only when the trough between them dips the same fraction below the median, cycles outside the period
   /// band rejected (walk-in, setup, rest).
-  private static func cycles(times: [Double], values: [Double], period: Double, thresholds: Thresholds) -> [RepInterval] {
+  private static func cycles(times: [Double], values: [Double], period: Double, thresholds: Thresholds) -> [RepInterval]
+  {
     let n = values.count
     let sorted = values.sorted()
     let mid = n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2
     let r = range(values)
-    let high = mid + thresholds.hysteresisFraction * r, low = mid - thresholds.hysteresisFraction * r
+    let high = mid + thresholds.hysteresisFraction * r
+    let low = mid - thresholds.hysteresisFraction * r
     let step = gridStep(times)
     let minGap = max(2 * step, 0.4 * period)
     var kept: [Int] = []

@@ -74,14 +74,16 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   public static let definition = ExerciseDefinition(
     name: "Turkish Get-Up",
     phases: [
-      PhaseInfo(id: floor, label: "Floor", aliases: [floorDown]), PhaseInfo(id: elbow, label: "Elbow", aliases: [elbowDown]),
+      PhaseInfo(id: floor, label: "Floor", aliases: [floorDown]),
+      PhaseInfo(id: elbow, label: "Elbow", aliases: [elbowDown]),
       PhaseInfo(id: hand, label: "Hand"), PhaseInfo(id: kneel, label: "Kneel", aliases: [kneelDown]),
       PhaseInfo(id: lunge, label: "Lunge", aliases: [lungeDown]), PhaseInfo(id: standing, label: "Standing"),
     ],
     galleryOrder: [
       PhaseInfo(id: floor, label: "Floor"), PhaseInfo(id: lying, label: "Lying"), PhaseInfo(id: elbow, label: "Elbow"),
       PhaseInfo(id: hand, label: "Hand"),
-      PhaseInfo(id: kneel, label: "Kneel"), PhaseInfo(id: lunge, label: "Lunge"), PhaseInfo(id: standing, label: "Standing"),
+      PhaseInfo(id: kneel, label: "Kneel"), PhaseInfo(id: lunge, label: "Lunge"),
+      PhaseInfo(id: standing, label: "Standing"),
       PhaseInfo(id: lungeDown, label: "↓ Lunge"), PhaseInfo(id: kneelDown, label: "↓ Kneel"),
       PhaseInfo(id: elbowDown, label: "↓ Elbow"), PhaseInfo(id: floorDown, label: "↓ Floor"),
     ],
@@ -240,10 +242,14 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
         lungeEntered = nil
         if let floor = floorFrame(before: lying.time) {
           machine.storePeak(
-            RepPosition(phase: Self.floor, time: floor.time, pose: floor.pose, metrics: floor.metrics, score: -floor.upright, image: nil))
+            RepPosition(
+              phase: Self.floor, time: floor.time, pose: floor.pose, metrics: floor.metrics, score: -floor.upright,
+              image: nil))
         }
         machine.storePeak(
-          RepPosition(phase: Self.lying, time: lying.time, pose: lying.pose, metrics: lying.metrics, score: -lying.upright, image: nil))
+          RepPosition(
+            phase: Self.lying, time: lying.time, pose: lying.pose, metrics: lying.metrics, score: -lying.upright,
+            image: nil))
         machine.transition(to: Self.rising)
         if let candidate = elbowCandidate {
           enter(Self.elbow, at: candidate)
@@ -277,9 +283,12 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
         standingImage = image()
       }
       if held("lowering", upright < thresholds.loweringMax), let peak = standingPeak {
-        trace?(String(format: "%.2fs lowering: upright %.2f (peak %.2f at %.2fs)", time, upright, peak.upright, peak.time))
+        trace?(
+          String(format: "%.2fs lowering: upright %.2f (peak %.2f at %.2fs)", time, upright, peak.upright, peak.time))
         machine.storePeak(
-          RepPosition(phase: Self.standing, time: peak.time, pose: peak.pose, metrics: peak.metrics, score: peak.upright, image: standingImage))
+          RepPosition(
+            phase: Self.standing, time: peak.time, pose: peak.pose, metrics: peak.metrics, score: peak.upright,
+            image: standingImage))
         machine.transition(to: Self.lowering)
         kneelEntered = nil
         enter(Self.lungeDown, at: frame)
@@ -331,12 +340,14 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   private func enter(_ id: String, at frame: Frame) {
     store(id, frame)
     stage = id
-    trace?(String(format: "%.2fs %@: upright %.2f, support elbow %.0f°", frame.time, id, frame.upright, frame.supportElbow))
+    trace?(
+      String(format: "%.2fs %@: upright %.2f, support elbow %.0f°", frame.time, id, frame.upright, frame.supportElbow))
   }
 
   private func store(_ id: String, _ frame: Frame) {
     machine.storePeak(
-      RepPosition(phase: id, time: frame.time, pose: frame.pose, metrics: frame.metrics, score: frame.upright, image: nil))
+      RepPosition(
+        phase: id, time: frame.time, pose: frame.pose, metrics: frame.metrics, score: frame.upright, image: nil))
   }
 
   /// Kneel positions are the middle of the plateau, not its first frame: stored when the plateau ends.
@@ -367,7 +378,9 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
       if stage == nil, supportElbowBent(frame) { enter(Self.elbow, at: frame) }
       if stageHeld("hand", frame.supportElbow >= thresholds.handElbowMin) { enter(Self.hand, at: frame) }
     case Self.hand:
-      if heldFor(&kneelEntered, frame, when: inKneelBand(frame), seconds: thresholds.kneelHoldSeconds), let entered = kneelEntered {
+      if heldFor(&kneelEntered, frame, when: inKneelBand(frame), seconds: thresholds.kneelHoldSeconds),
+        let entered = kneelEntered
+      {
         enter(Self.kneel, at: entered)  // replaced by the plateau's midpoint on exit
       }
     case Self.kneel:
@@ -383,10 +396,12 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   }
 
   private func trackDown(_ frame: Frame) {
-    let bent = frame.supportElbow > 0 && frame.supportElbow < thresholds.elbowBentMax && frame.upright <= thresholds.kneelMax
+    let bent =
+      frame.supportElbow > 0 && frame.supportElbow < thresholds.elbowBentMax && frame.upright <= thresholds.kneelMax
     switch stage {
     case Self.lungeDown:
-      if heldFor(&kneelEntered, frame, when: frame.upright <= thresholds.kneelMax, seconds: thresholds.kneelHoldSeconds),
+      if heldFor(
+        &kneelEntered, frame, when: frame.upright <= thresholds.kneelMax, seconds: thresholds.kneelHoldSeconds),
         let entered = kneelEntered
       {
         enter(Self.kneelDown, at: entered)
@@ -405,7 +420,8 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
 
   /// Every rep carries every position: a stage that was never entered gets the frame nearest its typical
   /// uprightness between the neighbouring stages that were.
-  private func fillMissing(_ targets: [(id: String, upright: Double)], frames: [Frame], floor: Double, ceiling: Double) {
+  private func fillMissing(_ targets: [(id: String, upright: Double)], frames: [Frame], floor: Double, ceiling: Double)
+  {
     for (index, target) in targets.enumerated() where machine.currentRepPeaks[target.id] == nil {
       let lower = targets[..<index].reversed().compactMap { machine.currentRepPeaks[$0.id]?.time }.first ?? floor
       let upper = targets[(index + 1)...].compactMap { machine.currentRepPeaks[$0.id]?.time }.first ?? ceiling
@@ -422,7 +438,8 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
   private func fillUpStages() {
     if stage == Self.kneel, let last = repFrames.last { storeKneelMidpoint(Self.kneel, until: last) }
     fillMissing(
-      [(Self.floor, 0.0), (Self.elbow, 0.2), (Self.hand, 0.3), (Self.kneel, 0.35), (Self.lunge, 0.6)], frames: repFrames,
+      [(Self.floor, 0.0), (Self.elbow, 0.2), (Self.hand, 0.3), (Self.kneel, 0.35), (Self.lunge, 0.6)],
+      frames: repFrames,
       floor: (machine.currentRepPeaks[Self.lying]?.time ?? 0) - 10, ceiling: repFrames.last?.time ?? 0)
   }
 

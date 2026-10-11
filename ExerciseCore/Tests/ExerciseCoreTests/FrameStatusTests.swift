@@ -26,7 +26,9 @@ final class FrameStatusTests: XCTestCase {
     var conf = Array(repeating: Float(0.9), count: 17)
     conf[CocoKeypoint.leftAnkle.rawValue] = 0.25
     conf[CocoKeypoint.rightAnkle.rawValue] = 0.2
-    let lowAnkles = Pose(xyn: Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17), conf: conf, imageSize: CGSize(width: 100, height: 100))
+    let lowAnkles = Pose(
+      xyn: Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17), conf: conf,
+      imageSize: CGSize(width: 100, height: 100))
     XCTAssertEqual(FrameStatus(box: CGRect(x: 0.3, y: 0.1, width: 0.3, height: 0.86), pose: lowAnkles).hint, "In frame")
     XCTAssertEqual(status.hint, "Feet cut off")
   }
@@ -35,13 +37,16 @@ final class FrameStatusTests: XCTestCase {
     var conf = Array(repeating: Float(0.9), count: 17)
     conf[CocoKeypoint.leftAnkle.rawValue] = 0.05
     conf[CocoKeypoint.rightAnkle.rawValue] = 0.05
-    let pose = Pose(xyn: Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17), conf: conf, imageSize: CGSize(width: 100, height: 100))
+    let pose = Pose(
+      xyn: Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17), conf: conf,
+      imageSize: CGSize(width: 100, height: 100))
     let status = FrameStatus(box: CGRect(x: 0.3, y: 0.1, width: 0.3, height: 0.88), pose: pose)
     XCTAssertEqual(status.hint, "Feet cut off")
   }
 
   func testSidesAndRealSets() throws {
-    XCTAssertEqual(FrameStatus(box: CGRect(x: 0, y: 0.2, width: 0.3, height: 0.5), pose: nil).hint, "Cut off on the left")
+    XCTAssertEqual(
+      FrameStatus(box: CGRect(x: 0, y: 0.2, width: 0.3, height: 0.5), pose: nil).hint, "Cut off on the left")
     func share(_ name: String, _ hint: String) throws -> Double {
       let frames = try Fixture.all.first { $0.name == name }!.frames()
       return Double(frames.filter { FrameStatus(box: $0.box, pose: $0.pose).hint == hint }.count) / Double(frames.count)
@@ -49,7 +54,7 @@ final class FrameStatusTests: XCTestCase {
     // The gym Bulgarian set was framed with room to spare; the 13-rep swing clip has the feet on the bottom edge
     // throughout (which is why the detector once misread it), so the hint must say so.
     XCTAssertGreaterThan(try share("bulgarian-phone", "In frame"), 0.9)
-    XCTAssertGreaterThan(try share("swing-phone-14reps","Feet cut off"), 0.95)
+    XCTAssertGreaterThan(try share("swing-phone-14reps", "Feet cut off"), 0.95)
   }
 
   func testAnAnkleAtTheSideIsCutOffThere() throws {
@@ -57,9 +62,11 @@ final class FrameStatusTests: XCTestCase {
     var xyn = Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17)
     xyn[CocoKeypoint.rightAnkle.rawValue] = PosePoint(x: 0.04, y: 0.8)
     let pose = Pose(xyn: xyn, conf: Array(repeating: Float(0.9), count: 17), imageSize: CGSize(width: 100, height: 100))
-    XCTAssertEqual(FrameStatus(box: CGRect(x: 0.05, y: 0.2, width: 0.5, height: 0.7), pose: pose).hint, "Cut off on the left")
+    XCTAssertEqual(
+      FrameStatus(box: CGRect(x: 0.05, y: 0.2, width: 0.5, height: 0.7), pose: pose).hint, "Cut off on the left")
     let url = try XCTUnwrap(
-      Bundle.module.url(forResource: "bulgarian-split-squat-20260922-79271425", withExtension: "json", subdirectory: "Fixtures/tracks"))
+      Bundle.module.url(
+        forResource: "bulgarian-split-squat-20260922-79271425", withExtension: "json", subdirectory: "Fixtures/tracks"))
     let frames = try Fixture.frames(at: url).filter { $0.pose != nil }
     let left = frames.filter { FrameStatus(box: $0.box, pose: $0.pose).clippedEdges.contains(.left) }.count
     XCTAssertGreaterThan(Double(left) / Double(frames.count), 0.5)
@@ -70,7 +77,7 @@ final class FrameStatusTests: XCTestCase {
       recording: true, frame: FrameStatus(personSeen: true, clippedEdges: [.bottom], coverage: 0.9), reps: 3,
       phase: "bottom", elapsed: 12.5, camera: "front", exercise: "Kettlebell Swing")
     status.paused = true
-    status.lastSet = LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62, at: 1718280000)
+    status.lastSet = LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62, at: 1_718_280_000)
     status.viewfinder = true
     let data = try JSONEncoder().encode(status)
     XCTAssertEqual(try JSONDecoder().decode(WatchStatus.self, from: data), status)

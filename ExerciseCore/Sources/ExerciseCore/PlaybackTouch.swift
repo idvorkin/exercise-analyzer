@@ -8,10 +8,16 @@ public struct PlaybackTouch {
   public struct Target: Equatable {
     public let side: Side
     public let key: Key
-    public init(side: Side, key: Key) { self.side = side; self.key = key }
+    public init(side: Side, key: Key) {
+      self.side = side
+      self.key = key
+    }
   }
   public enum Action: Equatable {
-    case showStacks, dismiss, tap(Side?), activate(Target?), end
+    case showStacks, dismiss
+    case tap(Side?)
+    case activate(Target?)
+    case end
   }
 
   public static let holdSeconds = 0.3
@@ -78,19 +84,27 @@ public struct PlaybackTouch {
   public static func target(at p: CGPoint, in size: CGSize, keeping active: Target? = nil) -> Target? {
     guard size.width > 0, size.height > 0,
       p.x >= -margin, p.x <= size.width + margin,
-      p.y >= -margin, p.y <= size.height + margin else { return nil }
+      p.y >= -margin, p.y <= size.height + margin
+    else { return nil }
     let edge = size.width * edgeFraction
     let side: Side
-    if p.x < edge { side = .previous }
-    else if p.x > size.width - edge { side = .next }
-    else if active?.side == .previous, p.x < edge + margin { side = .previous }
-    else if active?.side == .next, p.x > size.width - edge - margin { side = .next }
-    else { return nil }
+    if p.x < edge {
+      side = .previous
+    } else if p.x > size.width - edge {
+      side = .next
+    } else if active?.side == .previous, p.x < edge + margin {
+      side = .previous
+    } else if active?.side == .next, p.x > size.width - edge - margin {
+      side = .next
+    } else {
+      return nil
+    }
     let height = size.height / 3
     var row = min(2, max(0, Int(floor(p.y / height))))
     if let active, active.side == side,
       p.y >= Double(active.key.rawValue) * height - margin,
-      p.y < Double(active.key.rawValue + 1) * height + margin {
+      p.y < Double(active.key.rawValue + 1) * height + margin
+    {
       row = active.key.rawValue
     }
     return Target(side: side, key: Key(rawValue: row)!)
