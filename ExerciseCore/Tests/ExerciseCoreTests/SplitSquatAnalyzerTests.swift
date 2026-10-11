@@ -45,7 +45,8 @@ final class SplitSquatAnalyzerTests: XCTestCase {
   private func reps(through keys: [(t: Double, hipHeight: Double, split: Double)]) -> Int {
     let analyzer = SplitSquatAnalyzer()
     var count = 0
-    for i in 0...Int(keys.last!.t * 30) {
+    guard let last = keys.last else { return 0 }
+    for i in 0...Int(last.t * 30) {
       let t = Double(i) / 30
       let next = keys.firstIndex { $0.t >= t } ?? keys.count - 1
       let a = keys[max(0, next - 1)]

@@ -249,7 +249,7 @@ extension BodySkeleton {
       let length = Self.distance(shoulder, hip) + Self.distance(hip, knee) + Self.distance(knee, ankle)
       guard length > 0 else { continue }
       let value = Double(ankle.y - shoulder.y) / length
-      if best == nil || length > best!.length { best = (value, length) }
+      if length > (best?.length ?? -.infinity) { best = (value, length) }
     }
     return best?.value
   }
@@ -262,7 +262,7 @@ extension BodySkeleton {
         continue
       }
       let rise = Double(shoulder.y - wrist.y)
-      if rise > 0, best == nil || rise > best!.rise { best = (rise, side) }
+      if rise > 0, rise > (best?.rise ?? -.infinity) { best = (rise, side) }
     }
     return best?.side
   }
@@ -278,7 +278,7 @@ extension BodySkeleton {
       let rise = Double(shoulder.y - wrist.y)
       guard rise > 0 else { continue }
       let angle = atan2(Double(abs(wrist.x - shoulder.x)), rise) * 180 / .pi
-      if best == nil || rise > best!.rise { best = (rise, angle) }
+      if rise > (best?.rise ?? -.infinity) { best = (rise, angle) }
     }
     return best?.angle
   }

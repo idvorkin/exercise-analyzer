@@ -138,8 +138,9 @@ enum VideoFile {
     // The range starts at the keyframe's *decode* time: with B-frames it decodes before it is presented, and the
     // exporter keeps a sample only if its decode time is inside the range. Cutting from the presentation time
     // drops the keyframe and the clip then plays from the next one, seconds late on sparse-keyframe clips.
-    let usePassthrough = keyframe.map { start - $0.decode <= maxKeyframeLead } ?? false
-    let alignedStart = usePassthrough ? max(0, keyframe!.decode) : start
+    let passthroughKeyframe = keyframe.flatMap { start - $0.decode <= maxKeyframeLead ? $0 : nil }
+    let usePassthrough = passthroughKeyframe != nil
+    let alignedStart = passthroughKeyframe.map { max(0, $0.decode) } ?? start
     let range = CMTimeRange(
       start: CMTime(seconds: alignedStart, preferredTimescale: 600),
       end: CMTime(seconds: end, preferredTimescale: 600))

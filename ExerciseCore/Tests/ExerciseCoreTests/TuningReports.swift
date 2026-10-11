@@ -139,14 +139,15 @@ final class TuningReports: XCTestCase {
     for f in Fixture.all where f.expectedExercise == .bulgarianSplitSquat {
       let reps = AnalysisPipeline.analyze(frames: try f.frames(), exercise: .bulgarianSplitSquat).reps
       let gaps = reps.compactMap { rep -> String? in
-        guard let bottom = rep.positions[BulgarianSplitSquatAnalyzer.bottom]?.pose,
+        guard let bottomPosition = rep.positions[BulgarianSplitSquatAnalyzer.bottom],
           let top = rep.positions[BulgarianSplitSquatAnalyzer.standing]?.pose
         else { return nil }
+        let bottom = bottomPosition.pose
         let height = Double(max(top.xy[15].y, top.xy[16].y) - min(top.xy[3].y, top.xy[4].y))
         let gap = Double(abs(bottom.xy[13].x - bottom.xy[14].x))
         let ankles = Double(abs(bottom.xy[15].x - bottom.xy[16].x))
         let up = Double(abs(bottom.xy[15].y - bottom.xy[16].y))
-        let m = rep.positions[BulgarianSplitSquatAnalyzer.bottom]!.metrics
+        let m = bottomPosition.metrics
         // A hinge to the floor: the wrists near the lower ankle, the ear near the hips.
         let s = BodySkeleton(pose: bottom)
         let floor = [s.ankleY(.left), s.ankleY(.right)].compactMap { $0 }.max() ?? 0
@@ -158,7 +159,7 @@ final class TuningReports: XCTestCase {
         if let hips, let ear = s.earY { earOverHip = String(format: "%.2f", (hips - ear) / h) }
         return String(
           format: "%.1f:%.2f ankles %.2f/%.2f spine %.0f knee %.0f wrist↑%@ ear↑%@",
-          rep.positions[BulgarianSplitSquatAnalyzer.bottom]!.time, gap / h, ankles / h, up / h, m["spine"] ?? -1,
+          bottomPosition.time, gap / h, ankles / h, up / h, m["spine"] ?? -1,
           m["frontKnee"] ?? -1, wristUp, earOverHip)
       }
       print(
@@ -350,10 +351,11 @@ final class TuningReports: XCTestCase {
     for rep in pipeline.reps {
       let top = try XCTUnwrap(rep.positions["standing"])
       let stance = try XCTUnwrap(BodySkeleton(pose: top.pose).stance)
+      let bottom = try XCTUnwrap(rep.positions["bottom"])
       print(
         String(
-          format: "rep %d standing %.2f s hips %.4f bottom %.2f s", rep.number, top.time, stance.hipHeight,
-          rep.positions["bottom"]!.time))
+          format: "rep %d standing %.2f s hips %.4f bottom %.2f s", rep.number, top.time, stance.hipHeight, bottom.time)
+      )
     }
   }
 

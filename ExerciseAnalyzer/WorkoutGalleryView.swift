@@ -368,7 +368,7 @@ struct WorkoutDay: Identifiable {
       if groups[set.exerciseKind] == nil { order.append(set.exerciseKind) }
       groups[set.exerciseKind, default: []].append(set)
     }
-    return order.map { ExerciseSets(kind: $0, sets: groups[$0]!) }
+    return order.compactMap { kind in groups[kind].map { ExerciseSets(kind: kind, sets: $0) } }
   }
 
   /// A day the wrist ran a workout on (048): its workout lines are how in, the day does not fold (#163).

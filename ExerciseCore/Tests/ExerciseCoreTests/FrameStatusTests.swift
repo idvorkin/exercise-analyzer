@@ -48,7 +48,7 @@ final class FrameStatusTests: XCTestCase {
     XCTAssertEqual(
       FrameStatus(box: CGRect(x: 0, y: 0.2, width: 0.3, height: 0.5), pose: nil).hint, "Cut off on the left")
     func share(_ name: String, _ hint: String) throws -> Double {
-      let frames = try Fixture.all.first { $0.name == name }!.frames()
+      let frames = try XCTUnwrap(Fixture.all.first { $0.name == name }).frames()
       return Double(frames.filter { FrameStatus(box: $0.box, pose: $0.pose).hint == hint }.count) / Double(frames.count)
     }
     // The gym Bulgarian set was framed with room to spare; the 13-rep swing clip has the feet on the bottom edge

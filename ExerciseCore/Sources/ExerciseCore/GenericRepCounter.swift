@@ -65,13 +65,15 @@ public struct GenericRepCounter {
         }
       }
       // A candidate needs enough measured samples to hold several periods; the bell only runs when tracked.
-      guard times.count >= 10, times.last! - times.first! >= 2 * thresholds.minPeriod else { continue }
+      guard times.count >= 10, let first = times.first, let last = times.last,
+        last - first >= 2 * thresholds.minPeriod
+      else { continue }
       let (gridTimes, grid) = resampled(times: times, values: values)
       let smoothed = smooth(grid, radius: max(1, Int((0.15 / gridStep(gridTimes)).rounded())))
       guard smoothed.count >= 10 else { continue }
       guard range(smoothed) >= thresholds.minRange else { continue }
       let (strength, period) = periodicity(smoothed, step: gridStep(gridTimes), thresholds: thresholds)
-      if best == nil || strength > best!.strength { best = (signal, gridTimes, smoothed, strength, period) }
+      if strength > (best?.strength ?? -.infinity) { best = (signal, gridTimes, smoothed, strength, period) }
     }
     guard let winner = best, winner.strength >= thresholds.minPeriodicity else {
       // Still report how periodic the best candidate was, so the tuning table shows near-misses.
@@ -99,7 +101,7 @@ public struct GenericRepCounter {
         let knee = xy(pose, side.knee), let ankle = xy(pose, side.ankle)
       else { continue }
       let length = dist(sh, hip) + dist(hip, knee) + dist(knee, ankle)
-      if best == nil || length > best! { best = length }
+      if length > (best ?? -.infinity) { best = length }
     }
     return best
   }
@@ -153,9 +155,10 @@ public struct GenericRepCounter {
     guard step > 0 else { return (times, values) }
     var outTimes: [Double] = []
     var outValues: [Double] = []
+    guard let first = times.first, let last = times.last else { return (times, values) }
     var j = 0
-    var t = times.first!
-    while t <= times.last! {
+    var t = first
+    while t <= last {
       while j < times.count - 2 && times[j + 1] < t { j += 1 }
       let a = times[j]
       let b = times[j + 1]

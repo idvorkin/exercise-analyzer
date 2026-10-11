@@ -11,7 +11,7 @@ final class WorkoutTests: XCTestCase {
   /// A fixed zone: the dates below are the same instants on every machine.
   private let calendar: Calendar = {
     var c = Calendar(identifier: .gregorian)
-    c.timeZone = TimeZone(identifier: "UTC")!
+    c.timeZone = .gmt
     return c
   }()
 
@@ -118,7 +118,9 @@ final class WorkoutTests: XCTestCase {
   }
 
   private func date(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
-    calendar.date(from: DateComponents(year: 2026, month: 9, day: day, hour: hour, minute: minute))!
+    guard let date = calendar.date(from: DateComponents(year: 2026, month: 9, day: day, hour: hour, minute: minute))
+    else { preconditionFailure("September 2026 in UTC always makes a date; the test's own components are wrong") }
+    return date
   }
 
   func testIndexRoundTripsThroughItsFile() throws {

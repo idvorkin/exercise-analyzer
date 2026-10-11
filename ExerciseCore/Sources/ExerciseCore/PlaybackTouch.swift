@@ -107,6 +107,7 @@ public struct PlaybackTouch {
     {
       row = active.key.rawValue
     }
-    return Target(side: side, key: Key(rawValue: row)!)
+    guard let key = Key(rawValue: row) else { return nil }
+    return Target(side: side, key: key)
   }
 }

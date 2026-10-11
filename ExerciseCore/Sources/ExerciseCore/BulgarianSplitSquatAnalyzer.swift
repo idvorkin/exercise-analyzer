@@ -282,10 +282,10 @@ public final class BulgarianSplitSquatAnalyzer: ExerciseAnalyzer {
     case Self.descending:
       if let candidate = bottomCandidate, earY < candidate.earY - legLength * thresholds.riseFraction {
         framesAscendingAfterBottom += 1
-      } else if bottomCandidate == nil || earY >= bottomCandidate!.earY {
+      } else if earY >= (bottomCandidate?.earY ?? -.infinity) {
         framesAscendingAfterBottom = 0
       }
-      if bottomCandidate == nil || earY > bottomCandidate!.earY {
+      if earY > (bottomCandidate?.earY ?? -.infinity) {
         bottomCandidate = frame
         bottomImage = image()
         framesAscendingAfterBottom = 0

@@ -166,10 +166,10 @@ public final class PistolSquatAnalyzer: ExerciseAnalyzer {
   private func updateBottomCandidate(_ frame: SingleLegFrame, image: () -> CGImage?) {
     if let candidate = bottomCandidate, frame.earY < candidate.earY - 5 {
       framesAscendingAfterBottom += 1
-    } else if bottomCandidate == nil || frame.earY >= bottomCandidate!.earY {
+    } else if frame.earY >= (bottomCandidate?.earY ?? -.infinity) {
       framesAscendingAfterBottom = 0
     }
-    if bottomCandidate == nil || frame.earY > bottomCandidate!.earY {
+    if frame.earY > (bottomCandidate?.earY ?? -.infinity) {
       bottomCandidate = frame
       bottomImage = image()
       framesAscendingAfterBottom = 0

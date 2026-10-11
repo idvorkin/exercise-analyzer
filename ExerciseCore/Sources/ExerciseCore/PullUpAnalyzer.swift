@@ -212,7 +212,7 @@ public final class PullUpAnalyzer: ExerciseAnalyzer {
       } else {
         framesSinkingAfterTop = 0
       }
-      if topCandidate == nil || under < topCandidate!.under {
+      if under < (topCandidate?.under ?? .infinity) {
         topCandidate = sample
         topImage = image()
         framesSinkingAfterTop = 0

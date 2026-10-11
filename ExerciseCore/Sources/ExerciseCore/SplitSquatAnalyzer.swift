@@ -171,7 +171,7 @@ public final class SplitSquatAnalyzer: ExerciseAnalyzer {
       } else {
         framesRisingAfterBottom = 0
       }
-      if bottomCandidate == nil || height < bottomCandidate!.hipHeight {
+      if height < (bottomCandidate?.hipHeight ?? .infinity) {
         bottomCandidate = sample
         bottomImage = image()
         framesRisingAfterBottom = 0

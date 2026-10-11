@@ -278,7 +278,7 @@ public final class TurkishGetUpAnalyzer: ExerciseAnalyzer {
         abandon()
       }
     case Self.standing:
-      if standingPeak == nil || upright > standingPeak!.upright {
+      if upright > (standingPeak?.upright ?? -.infinity) {
         standingPeak = frame
         standingImage = image()
       }
