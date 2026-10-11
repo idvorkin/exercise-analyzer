@@ -862,8 +862,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/idvorkin/bug-kit";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = exactVersion;
+				version = 0.3.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
