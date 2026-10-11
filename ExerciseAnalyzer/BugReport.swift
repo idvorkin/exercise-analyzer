@@ -30,6 +30,7 @@ extension VideoPoseSession {
     // holds the microphone (the camera captures video only), so the busy hook stays BugKit's default.
     options.dictation = true
     let log = log
+    let store = BugStore()
     let reporter = BugReporter(
       hooks: BugReporterHooks(
         screen: { [unowned self] in self.bugScreen },
@@ -43,10 +44,37 @@ extension VideoPoseSession {
         extraFiles: { [weak self] folder in
           guard let clip = await MainActor.run(body: { self?.bugClip }) else { return [] }
           return try await Self.writeFrame(of: clip, into: folder)
-        }), options: options)
+        }), options: options, store: store, delivery: makeBugDelivery(store: store))
     bugStatus = reporter.$lastStatus.compactMap { $0 }.sink { [weak self] in self?.noteBugStatus($0) }
     return reporter
   }
+
+  /// Private CloudKit delivery of every report (bug-kit's `CloudKitReportDelivery`, story 022): the phone uploads
+  /// the report and its files to the container every app shares, and the Mac's listener downloads and files them,
+  /// so a shake in the gym becomes an issue without the phone ever meeting the Mac. The report is saved locally
+  /// first, so the device pull keeps working when the upload cannot. `start()` runs here and on every return to
+  /// the foreground: it resumes the outbox after a kill and queues what was saved while offline. Off in the
+  /// simulator, which has no iCloud account: the retries would only fill the smoke checks' logs.
+  private func makeBugDelivery(store: BugStore) -> CloudKitReportDelivery? {
+    #if targetEnvironment(simulator)
+      return nil
+    #else
+      let delivery = CloudKitReportDelivery(
+        containerIdentifier: Self.bugReportsContainer, store: store, logger: bugLogger)
+      Task {
+        await delivery.start()
+        // The reporter lives as long as the app, so this loop does too; nothing to retain or cancel.
+        for await _ in NotificationCenter.default.notifications(named: UIApplication.willEnterForegroundNotification) {
+          await delivery.start()
+        }
+      }
+      return delivery
+    #endif
+  }
+
+  /// The CloudKit container the bug-kit apps and the Mac reader share (the listener's `~/.config/bug-kit/cloudkit.json`
+  /// names the same one); also in the entitlements, next to the app's own iCloud Documents container.
+  static let bugReportsContainer = "iCloud.com.idvorkin.BugKitReports"
 
   /// What a report carries besides the note (story 022): enough to find the moment in the log and the clip in
   /// Workouts. Numbers stay numbers, so `jq` can compare them.

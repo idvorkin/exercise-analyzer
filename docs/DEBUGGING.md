@@ -96,7 +96,14 @@ the numbers, then fix. Never ship a second guessed fix. Examples that paid off: 
    pending for the next poll; `listener/bug-listener status --json` in the bug-kit checkout shows the last poll and
    what is pending. Through the app's `pull_extra` list in `apps.json` the listener also copies the
    WatchConnectivity inbox (`Documents/Inbox/com.apple.watchconnectivity/`, the watch's transfers waiting for the
-   app, #197).
+   app, #197). Since the 2026-10-11 bug-kit bump the phone also uploads each report to the private CloudKit
+   container `iCloud.com.idvorkin.BugKitReports` (BugKit's `CloudKitReportDelivery`, made in `BugReport.swift`,
+   restarted on every foreground; not in the simulator), and the listener reads that container too
+   (`cloudkit_config` in its config, the Mac reader app under `~/Applications/BugKitCloudReader.app`): a report
+   from the gym is filed before the phone is back on the Wi-Fi. The log says what happened to the upload:
+   `bug_delivery_queued`, `bug_delivery_uploading`, `bug_delivery_uploaded`, `bug_delivery_retry` (with the
+   backoff), `bug_delivery_pending` (evidence missing or oversized, left to the device pull) and
+   `bug_delivery_stopped` (a permanent error; needs attention).
 3. **Monitor while Igor tests**: arm `scripts/bugs-monitor.sh` as a persistent `Monitor`. It tails the inbox and
    prints one line per issue the listener filed for this app (`filed <kind> <device> <issue url> <note>`), and it
    watches the listener itself: `listener_stale <age>` when `status.json` shows no completed poll for three
