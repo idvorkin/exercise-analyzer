@@ -216,7 +216,7 @@ if ProcessInfo.processInfo.environment["POSETRACK_PLAN"] == "1" {
 let asset = AVURLAsset(url: URL(fileURLWithPath: options.video))
 let semaphore = DispatchSemaphore(value: 0)
 var frames: [FrameRecord] = []
-var lastWrists: [CGPoint] = []  // previous frame's wrists, for the parallel bell path below
+var lastWrists: [CGPoint] = []  // previous frame's wrists, for the bell reserve on both paths below
 var lastBenchTime = -Double.infinity
 var elapsed = 0.0
 let traceTracker: BellTracker = {  // trace only: what the pipeline's tracker will pick
@@ -278,12 +278,15 @@ Task {
       {
         person = parse(array, letterbox: letterbox, confidence: options.confidence)
       }
-      lastWrists = BellDetector.wrists(of: person?.pose)
       if parallel {
         await withCheckedContinuation { done in group.notify(queue: .global(qos: .userInitiated)) { done.resume() } }
       } else {
+        // Sequential too takes the previous frame's wrists for the reserve, as the phone's offline overlap and
+        // live ingest do (#77): a fixture written here then reproduces the phone at the cap. One frame of lag
+        // is far under the 0.2 reach.
         bells = bellDetector?.detect(in: pixelBuffer, wrists: lastWrists) ?? []
       }
+      lastWrists = BellDetector.wrists(of: person?.pose)
       if ProcessInfo.processInfo.environment["POSETRACK_TRACE"] == "1" {
         let tracked = traceTracker.track(bells, pose: person?.pose)
         let wrists =
