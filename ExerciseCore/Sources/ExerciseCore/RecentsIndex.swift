@@ -66,8 +66,26 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   /// wins when two devices changed the same set (story 070, step 4). Nil for a row never changed since it was
   /// made: `analyzedAt` stands in (`changedAt`).
   public var modifiedAt: Date? = nil
+  /// When the lifter last changed the row by hand (a count kept by hand, a bell weight), apart from the device's
+  /// own rewrites (a re-analysis, a backfill, a cloud identifier): what he typed wins over what was measured when
+  /// two devices changed the same set (`SyncMerge`). Nil for a row he never edited, or one from before this.
+  public var editedAt: Date? = nil
 
   public var changedAt: Date { modifiedAt ?? analyzedAt }
+
+  /// The lifter changed the row on `device` (story 070, step 4): the row is that device's to write from now on.
+  public mutating func edited(by device: String, at time: Date = Date()) {
+    modifiedAt = time
+    editedAt = time
+    self.device = device
+  }
+
+  /// The device rewrote the row itself (a re-analysis, a backfill, a cloud identifier, a clip moved to Photos):
+  /// a change to mirror, but not the lifter's, so it never outweighs what he typed.
+  public mutating func refreshed(by device: String, at time: Date = Date()) {
+    modifiedAt = time
+    self.device = device
+  }
 
   public init(
     id: String, analyzedAt: Date, recordedAt: Date?, duration: Double, repCount: Int, bestScore: Int?,

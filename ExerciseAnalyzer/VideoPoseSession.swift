@@ -520,11 +520,17 @@ final class VideoPoseSession: NSObject {
     let plans = models.outstandingPlans
     let waitStarted = Date()
     let predictor = await models.ready()
+    let modelsWaited = Int(Date().timeIntervalSince(waitStarted) * 1000)
+    // Which sets are this device's to re-analyze is read off their rows, so the other devices' changes go in
+    // first: a set kept by hand or weighed on the iPad, judged on the phone's stale copy, was re-analyzed and its
+    // row written over the iPad's (the 2026-10-26 review's F1).
+    let syncStarted = Date()
+    let syncRead = await sync?.firstRead(timeout: 10) ?? "no_sync"
     log.event(
       "recents_refresh_wait",
       [
-        "predictor": predictor != nil, "waited_ms": Int(Date().timeIntervalSince(waitStarted) * 1000), "plans": plans,
-        "models": models.names,
+        "predictor": predictor != nil, "waited_ms": modelsWaited, "plans": plans, "models": models.names,
+        "sync": syncRead, "sync_waited_ms": Int(Date().timeIntervalSince(syncStarted) * 1000),
       ])
     // A set typed on the wrist has no poses and no clip: nothing to re-read or re-run (059). Another device's
     // set is its owner's to re-analyze; the new row arrives by sync (070, step 4).
@@ -541,6 +547,8 @@ final class VideoPoseSession: NSObject {
     log.event(
       "recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current, "models": models.names])
     for entry in stale {
+      // A read pass during the refresh can hand the set to another device, or make it a set kept by hand.
+      guard refreshStillOurs(entry.id) else { continue }
       guard let stored = recents.loadPipeline(for: entry) else { continue }
       let frames = stored.track.frames
       let plan = StoredSetPlan.decide(
@@ -592,6 +600,7 @@ final class VideoPoseSession: NSObject {
       let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: kind)
       let clipURL = await recents.clipURL(for: entry)
       if let clipURL { await analyzed.fillRepImages(from: AVURLAsset(url: clipURL), frameDuration: frameDuration) }
+      guard refreshStillOurs(entry.id) else { continue }  // the clip fetch and the pictures awaited
       do {
         try recents.save(
           id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
@@ -611,6 +620,16 @@ final class VideoPoseSession: NSObject {
         log.event("error", ["where": "recents_refresh", "message": "\(error)"])
       }
     }
+  }
+
+  /// The set is still this device's to re-analyze: not deleted, not kept by hand, and not changed on another
+  /// device since the refresh chose it (a sync read merged meanwhile); logs `recents_refresh_skipped` when not.
+  private func refreshStillOurs(_ id: String) -> Bool {
+    guard let current = recents.entry(id: id) else { return false }
+    if !current.isByHand && SyncOwnership.isMine(current.device, me: SyncStore.deviceID) { return true }
+    log.event(
+      "recents_refresh_skipped", ["id": id, "reason": current.isByHand ? "kept_by_hand" : "changed_elsewhere"])
+    return false
   }
 
   private func galleryThumbnail(_ analyzed: AnalysisPipeline, kind: ExerciseKind, entry: RecentEntry) -> UIImage? {
