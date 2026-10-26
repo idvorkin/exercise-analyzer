@@ -79,7 +79,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 011:
 
 - **Summary:** Save the trimmed set to Photos, clean, in place of the original
-- **Status:** implemented in [2376b1b](https://github.com/idvorkin/exercise-analyzer/commit/2376b1b); verified on the phone; the offer after a trim (#90) in [13579f0](https://github.com/idvorkin/exercise-analyzer/commit/13579f0), on the phone since 2026-09-17; the set switch (#52) in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified on the host and the simulator, on the phone since 2026-09-26, Igor's check pending (a real Photos replace and undo)
+- **Status:** implemented in [2376b1b](https://github.com/idvorkin/exercise-analyzer/commit/2376b1b); verified on the phone; the offer after a trim (#90) in [13579f0](https://github.com/idvorkin/exercise-analyzer/commit/13579f0), on the phone since 2026-09-17; the set switch (#52) in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified on the host and the simulator, on the phone since 2026-09-26, Igor's check pending (a real Photos replace and undo); a declined delete finishes the save and the undo instead of failing them ([#316](https://github.com/idvorkin/exercise-analyzer/issues/316)) on `fix/2026-10-26-photos-delete-declined`, `LoadedClipTests` on the host (Linux toolchain, ExerciseCore only), the app build and a real decline on the phone pending
 
 #### Use Case:
 - **As a** lifter who keeps sets to compare over months
@@ -91,6 +91,16 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Given:** a clip from Photos has been trimmed to its set
 - **When:** I tap Save to Photos and confirm the deletion iOS asks about
 - **Then:** the trimmed clip (no overlay) is in Photos in place of the original, the Workouts entry points at it, and Undo trim still puts the original back into Photos and reopens it
+
+- **Scenario:** I decline the deletion iOS asks about
+- **Given:** a clip from Photos has been trimmed to its set
+- **When:** I tap Save to Photos and decline the deletion
+- **Then:** the status says "Trimmed clip saved; the original stays in Photos", not "Save failed"; the Workouts entry points at the trimmed clip; the original sits in the strip's Ignored tab, not New; Undo trim points the set back at the original and asks to delete the trimmed clip, which, declined again, goes to Ignored too
+
+- **Scenario:** I decline the deletion during Undo trim
+- **Given:** a trimmed clip replaced its original in Photos
+- **When:** I tap Undo trim and decline the deletion of the trimmed clip
+- **Then:** the original is back in Photos and plays, the set points at it, the trimmed clip sits in the strip's Ignored tab, not New, and nothing is saved to Photos twice
 
 - **Scenario:** The offer comes with the trim
 - **Given:** I opened a clip from Photos and tapped Trim to reps (a clip from Photos is never trimmed by itself)

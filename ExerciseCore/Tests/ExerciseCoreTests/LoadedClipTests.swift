@@ -78,6 +78,40 @@ final class LoadedClipTests: XCTestCase {
     XCTAssertEqual(clip.startedAt, started)
   }
 
+  // The 2026-10-26 review's F2: a trimmed Photos clip saved over its original, iOS asking before the delete.
+
+  private func trimmedPhotosClip() -> LoadedClip<String> {
+    var clip = LoadedClip(url: original, origin: "photos:A", entryID: "set", recordedAt: nil, startedAt: nil)
+    clip.untrimmed = untrimmed(of: clip)
+    clip.trimmed(to: cut, start: 4.5, joined: false)
+    return clip
+  }
+
+  func testAReplacedOriginalIsWhatTheUndoPutsBack() {
+    var clip = trimmedPhotosClip()
+    let dropStash = clip.savedOverOriginal("A", trimmedAsset: "B", as: "photos:B", outcome: .deleted)
+    XCTAssertFalse(dropStash, "the stash is the only copy of the original now")
+    XCTAssertEqual(clip.replacedOriginalID, "A")
+    XCTAssertNil(clip.trimmedBesideOriginal)
+    XCTAssertEqual(clip.untrimmed?.origin, "photos:B")
+    XCTAssertEqual(clip.untrimmed?.url, original)
+  }
+
+  func testADeclinedDeleteLeavesTheOriginalForTheUndoToPointAt() {
+    var clip = trimmedPhotosClip()
+    let dropStash = clip.savedOverOriginal("A", trimmedAsset: "B", as: "photos:B", outcome: .declined)
+    XCTAssertTrue(dropStash, "the original is still in Photos")
+    XCTAssertNil(clip.replacedOriginalID, "nothing to put back into Photos")
+    XCTAssertEqual(clip.trimmedBesideOriginal, "B", "the undo takes the trimmed asset away instead")
+    XCTAssertEqual(clip.untrimmed?.origin, "photos:A", "the undo points the set back at the original")
+  }
+
+  func testAnOriginalGoneBeforeTheDeleteCountsAsReplaced() {
+    var clip = trimmedPhotosClip()
+    XCTAssertFalse(clip.savedOverOriginal("A", trimmedAsset: "B", as: "photos:B", outcome: .notThere))
+    XCTAssertEqual(clip.replacedOriginalID, "A")
+  }
+
   func testUndoWithNoTrimDropsNothing() {
     var clip = recorded
     XCTAssertNil(clip.undo(to: untrimmed(of: clip)))

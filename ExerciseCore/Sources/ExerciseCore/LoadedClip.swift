@@ -18,6 +18,9 @@ public struct LoadedClip<Origin: Sendable> {
   public var untrimmed: Untrimmed?
   /// The Photos asset the trimmed clip replaced (#90), so the undo can put the original back into Photos.
   public var replacedOriginalID: String?
+  /// The trimmed clip's Photos asset when the replace left the original in Photos (its delete declined): the undo
+  /// points the set back at the original and takes this one away instead.
+  public var trimmedBesideOriginal: String?
 
   /// What a trim replaced: the untrimmed clip and its analysis.
   public struct Untrimmed {
@@ -58,6 +61,31 @@ public struct LoadedClip<Origin: Sendable> {
   public mutating func trimmed(to clip: URL, start: Double, joined: Bool) {
     trimmedURL = clip
     startedAt = joined ? nil : startedAt?.addingTimeInterval(start)
+  }
+
+  /// The save put the trimmed clip into Photos as `trimmedAsset`, the set's clip from now on, and asked Photos to
+  /// delete the original it replaces (#90; iOS asks first). Gone (or gone already): the undo puts the stashed
+  /// original back into Photos. Declined: the original is still there, so the undo points the set back at it and
+  /// deletes the trimmed asset instead (the 2026-10-26 review's F2). True when the stashed original is no longer
+  /// needed.
+  public mutating func savedOverOriginal(
+    _ originalID: String, trimmedAsset: String, as trimmedOrigin: Origin, outcome: PhotosDeleteOutcome
+  ) -> Bool {
+    switch outcome {
+    case .deleted, .notThere:
+      untrimmed = untrimmed.map {
+        Untrimmed(
+          url: $0.url, pipeline: $0.pipeline, frames: $0.frames, origin: trimmedOrigin, startedAt: $0.startedAt,
+          stashedFor: $0.stashedFor)
+      }
+      replacedOriginalID = originalID
+      trimmedBesideOriginal = nil
+      return false
+    case .declined:
+      replacedOriginalID = nil
+      trimmedBesideOriginal = trimmedAsset
+      return true
+    }
   }
 
   /// Puts the untrimmed clip back: its file, origin and first-frame time. Returns the trimmed file it dropped.
