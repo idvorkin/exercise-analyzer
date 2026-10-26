@@ -1605,6 +1605,7 @@ final class VideoPoseSession: NSObject {
       clip?.untrimmed = nil
       canUndoTrim = false
       clip?.replacedOriginalID = nil
+      clip?.trimmedBesideOriginal = nil
     }
     let asset = AVURLAsset(url: url)
     // No AVPlayerItemVideoOutput here: attaching a BGRA output routes an HDR item through an SDR conversion and
@@ -2780,11 +2781,17 @@ final class VideoPoseSession: NSObject {
           guard isCurrent(operation) else { return }
           // Point at the surviving asset before a deletion that can outlive this operation.
           recents.markSavedToPhotos(id: operation.entryID, identifier: restoredID)
-          try await VideoFile.deleteFromPhotos(identifier: trimmedID)
+          // The original is back either way: a declined delete leaves the trimmed asset in Photos, belonging to
+          // no set, so it is kept off the strip's New tab and the undo still finishes (F2).
+          let outcome = try await VideoFile.deleteFromPhotos(identifier: trimmedID)
           guard isCurrent(operation) else { return }
           recents.dropBackup(id: id)
           clip?.replacedOriginalID = nil
-          log.event("photos_restored", ["restored": restoredID, "removed": trimmedID])
+          if outcome == .declined {
+            PhotosSuggestions.ignore(identifier: trimmedID)
+            log.event("photos_delete_declined", ["asset": trimmedID, "where": "undo", "kept": restoredID])
+          }
+          log.event("photos_restored", ["restored": restoredID, "removed": trimmedID, "delete": outcome.rawValue])
           let url = await RecentsStore.photosClipURL(identifier: restoredID) ?? before.url
           guard isCurrent(operation) else { return }
           let restored = beginOperation(entryID: operation.entryID, origin: .photos(identifier: restoredID))
@@ -2828,7 +2835,25 @@ final class VideoPoseSession: NSObject {
       }
       return
     }
-    finishUndo(before: before, operation: restored)
+    let trimmedAsset = clip?.trimmedBesideOriginal
+    clip?.trimmedBesideOriginal = nil
+    guard finishUndo(before: before, operation: restored), let trimmedAsset else { return }
+    // The save left the original in Photos beside the trimmed asset (its delete was declined): the set points at
+    // the original again, so the trimmed asset goes (iOS asks); declined again, it stays off the strip's New tab.
+    Task {
+      do {
+        let outcome = try await VideoFile.deleteFromPhotos(identifier: trimmedAsset)
+        if outcome == .declined {
+          PhotosSuggestions.ignore(identifier: trimmedAsset)
+          log.event("photos_delete_declined", ["asset": trimmedAsset, "where": "undo_beside"])
+        } else {
+          log.event("photos_trimmed_removed", ["asset": trimmedAsset, "delete": outcome.rawValue])
+        }
+      } catch {
+        PhotosSuggestions.ignore(identifier: trimmedAsset)
+        log.event("error", ["where": "photos_undo_beside", "message": "\(error)"])
+      }
+    }
   }
 
   /// True once the set is saved with the untrimmed clip again.
@@ -3034,16 +3059,24 @@ final class VideoPoseSession: NSObject {
           recents.update(id: id) { $0.originalName = url.lastPathComponent }
           clip?.origin = .photos(identifier: newID)
           canSave = false
-          try await VideoFile.deleteFromPhotos(identifier: originalID)
+          let outcome = try await VideoFile.deleteFromPhotos(identifier: originalID)
           guard isCurrent(operation) else { return }
           // Undo re-adds the original only once it is really gone: a declined delete (iOS asks) leaves it in
-          // Photos, and Undo then just re-links the set to it.
-          clip?.untrimmed = Untrimmed(
-            url: before.url, pipeline: before.pipeline, frames: before.frames, origin: .photos(identifier: newID),
-            startedAt: before.startedAt)
-          clip?.replacedOriginalID = originalID
-          statusMessage = "Trimmed clip saved; original replaced (Undo trim restores it)"
-          log.event("photos_replaced", ["original": originalID, "trimmed": newID, "clip": url.lastPathComponent])
+          // Photos, and Undo then re-links the set to it and takes the trimmed asset away instead (F2).
+          if clip?.savedOverOriginal(
+            originalID, trimmedAsset: newID, as: .photos(identifier: newID), outcome: outcome) == true
+          {
+            recents.dropBackup(id: id)
+            // The original belongs to no set now: kept off the strip's New tab, where a tap would import it again.
+            PhotosSuggestions.ignore(identifier: originalID)
+            statusMessage = "Trimmed clip saved; the original stays in Photos (Undo trim goes back to it)"
+            log.event("photos_delete_declined", ["asset": originalID, "where": "save", "kept": newID])
+          } else {
+            statusMessage = "Trimmed clip saved; original replaced (Undo trim restores it)"
+            log.event(
+              "photos_replaced",
+              ["original": originalID, "trimmed": newID, "clip": url.lastPathComponent, "delete": outcome.rawValue])
+          }
         } else {
           let identifier = try await savePhotosClip(url, operation: operation)
           guard isCurrent(operation) else { return }

@@ -4,6 +4,7 @@
 //  keyframes, trims a clip, and saves it to or deletes it from the Photos library.
 
 import AVFoundation
+import ExerciseCore
 import Photos
 
 final class FrameRecorder: @unchecked Sendable {
@@ -353,12 +354,20 @@ enum VideoFile {
     }.value
   }
 
-  /// Deletes an asset from Photos (iOS shows its own confirmation; the asset lands in Recently Deleted).
-  static func deleteFromPhotos(identifier: String) async throws {
+  /// Deletes an asset from Photos (iOS shows its own confirmation; the asset lands in Recently Deleted). A
+  /// declined confirmation is an answer, `.declined`, not an error (the 2026-10-26 review's F2); anything else
+  /// Photos refuses throws.
+  @discardableResult
+  static func deleteFromPhotos(identifier: String) async throws -> PhotosDeleteOutcome {
     let assets = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
-    guard assets.count > 0 else { return }
-    try await PHPhotoLibrary.shared().performChanges {
-      PHAssetChangeRequest.deleteAssets(assets)
+    guard assets.count > 0 else { return .notThere }
+    do {
+      try await PHPhotoLibrary.shared().performChanges {
+        PHAssetChangeRequest.deleteAssets(assets)
+      }
+      return .deleted
+    } catch let error as PHPhotosError where error.code == .userCancelled {
+      return .declined
     }
   }
 
