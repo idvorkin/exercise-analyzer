@@ -185,6 +185,11 @@ struct WorkoutGalleryView: View {
               Text("No day matches. Tap the picked drawing again to see every day.")
                 .font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 8)
             }
+            // The picked exercise across weeks, above its days (story 075).
+            if let kind = filter.exercise, !noMatch {
+              let weeks = ProgressionSeries.weeks(of: kind, sets: store.entries, workouts: workouts.sessions)
+              if !weeks.isEmpty { ProgressionCard(exercise: kind, weeks: weeks) }
+            }
             ForEach(kept) { day in
               let folded = isFolded(day)
               Section {

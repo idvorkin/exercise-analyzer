@@ -870,3 +870,36 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Issues:** [#265](https://github.com/idvorkin/exercise-analyzer/issues/265) the row of drawings and the diamond; [#282](https://github.com/idvorkin/exercise-analyzer/issues/282) the row behind a filter button
 
 ---
+
+### User Story 075:
+
+- **Summary:** See one exercise across weeks: sets, reps, the bell, the load and the score per week
+- **Status:** built on `feat/2026-10-26-progression` ([#314](https://github.com/idvorkin/exercise-analyzer/issues/314)): the numbers are `ProgressionSeries` (ExerciseCore, `ProgressionSeriesTests`, 6 tests), the card `ProgressionCard` in Workouts; host tests on a Linux toolchain; app build pending
+- **Why:** #180 asks what changed in a session where the weight went up; every view so far is per set or per workout (the 2026-10-26 review, P2)
+
+#### Use Case:
+- **As a** lifter who has weeks of weighed sets
+- **I want to** see an exercise's weeks side by side
+- **so that** I can tell whether the load and the form are going up together
+
+#### Acceptance Criteria:
+- **Scenario:** Picking a drawing shows its weeks
+- **Given:** I swung in three of the last four weeks, some sets with a bell weight
+- **When:** I tap the swing drawing above the days in Workouts (story 073)
+- **Then:** above the swing days a card shows "Kettlebell Swing by week": a bar per week of the load (reps × kg), and one line per week, newest first, such as "Oct 5 · 4 sets · 46 reps · 24 kg · load 1104 · score 78"; a week without swings has no bar and no line
+
+- **Scenario:** The weight carries as on the workout page
+- **Given:** in one workout I set 16 kg on the first swing set only
+- **When:** the card counts that week's load
+- **Then:** every swing set after it in that workout counts at 16 kg, as the page shows it; a set outside every workout carries the weight within its day, never across days
+
+- **Scenario:** No weight yet
+- **Given:** no swing set has a weight
+- **When:** I pick the swing drawing
+- **Then:** the bars are reps per week, and the lines leave out kg and load; a set typed by hand counts its reps, with no score
+
+- **Notes:** read off the index only, so it costs nothing at launch. The week starts on the calendar's first weekday. The last twelve weeks show. Not yet: the heart-rate drop per week (each workout's heart-rate file, not the index) and the JSON hand-off for Larry (#277).
+
+- **Issues:** [#314](https://github.com/idvorkin/exercise-analyzer/issues/314); [#180](https://github.com/idvorkin/exercise-analyzer/issues/180) the ask
+
+---
