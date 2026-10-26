@@ -2,9 +2,10 @@
 
 //  Story 075: one exercise across weeks (#180 asks what changed when the weight went up; every other view is
 //  per set or per workout). Read off the index alone, so it is pure and host-tested: per week, the sets, reps,
-//  the heaviest bell, the load (reps × kg) and the median best score. The weight is carried as the workout
-//  page carries it (`WorkoutTimeline`): a set without one takes the last weight of its exercise before it in
-//  the same workout, or the same day when it is outside every workout.
+//  the heaviest bell, the load (reps × kg) and the median best score. A set without a weight takes the last
+//  weight of its exercise before it in the same workout, as the workout page (`WorkoutTimeline`) shows it.
+//  Outside every workout it takes the last one of the same day, which the page and the HUD do not show: a
+//  weight typed once in a morning without a workout still counts in that morning's load.
 //  ponytail: no heart-rate drop per week; it needs each workout's heart-rate file, not the index. Upgrade: a
 //  `drops` input of per-set drops the caller reads with `WorkoutTimeline`.
 
@@ -64,6 +65,15 @@ public enum ProgressionSeries {
         weighedSets: withKg.count,
         medianScore: median(items.compactMap(\.set.bestScore)))
     }
+  }
+
+  /// The weeks among `weeks` in the last `count` calendar weeks, the one holding `now` included.
+  public static func recent(
+    _ weeks: [ProgressionWeek], count: Int = 12, now: Date = Date(), calendar: Calendar = .current
+  ) -> [ProgressionWeek] {
+    let thisWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? calendar.startOfDay(for: now)
+    guard let first = calendar.date(byAdding: .weekOfYear, value: 1 - count, to: thisWeek) else { return weeks }
+    return weeks.filter { $0.start >= first }
   }
 
   /// The middle value; the mean of the two middle ones (rounded down) for an even count; nil for none.

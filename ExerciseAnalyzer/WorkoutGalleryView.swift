@@ -187,8 +187,9 @@ struct WorkoutGalleryView: View {
             }
             // The picked exercise across weeks, above its days (story 075).
             if let kind = filter.exercise, !noMatch {
-              let weeks = ProgressionSeries.weeks(of: kind, sets: store.entries, workouts: workouts.sessions)
-              if !weeks.isEmpty { ProgressionCard(exercise: kind, weeks: weeks) }
+              let weeks = ProgressionSeries.recent(
+                ProgressionSeries.weeks(of: kind, sets: store.entries, workouts: workouts.sessions))
+              if !weeks.isEmpty { ProgressionCard(exercise: kind, shown: weeks) }
             }
             ForEach(kept) { day in
               let folded = isFolded(day)

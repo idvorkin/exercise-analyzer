@@ -87,6 +87,16 @@ final class ProgressionSeriesTests: XCTestCase {
     XCTAssertNil(week?.medianScore)
   }
 
+  func testRecentKeepsTheLastTwelveCalendarWeeks() {
+    // Swings every third week, 2026-10-05 to 2027-01-18; "now" is Wednesday of the last of them.
+    let sets = (0..<6).map { set("s\($0)", day: $0 * 21, hour: 8, reps: 10) }
+    let weeks = ProgressionSeries.weeks(of: .kettlebellSwing, sets: sets, workouts: [], calendar: calendar)
+    let now = at(day: 105 + 2, hour: 12)
+    let recent = ProgressionSeries.recent(weeks, now: now, calendar: calendar)
+    // Twelve weeks ending with the week of 2027-01-18 begin on Monday 2026-11-02 (day 28): two of six are older.
+    XCTAssertEqual(recent.map(\.start), [42, 63, 84, 105].map { monday.addingTimeInterval(Double($0) * 86_400) })
+  }
+
   func testTheMedianIsTheMiddleScore() {
     XCTAssertEqual(ProgressionSeries.median([90, 10, 50]), 50)
     XCTAssertEqual(ProgressionSeries.median([60, 80]), 70)

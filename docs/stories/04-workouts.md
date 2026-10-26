@@ -874,7 +874,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 075:
 
 - **Summary:** See one exercise across weeks: sets, reps, the bell, the load and the score per week
-- **Status:** built on `feat/2026-10-26-progression` ([#314](https://github.com/idvorkin/exercise-analyzer/issues/314)): the numbers are `ProgressionSeries` (ExerciseCore, `ProgressionSeriesTests`, 6 tests), the card `ProgressionCard` in Workouts; host tests on a Linux toolchain; app build pending
+- **Status:** built on `feat/2026-10-26-progression` ([#314](https://github.com/idvorkin/exercise-analyzer/issues/314)): the numbers are `ProgressionSeries` (ExerciseCore, `ProgressionSeriesTests`, 7 tests), the card `ProgressionCard` in Workouts; host tests on a Linux toolchain; app build pending
 - **Why:** #180 asks what changed in a session where the weight went up; every view so far is per set or per workout (the 2026-10-26 review, P2)
 
 #### Use Case:
@@ -891,14 +891,14 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** The weight carries as on the workout page
 - **Given:** in one workout I set 16 kg on the first swing set only
 - **When:** the card counts that week's load
-- **Then:** every swing set after it in that workout counts at 16 kg, as the page shows it; a set outside every workout carries the weight within its day, never across days
+- **Then:** every swing set after it in that workout counts at 16 kg, as the page shows it; a set outside every workout counts at the last weight typed that day, which the page and the HUD do not show, and never at one from another day
 
 - **Scenario:** No weight yet
 - **Given:** no swing set has a weight
 - **When:** I pick the swing drawing
 - **Then:** the bars are reps per week, and the lines leave out kg and load; a set typed by hand counts its reps, with no score
 
-- **Notes:** read off the index only, so it costs nothing at launch. The week starts on the calendar's first weekday. The last twelve weeks show. Not yet: the heart-rate drop per week (each workout's heart-rate file, not the index) and the JSON hand-off for Larry (#277).
+- **Notes:** read off the index only, so it costs nothing at launch. The week starts on the calendar's first weekday. The last twelve calendar weeks show, this one included; an older week is left out even when fewer than twelve have swings, and with none in those twelve there is no card. Not yet: the heart-rate drop per week (each workout's heart-rate file, not the index) and the JSON hand-off for Larry (#277).
 
 - **Issues:** [#314](https://github.com/idvorkin/exercise-analyzer/issues/314); [#180](https://github.com/idvorkin/exercise-analyzer/issues/180) the ask
 

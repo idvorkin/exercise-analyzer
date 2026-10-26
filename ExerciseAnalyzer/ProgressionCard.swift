@@ -10,11 +10,8 @@ import SwiftUI
 
 struct ProgressionCard: View {
   let exercise: ExerciseKind
-  /// Oldest first, as `ProgressionSeries.weeks` returns them.
-  let weeks: [ProgressionWeek]
-
-  /// The weeks the chart and the lines show: the last twelve.
-  private var shown: [ProgressionWeek] { Array(weeks.suffix(12)) }
+  /// The weeks the chart and the lines show, oldest first: `ProgressionSeries.recent`, the last twelve.
+  let shown: [ProgressionWeek]
   private var byLoad: Bool { shown.contains { $0.loadKg != nil } }
 
   private static let weekLabel: DateFormatter = {
