@@ -27,8 +27,6 @@ final class MotionCapture: @unchecked Sendable {
   /// CoreMotion's timestamps are seconds since boot; this turns them into wall-clock seconds.
   private var bootToWall = 0.0
 
-  var available: Bool { manager.isDeviceMotionAvailable }
-
   /// Starts a set's capture; false when the watch has no device motion. A capture already running is replaced.
   @discardableResult
   func start(exercise: String, at start: Date = Date()) -> Bool {
@@ -54,14 +52,16 @@ final class MotionCapture: @unchecked Sendable {
     return true
   }
 
-  /// Stops the capture and hands back the set's track (nil when none was running), on the main actor.
-  func stop(at end: Date = Date(), done: @escaping @MainActor (MotionTrack?) -> Void) {
+  /// Stops the capture, writes and sends the set's track off the main actor, then hands back the track with the
+  /// file's size or the write's error, on the main actor. Nothing when no capture was running.
+  func stop(at end: Date = Date(), done: @escaping @MainActor (MotionTrack, Result<Int, any Error>) -> Void) {
     manager.stopDeviceMotionUpdates()
     let endTime = end.timeIntervalSince1970
     queue.addOperation { [self] in
-      let track = builder?.finish(end: endTime)
+      guard let track = builder?.finish(end: endTime) else { return }
       builder = nil
-      Task { @MainActor in done(track) }
+      let sent = Result { try Self.send(track) }
+      Task { @MainActor in done(track, sent) }
     }
   }
 

@@ -851,7 +851,7 @@ the first frame (story 001).
 ### User Story 076:
 
 - **Summary:** The watch records my wrist's motion during every filmed set and keeps it with the set's count, so a watch-only counter can be built from my own sets
-- **Status:** step 1 of #260 (record and label; the counter is step 2, not built) on `feat/2026-10-26-wrist-motion`: `MotionTrack`, `MotionTrackBuilder`, `MotionLabel`, `MotionPending`, `MotionFolder` in ExerciseCore (`MotionTrackTests`, 8 host tests on a Linux toolchain), `MotionCapture` on the watch, the receiving side in `WatchBridge`; host tests on a Linux toolchain; watch build and a wrist session pending
+- **Status:** step 1 of #260 (record and label; the counter is step 2, not built) in [6fa556e](https://github.com/idvorkin/exercise-analyzer/commit/6fa556e), the sensor stopped at the track's cap in [d28a662](https://github.com/idvorkin/exercise-analyzer/commit/d28a662): `MotionTrack`, `MotionTrackBuilder`, `MotionLabel`, `MotionPending`, `MotionFolder` in ExerciseCore, `MotionCapture` on the watch, the receiving side in `WatchBridge`; verified on the host (`MotionTrackTests`, 8 tests, on a Linux toolchain); watch build and a wrist session pending
 - **Why:** Igor, 2026-10-11 (#260): "Maybe let's start recording the data … Record the data, get the user's input, and then see if we can build the model." Every filmed set already has a count, so every set recorded from now on is a free label.
 
 #### Use Case:
@@ -862,7 +862,8 @@ the first frame (story 001).
 #### Acceptance Criteria:
 - **Scenario:** A filmed set inside a workout is recorded
 - **Given:** a workout runs on the watch
-- **When:** the phone starts recording a set and I press Done
+- **and Given:** the phone is recording a set
+- **When:** I press Done
 - **Then:** the watch has recorded its device motion (user acceleration, gravity, rotation rate, 50 Hz) from the recorder rolling to its stopping, the phone has it as `Documents/motion/motion-<start ms>.json`, and the log has `watch_motion` with its samples, seconds, bytes and bytes per minute
 
 - **Scenario:** The set's count labels its track

@@ -383,10 +383,10 @@ final class WorkoutController: NSObject {
   private func stopMotion() {
     guard motionRunning else { return }
     motionRunning = false
-    motion.stop { [weak self] track in
-      guard let self, let track else { return }
+    motion.stop { [weak self] track, sent in
+      guard let self else { return }
       do {
-        let bytes = try MotionCapture.send(track)
+        let bytes = try sent.get()
         self.motionPending.add(track)
         var fields = MotionStats(track: track, bytes: bytes).fields
         fields["id"] = track.id
@@ -400,9 +400,10 @@ final class WorkoutController: NSObject {
 
   /// The phone's final count labels the track of its own set, once (`MotionPending`), sent as queued user info.
   private func labelMotion(_ last: LastSet) {
-    guard !fixed, let label = motionPending.label(last) else { return }
+    guard !fixed, WCSession.default.activationState == .activated, let label = motionPending.label(last) else {
+      return
+    }
     log("motion_label", ["id": label.trackID, "reps": label.reps, "exercise": label.exercise])
-    guard WCSession.default.activationState == .activated else { return }
     WCSession.default.transferUserInfo(label.userInfo)
   }
 
