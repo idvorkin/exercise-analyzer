@@ -9,6 +9,7 @@ import ExerciseCore
 import Foundation
 import HealthKit
 import Observation
+import WatchConnectivity
 
 @MainActor
 @Observable
@@ -61,6 +62,18 @@ final class WorkoutController: NSObject {
   private(set) var lastError: String?
 
   var running: Bool { phase == .running || phase == .ending }
+
+  /// The wrist's motion while a set records (story 076, #260): started with the set's activity, stopped with it.
+  @ObservationIgnored private let motion = MotionCapture()
+  @ObservationIgnored private var motionRunning = false
+  /// Tracks sent, waiting for the phone's final count (story 076); kept across relaunches.
+  @ObservationIgnored private var motionPending: MotionPending =
+    UserDefaults.standard.data(forKey: WorkoutController.motionPendingKey)
+    .flatMap { try? JSONDecoder().decode(MotionPending.self, from: $0) } ?? MotionPending()
+  {
+    didSet { UserDefaults.standard.set(try? JSONEncoder().encode(motionPending), forKey: Self.motionPendingKey) }
+  }
+  private static let motionPendingKey = "motionPending"
 
   private let store = HKHealthStore()
   private var session: HKWorkoutSession?
@@ -321,6 +334,7 @@ final class WorkoutController: NSObject {
     phase = .ending
     log(discard ? "workout_discard" : "workout_end", summaryFields)
     sendWire(ending: true)
+    stopMotion()  // a set still rolling at End: its motion so far goes
     session.end()
   }
 
@@ -337,10 +351,13 @@ final class WorkoutController: NSObject {
     session.beginNewActivity(configuration: configuration, date: Date(), metadata: metadata)
     activityOpen = true
     log("workout_activity", ["begin": true, "exercise": exercise])
+    motionRunning = motion.start(exercise: exercise)
+    if !motionRunning { log("motion_unavailable", [:]) }
   }
 
   /// The recorder stopped (Done or Cancel alike): the activity closes; reps arrive later from the pass.
   func setEnded() {
+    stopMotion()
     // The peak keeps taking readings for 30 s after Done, the activity or not (#195).
     if phase == .running, !fixed { setPeak.setEnded(at: Date()) }
     guard phase == .running, let session, activityOpen, !fixed else { return }
@@ -353,10 +370,40 @@ final class WorkoutController: NSObject {
   /// only when it was analyzed after Start. `at` decides both, so a stored context's old last set does not count,
   /// nor does the last set told again to an app that restarted mid-workout (#190).
   func setAnalyzed(_ last: LastSet) {
+    labelMotion(last)
     guard let startedAt, last.at >= startedAt.timeIntervalSince1970, last.at > countedSetAt else { return }
     guard phase == .running else { return }
     countedSetAt = last.at
     setAnalyzed(reps: last.reps, exercise: ExerciseKind.allCases.first { $0.definition.name == last.exercise })
+  }
+
+  // MARK: - Wrist motion (story 076)
+
+  /// The set's motion goes to the phone as a file (`watch_motion` says what it cost) and waits for its count.
+  private func stopMotion() {
+    guard motionRunning else { return }
+    motionRunning = false
+    motion.stop { [weak self] track in
+      guard let self, let track else { return }
+      do {
+        let bytes = try MotionCapture.send(track)
+        self.motionPending.add(track)
+        var fields = MotionStats(track: track, bytes: bytes).fields
+        fields["id"] = track.id
+        fields["exercise"] = track.exercise
+        self.log("motion", fields)
+      } catch {
+        self.log("motion_failed", ["id": track.id, "message": "\(error)"])
+      }
+    }
+  }
+
+  /// The phone's final count labels the track of its own set, once (`MotionPending`), sent as queued user info.
+  private func labelMotion(_ last: LastSet) {
+    guard !fixed, let label = motionPending.label(last) else { return }
+    log("motion_label", ["id": label.trackID, "reps": label.reps, "exercise": label.exercise])
+    guard WCSession.default.activationState == .activated else { return }
+    WCSession.default.transferUserInfo(label.userInfo)
   }
 
   /// A set typed by hand on the wrist (059), or the phone's count from above.

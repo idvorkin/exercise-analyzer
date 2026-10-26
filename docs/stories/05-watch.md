@@ -848,6 +848,44 @@ the first frame (story 001).
 
 ---
 
+### User Story 076:
+
+- **Summary:** The watch records my wrist's motion during every filmed set and keeps it with the set's count, so a watch-only counter can be built from my own sets
+- **Status:** step 1 of #260 (record and label; the counter is step 2, not built) on `feat/2026-10-26-wrist-motion`: `MotionTrack`, `MotionTrackBuilder`, `MotionLabel`, `MotionPending`, `MotionFolder` in ExerciseCore (`MotionTrackTests`, 8 host tests on a Linux toolchain), `MotionCapture` on the watch, the receiving side in `WatchBridge`; host tests on a Linux toolchain; watch build and a wrist session pending
+- **Why:** Igor, 2026-10-11 (#260): "Maybe let's start recording the data … Record the data, get the user's input, and then see if we can build the model." Every filmed set already has a count, so every set recorded from now on is a free label.
+
+#### Use Case:
+- **As a** lifter whose sets are counted by the camera today
+- **I want to** have the watch quietly record its motion during each set, labelled with the set's count
+- **so that** a rep counter for the wrist alone can be tried and judged on my own sets, as the camera's analyzers are on fixtures
+
+#### Acceptance Criteria:
+- **Scenario:** A filmed set inside a workout is recorded
+- **Given:** a workout runs on the watch
+- **When:** the phone starts recording a set and I press Done
+- **Then:** the watch has recorded its device motion (user acceleration, gravity, rotation rate, 50 Hz) from the recorder rolling to its stopping, the phone has it as `Documents/motion/motion-<start ms>.json`, and the log has `watch_motion` with its samples, seconds, bytes and bytes per minute
+
+- **Scenario:** The set's count labels its track
+- **Given:** a set's track reached the phone
+- **When:** the pass's final count reaches the wrist (story 045's last set)
+- **Then:** the phone writes `motion-<start ms>.label.json` beside it with the reps and exercise; a count whose clip length is not the track's (a cancelled set's track) or that came more than 15 minutes after the set, or the same last set told again, labels nothing
+
+- **Scenario:** Outside a workout nothing is recorded
+- **Given:** no workout runs on the watch
+- **When:** the phone records a set
+- **Then:** the wrist records no motion: without the workout session the app is not kept alive wrist-down, and the cost stays at the minutes a set is on
+
+- **Scenario:** The phone is away
+- **Given:** the phone was out of reach when the set ended, or the watch app relaunched before the file left
+- **When:** the link comes back (the watch's session activates)
+- **Then:** the track goes when it can, and any still on the watch is queued again (`watch_motion_resent`); the phone keeps one copy per id
+
+- **Notes:** Always on inside a workout rather than behind a switch: the workout session already keeps the app awake and the heart rate on, device motion for the length of a set costs little next to that, and a switch would be one more thing to remember for data that is only useful if it piles up; `watch_motion`'s bytes per minute and rate are there to revisit that. Rows are integers (milliseconds; thousandths of a g; thousandths of a rad/s), about 150 KB per minute of set, capped at 10 minutes. The label is the camera's count; a count kept by hand on the phone later lives on the set and wins when tracks become fixtures (typed beats measured). Sets typed by hand on the wrist have no start, so no track. The motion folder is not mirrored to iCloud: it stays on the phone until step 2 pulls it. No permission prompt: raw device motion asks none (`CMMotionActivityManager` and the pedometer would).
+
+- **Issues:** [#260](https://github.com/idvorkin/exercise-analyzer/issues/260)
+
+---
+
 ### What a workout session costs
 
 Heart rate during a set, surviving wrist-down (#32) and launching the watch app from the phone all need an
