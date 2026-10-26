@@ -53,6 +53,13 @@ extension RecentEntry {
     return result
   }
 
+  /// The set survives a delete made at `deletedAt` (story 070, step 4): only when the lifter edited it after the
+  /// delete. A delete is his input too, so a device's own rewrite dated after it (a re-analysis on open or at
+  /// launch on a device that had not read the delete yet) does not bring the set back.
+  /// ponytail: a row from before `editedAt` with a hand edit after the delete loses to it; the window is one
+  /// build, both devices updating.
+  public func outlives(deletedAt: Date) -> Bool { (editedAt ?? .distantPast) > deletedAt }
+
   /// The bell weight on this row came from a later hand edit than `other`'s. With no edit time on either (rows
   /// from before `editedAt`), a weight beats none: the weight was typed, its absence may be a re-analysis.
   func typedWeightWins(over other: RecentEntry) -> Bool {
@@ -68,15 +75,15 @@ extension RecentEntry {
 
 extension RecentsIndex {
   /// Rows other devices wrote and the sets any device deleted, with when. A new id is added unless a tombstone
-  /// is as new as the row; a row of a set we have is merged with ours by `RecentEntry.merged`; a tombstone as
-  /// new as our row removes the set, our own included. Our own rows read back are skipped, as is a row with no
-  /// device, from a build before this, which waits for its owner to rewrite it: taken as is, it would read as
-  /// ours. Newest first, as `load` keeps it.
+  /// removes it; a row of a set we have is merged with ours by `RecentEntry.merged`; a tombstone removes the set,
+  /// our own included, unless the lifter edited it after the delete (`RecentEntry.outlives`). Our own rows read
+  /// back are skipped, as is a row with no device, from a build before this, which waits for its owner to
+  /// rewrite it: taken as is, it would read as ours. Newest first, as `load` keeps it.
   public mutating func merge(remote rows: [RecentEntry], tombstones: [String: Date], me: String) -> SyncMergeResult {
     var result = SyncMergeResult()
     var byID = Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     for row in rows where row.device != nil && row.device != me {
-      if let deletedAt = tombstones[row.id], deletedAt >= row.changedAt { continue }
+      if let deletedAt = tombstones[row.id], !row.outlives(deletedAt: deletedAt) { continue }
       if let have = byID[row.id] {
         guard let merged = have.merged(remote: row, me: me) else { continue }
         byID[row.id] = merged
@@ -89,7 +96,7 @@ extension RecentsIndex {
       }
     }
     for (id, deletedAt) in tombstones {
-      guard let have = byID[id], deletedAt >= have.changedAt else { continue }
+      guard let have = byID[id], !have.outlives(deletedAt: deletedAt) else { continue }
       byID[id] = nil
       result.removed += 1
       result.removedIDs.append(id)

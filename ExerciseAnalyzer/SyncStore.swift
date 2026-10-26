@@ -596,11 +596,13 @@ final class SyncStore {
         let workouts = self.workouts.mergeRemote(
           found.workouts, tombstones: found.workoutTombstones.merging(self.workouts.deleted, uniquingKeysWith: max),
           me: me)
-        // A tombstone older than a change of ours (written before our row reached the deleting device): the row
-        // is written again, which takes the tombstone away.
+        // A tombstone older than a hand edit of ours (written before our row reached the deleting device): the
+        // row is written again, which takes the tombstone away. A re-analysis after the delete does not
+        // (`RecentEntry.outlives`).
         var rewrite = false
         for (id, at) in found.setTombstones {
-          guard let entry = self.recents.entry(id: id), SyncOwnership.isMine(entry.device, me: me), entry.changedAt > at
+          guard let entry = self.recents.entry(id: id), SyncOwnership.isMine(entry.device, me: me),
+            entry.outlives(deletedAt: at)
           else { continue }
           self.ledger[id] = nil
           rewrite = true
@@ -965,7 +967,7 @@ final class SyncStore {
       }
       let dir = container.appendingPathComponent("sets/\(id)", isDirectory: true)
       if let data = try? read(dir.appendingPathComponent("row.json")),
-        let row = try? JSONDecoder().decode(RecentEntry.self, from: data), row.changedAt > at
+        let row = try? JSONDecoder().decode(RecentEntry.self, from: data), row.outlives(deletedAt: at)
       {
         return nil
       }

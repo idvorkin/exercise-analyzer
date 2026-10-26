@@ -13,14 +13,16 @@ final class SyncMergeTests: XCTestCase {
   private let t0 = Date(timeIntervalSince1970: 1_000_000)
 
   private func entry(
-    _ id: String, reps: Int = 10, device: String?, at seconds: TimeInterval = 1_000_000, modified: TimeInterval? = nil
+    _ id: String, reps: Int = 10, device: String?, at seconds: TimeInterval = 1_000_000, modified: TimeInterval? = nil,
+    edited: TimeInterval? = nil
   ) -> RecentEntry {
     var entry = RecentEntry(
       id: id, analyzedAt: Date(timeIntervalSince1970: seconds), recordedAt: nil, duration: 30, repCount: reps,
       bestScore: 80,
       source: .file(name: "clip.mov"), thumbnail: "thumbnail.jpg", exercise: .kettlebellSwing, originalName: nil)
     entry.device = device
-    entry.modifiedAt = modified.map { Date(timeIntervalSince1970: $0) }
+    entry.modifiedAt = (edited ?? modified).map { Date(timeIntervalSince1970: $0) }
+    entry.editedAt = edited.map { Date(timeIntervalSince1970: $0) }
     return entry
   }
 
@@ -78,8 +80,9 @@ final class SyncMergeTests: XCTestCase {
     XCTAssertEqual(result.removed, 2)
     XCTAssertEqual(Set(result.removedIDs), ["a", "m"])
     XCTAssertTrue(index.entries.isEmpty)
-    // Our set changed after the delete: it stays, and the row that comes back with it is taken over the stone.
-    var kept = RecentsIndex(entries: [entry("k", device: me, modified: 1_000_500)])
+    // Our set edited by hand after the delete: it stays, and the row that comes back with it is taken over the
+    // stone.
+    var kept = RecentsIndex(entries: [entry("k", device: me, edited: 1_000_500)])
     XCTAssertEqual(kept.merge(remote: [], tombstones: ["k": t0.addingTimeInterval(200)], me: me), SyncMergeResult())
     XCTAssertEqual(kept.entries.count, 1)
     // A row older than its tombstone is not added back.
@@ -102,16 +105,16 @@ final class SyncMergeTests: XCTestCase {
       index.merge(remote: [entry("a", device: phone, modified: 1_000_100)], tombstones: tombstones, me: me),
       SyncMergeResult())
     XCTAssertTrue(index.entries.isEmpty)
-    // The phone changed it after the delete: that change wins, and the set comes back.
-    let result = index.merge(remote: [entry("a", device: phone, modified: 1_000_300)], tombstones: tombstones, me: me)
+    // The phone's lifter edited it after the delete: that edit wins, and the set comes back.
+    let result = index.merge(remote: [entry("a", device: phone, edited: 1_000_300)], tombstones: tombstones, me: me)
     XCTAssertEqual(result.added, 1)
     XCTAssertEqual(index.entries.map(\.id), ["a"])
   }
 
-  func testARowChangedAfterItsTombstoneIsTakenOverIt() {
+  func testARowEditedAfterItsTombstoneIsTakenOverIt() {
     var index = RecentsIndex(entries: [entry("a", reps: 10, device: phone, modified: 1_000_100)])
     let result = index.merge(
-      remote: [entry("a", reps: 12, device: phone, modified: 1_000_300)], tombstones: ["a": t0.addingTimeInterval(200)],
+      remote: [entry("a", reps: 12, device: phone, edited: 1_000_300)], tombstones: ["a": t0.addingTimeInterval(200)],
       me: me)
     XCTAssertEqual(result.updated, 1)
     XCTAssertEqual(result.removed, 0)
@@ -226,6 +229,37 @@ final class SyncMergeTests: XCTestCase {
       XCTAssertEqual(w?.repCount, 12)
       XCTAssertEqual(w?.bellKg, 24)
     }
+  }
+
+  // A delete is the lifter's too. The phone, not yet read, opens a set the iPad deleted, and the open re-analyzes
+  // it against a new analyzer (`open(recent:)` → `.replay` → `rememberCurrent`), or the launch refresh does: the
+  // rewrite is dated after the delete, and was taken as a change that outlives it, bringing the set back.
+
+  func testAReanalysisAfterADeleteDoesNotBringTheSetBack() {
+    let deleted = ["a": t0.addingTimeInterval(200)]
+    // The re-analyzed row reaches a device that holds the set: the delete still takes it.
+    var here = RecentsIndex(entries: [entry("a", device: phone, at: 1_000_000)])
+    let result = here.merge(
+      remote: [reanalyzed("a", reps: 11, device: phone, at: 1_000_300)], tombstones: deleted, me: me)
+    XCTAssertEqual(result.removedIDs, ["a"])
+    XCTAssertTrue(here.entries.isEmpty)
+    // And a device that has dropped it does not add it back.
+    var gone = RecentsIndex()
+    XCTAssertEqual(
+      gone.merge(remote: [reanalyzed("a", reps: 11, device: phone, at: 1_000_300)], tombstones: deleted, me: me),
+      SyncMergeResult())
+    // The device that re-analyzed reads the tombstone: its own rewritten set goes too.
+    var phoneSide = RecentsIndex(entries: [reanalyzed("a", reps: 11, device: me, at: 1_000_300)])
+    XCTAssertEqual(phoneSide.merge(remote: [], tombstones: deleted, me: me).removedIDs, ["a"])
+    XCTAssertFalse(reanalyzed("a", reps: 11, device: me, at: 1_000_300).outlives(deletedAt: t0.addingTimeInterval(200)))
+  }
+
+  func testAHandEditAfterTheDeleteStillOutlivesIt() {
+    var weighed = entry("a", device: nil)
+    weighed.bellKg = 24
+    weighed.edited(by: phone, at: Date(timeIntervalSince1970: 1_000_300))
+    XCTAssertTrue(weighed.outlives(deletedAt: t0.addingTimeInterval(200)))
+    XCTAssertFalse(weighed.outlives(deletedAt: t0.addingTimeInterval(400)))
   }
 
   func testAnEditMovesTheEditTimeAndARefreshDoesNot() {
