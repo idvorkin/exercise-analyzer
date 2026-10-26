@@ -45,9 +45,11 @@ final class MotionCapture: @unchecked Sendable {
       let a = motion.userAcceleration
       let g = motion.gravity
       let r = motion.rotationRate
-      self.builder?.append(
+      let kept = self.builder?.append(
         time: self.bootToWall + motion.timestamp, acceleration: (a.x, a.y, a.z), gravity: (g.x, g.y, g.z),
         rotation: (r.x, r.y, r.z))
+      // Past the track's cap a recorder left rolling would keep the sensor at 50 Hz for nothing.
+      if kept == false { self.manager.stopDeviceMotionUpdates() }
     }
     return true
   }
