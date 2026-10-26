@@ -35,13 +35,15 @@ struct WorkoutDetailView: View {
     let series = heartRateFor == identity ? heartRate : nil
     let snapshot = WorkoutPageSnapshot(
       identity: identity, live: workouts.shownLive, saved: workouts.sessions,
-      // The 20 s tick, not Date(): a live workout's end read per render changed on every pan and pinch frame,
+      // The 5 s tick, not Date(): a live workout's end read per render changed on every pan and pinch frame,
       // re-logging `workout_page` and rebuilding the timeline each time.
       now: tick, sets: store.entries, heartRate: series)
     Group {
       if let snapshot {
         WorkoutPageView(
-          snapshot: snapshot, sets: store.entries, heartRate: series, onOpen: onOpen,
+          snapshot: snapshot, sets: store.entries, heartRate: series,
+          // Read here, so a reading kept by the mirror redraws the line (#308).
+          liveHeartRate: workouts.liveHeartRateSeries(for: snapshot.workout), onOpen: onOpen,
           thumbnail: thumbnail, onEvent: onEvent, onDelete: onDelete, onKeepByHand: onKeepByHand,
           onAddByHand: onAddByHand, onSetBellKg: onSetBellKg
         )
@@ -70,7 +72,9 @@ struct WorkoutDetailView: View {
         guard
           identity.resolve(live: workouts.shownLive, saved: workouts.sessions, now: Date())?.id == WorkoutMirror.liveID
         else { return }
-        do { try await Task.sleep(for: .seconds(20)) } catch { return }
+        // Five seconds: the plot's end follows now closely enough for the wrist's readings to draw live (#308);
+        // Health is still asked every 20 s (`HeartRateRequest`) and `workout_page` logs every 20 s (`PageLog`).
+        do { try await Task.sleep(for: .seconds(5)) } catch { return }
         tick = Date()
       }
     }
@@ -103,6 +107,9 @@ private struct WorkoutPageView: View {
   let snapshot: WorkoutPageSnapshot
   let sets: [RecentEntry]
   let heartRate: HeartRateSeries?
+  /// The wrist's readings past Health's newest sample, for the chart's line only (#308): the set rows and the
+  /// log keep to Health's series.
+  let liveHeartRate: HeartRateSeries?
   let onOpen: (RecentEntry) -> Void
   var thumbnail: (RecentEntry) -> UIImage?
   var onEvent: ((String, [String: Any]) -> Void)?
@@ -267,7 +274,13 @@ private struct WorkoutPageView: View {
     let samples: Int
     let grouped: Bool
     init(workout: StoredWorkout, timeline: WorkoutTimeline, samples: Int, grouped: Bool) {
-      self.workout = workout
+      // The live workout's end moves with every 5 s tick: logged at 20 s steps from its start, as before the faster
+      // tick (steps from the epoch made the simulator's live_workout check depend on the launch's phase).
+      var logged = workout
+      if workout.id == WorkoutMirror.liveID {
+        logged.end = workout.start.addingTimeInterval((workout.duration / 20).rounded(.down) * 20)
+      }
+      self.workout = logged
       sets = timeline.rows.count
       reps = timeline.rows.reduce(0) { $0 + $1.reps }
       self.samples = samples
@@ -373,8 +386,10 @@ private struct WorkoutPageView: View {
     // The series runs a minute before and three after the workout (for the last set's drop); the chart draws
     // the workout only, or the line runs off the plot. Zoomed, only the window and a minute either side are
     // drawn (the y scale stays the workout's, so the line does not jump as the window moves).
-    // While it runs, Health trails the wrist; the line ends on the reading the header says now (#194).
-    var whole: [HeartRateSeries.Sample] = heartRate?.slice(from: workout.start, to: workout.end).samples ?? []
+    // While it runs, Health trails the wrist by up to minutes (#107): past Health's newest sample the line draws
+    // the wrist's readings as they arrived (#308), and ends on the reading the header says now (#194).
+    let filled = (heartRate ?? HeartRateSeries(samples: [])).filled(withLive: liveHeartRate)
+    var whole: [HeartRateSeries.Sample] = filled.slice(from: workout.start, to: workout.end).samples
     if let now = snapshot.heartRateNow {
       whole.append(HeartRateSeries.Sample(at: workout.end.timeIntervalSince1970, bpm: Double(now)))
     }
