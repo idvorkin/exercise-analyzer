@@ -33,7 +33,8 @@ final class LiveHeartRateScenarioTests: XCTestCase {
     return live
   }
 
-  private func page(health: HeartRateSeries, live: LiveHeartRate, end: Double, now: Double) -> [HeartRateSeries.Sample] {
+  private func page(health: HeartRateSeries, live: LiveHeartRate, end: Double, now: Double) -> [HeartRateSeries.Sample]
+  {
     let liveSeries = live.series(from: at(0), to: at(end), now: at(now))
     return health.filled(withLive: liveSeries).slice(from: at(0), to: at(end)).samples
   }
@@ -63,8 +64,9 @@ final class LiveHeartRateScenarioTests: XCTestCase {
       XCTAssertEqual(line.last?.at, start + now)
     }
     XCTAssertEqual(tails, [24, 12, 4, 0])
-    XCTAssertEqual(health(now: now, lag: 0).filled(withLive: live.series(from: at(0), to: at(now), now: at(now))),
-                   health(now: now, lag: 0), "caught up: Health's series alone")
+    XCTAssertEqual(
+      health(now: now, lag: 0).filled(withLive: live.series(from: at(0), to: at(now), now: at(now))),
+      health(now: now, lag: 0), "caught up: Health's series alone")
   }
 
   func testALateEndingDeliveryDoesNotMoveTheEndAndADiscardFallsBackToHealth() {
