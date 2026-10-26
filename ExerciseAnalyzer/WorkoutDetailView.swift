@@ -35,7 +35,7 @@ struct WorkoutDetailView: View {
     let series = heartRateFor == identity ? heartRate : nil
     let snapshot = WorkoutPageSnapshot(
       identity: identity, live: workouts.shownLive, saved: workouts.sessions,
-      // The 20 s tick, not Date(): a live workout's end read per render changed on every pan and pinch frame,
+      // The 5 s tick, not Date(): a live workout's end read per render changed on every pan and pinch frame,
       // re-logging `workout_page` and rebuilding the timeline each time.
       now: tick, sets: store.entries, heartRate: series)
     Group {
@@ -274,10 +274,11 @@ private struct WorkoutPageView: View {
     let samples: Int
     let grouped: Bool
     init(workout: StoredWorkout, timeline: WorkoutTimeline, samples: Int, grouped: Bool) {
-      // The live workout's end moves with every 5 s tick: logged at 20 s steps, as before the faster tick.
+      // The live workout's end moves with every 5 s tick: logged at 20 s steps from its start, as before the faster
+      // tick (steps from the epoch made the simulator's live_workout check depend on the launch's phase).
       var logged = workout
       if workout.id == WorkoutMirror.liveID {
-        logged.end = Date(timeIntervalSince1970: (workout.end.timeIntervalSince1970 / 20).rounded(.down) * 20)
+        logged.end = workout.start.addingTimeInterval((workout.duration / 20).rounded(.down) * 20)
       }
       self.workout = logged
       sets = timeline.rows.count
