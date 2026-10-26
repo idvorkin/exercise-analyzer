@@ -15,12 +15,12 @@ which field holds it:
 | count | the camera's analyzer, or the lifter's typed count | `source == .byHand` replaces the camera's count wholesale (#156/#157) |
 | exercise | the analyzer's detection or the mode, or typed | nothing; a by-hand set carries the typed one |
 | load | typed per set (066), carried from the set before in the workout | `bellKg`; the carry is computed (`WorkoutTimeline`), not stored |
-| heart rate | Health, per workout; the live wire while it runs (#317) | per-workout `heartrate.json`; the live line is memory only |
+| heart rate | Health, per set and per workout; the live wire while it runs (#317) | a `heartrate.json` in each set's folder (story 051) and each workout's; the live line is memory only |
 | motion | the wrist, per set, from #319 on | `Documents/motion/<id>.json` beside, not on the row |
 | form | the analyzer's score and reasons | `bestScore`, the reps in `analysis.json` |
 
 What this costs: the merge cannot tell a typed fact from a measured one except by the by-hand switch, which is
-why #313 had to add `editedAt` beside `modifiedAt`. A watch count (#260 step 3) has no slot. A cloud coach's
+why #313 had to add `editedAt` beside `modifiedAt`. A watch count (#260 step 3, the counter; story 076 calls it step 2) has no slot. A cloud coach's
 opinion, which VISION allows beside the tested score and never in place of it, has no slot either. Every new
 source would otherwise need its own special case in the merge, the timeline and the UI.
 
@@ -91,11 +91,14 @@ review that happens outside the app (#277). One file per ISO week:
 
 Two ways to get the data, cheapest first:
 - **From the iCloud container on the Mac** (`~/Library/Mobile Documents/iCloud~com~idvorkin~exerciseanalyzer/Documents`):
-  story 070's mirror already holds every row, workout and heart-rate series. A script reads it with no phone
-  cable and no app change. To check first: that iCloud Drive brings an iOS-only app's container down to the Mac
-  signed into the same account (if not, a one-line `NSUbiquitousContainers` entry makes it visible). The only new code is the reader and `History` behind a small CLI (the `posetrack`
-  target shows the pattern).
-- **From the phone over `devicectl`**, as `pull-tracks.sh` does, when the container is behind.
+  story 070's mirror already holds every row, workout and heart-rate series. Checked 2026-10-26: the folder
+  exists on this Mac but its `Documents` is empty (no `sets/`, no `workouts/`, no placeholders), because iCloud
+  Drive does not bring an iOS-only app's container down. So this way needs an `NSUbiquitousContainers`
+  (document-scope-public) entry first, which also shows `sets/` and `workouts/` in Files and Finder on every
+  device. After that the only new code is the reader and `History` behind a small CLI (the `posetrack` target
+  shows the pattern).
+- **From the phone over `devicectl`**, as `pull-tracks.sh` does: works today with no app change, so it is the
+  real first step until the container is made public.
 
 This keeps VISION's line: there is no backend and no account. The export is a file the lifter makes on his own
 machine, on purpose. Footage never leaves; only counts, loads and heart-rate summaries do.
@@ -108,7 +111,7 @@ machine, on purpose. Footage never leaves; only counts, loads and heart-rate sum
 | 2 | The day list's "by hand" mark from `count.source` | S | 1 |
 | 3 | `History`: heart drop per set from `heartrate.json`, video coverage per week | M | #315 |
 | 4 | `pull-history` CLI over the iCloud container, the JSON above, one file per week | S–M | 3 |
-| 5 | Wrist count as a source, shown beside the camera's, never in place of it until fixtures say so | L | 1, #319, #260 step 2 |
+| 5 | Wrist count as a source, shown beside the camera's, never in place of it until fixtures say so | L | 1, #319, #260 step 3 |
 | 6 | The coach's opinion list beside the score | S | 1 |
 
 ## Open questions for Igor
