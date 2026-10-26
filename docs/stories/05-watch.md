@@ -851,7 +851,7 @@ the first frame (story 001).
 ### User Story 076:
 
 - **Summary:** The watch records my wrist's motion during every filmed set and keeps it with the set's count, so a watch-only counter can be built from my own sets
-- **Status:** step 1 of #260 (record and label; the counter is step 2, not built) in [6fa556e](https://github.com/idvorkin/exercise-analyzer/commit/6fa556e), the sensor stopped at the track's cap in [d28a662](https://github.com/idvorkin/exercise-analyzer/commit/d28a662): `MotionTrack`, `MotionTrackBuilder`, `MotionLabel`, `MotionPending`, `MotionFolder` in ExerciseCore, `MotionCapture` on the watch, the receiving side in `WatchBridge`; verified on the host (`MotionTrackTests`, 8 tests, on a Linux toolchain); watch build and a wrist session pending
+- **Status:** step 1 of #260 (record and label; the counter is step 2, not built) in [aacd43b](https://github.com/idvorkin/exercise-analyzer/commit/aacd43b), the sensor stopped at the track's cap in [1c95203](https://github.com/idvorkin/exercise-analyzer/commit/1c95203), the label held until the link is up and the track written off the main actor in [0488eac](https://github.com/idvorkin/exercise-analyzer/commit/0488eac): `MotionTrack`, `MotionTrackBuilder`, `MotionLabel`, `MotionPending`, `MotionFolder` in ExerciseCore, `MotionCapture` on the watch, the receiving side in `WatchBridge`; verified on the host (`MotionTrackTests`, 8 tests, on a Linux toolchain); watch build and a wrist session pending
 - **Why:** Igor, 2026-10-11 (#260): "Maybe let's start recording the data … Record the data, get the user's input, and then see if we can build the model." Every filmed set already has a count, so every set recorded from now on is a free label.
 
 #### Use Case:

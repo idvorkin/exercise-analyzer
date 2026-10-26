@@ -65,7 +65,7 @@ final class MotionCapture: @unchecked Sendable {
     }
   }
 
-  /// Writes the track under Documents/motion/ and queues it to the phone. The file's size, or nil when it could
+  /// Writes the track under Documents/motion/ and queues it to the phone. The file's size; throws when it could
   /// not be written.
   static func send(_ track: MotionTrack) throws -> Int {
     let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
