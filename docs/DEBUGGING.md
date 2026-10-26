@@ -34,7 +34,8 @@ means the phone was busy or locked, so run it again. The current session's file 
 
 `workout_page` is also emitted when the displayed workout changes: `sets`, `reps`, `heart_rate_samples`,
 `live`, `workout_id`, `duration_s`, and `window_s` describe the current render. A live page refreshes its clock
-and re-asks Health every 20 seconds while active; saving switches `workout_id` from `live` to the saved id.
+every 5 seconds while active (#308) and re-asks Health every 20; its moving end re-logs only at each 20 s step
+from the workout's start, so it logs no more often than before; saving switches `workout_id` from `live` to the saved id.
 
 | Area | Events (key fields) |
 |---|---|
