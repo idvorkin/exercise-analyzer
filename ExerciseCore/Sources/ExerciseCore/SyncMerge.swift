@@ -42,7 +42,8 @@ extension RecentEntry {
     let other = takeTheirs ? self : row
     if other.typedWeightWins(over: result) {
       result.bellKg = other.bellKg
-      result.editedAt = other.editedAt
+      result.bellKgEditedAt = other.bellKgEditedAt
+      result.editedAt = [result.editedAt, other.bellKgEditedAt].compactMap { $0 }.max()
     }
     if result == self && !newer { return nil }
     var asTheirs = result
@@ -60,11 +61,12 @@ extension RecentEntry {
   /// build, both devices updating.
   public func outlives(deletedAt: Date) -> Bool { (editedAt ?? .distantPast) > deletedAt }
 
-  /// The bell weight on this row came from a later hand edit than `other`'s. With no edit time on either (rows
-  /// from before `editedAt`), a weight beats none: the weight was typed, its absence may be a re-analysis.
+  /// The bell weight on this row was typed later than `other`'s (`bellKgEditedAt`; a count kept by hand is not a
+  /// weight edit). With no weight-edit time on either (rows from before it), a weight beats none: the weight was
+  /// typed, its absence may be a re-analysis.
   func typedWeightWins(over other: RecentEntry) -> Bool {
     guard bellKg != other.bellKg else { return false }
-    switch (editedAt, other.editedAt) {
+    switch (bellKgEditedAt, other.bellKgEditedAt) {
     case (let mine?, let theirs?): return mine > theirs
     case (.some, nil): return true
     case (nil, .some): return false

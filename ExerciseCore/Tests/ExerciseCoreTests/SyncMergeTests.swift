@@ -160,8 +160,7 @@ final class SyncMergeTests: XCTestCase {
 
   func testABellWeightSetHereSurvivesALaterReanalysisThere() {
     var weighed = entry("a", reps: 10, device: nil)
-    weighed.bellKg = 24
-    weighed.edited(by: me, at: Date(timeIntervalSince1970: 1_000_200))
+    weighed.setBellKg(24, by: me, at: Date(timeIntervalSince1970: 1_000_200))
     var index = RecentsIndex(entries: [weighed])
     let result = index.merge(remote: [reanalyzed("a", reps: 11, device: phone, at: 1_000_300)], tombstones: [:], me: me)
     XCTAssertEqual(result.updated, 1)
@@ -174,8 +173,7 @@ final class SyncMergeTests: XCTestCase {
   func testABellWeightSetThereReachesAReanalysisHere() {
     var index = RecentsIndex(entries: [reanalyzed("a", reps: 11, device: me, at: 1_000_300)])
     var weighed = entry("a", reps: 10, device: nil)
-    weighed.bellKg = 24
-    weighed.edited(by: phone, at: Date(timeIntervalSince1970: 1_000_200))
+    weighed.setBellKg(24, by: phone, at: Date(timeIntervalSince1970: 1_000_200))
     let result = index.merge(remote: [weighed], tombstones: [:], me: me)
     XCTAssertEqual(result.updated, 1)
     XCTAssertEqual(index.entries.first?.repCount, 11)
@@ -184,13 +182,41 @@ final class SyncMergeTests: XCTestCase {
 
   func testTheNewerTypedWeightWinsAClearedOneIncluded() {
     var weighed = entry("a", device: nil)
-    weighed.bellKg = 24
-    weighed.edited(by: me, at: Date(timeIntervalSince1970: 1_000_200))
+    weighed.setBellKg(24, by: me, at: Date(timeIntervalSince1970: 1_000_200))
     var cleared = entry("a", device: nil)
-    cleared.edited(by: phone, at: Date(timeIntervalSince1970: 1_000_400))
+    cleared.setBellKg(nil, by: phone, at: Date(timeIntervalSince1970: 1_000_400))
     var index = RecentsIndex(entries: [weighed])
     XCTAssertEqual(index.merge(remote: [cleared], tombstones: [:], me: me).updated, 1)
     XCTAssertNil(index.entries.first?.bellKg)
+  }
+
+  func testAKeepByHandThereDoesNotEraseAWeightTypedEarlierHere() {
+    // The iPad sets 24 kg at 200; the phone, not yet read, keeps the same set by hand at 300 from its copy with no
+    // weight. The count kept by hand is not a weight edit: both devices keep the count and the 24 kg.
+    let ipad = me
+    var weighed = entry("a", reps: 10, device: nil)
+    weighed.setBellKg(24, by: ipad, at: Date(timeIntervalSince1970: 1_000_200))
+    var onIPad = RecentsIndex(entries: [weighed])
+    var onPhone = RecentsIndex(entries: [byHand("a", reps: 9, device: phone, edited: 1_000_300)])
+    for _ in 0..<4 {
+      _ = onIPad.merge(remote: onPhone.entries, tombstones: [:], me: ipad)
+      _ = onPhone.merge(remote: onIPad.entries, tombstones: [:], me: phone)
+    }
+    XCTAssertEqual(onIPad.merge(remote: onPhone.entries, tombstones: [:], me: ipad), SyncMergeResult())
+    XCTAssertEqual(onPhone.merge(remote: onIPad.entries, tombstones: [:], me: phone), SyncMergeResult())
+    for index in [onIPad, onPhone] {
+      XCTAssertEqual(index.entries.first?.isByHand, true)
+      XCTAssertEqual(index.entries.first?.repCount, 9)
+      XCTAssertEqual(index.entries.first?.bellKg, 24)
+    }
+  }
+
+  func testAKeepByHandCarriesItsOwnTypedWeight() {
+    var weighed = entry("a", device: nil)
+    weighed.setBellKg(24, by: me, at: Date(timeIntervalSince1970: 1_000_200))
+    let kept = weighed.keptByHand(exercise: .kettlebellSwing, reps: 9)
+    XCTAssertEqual(kept.bellKg, 24)
+    XCTAssertEqual(kept.bellKgEditedAt, Date(timeIntervalSince1970: 1_000_200))
   }
 
   func testAWeightFromBeforeEditTimesIsKeptOverARowWithout() {
@@ -209,8 +235,7 @@ final class SyncMergeTests: XCTestCase {
     // re-analyzes both before it reads. Each reads the other's rows until nothing changes.
     let ipad = me
     var weighed = entry("w", reps: 10, device: nil)
-    weighed.bellKg = 24
-    weighed.edited(by: ipad, at: Date(timeIntervalSince1970: 1_000_200))
+    weighed.setBellKg(24, by: ipad, at: Date(timeIntervalSince1970: 1_000_200))
     var onIPad = RecentsIndex(entries: [byHand("k", reps: 9, device: ipad, edited: 1_000_200), weighed])
     var onPhone = RecentsIndex(entries: [
       reanalyzed("k", reps: 11, device: phone, at: 1_000_300), reanalyzed("w", reps: 12, device: phone, at: 1_000_300),
@@ -256,8 +281,7 @@ final class SyncMergeTests: XCTestCase {
 
   func testAHandEditAfterTheDeleteStillOutlivesIt() {
     var weighed = entry("a", device: nil)
-    weighed.bellKg = 24
-    weighed.edited(by: phone, at: Date(timeIntervalSince1970: 1_000_300))
+    weighed.setBellKg(24, by: phone, at: Date(timeIntervalSince1970: 1_000_300))
     XCTAssertTrue(weighed.outlives(deletedAt: t0.addingTimeInterval(200)))
     XCTAssertFalse(weighed.outlives(deletedAt: t0.addingTimeInterval(400)))
   }

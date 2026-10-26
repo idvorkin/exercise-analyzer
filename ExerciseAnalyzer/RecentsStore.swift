@@ -220,7 +220,10 @@ final class RecentsStore {
   /// The bell's weight the lifter set for a set (066); nil clears it. A re-analysis keeps it (`save` updates the
   /// entry in place).
   func setBellKg(id: String, kg: Int?) {
-    update(id: id, byLifter: true) { $0.bellKg = kg }
+    guard var entry = entry(id: id), entry.bellKg != kg else { return }
+    entry.setBellKg(kg, by: SyncStore.deviceID)
+    entries = entries.map { $0.id == id ? entry : $0 }
+    try? persistIndex()
   }
 
   func remove(id: String) {
@@ -288,15 +291,13 @@ final class RecentsStore {
     update(id: id) { $0.originalBackup = nil }
   }
 
-  /// Changes one entry in place; `byLifter` when the change is one he made by hand (a bell weight).
-  func update(id: String, byLifter: Bool = false, _ change: (inout RecentEntry) -> Void) {
+  /// Changes one entry in place, a change this device made by itself (`refreshed`).
+  func update(id: String, _ change: (inout RecentEntry) -> Void) {
     entries = entries.map { entry in
       guard entry.id == id else { return entry }
       var copy = entry
       change(&copy)
-      if copy != entry {
-        if byLifter { Self.edited(&copy) } else { Self.refreshed(&copy) }
-      }
+      if copy != entry { Self.refreshed(&copy) }
       return copy
     }
     try? persistIndex()
