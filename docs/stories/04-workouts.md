@@ -145,7 +145,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 015:
 
 - **Summary:** Old sets are re-read when the analyzer improves
-- **Status:** implemented in [d269b25](https://github.com/idvorkin/exercise-analyzer/commit/d269b25), [c92e8c6](https://github.com/idvorkin/exercise-analyzer/commit/c92e8c6), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the simulator (22 stale entries refreshed) and the host (`StoredSetPlan` tests); the decode, analysis and encoding off the main thread with each set's cost in `recents_refreshed` ([#320](https://github.com/idvorkin/exercise-analyzer/issues/320)) on `fix/2026-10-26-refresh-off-main`, lint only (no compiler for the app here), the app build and a launch after an analyzer bump pending
+- **Status:** implemented in [d269b25](https://github.com/idvorkin/exercise-analyzer/commit/d269b25), [c92e8c6](https://github.com/idvorkin/exercise-analyzer/commit/c92e8c6), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the simulator (22 stale entries refreshed) and the host (`StoredSetPlan` tests); the decode, analysis and encoding off the main thread with each set's cost in `recents_refreshed` ([#320](https://github.com/idvorkin/exercise-analyzer/issues/320)) in [ae49f29](https://github.com/idvorkin/exercise-analyzer/commit/ae49f29), [81e27dd](https://github.com/idvorkin/exercise-analyzer/commit/81e27dd), lint only (no compiler for the app here), the app build and a launch after an analyzer bump pending
 
 #### Use Case:
 - **As a** lifter whose old sets were counted by an older analyzer

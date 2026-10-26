@@ -548,7 +548,7 @@ final class VideoPoseSession: NSObject {
       "recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current, "models": models.names])
     for entry in stale {
       // A read pass during the refresh can hand the set to another device, or make it a set kept by hand.
-      guard refreshStillOurs(entry.id) else { continue }
+      guard refreshStillOurs(entry) else { continue }
       // Decode, analyze and encode run off the main actor, one set at a time (the 2026-10-26 review's F3: ~124
       // sets after every analyzer bump, each a multi-MB analysis.json, all on main); only the save's folder swap
       // and index write stay here, the store's single writer.
@@ -558,7 +558,7 @@ final class VideoPoseSession: NSObject {
         let stored = await Task.detached(priority: .utility, operation: { RecentsStore.loadPipeline(dir: dir) }).value
       else { continue }
       // A read pass can land while the load runs off main; checked again so this stale copy never saves over it.
-      guard refreshStillOurs(entry.id) else { continue }
+      guard refreshStillOurs(entry) else { continue }
       let loadMs = Self.ms(since: started)
       let frames = stored.track.frames
       let plan = StoredSetPlan.decide(
@@ -615,7 +615,7 @@ final class VideoPoseSession: NSObject {
       let analyzeMs = Self.ms(since: analyzeStarted)
       let clipURL = await recents.clipURL(for: entry)
       if let clipURL { await analyzed.fillRepImages(from: AVURLAsset(url: clipURL), frameDuration: frameDuration) }
-      guard refreshStillOurs(entry.id) else { continue }  // the clip fetch and the pictures awaited
+      guard refreshStillOurs(entry) else { continue }  // the clip fetch and the pictures awaited
       // Poses replayed, not re-extracted: the model set is the stored one.
       let keptModels = recents.models(for: entry)
       let thumbnail = galleryThumbnail(analyzed, kind: kind, entry: entry)
@@ -625,7 +625,7 @@ final class VideoPoseSession: NSObject {
           try RecentsStore.encode(pipeline: analyzed, models: keptModels, thumbnail: thumbnail)
         }.value
         let encodeMs = Self.ms(since: encodeStarted)
-        guard refreshStillOurs(entry.id) else { continue }
+        guard refreshStillOurs(entry) else { continue }
         let saveStarted = Date()
         try recents.save(
           id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
@@ -651,12 +651,21 @@ final class VideoPoseSession: NSObject {
   private static func ms(since start: Date) -> Int { Int(Date().timeIntervalSince(start) * 1000) }
 
   /// The set is still this device's to re-analyze: not deleted, not kept by hand, and not changed on another
-  /// device since the refresh chose it (a sync read merged meanwhile); logs `recents_refresh_skipped` when not.
-  private func refreshStillOurs(_ id: String) -> Bool {
-    guard let current = recents.entry(id: id) else { return false }
-    if !current.isByHand && SyncOwnership.isMine(current.device, me: SyncStore.deviceID) { return true }
-    log.event(
-      "recents_refresh_skipped", ["id": id, "reason": current.isByHand ? "kept_by_hand" : "changed_elsewhere"])
+  /// device since the refresh chose it (a sync read merged meanwhile), and not saved again here since (a trim, a
+  /// pass or a re-run on open); logs `recents_refresh_skipped` when not.
+  private func refreshStillOurs(_ entry: RecentEntry) -> Bool {
+    guard let current = recents.entry(id: entry.id) else { return false }
+    let reason: String
+    if current.isByHand {
+      reason = "kept_by_hand"
+    } else if !SyncOwnership.isMine(current.device, me: SyncStore.deviceID) {
+      reason = "changed_elsewhere"
+    } else if current.analyzedAt != entry.analyzedAt {
+      reason = "changed_here"
+    } else {
+      return true
+    }
+    log.event("recents_refresh_skipped", ["id": entry.id, "reason": reason])
     return false
   }
 
