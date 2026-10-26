@@ -156,7 +156,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** Launch after an analyzer update
 - **Given:** Workouts holds sets analyzed by a previous version
 - **When:** I launch the updated app
-- **Then:** those sets are re-analyzed in the background and their counts in Workouts update without me opening them; the app stays responsive meanwhile, since reading, re-counting and writing each set run off the main thread
+- **Then:** those sets are re-analyzed in the background and their counts in Workouts update without me opening them; the app stays responsive meanwhile, since reading, re-counting and encoding each set run off the main thread (the write stays on it, timed as `save_ms`)
 
 - **Scenario:** A stale set keeps its own exercise
 - **Given:** a stale get-up in Workouts and the exercise menu fixed on Swing

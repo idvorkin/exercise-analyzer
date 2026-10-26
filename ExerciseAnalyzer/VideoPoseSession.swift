@@ -557,6 +557,8 @@ final class VideoPoseSession: NSObject {
       guard
         let stored = await Task.detached(priority: .utility, operation: { RecentsStore.loadPipeline(dir: dir) }).value
       else { continue }
+      // A read pass can land while the load runs off main; checked again so this stale copy never saves over it.
+      guard refreshStillOurs(entry.id) else { continue }
       let loadMs = Self.ms(since: started)
       let frames = stored.track.frames
       let plan = StoredSetPlan.decide(
