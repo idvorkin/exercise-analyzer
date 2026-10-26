@@ -19,6 +19,10 @@ final class WorkoutMirror: NSObject {
 
   /// The running workout as last heard from the watch; nil when none runs.
   private(set) var live: WorkoutWire?
+  /// The wrist's readings as they arrived (#308), in memory only: the workout page's line runs up to now with
+  /// them while Health trails the wrist (#107). Assigned only when a reading is kept, so the page redraws once
+  /// per reading and never for a message without one.
+  private(set) var liveHeartRate = LiveHeartRate()
   private(set) var index: WorkoutIndex
   var onEvent: ((String, [String: Any]) -> Void)?
   /// The wrist's Retry came through the workout session (#189): say the status again.
@@ -158,6 +162,12 @@ final class WorkoutMirror: NSObject {
   /// the wrist's own, which `ended(at:)` saves.
   var shownLive: WorkoutWire? { index.joining(live, now: Date()).live }
 
+  /// The wrist's readings for a workout shown from its start to its end (#308): the running one, or the one
+  /// that just ended while Health may still be catching up; nil for any other.
+  func liveHeartRateSeries(for workout: StoredWorkout) -> HeartRateSeries? {
+    liveHeartRate.series(from: workout.start, to: workout.end, now: Date())
+  }
+
   /// The running workout as a span up to now (053, #123): what its page and "‹" open, never kept.
   var liveWorkout: StoredWorkout? { shownLive.map(Self.soFar) }
 
@@ -252,6 +262,7 @@ final class WorkoutMirror: NSObject {
     live = WorkoutWire(
       startedAt: Date().addingTimeInterval(-minutes * 60).timeIntervalSince1970, heartRate: 128, heartRateAverage: 126,
       heartRateMax: 151, sets: 2, reps: 17)
+    if let live { _ = liveHeartRate.record(live, at: Date()) }  // the seeded reading starts the live line (#308)
     onEvent?("workout_mirror", ["state": -1, "seeded": true, "started_at": live?.startedAt ?? 0])
   }
 
@@ -275,6 +286,7 @@ final class WorkoutMirror: NSObject {
 
   private func ended(at date: Date) {
     guard let live else { return }
+    liveHeartRate.end(at: date)
     defer {
       self.live = nil
       session = nil
@@ -340,8 +352,10 @@ extension WorkoutMirror: HKWorkoutSessionDelegate {
     Task { @MainActor [last] in
       if wantsStatus { onStatusWanted?() }
       live = last
-      // Heart rate arrives every few seconds: one line a minute keeps the log readable, transitions always.
       let now = Date()
+      var buffer = liveHeartRate
+      if buffer.record(last, at: now) { liveHeartRate = buffer }
+      // Heart rate arrives every few seconds: one line a minute keeps the log readable, transitions always.
       guard last.ending || now.timeIntervalSince(lastDataLogged) >= 60 else { return }
       lastDataLogged = now
       onEvent?(
@@ -349,6 +363,7 @@ extension WorkoutMirror: HKWorkoutSessionDelegate {
         [
           "heart_rate": last.heartRate ?? 0, "hr_avg": last.heartRateAverage ?? 0, "hr_max": last.heartRateMax ?? 0,
           "sets": last.sets, "reps": last.reps, "ending": last.ending, "discarded": last.discarded,
+          "live_samples": liveHeartRate.samples.count,
         ])
     }
   }
