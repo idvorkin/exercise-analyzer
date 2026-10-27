@@ -173,6 +173,7 @@ extension RecentEntry {
       bestScore: nil, source: .byHand, thumbnail: nil, exercise: exercise, originalName: nil,
       clipStartedAt: clipStartedAt)
     kept.bellKg = bellKg  // the lifter's weight is not the camera's (066)
+    kept.bellKgEditedAt = bellKgEditedAt
     return kept
   }
 }

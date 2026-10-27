@@ -49,7 +49,7 @@ by the sync merge, the launch refresh (a re-analysis writes only `source == .cam
 counter (it writes only `source == .wrist` and never overrides `.camera` without numbers on fixtures).
 
 **Migration is additive.** Old rows decode as they do today: a computed `count` reads `.hand` for a by-hand row and
-`.camera` stamped `analysisVersion` otherwise, and `bellKg` reads `.hand` at `editedAt ?? modifiedAt`. New rows
+`.camera` stamped `analysisVersion` otherwise, and `bellKg` reads `.hand` at `bellKgEditedAt ?? modifiedAt`. New rows
 write both forms until every device runs the new build, so the phone and iPad can update one at a time. Then
 the old fields become read-only.
 

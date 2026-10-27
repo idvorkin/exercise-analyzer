@@ -37,7 +37,7 @@ final class RecentsStore {
     if index.backfill(root: self.root) {
       for i in index.entries.indices
       where index.entries[i] != loaded[i] && SyncOwnership.isMine(index.entries[i].device, me: SyncStore.deviceID) {
-        Self.touch(&index.entries[i])
+        Self.refreshed(&index.entries[i])
       }
       try? index.save(root: self.root)
     }
@@ -103,7 +103,7 @@ final class RecentsStore {
       entry.models = models
       entry.clipStartedAt = clipStartedAt ?? entry.clipStartedAt
       if thumbnail != nil { entry.thumbnail = "thumbnail.jpg" }
-      Self.touch(&entry)
+      Self.refreshed(&entry)  // a re-analysis or a new clip: never outweighs a weight typed elsewhere (F1)
       return entry
     } writeFiles: { dir in
       if case .file(let name) = source {
@@ -140,11 +140,16 @@ final class RecentsStore {
   /// Ids removed since launch: `save` refuses them. In memory only, a relaunch has no pass under way.
   private var removedIDs: Set<String> = []
 
-  /// A change made here (story 070, step 4): the row is this device's from now on, and the later change wins
-  /// when another device changed the same set.
-  static func touch(_ entry: inout RecentEntry) {
-    entry.modifiedAt = Date()
-    entry.device = SyncStore.deviceID
+  /// A change the lifter made here (story 070, step 4: a count kept by hand, a bell weight): the row is this
+  /// device's from now on, and what he typed wins over a re-analysis on another device (`RecentEntry.merged`).
+  static func edited(_ entry: inout RecentEntry) {
+    entry.edited(by: SyncStore.deviceID)
+  }
+
+  /// A change this device made by itself (a re-analysis, a backfill, a cloud identifier, a clip moved to Photos):
+  /// the row is this device's to mirror, but the change is not the lifter's.
+  static func refreshed(_ entry: inout RecentEntry) {
+    entry.refreshed(by: SyncStore.deviceID)
   }
 
   private static let deletedKey = "recentsRemovedRemote"
@@ -206,7 +211,7 @@ final class RecentsStore {
       }
     }
     var kept = entry.keptByHand(exercise: exercise, reps: reps)
-    Self.touch(&kept)
+    Self.edited(&kept)
     entries = entries.map { $0.id == id ? kept : $0 }
     try? FileManager.default.removeItem(at: folder(for: id))
     try? persistIndex()
@@ -215,7 +220,10 @@ final class RecentsStore {
   /// The bell's weight the lifter set for a set (066); nil clears it. A re-analysis keeps it (`save` updates the
   /// entry in place).
   func setBellKg(id: String, kg: Int?) {
-    update(id: id) { $0.bellKg = kg }
+    guard var entry = entry(id: id), entry.bellKg != kg else { return }
+    entry.setBellKg(kg, by: SyncStore.deviceID)
+    entries = entries.map { $0.id == id ? entry : $0 }
+    try? persistIndex()
   }
 
   func remove(id: String) {
@@ -250,7 +258,7 @@ final class RecentsStore {
       try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name))
     }
     entry.setSource(.photos(identifier: identifier))  // a new asset: named again by the mirror
-    Self.touch(&entry)
+    Self.refreshed(&entry)
     entries = entries.map { $0.id == id ? entry : $0 }
     try? persistIndex()
   }
@@ -283,12 +291,13 @@ final class RecentsStore {
     update(id: id) { $0.originalBackup = nil }
   }
 
+  /// Changes one entry in place, a change this device made by itself (`refreshed`).
   func update(id: String, _ change: (inout RecentEntry) -> Void) {
     entries = entries.map { entry in
       guard entry.id == id else { return entry }
       var copy = entry
       change(&copy)
-      if copy != entry { Self.touch(&copy) }
+      if copy != entry { Self.refreshed(&copy) }
       return copy
     }
     try? persistIndex()
@@ -359,7 +368,7 @@ final class RecentsStore {
       guard let local = entry.photosIdentifier, let cloud = found[local] else { return entry }
       var copy = entry
       copy.cloudIdentifier = cloud
-      Self.touch(&copy)
+      Self.refreshed(&copy)
       return copy
     }
     try? persistIndex()

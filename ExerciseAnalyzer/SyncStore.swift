@@ -101,6 +101,9 @@ final class SyncStore {
   private var mirroring = false
   private var again = false
   private var reading = false
+  /// Read passes finished since launch, and whether the container lookup has answered at all: `firstRead`.
+  private var readsDone = 0
+  private var lookedUp = false
   /// A pass asked for while one runs, with the query's latest not-downloaded count.
   private var readAgain: Int?
   private var query: NSMetadataQuery?
@@ -142,7 +145,23 @@ final class SyncStore {
     if UIApplication.shared.applicationState != .background { startHeartbeat() }
   }
 
+  /// Waits, at most `timeout` seconds, for the first read pass to merge the other devices' rows, so the launch
+  /// refresh judges which sets are this device's on what they say (the 2026-10-26 review's F1: a set changed on
+  /// the iPad still looked like the phone's, was re-analyzed and written over the iPad's row). "read",
+  /// "no_container" (no iCloud: nothing to read) or "timeout".
+  /// ponytail: polls every 200 ms, once per launch. Upgrade: a continuation resumed by the read pass.
+  func firstRead(timeout: TimeInterval) async -> String {
+    let started = Date()
+    while true {
+      if readsDone > 0 { return "read" }
+      if lookedUp && container == nil { return "no_container" }
+      if Date().timeIntervalSince(started) >= timeout { return "timeout" }
+      try? await Task.sleep(for: .milliseconds(200))
+    }
+  }
+
   private func attach(_ url: URL?, ms: Int) {
+    lookedUp = true
     container = url?.appendingPathComponent("Documents", isDirectory: true)
     status.containerAvailable = url != nil
     status.containerPath = container?.path ?? ""
@@ -577,11 +596,13 @@ final class SyncStore {
         let workouts = self.workouts.mergeRemote(
           found.workouts, tombstones: found.workoutTombstones.merging(self.workouts.deleted, uniquingKeysWith: max),
           me: me)
-        // A tombstone older than a change of ours (written before our row reached the deleting device): the row
-        // is written again, which takes the tombstone away.
+        // A tombstone older than a hand edit of ours (written before our row reached the deleting device): the
+        // row is written again, which takes the tombstone away. A re-analysis after the delete does not
+        // (`RecentEntry.outlives`).
         var rewrite = false
         for (id, at) in found.setTombstones {
-          guard let entry = self.recents.entry(id: id), SyncOwnership.isMine(entry.device, me: me), entry.changedAt > at
+          guard let entry = self.recents.entry(id: id), SyncOwnership.isMine(entry.device, me: me),
+            entry.outlives(deletedAt: at)
           else { continue }
           self.ledger[id] = nil
           rewrite = true
@@ -619,6 +640,7 @@ final class SyncStore {
             "failed": failures.count, "devices": Self.devicesText(self.status.devices, me: me), "ms": ms,
           ])
         self.reading = false
+        self.readsDone += 1
         if let queryNotDownloaded = self.readAgain {
           self.readAgain = nil
           self.readContainer(queryNotDownloaded: queryNotDownloaded)
@@ -945,7 +967,7 @@ final class SyncStore {
       }
       let dir = container.appendingPathComponent("sets/\(id)", isDirectory: true)
       if let data = try? read(dir.appendingPathComponent("row.json")),
-        let row = try? JSONDecoder().decode(RecentEntry.self, from: data), row.changedAt > at
+        let row = try? JSONDecoder().decode(RecentEntry.self, from: data), row.outlives(deletedAt: at)
       {
         return nil
       }
