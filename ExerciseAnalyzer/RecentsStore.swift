@@ -69,14 +69,13 @@ final class RecentsStore {
   func save(
     id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,
     clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil, models: [String] = [],
-    clipStartedAt: Date? = nil, photosCopy: Bool = false
+    clipStartedAt: Date? = nil, photosCopy: Bool = false, encoded: EncodedFiles? = nil
   ) throws {
     // A pass that was under way when its set was deleted must not bring it back (#111, the 2026-09-19 review):
     // the launch refresh and a re-run save by id minutes after they started. Nor may it put a video back over
     // a set the lifter has since kept by hand (#157).
     guard !removedIDs.contains(id), entry(id: id)?.isByHand != true else { throw RemovedSetError(id: id) }
-    var snapshot = AnalysisSnapshot(exercise: pipeline.exercise, frames: pipeline.track.frames, reps: pipeline.reps)
-    snapshot.models = models
+    let files = try encoded ?? Self.encode(pipeline: pipeline, models: models, thumbnail: thumbnail)
     let fresh = RecentEntry(
       id: id, analyzedAt: Date(), recordedAt: recordedAt, duration: duration,
       repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
@@ -102,7 +101,7 @@ final class RecentsStore {
       entry.analysisVersion = AnalysisVersion.current
       entry.models = models
       entry.clipStartedAt = clipStartedAt ?? entry.clipStartedAt
-      if thumbnail != nil { entry.thumbnail = "thumbnail.jpg" }
+      if files.thumbnail != nil { entry.thumbnail = "thumbnail.jpg" }
       Self.refreshed(&entry)  // a re-analysis or a new clip: never outweighs a weight typed elsewhere (F1)
       return entry
     } writeFiles: { dir in
@@ -115,26 +114,43 @@ final class RecentsStore {
           throw CocoaError(.fileNoSuchFile)
         }
       }
-      try JSONEncoder().encode(snapshot).write(to: dir.appendingPathComponent("analysis.json"), options: .atomic)
-      for rep in pipeline.reps {
-        for (phase, position) in rep.positions {
-          guard let image = position.image else { continue }
-          guard let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.8) else {
-            throw CocoaError(.fileWriteUnknown)
-          }
-          try data.write(
-            to: dir.appendingPathComponent(Self.imageName(rep: rep.number, phase: phase)), options: .atomic)
-        }
+      try files.analysis.write(to: dir.appendingPathComponent("analysis.json"), options: .atomic)
+      for image in files.images {
+        try image.data.write(to: dir.appendingPathComponent(image.name), options: .atomic)
       }
-      if let thumbnail {
-        guard let data = thumbnail.jpegData(compressionQuality: 0.8) else { throw CocoaError(.fileWriteUnknown) }
-        try data.write(to: dir.appendingPathComponent("thumbnail.jpg"), options: .atomic)
+      if let thumbnail = files.thumbnail {
+        try thumbnail.write(to: dir.appendingPathComponent("thumbnail.jpg"), options: .atomic)
       }
     }
     let retired = Set(entries.map(\.id)).subtracting(saved.entries.map(\.id))
     removedIDs.formUnion(retired)
     noteDeleted(Array(retired))
     entries = saved.entries
+  }
+
+  /// A set's files, encoded off the main actor by the launch refresh (the 2026-10-26 review's F3); `save` encodes
+  /// them in place when not handed them.
+  nonisolated static func encode(
+    pipeline: AnalysisPipeline, models: [String], thumbnail: UIImage?
+  ) throws -> EncodedFiles {
+    var snapshot = AnalysisSnapshot(exercise: pipeline.exercise, frames: pipeline.track.frames, reps: pipeline.reps)
+    snapshot.models = models
+    var images: [EncodedFiles.Image] = []
+    for rep in pipeline.reps {
+      for (phase, position) in rep.positions {
+        guard let image = position.image else { continue }
+        guard let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.8) else {
+          throw CocoaError(.fileWriteUnknown)
+        }
+        images.append(EncodedFiles.Image(name: imageName(rep: rep.number, phase: phase), data: data))
+      }
+    }
+    var card: Data?
+    if let thumbnail {
+      guard let data = thumbnail.jpegData(compressionQuality: 0.8) else { throw CocoaError(.fileWriteUnknown) }
+      card = data
+    }
+    return EncodedFiles(analysis: try JSONEncoder().encode(snapshot), images: images, thumbnail: card)
   }
 
   /// Ids removed since launch: `save` refuses them. In memory only, a relaunch has no pass under way.
@@ -320,7 +336,12 @@ final class RecentsStore {
   }
 
   func loadPipeline(for entry: RecentEntry) -> AnalysisPipeline? {
-    let dir = folder(for: entry.id)
+    Self.loadPipeline(dir: folder(for: entry.id))
+  }
+
+  /// The set's stored analysis and rep pictures from its folder; off the main actor for the launch refresh, which
+  /// decodes every stale set's multi-MB analysis.json (the 2026-10-26 review's F3).
+  nonisolated static func loadPipeline(dir: URL) -> AnalysisPipeline? {
     guard let data = try? Data(contentsOf: dir.appendingPathComponent("analysis.json")),
       let snapshot = try? JSONDecoder().decode(AnalysisSnapshot.self, from: data),
       snapshot.version == AnalysisSnapshot.currentVersion
@@ -461,9 +482,21 @@ final class RecentsStore {
     PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject?.creationDate
   }
 
-  private static func imageName(rep: Int, phase: String) -> String { "rep-\(rep)-\(phase).jpg" }
+  private nonisolated static func imageName(rep: Int, phase: String) -> String { "rep-\(rep)-\(phase).jpg" }
 
   private func persistIndex() throws {
     try RecentsIndex(entries: entries).save(root: root)
   }
+}
+
+/// A set's analysis, rep pictures and card, encoded: what `RecentsStore.save` writes into the set's folder.
+struct EncodedFiles: Sendable {
+  struct Image: Sendable {
+    var name: String
+    var data: Data
+  }
+
+  var analysis: Data
+  var images: [Image]
+  var thumbnail: Data?
 }

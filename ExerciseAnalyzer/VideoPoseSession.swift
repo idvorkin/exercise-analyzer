@@ -548,8 +548,18 @@ final class VideoPoseSession: NSObject {
       "recents_refresh_start", ["count": stale.count, "version": AnalysisVersion.current, "models": models.names])
     for entry in stale {
       // A read pass during the refresh can hand the set to another device, or make it a set kept by hand.
-      guard refreshStillOurs(entry.id) else { continue }
-      guard let stored = recents.loadPipeline(for: entry) else { continue }
+      guard refreshStillOurs(entry) else { continue }
+      // Decode, analyze and encode run off the main actor, one set at a time (the 2026-10-26 review's F3: ~124
+      // sets after every analyzer bump, each a multi-MB analysis.json, all on main); only the save's folder swap
+      // and index write stay here, the store's single writer.
+      let started = Date()
+      let dir = recents.folder(for: entry.id)
+      guard
+        let stored = await Task.detached(priority: .utility, operation: { RecentsStore.loadPipeline(dir: dir) }).value
+      else { continue }
+      // A read pass can land while the load runs off main; checked again so this stale copy never saves over it.
+      guard refreshStillOurs(entry) else { continue }
+      let loadMs = Self.ms(since: started)
       let frames = stored.track.frames
       let plan = StoredSetPlan.decide(
         storedVersion: entry.analysisVersion, storedModels: storedModels(entry),
@@ -597,22 +607,38 @@ final class VideoPoseSession: NSObject {
       case .keep:  // unreachable: the filter above only keeps stale-or-models-changed entries
         kind = stored.exercise
       }
-      let analyzed = AnalysisPipeline.analyze(frames: frames, exercise: kind)
+      let analyzeStarted = Date()
+      let analyzed = await Task.detached(priority: .utility) {
+        AnalysisPipeline.analyze(frames: frames, exercise: kind)
+      }
+      .value
+      let analyzeMs = Self.ms(since: analyzeStarted)
       let clipURL = await recents.clipURL(for: entry)
       if let clipURL { await analyzed.fillRepImages(from: AVURLAsset(url: clipURL), frameDuration: frameDuration) }
-      guard refreshStillOurs(entry.id) else { continue }  // the clip fetch and the pictures awaited
+      guard refreshStillOurs(entry) else { continue }  // the clip fetch and the pictures awaited
+      // Poses replayed, not re-extracted: the model set is the stored one.
+      let keptModels = recents.models(for: entry)
+      let thumbnail = galleryThumbnail(analyzed, kind: kind, entry: entry)
       do {
+        let encodeStarted = Date()
+        let encoded = try await Task.detached(priority: .utility) {
+          try RecentsStore.encode(pipeline: analyzed, models: keptModels, thumbnail: thumbnail)
+        }.value
+        let encodeMs = Self.ms(since: encodeStarted)
+        guard refreshStillOurs(entry) else { continue }
+        let saveStarted = Date()
         try recents.save(
           id: entry.id, source: entry.source, recordedAt: entry.recordedAt, duration: entry.duration,
-          pipeline: analyzed, clipURL: nil, thumbnail: galleryThumbnail(analyzed, kind: kind, entry: entry),
-          originalName: entry.originalName,
-          models: recents.models(for: entry),  // poses replayed, not re-extracted: the model set is the stored one
-          clipStartedAt: entry.clipStartedAt)
+          pipeline: analyzed, clipURL: nil, thumbnail: thumbnail, originalName: entry.originalName,
+          models: keptModels, clipStartedAt: entry.clipStartedAt, encoded: encoded)
         log.event(
           "recents_refreshed",
           [
             "id": entry.id, "was": "\(stored.exercise.rawValue) \(stored.reps.count)",
             "now": "\(kind.rawValue) \(analyzed.reps.count)",
+            // What each step cost, and the main thread's share (the save): F3's measurement.
+            "elapsed_ms": Self.ms(since: started), "load_ms": loadMs, "analyze_ms": analyzeMs, "encode_ms": encodeMs,
+            "save_ms": Self.ms(since: saveStarted),
           ])
       } catch let removed as RecentsStore.RemovedSetError {
         log.event("remember_skipped", ["reason": "set deleted", "where": "recents_refresh", "id": removed.id])
@@ -622,13 +648,24 @@ final class VideoPoseSession: NSObject {
     }
   }
 
+  private static func ms(since start: Date) -> Int { Int(Date().timeIntervalSince(start) * 1000) }
+
   /// The set is still this device's to re-analyze: not deleted, not kept by hand, and not changed on another
-  /// device since the refresh chose it (a sync read merged meanwhile); logs `recents_refresh_skipped` when not.
-  private func refreshStillOurs(_ id: String) -> Bool {
-    guard let current = recents.entry(id: id) else { return false }
-    if !current.isByHand && SyncOwnership.isMine(current.device, me: SyncStore.deviceID) { return true }
-    log.event(
-      "recents_refresh_skipped", ["id": id, "reason": current.isByHand ? "kept_by_hand" : "changed_elsewhere"])
+  /// device since the refresh chose it (a sync read merged meanwhile), and not saved again here since (a trim, a
+  /// pass or a re-run on open); logs `recents_refresh_skipped` when not.
+  private func refreshStillOurs(_ entry: RecentEntry) -> Bool {
+    guard let current = recents.entry(id: entry.id) else { return false }
+    let reason: String
+    if current.isByHand {
+      reason = "kept_by_hand"
+    } else if !SyncOwnership.isMine(current.device, me: SyncStore.deviceID) {
+      reason = "changed_elsewhere"
+    } else if current.analyzedAt != entry.analyzedAt {
+      reason = "changed_here"
+    } else {
+      return true
+    }
+    log.event("recents_refresh_skipped", ["id": entry.id, "reason": reason])
     return false
   }
 

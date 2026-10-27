@@ -145,7 +145,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 015:
 
 - **Summary:** Old sets are re-read when the analyzer improves
-- **Status:** implemented in [d269b25](https://github.com/idvorkin/exercise-analyzer/commit/d269b25), [c92e8c6](https://github.com/idvorkin/exercise-analyzer/commit/c92e8c6), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the simulator (22 stale entries refreshed) and the host (`StoredSetPlan` tests)
+- **Status:** implemented in [d269b25](https://github.com/idvorkin/exercise-analyzer/commit/d269b25), [c92e8c6](https://github.com/idvorkin/exercise-analyzer/commit/c92e8c6), [9e5e61e](https://github.com/idvorkin/exercise-analyzer/commit/9e5e61e); verified on the simulator (22 stale entries refreshed) and the host (`StoredSetPlan` tests); the decode, analysis and encoding off the main thread with each set's cost in `recents_refreshed` ([#320](https://github.com/idvorkin/exercise-analyzer/issues/320)) in [ae49f29](https://github.com/idvorkin/exercise-analyzer/commit/ae49f29), [81e27dd](https://github.com/idvorkin/exercise-analyzer/commit/81e27dd), and a set saved again here meanwhile skipped (`changed_here`) in [af287bb](https://github.com/idvorkin/exercise-analyzer/commit/af287bb), lint only (no compiler for the app here), the app build and a launch after an analyzer bump pending
 
 #### Use Case:
 - **As a** lifter whose old sets were counted by an older analyzer
@@ -156,7 +156,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** Launch after an analyzer update
 - **Given:** Workouts holds sets analyzed by a previous version
 - **When:** I launch the updated app
-- **Then:** those sets are re-analyzed in the background and their counts in Workouts update without me opening them
+- **Then:** those sets are re-analyzed in the background and their counts in Workouts update without me opening them; the app stays responsive meanwhile, since reading, re-counting and encoding each set run off the main thread (the write stays on it, timed as `save_ms`)
 
 - **Scenario:** A stale set keeps its own exercise
 - **Given:** a stale get-up in Workouts and the exercise menu fixed on Swing
