@@ -297,6 +297,18 @@ extension WatchBridge: WCSessionDelegate {
       Task { @MainActor in self.onEvent?("error", ["where": "hand_set", "message": message]) }
       return
     }
+    // A recorded set's count for its wrist motion (story 076), beside the track in Documents/motion/.
+    if let label = MotionLabel(userInfo: userInfo) {
+      let event: (String, [String: Any])
+      do {
+        try MotionFolder.store(label: label, root: Self.motionRoot)
+        event = ("motion_label", ["id": label.trackID, "reps": label.reps, "exercise": label.exercise])
+      } catch {
+        event = ("error", ["where": "motion_label", "id": label.trackID, "message": "\(error)"])
+      }
+      Task { @MainActor in self.onEvent?(event.0, event.1) }
+      return
+    }
     // The wrist's Retry, queued (#189): it gets here when a message could not. Not through `handle`, which
     // takes a command as proof the watch app is in front, and this one may be minutes old.
     if userInfo["retry"] != nil {
@@ -318,5 +330,28 @@ extension WatchBridge: WCSessionDelegate {
   ) {
     handle(message)
     replyHandler(["ok": true])
+  }
+
+  /// Documents/motion/: the wrist's motion per recorded set and its labels (story 076, #260).
+  nonisolated static var motionRoot: URL {
+    MotionFolder.url(documents: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0])
+  }
+
+  /// A set's wrist motion (story 076). WatchConnectivity deletes the file when this returns, so it is moved in
+  /// here, before hopping to the main actor.
+  nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
+    guard let id = file.metadata?[MotionTrack.transferKey] as? String else {
+      let name = file.fileURL.lastPathComponent
+      Task { @MainActor in self.onEvent?("watch_file_unknown", ["name": name]) }
+      return
+    }
+    let event: (String, [String: Any])
+    do {
+      let bytes = try MotionFolder.store(file: file.fileURL, id: id, root: Self.motionRoot)
+      event = ("motion_received", ["id": id, "bytes": bytes])
+    } catch {
+      event = ("error", ["where": "motion_received", "id": id, "message": "\(error)"])
+    }
+    Task { @MainActor in self.onEvent?(event.0, event.1) }
   }
 }

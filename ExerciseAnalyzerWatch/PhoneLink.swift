@@ -537,6 +537,10 @@ extension PhoneLink: WCSessionDelegate {
       self.apply(context, via: "stored_context")
       self.logEvent("session", fields)
       self.workout.recover()
+      if self.screenshot == nil, state == .activated {
+        let resent = MotionCapture.resendLeftovers()
+        if resent > 0 { self.logEvent("motion_resent", ["count": resent]) }
+      }
     }
   }
 
@@ -575,6 +579,16 @@ extension PhoneLink: WCSessionDelegate {
 
   nonisolated func session(_ session: WCSession, didReceiveApplicationContext context: [String: Any]) {
     Task { @MainActor in self.apply(context, via: "context") }
+  }
+
+  /// A set's motion file reached the phone or failed (story 076): the watch's copy goes once delivered; a failure
+  /// is logged, and the file stays for the next look.
+  nonisolated func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
+    let file = fileTransfer.file
+    guard let id = file.metadata?[MotionTrack.transferKey] as? String else { return }
+    if error == nil { MotionCapture.sent(file) }
+    let message = error.map { "\($0)" } ?? ""
+    Task { @MainActor in self.logEvent("motion_sent", ["id": id, "error": message]) }
   }
 
   /// A queued set's transfer ended (#197): only sets are logged, so a log line's own transfer never logs again.
