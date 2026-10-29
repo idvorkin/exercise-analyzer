@@ -903,7 +903,7 @@ the first frame (story 001).
 - **Given:** a workout runs on the watch, with at least one set or the heart up a minute or more (a slow warm-up never asks)
 - **and Given:** my heart has stayed within 30 BPM of my resting rate (Health's newest, 65 when it has none) for 15 minutes with no set; a rise above that line for under a minute does not restart the 15 minutes
 - **When:** the next heart reading arrives
-- **Then:** the wrist taps and asks "Looks like you're done" with End at 10:20 (the time my heart came down) and Keep going; End at 10:20 writes the workout to Health ending at 10:20 and the phone's row ends there too (`watch_workout_quiet_ask`, then `watch_workout_end` with `end_s_ago`); Keep going asks again after another 15 minutes at rest, offering the same time; a set at any point cancels the ask and starts the 15 minutes over
+- **Then:** the wrist taps and asks "Looks like you're done" with End at 10:20 (the time my heart came down) and Keep going; End at 10:20 writes the workout to Health ending at 10:20 and the phone's row ends there too (`watch_workout_quiet_ask`, then `watch_workout_end` with `end_s_ago`), never before the last set; if Health refuses the earlier end, the workout ends at the tap instead of being lost (`watch_workout_failed` with retry) and Trim end (078) takes it back; Keep going asks again after another 15 minutes at rest, offering the same time; a set at any point cancels the ask and starts the 15 minutes over
 
 - **Issues:** [#330](https://github.com/idvorkin/exercise-analyzer/issues/330)
 
@@ -925,7 +925,7 @@ the first frame (story 001).
 - **Given:** End when I leave is on (under Start on the watch; turning it on asks once for the watch's location)
 - **and Given:** I started a workout, and the watch's first fix within 100 m is taken as the gym
 - **When:** two fixes in a row within 100 m are each more than 300 m (plus their own doubt) from it
-- **Then:** the wrist taps and the workout ends as End does, at the time of the last fix still near the gym (`watch_leave_left`, then `watch_workout_end` with `end_s_ago`); a single stray fix, a vague fix or the car park end nothing; with the option off the watch never reads location, and the phone's Trim end (078) corrects whatever the door time got wrong
+- **Then:** the wrist taps and the workout ends as End does, two minutes before the first fix away (never before the last fix still near the gym, the first minute after Start, or the last set) (`watch_leave_left`, then `watch_workout_end` with `end_s_ago`); a single stray fix, a vague fix, the car park, or the watch's remembered place from before Start end nothing; with the option off the watch never reads location, and the phone's Trim end (078) corrects whatever the door time got wrong
 
 - **Issues:** [#332](https://github.com/idvorkin/exercise-analyzer/issues/332)
 
