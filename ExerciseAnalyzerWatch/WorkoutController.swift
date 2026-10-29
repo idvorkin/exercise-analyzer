@@ -25,6 +25,8 @@ final class WorkoutController: NSObject {
 
   private(set) var phase: Phase = .none
   private(set) var startedAt: Date?
+  /// What Health records it as (#333): picked at Start, read back from the session after a restart.
+  private(set) var kind: WorkoutKind = .strength
   private(set) var heartRate: Int?
   private(set) var heartRateAverage: Int?
   private(set) var heartRateMax: Int?
@@ -119,10 +121,12 @@ final class WorkoutController: NSObject {
   // MARK: - Start, End, Discard
 
   /// Asks for Health permission the first time, then opens the session and starts mirroring it to the phone.
-  /// `continuing`: Continue on Start's ask (#238), the last ended workout carried on the wrist.
-  func start(continuing: Bool = false) {
+  /// `continuing`: Continue on Start's ask (#238), the last ended workout carried on the wrist. `kind`: Start
+  /// workout or Elliptical (#333).
+  func start(continuing: Bool = false, kind: WorkoutKind = .strength) {
     guard phase == .none, !fixed else { return }
     pendingCarry = continuing ? continuable : nil
+    self.kind = kind
     guard HKHealthStore.isHealthDataAvailable() else {
       fail("Health data is not available on this watch", event: "workout_failed")
       return
@@ -148,7 +152,7 @@ final class WorkoutController: NSObject {
 
   private func open() {
     let configuration = HKWorkoutConfiguration()
-    configuration.activityType = .functionalStrengthTraining
+    configuration.activityType = kind == .elliptical ? .elliptical : .functionalStrengthTraining
     configuration.locationType = .indoor
     do {
       let session = try HKWorkoutSession(healthStore: store, configuration: configuration)
@@ -189,11 +193,11 @@ final class WorkoutController: NSObject {
       activityOpen = false
       phase = .running
       saveTally()
-      var startFields: [String: Any] = [:]
+      var startFields: [String: Any] = ["kind": kind.rawValue]
       if let carried {
-        startFields = [
-          "continues": true, "ended_s_ago": Int(start.timeIntervalSince(carried.end)), "sets": carried.sets,
-        ]
+        startFields["continues"] = true
+        startFields["ended_s_ago"] = Int(start.timeIntervalSince(carried.end))
+        startFields["sets"] = carried.sets
       }
       log("workout_start", startFields)
       sendWire()
@@ -232,6 +236,7 @@ final class WorkoutController: NSObject {
         self.builder = builder
         let start = session.startDate ?? builder.startDate ?? Date()
         self.startedAt = start
+        self.kind = session.workoutConfiguration.activityType == .elliptical ? .elliptical : .strength
         // The count of sets is ours, not Health's: kept on disk per workout (`saveTally`).
         let tally = Self.savedTally(startedAt: start)
         self.sets = tally.sets
@@ -423,9 +428,12 @@ final class WorkoutController: NSObject {
   // MARK: - Wire to the phone
 
   private var wire: WorkoutWire {
-    WorkoutWire(
+    var wire = WorkoutWire(
       startedAt: (startedAt ?? Date()).timeIntervalSince1970, heartRate: heartRate, heartRateAverage: heartRateAverage,
       heartRateMax: heartRateMax, sets: sets, reps: reps)
+    // Strength stays nil on the wire, as before #333.
+    if kind == .elliptical { wire.kind = .elliptical }
+    return wire
   }
 
   /// Sends the workout's state to the phone through the mirrored session; heart-rate samples are throttled to

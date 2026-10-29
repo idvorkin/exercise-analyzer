@@ -172,9 +172,11 @@ final class WorkoutMirror: NSObject {
   var liveWorkout: StoredWorkout? { shownLive.map(Self.soFar) }
 
   nonisolated static func soFar(_ live: WorkoutWire) -> StoredWorkout {
-    StoredWorkout(
+    var workout = StoredWorkout(
       id: liveID, start: live.startDate, end: Date(), heartRateAverage: live.heartRateAverage,
       heartRateMax: live.heartRateMax, sets: live.sets, reps: live.reps)
+    workout.kind = live.kind
+    return workout
   }
 
   /// Deletes a workout line (065; Igor: "Delete it from Health too"): every workout inside it, their heart-rate
@@ -295,9 +297,10 @@ final class WorkoutMirror: NSObject {
       onEvent?("workout_discarded", ["seconds": Int(date.timeIntervalSince(live.startDate))])
       return
     }
-    let workout = StoredWorkout(
+    var workout = StoredWorkout(
       start: live.startDate, end: date, heartRateAverage: live.heartRateAverage, heartRateMax: live.heartRateMax,
       sets: live.sets, reps: live.reps)
+    workout.kind = live.kind
     index.workouts.append(workout)
     var fields: [String: Any] = [
       "seconds": Int(workout.duration), "hr_avg": workout.heartRateAverage ?? 0, "hr_max": workout.heartRateMax ?? 0,

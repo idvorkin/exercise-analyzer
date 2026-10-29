@@ -22,6 +22,8 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
   /// The wrist's Retry (#189): the phone should say its status again, by every road. Only on that one message;
   /// the phone does not keep it.
   public var wantsStatus: Bool? = nil
+  /// What the wrist records it as (#333); nil is strength, as every workout before #333.
+  public var kind: WorkoutKind? = nil
 
   public init(
     startedAt: Double, heartRate: Int? = nil, heartRateAverage: Int? = nil, heartRateMax: Int? = nil, sets: Int = 0,
@@ -38,6 +40,18 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
   }
 
   public var startDate: Date { Date(timeIntervalSince1970: startedAt) }
+}
+
+/// What a workout is in Health (#333; Igor: "Add another type of workout where it's an elliptical workout"): the
+/// gym hour of sets is functional strength training, an elliptical session is elliptical. Chosen at Start.
+public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
+  case strength
+  case elliptical
+
+  /// The phone's word for it on the workout line; strength says nothing, the lifter sign says it.
+  public var label: String? { self == .elliptical ? "Elliptical" : nil }
+  /// Its SF Symbol: the lifter the workout line has always worn (#130), or the elliptical.
+  public var symbol: String { self == .elliptical ? "figure.elliptical" : "figure.strengthtraining.traditional" }
 }
 
 /// What the workout's Live Activity shows beside its self-running clock (#161): the wrist's heart rate, sets and
@@ -156,6 +170,8 @@ public struct StoredWorkout: Codable, Hashable, Identifiable, Sendable {
   public var device: String? = nil
   /// When a device last changed the row; nil for one never changed since it ended (`end` stands in, `changedAt`).
   public var modifiedAt: Date? = nil
+  /// What the wrist recorded it as (#333); nil is strength.
+  public var kind: WorkoutKind? = nil
 
   public var changedAt: Date { modifiedAt ?? end }
 
@@ -232,6 +248,8 @@ public struct WorkoutIndex: Codable, Equatable, Sendable {
     return merged.map { entry in
       guard entry.parts.count > 1 else { return entry.session }
       var session = entry.session
+      // Elliptical only when every part was (#333): a warm-up on it before the sets is still the gym hour.
+      session.kind = entry.parts.allSatisfy { $0.kind == .elliptical } ? .elliptical : nil
       session.sets = entry.parts.reduce(0) { $0 + $1.sets }
       session.reps = entry.parts.reduce(0) { $0 + $1.reps }
       session.heartRateMax = entry.parts.compactMap(\.heartRateMax).max()

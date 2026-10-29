@@ -887,6 +887,27 @@ the first frame (story 001).
 
 ---
 
+### User Story 080:
+
+- **Summary:** An elliptical session is started from the watch and lands in Health as an elliptical workout
+- **Status:** built on `feat/2026-10-29-workout-end` ([#333](https://github.com/idvorkin/exercise-analyzer/issues/333)): `WorkoutKind` on `WorkoutWire` and `StoredWorkout` in ExerciseCore (`WorkoutTests`, host), Elliptical under Start on the watch, the workout line's word and sign on the phone; the watch and phone builds and a wrist session pending
+- **Why:** Igor, 2026-10-29: "Add another type of workout where it's an elliptical workout"
+
+#### Use Case:
+- **As a** lifter who also does cardio on the elliptical at the gym
+- **I want to** start an elliptical workout from the same watch app
+- **so that** Health and my Workouts list show it as elliptical, not as another hour of strength training
+
+#### Acceptance Criteria:
+- **Scenario:** Starting an elliptical workout
+- **Given:** no workout runs on the watch
+- **When:** I tap Elliptical under Start workout
+- **Then:** the workout page heads with ELLIPTICAL and the clock and heart rate as a workout does (048); End writes an elliptical (indoor) workout to Health; Workouts' line reads "Elliptical · 7:02 AM · 30 min · ♥ 131" with the elliptical sign; it never asks to continue the last workout (#238), and a line that merges it with a strength workout under 30 minutes apart (#169) is the strength line
+
+- **Issues:** [#333](https://github.com/idvorkin/exercise-analyzer/issues/333)
+
+---
+
 ### What a workout session costs
 
 Heart rate during a set, surviving wrist-down (#32) and launching the watch app from the phone all need an

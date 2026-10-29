@@ -211,6 +211,27 @@ final class WorkoutTests: XCTestCase {
     XCTAssertEqual(apart.sessions().map(\.id), ["x", "y"])
   }
 
+  /// #333: an elliptical workout travels the wire and the row; rows and wires from before #333 read as strength;
+  /// a merged line is elliptical only when every part was.
+  func testEllipticalTravelsAndOldRowsAreStrength() throws {
+    var wire = WorkoutWire(startedAt: 1_000)
+    wire.kind = .elliptical
+    XCTAssertEqual(try JSONDecoder().decode(WorkoutWire.self, from: JSONEncoder().encode(wire)).kind, .elliptical)
+    let oldWire = Data(#"{"startedAt":1000,"sets":0,"reps":0,"ending":false,"discarded":false}"#.utf8)
+    XCTAssertNil(try JSONDecoder().decode(WorkoutWire.self, from: oldWire).kind)
+    let oldRow = Data(#"{"id":"a","start":0,"end":600,"sets":1,"reps":5}"#.utf8)
+    XCTAssertNil(try JSONDecoder().decode(StoredWorkout.self, from: oldRow).kind)
+
+    var cardio = StoredWorkout(id: "e", start: date(16, 7, 0), end: date(16, 7, 20))
+    cardio.kind = .elliptical
+    var more = StoredWorkout(id: "f", start: date(16, 7, 25), end: date(16, 7, 40))
+    more.kind = .elliptical
+    let lifting = StoredWorkout(id: "g", start: date(16, 7, 45), end: date(16, 8, 30), sets: 4, reps: 30)
+    XCTAssertEqual(WorkoutIndex(workouts: [cardio, more]).sessions().map(\.kind), [.elliptical])
+    XCTAssertEqual(WorkoutIndex(workouts: [cardio, more, lifting]).sessions().map(\.kind), [nil])
+    XCTAssertEqual(WorkoutIndex(workouts: [cardio]).sessions().map(\.kind), [.elliptical])
+  }
+
   /// 065: deleting a merged line deletes every workout inside it and nothing outside it.
   func testDeletingASessionRemovesEveryWorkoutInIt() {
     var index = WorkoutIndex(workouts: [

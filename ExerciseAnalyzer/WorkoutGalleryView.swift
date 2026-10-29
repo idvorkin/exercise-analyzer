@@ -644,7 +644,7 @@ struct DayHeader: View {
             } icon: {
               // The workout's sign, the same lifter the playback screen's "‹" wears, not a watch (#130; Igor:
               // "don't show watch … whatever we use for workout").
-              Image(systemName: "figure.strengthtraining.traditional").font(.caption)
+              Image(systemName: (line.workout.kind ?? .strength).symbol).font(.caption)
             }
             Spacer(minLength: 4)
             if onOpenWorkout != nil { Image(systemName: "chevron.right").font(.caption.bold()) }
@@ -770,10 +770,13 @@ struct DayHeader: View {
     var lines = day.workouts.map { workout -> (text: String, workout: StoredWorkout) in
       var parts = [Self.clock.string(from: workout.start), "\(Int(workout.duration / 60)) min"]
       if let avg = workout.heartRateAverage { parts.append("♥ \(avg)") }
+      // "Elliptical · 9:02 AM · 30 min · ♥ 131" (#333): its own sign says so too.
+      if let label = workout.kind?.label { parts.insert(label, at: 0) }
       return (parts.joined(separator: " · "), workout)
     }
     if let live = day.live {
       var parts = ["Since \(Self.clock.string(from: live.startDate))"]
+      if let label = live.kind?.label { parts.insert(label, at: 0) }
       if let heartRate = live.heartRate { parts.append("♥ \(heartRate)") }
       parts.append("on the watch")
       // The running workout opens as a span up to now (053).

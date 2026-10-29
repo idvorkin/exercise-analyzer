@@ -230,7 +230,7 @@ struct WatchContentView: View {
           .font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit()
           .foregroundStyle(restIsOver(resting) ? .orange : .primary)
       } else {
-        Text(workout.phase == .ending ? "ENDING…" : "WORKOUT")
+        Text(workout.phase == .ending ? "ENDING…" : workout.kind == .elliptical ? "ELLIPTICAL" : "WORKOUT")
           .font(.caption2.weight(.semibold)).kerning(1).foregroundStyle(.green)
         if let startedAt = workout.shownStart {
           Text(startedAt, style: .timer)
@@ -307,6 +307,14 @@ struct WatchContentView: View {
         Button("Continue") { phone.startWorkout(continuing: true) }
         Button("New workout") { phone.startWorkout() }
       }
+      // Under Start (#333): an elliptical session is its own workout in Health, never a continued gym hour.
+      Button {
+        phone.startWorkout(kind: .elliptical)
+      } label: {
+        Label("Elliptical", systemImage: WorkoutKind.elliptical.symbol).frame(maxWidth: .infinity)
+      }
+      .tint(.green)
+      .disabled(workout.phase == .starting)
     }
   }
 
