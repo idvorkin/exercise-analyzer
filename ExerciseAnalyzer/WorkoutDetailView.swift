@@ -229,7 +229,8 @@ private struct WorkoutPageView: View {
         }
       }
       // A saved workout's end can come in (078, #331); the running one belongs to the watch.
-      if onTrimEnd != nil, workout.id != WorkoutMirror.liveID {
+      // Two minutes at least: the picker's range runs from a minute in to a minute before the end.
+      if onTrimEnd != nil, workout.id != WorkoutMirror.liveID, workout.duration >= 120 {
         ToolbarItem(placement: .navigationBarTrailing) {
           Button {
             trimming = true

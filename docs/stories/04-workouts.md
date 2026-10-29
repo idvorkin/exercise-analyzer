@@ -932,9 +932,9 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 #### Acceptance Criteria:
 - **Scenario:** Trimming a forgotten workout
-- **Given:** a saved workout on its page (Trim end, the scissors at top right; the running workout has none)
+- **Given:** a saved workout of two minutes or more, recorded on this device, on its page (Trim end, the scissors at top right; the running workout has none, and another device's workout says to trim it there)
 - **When:** I tap Trim end, pick an end at least a minute earlier (the sheet opens on "Heart back at rest: 10:20", when the heart settled after the last set, if the heart rate says so) and Save
-- **Then:** the line and the page end there, a merged line's later parts go (065's tombstones carry it to the other devices), the stored heart rate is cut to match, and in Health the wrist's long record is replaced by one from the same start to the new end with its sets up to there (`workout_trimmed`); the sets stay; when Health refuses, the list is still trimmed and an alert says Health kept its longer record
+- **Then:** the line and the page end there, a merged line's later parts go (065's tombstones carry it to the other devices), the stored heart rate (each trimmed part's and the line's own) is cut to match and the row's average and peak are the kept time's, and in Health the wrist's long record is replaced by one from the same start to the new end with its sets up to there (`workout_trimmed`); the sets stay; when Health refuses, the list is still trimmed, a short record already saved is deleted again so Health never holds both, and an alert says Health kept its longer record
 
 - **Issues:** [#331](https://github.com/idvorkin/exercise-analyzer/issues/331)
 

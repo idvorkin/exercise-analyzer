@@ -240,6 +240,11 @@ final class WorkoutMirror: NSObject {
   /// records running past it is saved again ending there and the long one deleted; Health cannot shorten a
   /// workout in place. The sets stay.
   func trimEnd(_ session: StoredWorkout, to end: Date) async -> WorkoutTrim {
+    // Another device's rows are mirrored only by it (070): trimmed here, the change would never reach it while
+    // its dropped parts' tombstones would.
+    guard index.parts(of: session).allSatisfy({ $0.device == nil }) else {
+      return WorkoutTrim(rows: 0, failure: "Trim this workout on the device that recorded it.")
+    }
     let now = Date()
     let (trimmed, removed) = index.trimEnd(session, to: end, now: now)
     var trim = WorkoutTrim(rows: trimmed.count + removed.count)
@@ -249,27 +254,37 @@ final class WorkoutMirror: NSObject {
       try? FileManager.default.removeItem(at: folder(for: part.id))
     }
     if !removed.isEmpty { UserDefaults.standard.set(deleted, forKey: Self.deletedKey) }
-    for part in trimmed {
-      // Health's read keeps the fuller series, so the stored one is cut too or the old tail stays.
-      let folder = folder(for: part.id)
-      if let series = HeartRateSeries.load(from: folder) {
-        try? series.slice(from: part.start.addingTimeInterval(-60), to: end.addingTimeInterval(180)).save(to: folder)
+    // Health's read keeps the fuller series, so the stored ones are cut too or the old tail stays: each trimmed
+    // part's, and the line's own (its first part's folder, read for the whole merged span).
+    for id in Set(trimmed.map(\.id) + [session.id]) {
+      let folder = folder(for: id)
+      guard let series = HeartRateSeries.load(from: folder) else { continue }
+      let first = series.samples.first.map { Date(timeIntervalSince1970: $0.at) } ?? end
+      let cut = series.slice(from: first, to: end.addingTimeInterval(180))
+      try? cut.save(to: folder)
+      // The trimmed row's heart numbers are the kept hour's, not the afternoon's.
+      if let i = index.workouts.firstIndex(where: { $0.id == id }), trimmed.contains(where: { $0.id == id }) {
+        let row = index.workouts[i]
+        index.workouts[i].heartRateAverage = cut.average(from: row.start, to: row.end) ?? row.heartRateAverage
+        index.workouts[i].heartRateMax = cut.peak(from: row.start, to: row.end) ?? row.heartRateMax
       }
     }
+    var failures: [String] = []
     do {
       try index.save(root: root)
     } catch {
-      trim.failure = "The list could not be saved: \(error.localizedDescription)"
+      failures.append("The list could not be saved: \(error.localizedDescription)")
     }
     #if !targetEnvironment(simulator)
       if HKHealthStore.isHealthDataAvailable() {
         do {
           trim.healthRecords = try await trimHealth(session, to: end)
         } catch {
-          trim.failure = "Health kept its longer record: \(error.localizedDescription)"
+          failures.append("Health kept its longer record: \(error.localizedDescription)")
         }
       }
     #endif
+    trim.failure = failures.isEmpty ? nil : failures.joined(separator: "\n")
     onEvent?(
       "workout_trimmed",
       [
@@ -297,6 +312,7 @@ final class WorkoutMirror: NSObject {
     let records = try await query.result(for: store).filter {
       $0.sourceRevision.source.bundleIdentifier.hasPrefix(family) && $0.endDate > end
     }
+    var saved: [HKWorkout] = []
     for record in records where record.startDate < end {
       let configuration = HKWorkoutConfiguration()
       configuration.activityType = record.workoutActivityType
@@ -313,10 +329,17 @@ final class WorkoutMirror: NSObject {
       let metadata = (record.metadata ?? [:]).filter { !$0.key.hasPrefix("HK") || $0.key == HKMetadataKeyIndoorWorkout }
       if !metadata.isEmpty { try await builder.addMetadata(metadata) }
       try await builder.endCollection(at: end)
-      guard try await builder.finishWorkout() != nil else { throw WorkoutTrimError.notSaved }
+      guard let short = try await builder.finishWorkout() else { throw WorkoutTrimError.notSaved }
+      saved.append(short)
     }
-    // The long records go only once their short ones are saved.
-    if !records.isEmpty { try await store.delete(records) }
+    // The long records go only once their short ones are saved; if Health will not let them go (a record the
+    // watch wrote may be the watch's alone to delete), the short ones go again, so Health never holds both.
+    do {
+      if !records.isEmpty { try await store.delete(records) }
+    } catch {
+      if !saved.isEmpty { try? await store.delete(saved) }
+      throw error
+    }
     return records.count
   }
 
