@@ -82,6 +82,29 @@ final class WorkoutQuietTests: XCTestCase {
     XCTAssertEqual(quiet.offer(at: at(30)), at(0))
   }
 
+  /// Story 078 (#331): Trim end suggests what the wrist would have offered after the last set, over the saved
+  /// series: Igor's forgotten morning, ending hours later with a walk home in it.
+  func testTrimSuggestsTheEndTheWristWouldHaveOffered() {
+    var samples: [HeartRateSeries.Sample] = []
+    func add(_ bpm: Double, from: Double, to: Double) {
+      for minute in stride(from: from, through: to, by: 1) {
+        samples.append(.init(at: at(minute).timeIntervalSince1970, bpm: bpm))
+      }
+    }
+    add(130, from: 0, to: 59)
+    add(105, from: 61, to: 64)
+    add(70, from: 65, to: 120)
+    add(110, from: 121, to: 130)  // the walk home
+    add(68, from: 131, to: 270)
+    let series = HeartRateSeries(samples: samples)
+    let sets = [at(10), at(11), at(40), at(41), at(59), at(60)]
+    XCTAssertEqual(WorkoutQuiet.suggestedEnd(heartRate: series, sets: sets, resting: 55), at(65))
+    XCTAssertNil(
+      WorkoutQuiet.suggestedEnd(heartRate: series, sets: sets + [at(280)], resting: 55),
+      "a set after the readings: nothing at rest after it")
+    XCTAssertNil(WorkoutQuiet.suggestedEnd(heartRate: HeartRateSeries(samples: []), sets: sets))
+  }
+
   /// No resting heart rate in Health: 65.
   func testFallbackResting() {
     XCTAssertEqual(WorkoutQuiet().resting, 65)

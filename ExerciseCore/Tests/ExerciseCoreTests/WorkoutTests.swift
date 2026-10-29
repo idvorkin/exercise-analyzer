@@ -232,6 +232,31 @@ final class WorkoutTests: XCTestCase {
     XCTAssertEqual(WorkoutIndex(workouts: [cardio]).sessions().map(\.kind), [.elliptical])
   }
 
+  /// 078 (#331): trimming a merged line ends the part running past the new end there and drops parts after it.
+  func testTrimEndEndsThePartAcrossItAndDropsTheOnesAfter() {
+    var index = WorkoutIndex(workouts: [
+      StoredWorkout(id: "a", start: date(16, 7, 0), end: date(16, 7, 30)),
+      StoredWorkout(id: "b", start: date(16, 7, 40), end: date(16, 9, 0)),
+      StoredWorkout(id: "c", start: date(16, 9, 10), end: date(16, 11, 30)),
+      StoredWorkout(id: "evening", start: date(16, 18), end: date(16, 19)),
+    ])
+    let morning = index.sessions()[0]
+    XCTAssertEqual(morning.end, date(16, 11, 30))
+    let now = date(16, 20)
+    let result = index.trimEnd(morning, to: date(16, 8, 15), now: now)
+    XCTAssertEqual(result.trimmed.map(\.id), ["b"])
+    XCTAssertEqual(result.removed.map(\.id), ["c"])
+    XCTAssertEqual(index.workouts.map(\.id), ["a", "b", "evening"])
+    XCTAssertEqual(index.workouts[1].end, date(16, 8, 15))
+    XCTAssertEqual(index.workouts[1].modifiedAt, now)
+    XCTAssertEqual(index.sessions()[0].end, date(16, 8, 15))
+    // An end outside the line changes nothing.
+    let unchanged = index
+    XCTAssertTrue(index.trimEnd(index.sessions()[0], to: date(16, 6), now: now).trimmed.isEmpty)
+    XCTAssertTrue(index.trimEnd(index.sessions()[0], to: date(16, 9), now: now).trimmed.isEmpty)
+    XCTAssertEqual(index, unchanged)
+  }
+
   /// 065: deleting a merged line deletes every workout inside it and nothing outside it.
   func testDeletingASessionRemovesEveryWorkoutInIt() {
     var index = WorkoutIndex(workouts: [

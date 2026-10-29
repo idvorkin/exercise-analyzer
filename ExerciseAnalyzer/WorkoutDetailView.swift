@@ -30,6 +30,8 @@ struct WorkoutDetailView: View {
   /// Whose series `heartRate` is: the iPad's split view reuses this page between workouts (#244), so a series
   /// read for one workout stayed on the next, drawn outside its window as an empty chart.
   @State private var heartRateFor: WorkoutIdentity?
+  /// What Trim end could not change, said once (078).
+  @State private var trimFailure: String?
 
   var body: some View {
     let series = heartRateFor == identity ? heartRate : nil
@@ -45,8 +47,22 @@ struct WorkoutDetailView: View {
           // Read here, so a reading kept by the mirror redraws the line (#308).
           liveHeartRate: workouts.liveHeartRateSeries(for: snapshot.workout), onOpen: onOpen,
           thumbnail: thumbnail, onEvent: onEvent, onDelete: onDelete, onKeepByHand: onKeepByHand,
-          onAddByHand: onAddByHand, onSetBellKg: onSetBellKg
+          onAddByHand: onAddByHand, onSetBellKg: onSetBellKg,
+          onTrimEnd: { end in
+            let session = snapshot.workout
+            Task {
+              let trim = await workouts.trimEnd(session, to: end)
+              trimFailure = trim.failure
+            }
+          }
         )
+        .alert(
+          "Trim end", isPresented: Binding(get: { trimFailure != nil }, set: { if !$0 { trimFailure = nil } })
+        ) {
+          Button("OK", role: .cancel) {}
+        } message: {
+          Text(trimFailure ?? "")
+        }
         // A fresh page per workout: the reused iPad page kept the last workout's chart window, so this one's
         // series drew off the plot (#244). The identity holds across the live → saved hand-over.
         .id(identity)
@@ -117,6 +133,9 @@ private struct WorkoutPageView: View {
   var onKeepByHand: ((RecentEntry, ExerciseKind, Int) -> Void)?
   var onAddByHand: ((HandSet) -> Void)?
   var onSetBellKg: ((RecentEntry, Int?) -> Void)?
+  /// Trim end's new end for this saved workout (078).
+  var onTrimEnd: ((Date) -> Void)?
+  @State private var trimming = false
   @State private var deleting: RecentEntry?
   /// The set whose bell weight is being set (066).
   @State private var weighing: RecentEntry?
@@ -208,6 +227,26 @@ private struct WorkoutPageView: View {
           }
           .accessibilityLabel("Back to Workouts")
         }
+      }
+      // A saved workout's end can come in (078, #331); the running one belongs to the watch.
+      if onTrimEnd != nil, workout.id != WorkoutMirror.liveID {
+        ToolbarItem(placement: .navigationBarTrailing) {
+          Button {
+            trimming = true
+          } label: {
+            Label("Trim end", systemImage: "scissors")
+          }
+        }
+      }
+    }
+    .sheet(isPresented: $trimming) {
+      TrimEndSheet(
+        workout: workout,
+        suggested: heartRate.flatMap {
+          WorkoutQuiet.suggestedEnd(heartRate: $0, sets: timeline.rows.flatMap { [$0.start, $0.end] })
+        }
+      ) { end in
+        onTrimEnd?(end)
       }
     }
     .task(id: timeline.rows.map(\.id)) {
@@ -700,5 +739,55 @@ private struct SetTimelineRow: View {
     .frame(minHeight: 60)
     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
     .contentShape(Rectangle())
+  }
+}
+
+/// Trim end (story 078, #331): the new end, between a minute in and the end it has, opening on when the heart
+/// came back to rest after the last set when the series says so.
+private struct TrimEndSheet: View {
+  let workout: StoredWorkout
+  let suggested: Date?
+  let onSave: (Date) -> Void
+  @Environment(\.dismiss) private var dismiss
+  @State private var end: Date
+
+  init(workout: StoredWorkout, suggested: Date?, onSave: @escaping (Date) -> Void) {
+    self.workout = workout
+    self.suggested = suggested
+    self.onSave = onSave
+    _end = State(initialValue: suggested ?? workout.end)
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        DatePicker(
+          "Ends at", selection: $end, in: workout.start.addingTimeInterval(60)...workout.end,
+          displayedComponents: .hourAndMinute)
+        if let suggested {
+          Button("Heart back at rest: \(suggested.formatted(date: .omitted, time: .shortened))") { end = suggested }
+        }
+        Text(
+          "\(workout.start.formatted(date: .omitted, time: .shortened))–\(end.formatted(date: .omitted, time: .shortened)) · \(Int(end.timeIntervalSince(workout.start) / 60)) min, was \(Int(workout.duration / 60)) min"
+        )
+        .monospacedDigit().foregroundStyle(.secondary)
+        Text("Health gets the shorter workout in place of the long one. The sets stay.")
+          .font(.footnote).foregroundStyle(.secondary)
+      }
+      .navigationTitle("Trim end")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Save") {
+            onSave(end)
+            dismiss()
+          }
+          // Under a minute shorter is not a trim.
+          .disabled(end > workout.end.addingTimeInterval(-60))
+        }
+      }
+    }
+    .presentationDetents([.medium])
   }
 }

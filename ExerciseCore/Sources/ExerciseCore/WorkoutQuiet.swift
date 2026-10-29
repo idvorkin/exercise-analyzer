@@ -58,6 +58,26 @@ public struct WorkoutQuiet: Equatable, Sendable {
     snoozedUntil = date.addingTimeInterval(Self.quietFor)
   }
 
+  /// Trim end's suggestion (story 078, #331): the end the wrist would have offered after the last set, replayed
+  /// over a saved workout's heart rate and its sets' starts and ends; nil when it never came to rest.
+  public static func suggestedEnd(heartRate: HeartRateSeries, sets: [Date], resting: Int? = nil) -> Date? {
+    var quiet = WorkoutQuiet(resting: resting)
+    var offered: Date?
+    var setTimes = sets.sorted()[...]
+    for sample in heartRate.samples {
+      let at = Date(timeIntervalSince1970: sample.at)
+      while let next = setTimes.first, next <= at {
+        quiet.set(at: next)
+        offered = nil
+        setTimes = setTimes.dropFirst()
+      }
+      quiet.reading(Int(sample.bpm.rounded()), at: at)
+      if offered == nil { offered = quiet.offer(at: at) }
+    }
+    // A set after the last reading: nothing at rest after it to offer.
+    return setTimes.isEmpty ? offered : nil
+  }
+
   /// The end to offer, when the heart came down, once it has stayed down `quietFor` with no set; nil otherwise.
   public func offer(at now: Date) -> Date? {
     guard worked, let quietSince, now.timeIntervalSince(quietSince) >= Self.quietFor else { return nil }

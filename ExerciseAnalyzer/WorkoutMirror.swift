@@ -235,6 +235,91 @@ final class WorkoutMirror: NSObject {
     return deletion
   }
 
+  /// Trim end (story 078, #331; Igor: "let me trim end time"): the line ends at `end`. Its rows end there (a part
+  /// after it goes, with a tombstone), the stored heart rate is cut to match, and each of the wrist's Health
+  /// records running past it is saved again ending there and the long one deleted; Health cannot shorten a
+  /// workout in place. The sets stay.
+  func trimEnd(_ session: StoredWorkout, to end: Date) async -> WorkoutTrim {
+    let now = Date()
+    let (trimmed, removed) = index.trimEnd(session, to: end, now: now)
+    var trim = WorkoutTrim(rows: trimmed.count + removed.count)
+    guard trim.rows > 0 else { return trim }
+    for part in removed {
+      deleted[part.id] = now
+      try? FileManager.default.removeItem(at: folder(for: part.id))
+    }
+    if !removed.isEmpty { UserDefaults.standard.set(deleted, forKey: Self.deletedKey) }
+    for part in trimmed {
+      // Health's read keeps the fuller series, so the stored one is cut too or the old tail stays.
+      let folder = folder(for: part.id)
+      if let series = HeartRateSeries.load(from: folder) {
+        try? series.slice(from: part.start.addingTimeInterval(-60), to: end.addingTimeInterval(180)).save(to: folder)
+      }
+    }
+    do {
+      try index.save(root: root)
+    } catch {
+      trim.failure = "The list could not be saved: \(error.localizedDescription)"
+    }
+    #if !targetEnvironment(simulator)
+      if HKHealthStore.isHealthDataAvailable() {
+        do {
+          trim.healthRecords = try await trimHealth(session, to: end)
+        } catch {
+          trim.failure = "Health kept its longer record: \(error.localizedDescription)"
+        }
+      }
+    #endif
+    onEvent?(
+      "workout_trimmed",
+      [
+        "id": session.id, "cut_s": Int(session.end.timeIntervalSince(end)), "rows": trim.rows,
+        "health": trim.healthRecords, "message": trim.failure ?? "",
+      ])
+    return trim
+  }
+
+  /// The wrist's records in the line that run past `end`: each saved again from its start to `end` with its sets
+  /// (activities) up to there, then deleted; one starting after `end` is only deleted. Returns how many changed.
+  /// ponytail: the new record carries no heart-rate or energy samples of its own (the watch's stay in Health,
+  /// by time); re-associate them with `HKWorkoutBuilder.add` if Fitness's workout view needs them.
+  private func trimHealth(_ session: StoredWorkout, to end: Date) async throws -> Int {
+    try await store.requestAuthorization(
+      toShare: [.workoutType()], read: [.workoutType(), HKQuantityType(.heartRate)])
+    let family = Bundle.main.bundleIdentifier ?? "com.idvorkin.exerciseanalyzer"
+    let query = HKSampleQueryDescriptor(
+      predicates: [
+        .workout(
+          HKQuery.predicateForSamples(
+            withStart: session.start.addingTimeInterval(-60), end: session.end.addingTimeInterval(60)))
+      ],
+      sortDescriptors: [])
+    let records = try await query.result(for: store).filter {
+      $0.sourceRevision.source.bundleIdentifier.hasPrefix(family) && $0.endDate > end
+    }
+    for record in records where record.startDate < end {
+      let configuration = HKWorkoutConfiguration()
+      configuration.activityType = record.workoutActivityType
+      configuration.locationType = .indoor
+      let builder = HKWorkoutBuilder(healthStore: store, configuration: configuration, device: record.device)
+      try await builder.beginCollection(at: record.startDate)
+      for activity in record.workoutActivities where activity.startDate < end {
+        try await builder.addWorkoutActivity(
+          HKWorkoutActivity(
+            workoutConfiguration: activity.workoutConfiguration, start: activity.startDate,
+            end: min(activity.endDate ?? end, end), metadata: activity.metadata))
+      }
+      // Ours and the indoor flag; Health's own keys are its to write.
+      let metadata = (record.metadata ?? [:]).filter { !$0.key.hasPrefix("HK") || $0.key == HKMetadataKeyIndoorWorkout }
+      if !metadata.isEmpty { try await builder.addMetadata(metadata) }
+      try await builder.endCollection(at: end)
+      guard try await builder.finishWorkout() != nil else { throw WorkoutTrimError.notSaved }
+    }
+    // The long records go only once their short ones are saved.
+    if !records.isEmpty { try await store.delete(records) }
+    return records.count
+  }
+
   /// Workouts other devices put in the iCloud container and the ones deleted there (story 070, steps 2 and 4),
   /// as `WorkoutIndex.merge` takes them. Merged into a copy: the published index moves only when something did.
   func mergeRemote(_ rows: [StoredWorkout], tombstones: [String: Date], me: String) -> SyncMergeResult {
@@ -324,6 +409,19 @@ final class WorkoutMirror: NSObject {
 }
 
 /// What deleting a workout line did (065).
+enum WorkoutTrimError: LocalizedError {
+  case notSaved
+  var errorDescription: String? { "the shorter workout was not saved" }
+}
+
+/// What Trim end did (078): the rows trimmed or dropped, the Health records saved shorter, and what refused.
+struct WorkoutTrim {
+  var rows: Int
+  var healthRecords = 0
+  /// Said to the lifter when set: the list or Health could not be changed.
+  var failure: String?
+}
+
 struct WorkoutDeletion {
   var rows: Int
   var healthRecords = 0

@@ -302,6 +302,26 @@ public struct WorkoutIndex: Codable, Equatable, Sendable {
     workouts.filter { $0.start >= session.start && $0.end <= session.end }
   }
 
+  /// Trim end (story 078, #331): the line ends at `end`. Its parts that end later end there, stamped `now` so the
+  /// change syncs; parts that start at or after it go. Returns both; nothing changes for an end outside the line.
+  @discardableResult public mutating func trimEnd(
+    _ session: StoredWorkout, to end: Date, now: Date
+  ) -> (trimmed: [StoredWorkout], removed: [StoredWorkout]) {
+    guard end > session.start, end < session.end else { return ([], []) }
+    let parts = parts(of: session)
+    let removed = parts.filter { $0.start >= end }
+    var trimmed: [StoredWorkout] = []
+    for part in parts where part.start < end && part.end > end {
+      guard let i = workouts.firstIndex(where: { $0.id == part.id }) else { continue }
+      workouts[i].end = end
+      workouts[i].modifiedAt = now
+      trimmed.append(workouts[i])
+    }
+    let gone = Set(removed.map(\.id))
+    workouts.removeAll { gone.contains($0.id) }
+    return (trimmed, removed)
+  }
+
   /// Deletes a line (065): every workout inside it, since a merged line cannot be half deleted. Returns them.
   @discardableResult public mutating func removeSession(_ session: StoredWorkout) -> [StoredWorkout] {
     let gone = parts(of: session)
