@@ -24,6 +24,8 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
   public var wantsStatus: Bool? = nil
   /// What the wrist records it as (#333); nil is strength, as every workout before #333.
   public var kind: WorkoutKind? = nil
+  /// With `ending`: the earlier end the lifter took on "Looks like you're done" (#330); nil ends it now.
+  public var endedAt: Double? = nil
 
   public init(
     startedAt: Double, heartRate: Int? = nil, heartRateAverage: Int? = nil, heartRateMax: Int? = nil, sets: Int = 0,

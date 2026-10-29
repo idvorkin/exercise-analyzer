@@ -887,6 +887,28 @@ the first frame (story 001).
 
 ---
 
+### User Story 077:
+
+- **Summary:** The watch notices I've stopped and offers to end the workout when my heart came down
+- **Status:** built on `feat/2026-10-29-workout-end` ([#330](https://github.com/idvorkin/exercise-analyzer/issues/330)): the rule is `WorkoutQuiet` in ExerciseCore (`WorkoutQuietTests`, 7 host tests), the ask and the earlier end in `WorkoutController`, `WorkoutWire.endedAt` to the phone; the watch build and a wrist session pending, including whether Health takes an end earlier than the session's (`workout_ended` with `saved`)
+- **Why:** Igor, 2026-10-27 (#330): "If leave gym then end workout and let me trim end time." His 9:05 AM workout ran to 1:34 PM with his heart back at resting from about 10:20, and was discarded. On 2026-10-29 he picked this ask, the phone's trim (078) and leaving the gym as an option (079).
+
+#### Use Case:
+- **As a** lifter who sometimes walks out of the gym without ending the workout on the watch
+- **I want to** be asked, once my heart has been resting a while with no set, whether I'm done, with the end set to when I stopped
+- **so that** Health gets the hour I trained, not the afternoon after it
+
+#### Acceptance Criteria:
+- **Scenario:** A quarter hour at rest after the last set
+- **Given:** a workout runs on the watch, with at least one set or the heart up a minute or more (a slow warm-up never asks)
+- **and Given:** my heart has stayed within 30 BPM of my resting rate (Health's newest, 65 when it has none) for 15 minutes with no set; a rise above that line for under a minute does not restart the 15 minutes
+- **When:** the next heart reading arrives
+- **Then:** the wrist taps and asks "Looks like you're done" with End at 10:20 (the time my heart came down) and Keep going; End at 10:20 writes the workout to Health ending at 10:20 and the phone's row ends there too (`watch_workout_quiet_ask`, then `watch_workout_end` with `end_s_ago`); Keep going asks again after another 15 minutes at rest, offering the same time; a set at any point cancels the ask and starts the 15 minutes over
+
+- **Issues:** [#330](https://github.com/idvorkin/exercise-analyzer/issues/330)
+
+---
+
 ### User Story 080:
 
 - **Summary:** An elliptical session is started from the watch and lands in Health as an elliptical workout

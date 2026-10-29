@@ -371,12 +371,17 @@ final class PhoneLink: NSObject {
   }
 
   /// End writes the workout to Health; Discard writes nothing. Either way the wrist goes back to idle.
-  func endWorkout(discard: Bool) {
+  /// `at`: the earlier end taken on "Looks like you're done" (#330).
+  func endWorkout(discard: Bool, at: Date? = nil) {
     logEvent(
-      "command", ["command": discard ? "workout_discard" : "workout_end", "reachable": reachable, "live": isLive])
+      "command",
+      [
+        "command": discard ? "workout_discard" : "workout_end", "reachable": reachable, "live": isLive,
+        "at_done_ask": at != nil,
+      ])
     guard screenshot == nil else { return }
     WKInterfaceDevice.current().play(discard ? .failure : .success)
-    workout.end(discard: discard)
+    workout.end(discard: discard, at: at)
   }
 
   /// Save on the count page (059): the wrist counts the set at once and starts the rest as Done does; the phone

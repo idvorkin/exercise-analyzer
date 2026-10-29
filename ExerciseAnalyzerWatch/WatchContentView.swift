@@ -32,6 +32,19 @@ struct WatchContentView: View {
         idlePages
       }
     }
+    // Story 077 (#330): a quarter hour at rest with no set, on whatever page is up.
+    .alert(
+      "Looks like you're done",
+      isPresented: Binding(get: { workout.doneOffer != nil }, set: { _ in }),
+      presenting: workout.doneOffer
+    ) { offer in
+      Button("End at \(offer.formatted(date: .omitted, time: .shortened))") {
+        phone.endWorkout(discard: false, at: offer)
+      }
+      Button("Keep going", role: .cancel) { workout.keepGoing() }
+    } message: { offer in
+      Text("Your heart has been resting since \(offer.formatted(date: .omitted, time: .shortened)) with no set.")
+    }
     .onReceive(clock) {
       now = $0
       if !phone.isLive { phone.ping() }

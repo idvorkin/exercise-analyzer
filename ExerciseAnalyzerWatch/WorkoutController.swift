@@ -10,6 +10,7 @@ import Foundation
 import HealthKit
 import Observation
 import WatchConnectivity
+import WatchKit
 
 @MainActor
 @Observable
@@ -62,6 +63,11 @@ final class WorkoutController: NSObject {
   /// says it again to an app that restarted and no longer knows what it had heard (#190).
   private var countedSetAt = 0.0
   private(set) var lastError: String?
+  /// "Looks like you're done. End at 10:20?" (story 077, #330): the end to offer, while the wrist asks.
+  private(set) var doneOffer: Date?
+  @ObservationIgnored private var quiet = WorkoutQuiet()
+  /// The end taken on that ask: Health and the phone get it instead of the moment End ran.
+  @ObservationIgnored private var endAt: Date?
 
   var running: Bool { phase == .running || phase == .ending }
 
@@ -133,7 +139,10 @@ final class WorkoutController: NSObject {
     }
     phase = .starting
     lastError = nil
-    let read: Set<HKObjectType> = [Self.heartRateType, HKQuantityType(.activeEnergyBurned)]
+    // Resting heart rate is the line "Looks like you're done" reads the heart against (#330).
+    let read: Set<HKObjectType> = [
+      Self.heartRateType, HKQuantityType(.activeEnergyBurned), HKQuantityType(.restingHeartRate),
+    ]
     store.requestAuthorization(toShare: [.workoutType()], read: read) { [weak self] granted, error in
       Task { @MainActor in
         guard let self else { return }
@@ -191,6 +200,10 @@ final class WorkoutController: NSObject {
       countedSetAt = 0
       discarding = false
       activityOpen = false
+      quiet = WorkoutQuiet()
+      doneOffer = nil
+      endAt = nil
+      readResting()
       phase = .running
       saveTally()
       var startFields: [String: Any] = ["kind": kind.rawValue]
@@ -247,6 +260,11 @@ final class WorkoutController: NSObject {
         self.carried = Self.savedCarry(startedAt: start)
         self.discarding = false
         self.activityOpen = false
+        // The quiet stretch starts over; a workout with sets has been worked (#330).
+        self.quiet = WorkoutQuiet(worked: tally.sets > 0)
+        self.doneOffer = nil
+        self.endAt = nil
+        self.readResting()
         self.phase = .running
         session.startMirroringToCompanionDevice { [weak self] ok, error in
           Task { @MainActor in
@@ -333,11 +351,16 @@ final class WorkoutController: NSObject {
   }
 
   /// End writes one HKWorkout; Discard writes nothing. Both end the session; the delegate finishes the job.
-  func end(discard: Bool) {
+  /// `at`: the earlier end taken on "Looks like you're done" (#330); nil ends it now.
+  func end(discard: Bool, at: Date? = nil) {
     guard phase == .running, let session, !fixed else { return }
     discarding = discard
+    endAt = at
+    doneOffer = nil
     phase = .ending
-    log(discard ? "workout_discard" : "workout_end", summaryFields)
+    var fields = summaryFields
+    if let at { fields["end_s_ago"] = Int(Date().timeIntervalSince(at)) }
+    log(discard ? "workout_discard" : "workout_end", fields)
     sendWire(ending: true)
     stopMotion()  // a set still rolling at End: its motion so far goes
     session.end()
@@ -349,6 +372,7 @@ final class WorkoutController: NSObject {
   func setBegan(exercise: String) {
     guard phase == .running, let session, !fixed else { return }
     setPeak.recordStarted(at: Date())
+    worked()
     let configuration = HKWorkoutConfiguration()
     configuration.activityType = .functionalStrengthTraining
     configuration.locationType = .indoor
@@ -364,7 +388,10 @@ final class WorkoutController: NSObject {
   func setEnded() {
     stopMotion()
     // The peak keeps taking readings for 30 s after Done, the activity or not (#195).
-    if phase == .running, !fixed { setPeak.setEnded(at: Date()) }
+    if phase == .running, !fixed {
+      setPeak.setEnded(at: Date())
+      worked()
+    }
     guard phase == .running, let session, activityOpen, !fixed else { return }
     session.endCurrentActivity(on: Date())
     activityOpen = false
@@ -380,6 +407,51 @@ final class WorkoutController: NSObject {
     guard phase == .running else { return }
     countedSetAt = last.at
     setAnalyzed(reps: last.reps, exercise: ExerciseKind.allCases.first { $0.definition.name == last.exercise })
+  }
+
+  // MARK: - Looks like you're done (story 077, #330)
+
+  /// A set began, ended or was counted: no ask, and the quiet quarter hour starts over.
+  private func worked() {
+    quiet.set(at: Date())
+    doneOffer = nil
+  }
+
+  /// Keep going on the ask: it asks again after another quarter hour at rest.
+  func keepGoing() {
+    guard let offer = doneOffer else { return }
+    quiet.keepGoing(at: Date())
+    doneOffer = nil
+    log("workout_quiet_keep", ["quiet_s": Int(Date().timeIntervalSince(offer))])
+  }
+
+  /// After each heart reading: once the heart has been down a quarter hour with no set, ask, with a tap on the
+  /// wrist, whatever page is up.
+  private func checkQuiet() {
+    guard phase == .running, doneOffer == nil, let offer = quiet.offer(at: Date()) else { return }
+    doneOffer = offer
+    WKInterfaceDevice.current().play(.notification)
+    log("workout_quiet_ask", ["quiet_s": Int(Date().timeIntervalSince(offer)), "resting": quiet.resting])
+  }
+
+  /// The lifter's resting heart rate, Health's newest in the last month; none keeps `WorkoutQuiet`'s fallback.
+  private func readResting() {
+    guard !fixed else { return }
+    let query = HKSampleQuery(
+      sampleType: HKQuantityType(.restingHeartRate),
+      predicate: HKQuery.predicateForSamples(withStart: Date().addingTimeInterval(-30 * 86_400), end: nil),
+      limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]
+    ) { [weak self] _, samples, error in
+      let bpm = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: Self.bpm)
+      Task { @MainActor in
+        guard let self else { return }
+        if let bpm { self.quiet.resting = Int(bpm.rounded()) }
+        self.log(
+          "workout_resting",
+          ["bpm": bpm.map { Int($0.rounded()) } ?? 0, "message": error.map { "\($0)" } ?? ""])
+      }
+    }
+    store.execute(query)
   }
 
   // MARK: - Wrist motion (story 076)
@@ -415,6 +487,7 @@ final class WorkoutController: NSObject {
   /// A set typed by hand on the wrist (059), or the phone's count from above.
   func setAnalyzed(reps count: Int, exercise: ExerciseKind?) {
     guard phase == .running else { return }
+    worked()
     sets += 1
     reps += count
     if let exercise {
@@ -452,6 +525,7 @@ final class WorkoutController: NSObject {
     var message = wire
     message.ending = ending
     message.discarded = ending && discarding
+    if ending { message.endedAt = endAt?.timeIntervalSince1970 }
     if wantsStatus { message.wantsStatus = true }
     guard let data = try? JSONEncoder().encode(message) else { return }
     session.sendToRemoteWorkoutSession(data: data) { [weak self] ok, error in
@@ -476,11 +550,13 @@ final class WorkoutController: NSObject {
 
   // MARK: - The session ended
 
-  private func sessionEnded(at date: Date) {
+  private func sessionEnded(at sessionEnd: Date) {
     guard let builder else {
       reset()
       return
     }
+    // The end taken on "Looks like you're done" (#330): Health's workout stops there, the later readings left out.
+    let date = endAt.map { min($0, sessionEnd) } ?? sessionEnd
     builder.endCollection(withEnd: date) { [weak self] _, error in
       Task { @MainActor in
         guard let self else { return }
@@ -517,6 +593,8 @@ final class WorkoutController: NSObject {
     heartRate = nil
     carried = nil
     activityOpen = false
+    doneOffer = nil
+    endAt = nil
   }
 }
 
@@ -562,7 +640,11 @@ extension WorkoutController: HKLiveWorkoutBuilderDelegate {
     let maximum = statistics.maximumQuantity()?.doubleValue(for: Self.bpm)
     Task { @MainActor in
       heartRate = latest.map { Int($0.rounded()) }
-      if let heartRate { setPeak.reading(heartRate, at: Date()) }
+      if let heartRate {
+        setPeak.reading(heartRate, at: Date())
+        quiet.reading(heartRate, at: Date())
+        checkQuiet()
+      }
       heartRateAverage = average.map { Int($0.rounded()) }
       heartRateMax = maximum.map { Int($0.rounded()) }
       sendWire(throttled: true)

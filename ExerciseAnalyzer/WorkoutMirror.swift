@@ -286,8 +286,10 @@ final class WorkoutMirror: NSObject {
     }
   }
 
-  private func ended(at date: Date) {
+  private func ended(at sessionEnd: Date) {
     guard let live else { return }
+    // The end the lifter took on the wrist's "Looks like you're done" (#330), never after the session's.
+    let date = live.endedAt.map { min(Date(timeIntervalSince1970: $0), sessionEnd) } ?? sessionEnd
     liveHeartRate.end(at: date)
     defer {
       self.live = nil
