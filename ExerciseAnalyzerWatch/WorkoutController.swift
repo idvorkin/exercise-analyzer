@@ -68,6 +68,8 @@ final class WorkoutController: NSObject {
   @ObservationIgnored private var quiet = WorkoutQuiet()
   /// The end taken on that ask: Health and the phone get it instead of the moment End ran.
   @ObservationIgnored private var endAt: Date?
+  /// The last set's start, end or count: an earlier end never cuts a set off.
+  @ObservationIgnored private var lastWorkedAt: Date?
   /// End when I leave (story 079, #332): the option, kept on the wrist; it watches only while a workout runs.
   var endWhenLeaving = UserDefaults.standard.bool(forKey: WorkoutController.endWhenLeavingKey) {
     didSet {
@@ -227,6 +229,7 @@ final class WorkoutController: NSObject {
       quiet = WorkoutQuiet()
       doneOffer = nil
       endAt = nil
+      lastWorkedAt = nil
       readResting()
       if endWhenLeaving { leave?.start() }
       phase = .running
@@ -289,6 +292,7 @@ final class WorkoutController: NSObject {
         self.quiet = WorkoutQuiet(worked: tally.sets > 0)
         self.doneOffer = nil
         self.endAt = nil
+        self.lastWorkedAt = nil
         self.readResting()
         // ponytail: after a restart the first fix becomes the place, wherever the watch is by then; keep the
         // start fix on disk if a restart away from the gym ever matters.
@@ -383,12 +387,20 @@ final class WorkoutController: NSObject {
   func end(discard: Bool, at: Date? = nil) {
     guard phase == .running, let session, !fixed else { return }
     discarding = discard
-    endAt = at
+    // Never before Start's first minute nor the last set: a Health workout with no length or with sets past its
+    // end is worse than a late end, which Trim end can still take back.
+    if let at {
+      let floor = [startedAt?.addingTimeInterval(60), lastWorkedAt].compactMap { $0 }.max() ?? at
+      let clamped = max(at, floor)
+      endAt = clamped < Date() ? clamped : nil
+    } else {
+      endAt = nil
+    }
     doneOffer = nil
     leave?.stop()
     phase = .ending
     var fields = summaryFields
-    if let at { fields["end_s_ago"] = Int(Date().timeIntervalSince(at)) }
+    if let endAt { fields["end_s_ago"] = Int(Date().timeIntervalSince(endAt)) }
     log(discard ? "workout_discard" : "workout_end", fields)
     sendWire(ending: true)
     stopMotion()  // a set still rolling at End: its motion so far goes
@@ -443,6 +455,7 @@ final class WorkoutController: NSObject {
   /// A set began, ended or was counted: no ask, and the quiet quarter hour starts over.
   private func worked() {
     quiet.set(at: Date())
+    lastWorkedAt = Date()
     doneOffer = nil
   }
 
@@ -548,6 +561,9 @@ final class WorkoutController: NSObject {
 
   private func sendWire(ending: Bool = false, throttled: Bool = false, wantsStatus: Bool = false) {
     guard let session, !fixed else { return }
+    // After the ending message nothing else goes: a late heart reading's message would replace it on the phone,
+    // and with it the earlier end and Discard.
+    if !ending, phase != .running { return }
     let now = Date()
     if throttled, now.timeIntervalSince(lastWireAt) < 5 { return }
     lastWireAt = now
@@ -585,31 +601,48 @@ final class WorkoutController: NSObject {
       return
     }
     // The end taken on "Looks like you're done" (#330): Health's workout stops there, the later readings left out.
-    let date = endAt.map { min($0, sessionEnd) } ?? sessionEnd
-    builder.endCollection(withEnd: date) { [weak self] _, error in
+    let earlier = endAt.map { min($0, sessionEnd) } ?? sessionEnd
+    builder.endCollection(withEnd: earlier) { [weak self] _, error in
       Task { @MainActor in
         guard let self else { return }
-        if let error { self.log("workout_failed", ["message": "endCollection: \(error)"]) }
-        if self.discarding {
-          builder.discardWorkout()
-          self.forgetEnded()
-          self.log("workout_ended", ["saved": false])
-          self.reset()
+        guard let error, earlier < sessionEnd else {
+          if let error { self.log("workout_failed", ["message": "endCollection: \(error)"]) }
+          self.collectionEnded(builder, at: earlier)
           return
         }
-        // Before the Health write's reply, which can take a while: a Start meanwhile already asks (#238).
-        self.rememberEnded(at: date)
-        builder.finishWorkout { workout, error in
+        // Health refused the earlier end: the workout ends now rather than not at all; Trim end on the phone can
+        // still take it back.
+        self.log("workout_failed", ["message": "endCollection at the earlier end: \(error)", "retry": true])
+        builder.endCollection(withEnd: sessionEnd) { [weak self] _, error in
           Task { @MainActor in
-            var fields = self.summaryFields
-            fields["saved"] = workout != nil
-            fields["uuid"] = workout?.uuid.uuidString ?? ""
-            fields["message"] = error.map { "\($0)" } ?? ""
-            self.log("workout_ended", fields)
-            if workout == nil { self.lastError = error?.localizedDescription ?? "The workout was not saved to Health" }
-            self.reset()
+            if let error { self?.log("workout_failed", ["message": "endCollection: \(error)"]) }
+            self?.collectionEnded(builder, at: sessionEnd)
           }
         }
+      }
+    }
+  }
+
+  /// The builder has stopped collecting at `date`: Discard throws it away, End writes it to Health.
+  private func collectionEnded(_ builder: HKLiveWorkoutBuilder, at date: Date) {
+    if discarding {
+      builder.discardWorkout()
+      forgetEnded()
+      log("workout_ended", ["saved": false])
+      reset()
+      return
+    }
+    // Before the Health write's reply, which can take a while: a Start meanwhile already asks (#238).
+    rememberEnded(at: date)
+    builder.finishWorkout { workout, error in
+      Task { @MainActor in
+        var fields = self.summaryFields
+        fields["saved"] = workout != nil
+        fields["uuid"] = workout?.uuid.uuidString ?? ""
+        fields["message"] = error.map { "\($0)" } ?? ""
+        self.log("workout_ended", fields)
+        if workout == nil { self.lastError = error?.localizedDescription ?? "The workout was not saved to Health" }
+        self.reset()
       }
     }
   }
@@ -624,6 +657,7 @@ final class WorkoutController: NSObject {
     activityOpen = false
     doneOffer = nil
     endAt = nil
+    lastWorkedAt = nil
     leave?.stop()
   }
 }
