@@ -20,6 +20,8 @@ struct WorkoutGalleryView: View {
   var session: VideoPoseSession? = nil
   /// What's new (story 072): the build's feed and what opens the list; nil hides the row.
   var whatsNew: WhatsNewFeed? = nil
+  /// This device's own reports, for the row's "fixed in this build" (BugKit 0.3.11).
+  var myReports: [BugReport] = []
   var onWhatsNew: (() -> Void)? = nil
   /// Pushes a workout's page (053), from a tap on its line, or on landing mid-workout (#123).
   let onOpenWorkout: (StoredWorkout) -> Void
@@ -124,7 +126,10 @@ struct WorkoutGalleryView: View {
           LazyVStack(alignment: .leading, spacing: 4, pinnedViews: [.sectionHeaders]) {
             // One line about the newest change, with its ✕ (story 072); BugKit's row shows nothing once dismissed.
             if let onWhatsNew {
-              WhatsNewRow(feed: whatsNew, logger: { type, fields in onEvent?(type, fields.mapValues(\.foundation)) }) {
+              WhatsNewRow(
+                feed: whatsNew, reports: myReports,
+                logger: { type, fields in onEvent?(type, fields.mapValues(\.foundation)) }
+              ) {
                 onWhatsNew()
               }
               .padding(.top, 8)
