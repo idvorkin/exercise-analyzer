@@ -10,6 +10,12 @@
 	<array>
 		<string>workout-processing</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>With End when I leave on, the watch ends your workout once you leave the place you started it.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Exercise Analyzer reads your heart rate during a workout started on the watch.</string>
 	<key>NSHealthUpdateUsageDescription</key>

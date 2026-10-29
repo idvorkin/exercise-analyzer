@@ -909,6 +909,28 @@ the first frame (story 001).
 
 ---
 
+### User Story 079:
+
+- **Summary:** With End when I leave on, walking out of the gym ends the workout at the moment I left
+- **Status:** built on `feat/2026-10-29-workout-end` ([#332](https://github.com/idvorkin/exercise-analyzer/issues/332)): the rule is `LeavingPlace` in ExerciseCore (`LeavingPlaceTests`, 5 host tests), the watch's location in `LeaveWatcher`, the toggle under Start; the watch build, the location prompt and a real walk out of the gym pending (whether fixes keep coming wrist-down, `watch_leave_left`)
+- **Why:** Igor, 2026-10-27 (#330): "If leave gym then end workout and let me trim end time." On 2026-10-29: "3 as well as an option. Gym can be where we start the workout."
+
+#### Use Case:
+- **As a** lifter who forgets the watch when the workout is over
+- **I want to** have the workout end itself once I've left the place I started it, if I turn that on
+- **so that** a forgotten workout stops at the gym door, not hours later, with no gym to set up first
+
+#### Acceptance Criteria:
+- **Scenario:** Leaving the gym with the option on
+- **Given:** End when I leave is on (under Start on the watch; turning it on asks once for the watch's location)
+- **and Given:** I started a workout, and the watch's first fix within 100 m is taken as the gym
+- **When:** two fixes in a row within 100 m are each more than 300 m (plus their own doubt) from it
+- **Then:** the wrist taps and the workout ends as End does, at the time of the last fix still near the gym (`watch_leave_left`, then `watch_workout_end` with `end_s_ago`); a single stray fix, a vague fix or the car park end nothing; with the option off the watch never reads location, and the phone's Trim end (078) corrects whatever the door time got wrong
+
+- **Issues:** [#332](https://github.com/idvorkin/exercise-analyzer/issues/332)
+
+---
+
 ### User Story 080:
 
 - **Summary:** An elliptical session is started from the watch and lands in Health as an elliptical workout

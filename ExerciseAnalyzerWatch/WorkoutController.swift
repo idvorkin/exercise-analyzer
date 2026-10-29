@@ -68,6 +68,21 @@ final class WorkoutController: NSObject {
   @ObservationIgnored private var quiet = WorkoutQuiet()
   /// The end taken on that ask: Health and the phone get it instead of the moment End ran.
   @ObservationIgnored private var endAt: Date?
+  /// End when I leave (story 079, #332): the option, kept on the wrist; it watches only while a workout runs.
+  var endWhenLeaving = UserDefaults.standard.bool(forKey: WorkoutController.endWhenLeavingKey) {
+    didSet {
+      UserDefaults.standard.set(endWhenLeaving, forKey: Self.endWhenLeavingKey)
+      log("leave_option", ["on": endWhenLeaving])
+      if endWhenLeaving { leave?.askPermission() }
+      if running, endWhenLeaving {
+        leave?.start()
+      } else {
+        leave?.stop()
+      }
+    }
+  }
+  private static let endWhenLeavingKey = "endWhenLeaving"
+  @ObservationIgnored private var leave: LeaveWatcher?
 
   var running: Bool { phase == .running || phase == .ending }
 
@@ -105,6 +120,15 @@ final class WorkoutController: NSObject {
     self.log = log
     fixed = screenshot != nil
     super.init()
+    if screenshot == nil {
+      let leave = LeaveWatcher(log: log)
+      leave.onLeft = { [weak self] left in
+        guard let self, self.phase == .running else { return }
+        WKInterfaceDevice.current().play(.success)
+        self.end(discard: false, at: left)
+      }
+      self.leave = leave
+    }
     guard let screenshot, let workout = screenshot.workout else { return }
     phase = .running
     startedAt = Date().addingTimeInterval(-workout.elapsed)
@@ -204,6 +228,7 @@ final class WorkoutController: NSObject {
       doneOffer = nil
       endAt = nil
       readResting()
+      if endWhenLeaving { leave?.start() }
       phase = .running
       saveTally()
       var startFields: [String: Any] = ["kind": kind.rawValue]
@@ -265,6 +290,9 @@ final class WorkoutController: NSObject {
         self.doneOffer = nil
         self.endAt = nil
         self.readResting()
+        // ponytail: after a restart the first fix becomes the place, wherever the watch is by then; keep the
+        // start fix on disk if a restart away from the gym ever matters.
+        if self.endWhenLeaving { self.leave?.start() }
         self.phase = .running
         session.startMirroringToCompanionDevice { [weak self] ok, error in
           Task { @MainActor in
@@ -357,6 +385,7 @@ final class WorkoutController: NSObject {
     discarding = discard
     endAt = at
     doneOffer = nil
+    leave?.stop()
     phase = .ending
     var fields = summaryFields
     if let at { fields["end_s_ago"] = Int(Date().timeIntervalSince(at)) }
@@ -595,6 +624,7 @@ final class WorkoutController: NSObject {
     activityOpen = false
     doneOffer = nil
     endAt = nil
+    leave?.stop()
   }
 }
 

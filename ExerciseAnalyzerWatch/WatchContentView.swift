@@ -328,6 +328,8 @@ struct WatchContentView: View {
       }
       .tint(.green)
       .disabled(workout.phase == .starting)
+      // The option (#332; Igor: "3 as well as an option"): the gym is wherever Start is tapped.
+      Toggle("End when I leave", isOn: Bindable(workout).endWhenLeaving).font(.caption)
     }
   }
 
