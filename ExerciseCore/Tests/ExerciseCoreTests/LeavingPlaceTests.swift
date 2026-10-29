@@ -24,6 +24,26 @@ final class LeavingPlaceTests: XCTestCase {
     XCTAssertNil(place.fix(fix(north: 3_000, minutes: 66)), "it decides once")
   }
 
+  /// Standing at the rack sends no fixes (the 50 m filter): an hour of sets then the walk out ends near the walk
+  /// out, not at the Start fix.
+  func testNoFixesWhileStillEndsShortlyBeforeTheFirstFixAway() {
+    var place = LeavingPlace()
+    _ = place.fix(fix(north: 0, minutes: 0))
+    XCTAssertNil(place.fix(fix(north: 800, minutes: 65)))
+    XCTAssertEqual(place.fix(fix(north: 2_000, minutes: 67)), start.addingTimeInterval(63 * 60))
+  }
+
+  /// The cached fix Core Location hands over first (home, before Start) is not the gym.
+  func testAFixFromBeforeStartIsIgnored() {
+    var place = LeavingPlace(since: start)
+    XCTAssertNil(place.fix(fix(north: 5_000, minutes: -30)))
+    XCTAssertNil(place.place)
+    _ = place.fix(fix(north: 0, minutes: 1))
+    XCTAssertNil(place.fix(fix(north: 20, minutes: 3)))
+    XCTAssertNil(place.fix(fix(north: 30, minutes: 4)))
+    XCTAssertFalse(place.left)
+  }
+
   func testOneStrayFixDoesNotEndIt() {
     var place = LeavingPlace()
     _ = place.fix(fix(north: 0, minutes: 0))

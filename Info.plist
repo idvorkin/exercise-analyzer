@@ -4,6 +4,8 @@
 <dict>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Exercise Analyzer saves your trimmed swing clips to Photos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>With End when I leave on, the watch ends your workout once you leave the place you started it.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Exercise Analyzer reads your heart rate during a workout started on the watch.</string>
 	<key>NSHealthUpdateUsageDescription</key>

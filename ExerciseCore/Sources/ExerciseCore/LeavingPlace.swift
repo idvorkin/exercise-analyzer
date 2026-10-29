@@ -32,12 +32,21 @@ public struct LeavingPlace: Equatable, Sendable {
   public private(set) var lastInside: Date?
   public private(set) var left = false
   private var away = 0
+  /// The first of the fixes in a row beyond the radius.
+  private var firstAway: Date?
+  /// Fixes older than this are the watch's cached last-known place (home, the car), not the gym.
+  private let since: Date
 
-  public init() {}
+  /// How long before the first fix away the lifter is taken to have walked out: the watch moves its fix only every
+  /// 50 m, so standing at the rack sends none and the last fix inside can be the one taken at Start.
+  public static let walkOut: TimeInterval = 2 * 60
 
-  /// A fix from the watch; the time it left, the last fix still inside, once, when this one decides it.
+  public init(since: Date = .distantPast) { self.since = since }
+
+  /// A fix from the watch; the time it left, once, when this one decides it: shortly before the first fix away,
+  /// never before the last fix inside.
   public mutating func fix(_ fix: Fix) -> Date? {
-    guard !left, fix.accuracy >= 0, fix.accuracy <= Self.goodAccuracy else { return nil }
+    guard !left, fix.at >= since, fix.accuracy >= 0, fix.accuracy <= Self.goodAccuracy else { return nil }
     guard let place else {
       place = fix
       lastInside = fix.at
@@ -46,13 +55,15 @@ public struct LeavingPlace: Equatable, Sendable {
     // Beyond the radius by more than this fix's own doubt.
     if Self.meters(from: place, to: fix) > Self.radius + fix.accuracy {
       away += 1
+      if firstAway == nil { firstAway = fix.at }
     } else {
       away = 0
+      firstAway = nil
       lastInside = fix.at
     }
-    guard away >= Self.fixesAway else { return nil }
+    guard away >= Self.fixesAway, let firstAway else { return nil }
     left = true
-    return lastInside ?? place.at
+    return max(lastInside ?? place.at, firstAway.addingTimeInterval(-Self.walkOut))
   }
 
   /// Great-circle distance in meters (haversine).

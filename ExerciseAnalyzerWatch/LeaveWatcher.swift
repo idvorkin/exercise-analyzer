@@ -33,20 +33,25 @@ final class LeaveWatcher: NSObject {
   func start() {
     guard !running else { return }
     running = true
-    place = LeavingPlace()
+    // From now: the cached fix Core Location hands over first is wherever the watch was last, not the gym.
+    place = LeavingPlace(since: Date())
     askPermission()
-    // The workout session keeps the app running wrist-down; this keeps its fixes coming then.
-    manager.allowsBackgroundLocationUpdates = true
+    // The workout session keeps the app running wrist-down; this keeps its fixes coming then. Setting it without
+    // the location background mode in the bundle throws, so it is set only when the mode is there.
+    if Self.hasLocationMode { manager.allowsBackgroundLocationUpdates = true }
     manager.startUpdatingLocation()
-    log("leave_watch_start", ["auth": manager.authorizationStatus.rawValue])
+    log("leave_watch_start", ["auth": manager.authorizationStatus.rawValue, "background": Self.hasLocationMode])
   }
 
   func stop() {
     guard running else { return }
     running = false
     manager.stopUpdatingLocation()
-    manager.allowsBackgroundLocationUpdates = false
+    if Self.hasLocationMode { manager.allowsBackgroundLocationUpdates = false }
   }
+
+  private static let hasLocationMode =
+    (Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String])?.contains("location") ?? false
 
   private func take(_ fixes: [LeavingPlace.Fix]) {
     guard running else { return }
