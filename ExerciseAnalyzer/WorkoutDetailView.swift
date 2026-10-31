@@ -75,7 +75,10 @@ struct WorkoutDetailView: View {
           }
           let read = await workouts.heartRate(for: snapshot.workout)
           guard !Task.isCancelled else { return }
-          if let read, read.samples.count > (heartRate?.samples.count ?? 0) { heartRate = read }
+          // A series running past the read's span is from before Trim end (078): the shorter read replaces it.
+          let readEnd = snapshot.workout.end.addingTimeInterval(180).timeIntervalSince1970
+          let trimmed = (heartRate?.samples.last?.at ?? 0) > readEnd
+          if let read, trimmed || read.samples.count > (heartRate?.samples.count ?? 0) { heartRate = read }
         }
       } else {
         Text("This workout is no longer available.").foregroundStyle(.secondary)
@@ -113,7 +116,10 @@ struct WorkoutDetailView: View {
     let active: Bool
     init(workout: StoredWorkout, active: Bool) {
       id = workout.id
-      bucket = workout.id == WorkoutMirror.liveID ? Int(workout.end.timeIntervalSince1970 / 20) : 0
+      // A saved workout's end moves only on Trim end (078), which asks again.
+      bucket =
+        workout.id == WorkoutMirror.liveID
+        ? Int(workout.end.timeIntervalSince1970 / 20) : Int(workout.end.timeIntervalSince1970)
       self.active = active
     }
   }

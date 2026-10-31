@@ -313,28 +313,31 @@ final class WorkoutMirror: NSObject {
       $0.sourceRevision.source.bundleIdentifier.hasPrefix(family) && $0.endDate > end
     }
     var saved: [HKWorkout] = []
-    for record in records where record.startDate < end {
-      let configuration = HKWorkoutConfiguration()
-      configuration.activityType = record.workoutActivityType
-      configuration.locationType = .indoor
-      let builder = HKWorkoutBuilder(healthStore: store, configuration: configuration, device: record.device)
-      try await builder.beginCollection(at: record.startDate)
-      for activity in record.workoutActivities where activity.startDate < end {
-        try await builder.addWorkoutActivity(
-          HKWorkoutActivity(
-            workoutConfiguration: activity.workoutConfiguration, start: activity.startDate,
-            end: min(activity.endDate ?? end, end), metadata: activity.metadata))
-      }
-      // Ours and the indoor flag; Health's own keys are its to write.
-      let metadata = (record.metadata ?? [:]).filter { !$0.key.hasPrefix("HK") || $0.key == HKMetadataKeyIndoorWorkout }
-      if !metadata.isEmpty { try await builder.addMetadata(metadata) }
-      try await builder.endCollection(at: end)
-      guard let short = try await builder.finishWorkout() else { throw WorkoutTrimError.notSaved }
-      saved.append(short)
-    }
-    // The long records go only once their short ones are saved; if Health will not let them go (a record the
-    // watch wrote may be the watch's alone to delete), the short ones go again, so Health never holds both.
+    // The long records go only once their short ones are saved; if Health will not save one or let them go (a
+    // record the watch wrote may be the watch's alone to delete), the short ones go again, so Health never holds
+    // both.
     do {
+      for record in records where record.startDate < end {
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = record.workoutActivityType
+        configuration.locationType = .indoor
+        let builder = HKWorkoutBuilder(healthStore: store, configuration: configuration, device: record.device)
+        try await builder.beginCollection(at: record.startDate)
+        for activity in record.workoutActivities where activity.startDate < end {
+          try await builder.addWorkoutActivity(
+            HKWorkoutActivity(
+              workoutConfiguration: activity.workoutConfiguration, start: activity.startDate,
+              end: min(activity.endDate ?? end, end), metadata: activity.metadata))
+        }
+        // Ours and the indoor flag; Health's own keys are its to write.
+        let metadata = (record.metadata ?? [:]).filter {
+          !$0.key.hasPrefix("HK") || $0.key == HKMetadataKeyIndoorWorkout
+        }
+        if !metadata.isEmpty { try await builder.addMetadata(metadata) }
+        try await builder.endCollection(at: end)
+        guard let short = try await builder.finishWorkout() else { throw WorkoutTrimError.notSaved }
+        saved.append(short)
+      }
       if !records.isEmpty { try await store.delete(records) }
     } catch {
       if !saved.isEmpty { try? await store.delete(saved) }
@@ -407,8 +410,12 @@ final class WorkoutMirror: NSObject {
       onEvent?("workout_discarded", ["seconds": Int(date.timeIntervalSince(live.startDate))])
       return
     }
+    // The wire's numbers are the whole session's; an earlier end keeps only its own span's readings.
+    let kept = live.endedAt == nil ? nil : liveHeartRate.series(from: live.startDate, to: date, now: date)
     var workout = StoredWorkout(
-      start: live.startDate, end: date, heartRateAverage: live.heartRateAverage, heartRateMax: live.heartRateMax,
+      start: live.startDate, end: date,
+      heartRateAverage: kept?.average(from: live.startDate, to: date) ?? live.heartRateAverage,
+      heartRateMax: kept?.peak(from: live.startDate, to: date) ?? live.heartRateMax,
       sets: live.sets, reps: live.reps)
     workout.kind = live.kind
     index.workouts.append(workout)
@@ -431,7 +438,6 @@ final class WorkoutMirror: NSObject {
   #endif
 }
 
-/// What deleting a workout line did (065).
 enum WorkoutTrimError: LocalizedError {
   case notSaved
   var errorDescription: String? { "the shorter workout was not saved" }
@@ -445,6 +451,7 @@ struct WorkoutTrim {
   var failure: String?
 }
 
+/// What deleting a workout line did (065).
 struct WorkoutDeletion {
   var rows: Int
   var healthRecords = 0
