@@ -78,7 +78,8 @@ struct BellWeightSheet: View {
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
     }
-    .presentationDetents([.medium, .large])
+    // Large first: with 36 kg the bells take three rows, and with Other open Save fell below a medium sheet (#334).
+    .presentationDetents([.large, .medium])
   }
 
   private func save(_ value: Int?) {
