@@ -656,7 +656,7 @@ the first frame (story 001).
   and the weight, all on a 40 mm face without scrolling, with Save the green checkmark at top right beside the
   close button; the reps row opens green, the row the Crown turns; a tap on another row, or on − or +, moves the
   green and the Crown to it; the exercise row opens the drawings, three across and 52 pt each, and a second tap on the
-  green weight row opens every bell, None and 8 … 32 kg, as 44 pt tiles; one tap on a drawing or a tile picks it and
+  green weight row opens every bell, None and 8 … 36 kg, as 44 pt tiles; one tap on a drawing or a tile picks it and
   closes; the page's close button cancels, so there is no Cancel button
 
 - **Scenario:** Typed sets between filmed ones (#183)

@@ -21,10 +21,10 @@ struct BellWeightSheet: View {
     _other = State(initialValue: kg.flatMap { Self.code.map(\.kg).contains($0) ? nil : $0 })
   }
 
-  /// The competition colour code (the detector's map, `BellColor`): 8 pink … 32 red.
-  /// Also the by-hand sheet's weight row (#271).
+  /// The competition colour code (the detector's map, `BellColor`): 8 pink … 32 red, and 36 grey (#334; Igor: "Add
+  /// 36 as a kb weight"), which the detector does not know. Also the by-hand sheet's weight row (#271).
   static let code: [(kg: Int, color: Color)] = [
-    (8, .pink), (12, .blue), (16, .yellow), (20, .purple), (24, .green), (28, .orange), (32, .red),
+    (8, .pink), (12, .blue), (16, .yellow), (20, .purple), (24, .green), (28, .orange), (32, .red), (36, .gray),
   ]
 
   var body: some View {
@@ -45,7 +45,7 @@ struct BellWeightSheet: View {
             .accessibilityAddTraits(bell.kg == kg ? .isSelected : [])
           }
           Button {
-            other = other ?? kg ?? 36
+            other = other ?? kg ?? 40
           } label: {
             Text("Other").font(.headline)
               .frame(maxWidth: .infinity, minHeight: 64)

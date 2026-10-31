@@ -707,7 +707,7 @@ private struct SetByHandPage: View {
         .onTapGesture { crownFocused = true }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(reps) reps")
-        // The bell's weight (#271): a tap gives it the Crown, which steps None, 8 … 32 kg; a tap on the green row
+        // The bell's weight (#271): a tap gives it the Crown, which steps None, 8 … 36 kg; a tap on the green row
         // opens every bell as a tile.
         row(green: kgFocused) {
           Text("kg").font(.caption).foregroundStyle(.secondary)
