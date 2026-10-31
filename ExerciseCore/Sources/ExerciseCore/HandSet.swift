@@ -25,8 +25,8 @@ public struct HandSet: Codable, Equatable, Sendable {
     self.kg = kg
   }
 
-  /// The wrist's weight column: the competition bells, 8 … 32 kg (066's code).
-  public static let weights = [8, 12, 16, 20, 24, 28, 32]
+  /// The wrist's weight column: the competition bells, 8 … 36 kg (066's code; 36 for #334).
+  public static let weights = [8, 12, 16, 20, 24, 28, 32, 36]
 
   /// What the wrist's weight column opens on (#271; Igor: "remember the weight from the last set we did on that
   /// exercise"): the set typed here when it is of this exercise and newer than the phone's last set, or the phone

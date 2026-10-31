@@ -686,7 +686,7 @@ private struct SetByHandPage: View {
     return HandSet.weights.indices.contains(step - 1) ? HandSet.weights[step - 1] : nil
   }
 
-  /// A weight off the code (a 36 kg tapped on the phone) opens on the nearest bell.
+  /// A weight off the code (a 34 kg tapped on the phone) opens on the nearest bell.
   private static func step(for kg: Int?) -> Double {
     guard let kg else { return 0 }
     let nearest = HandSet.weights.indices.min { abs(HandSet.weights[$0] - kg) < abs(HandSet.weights[$1] - kg) }
@@ -730,7 +730,7 @@ private struct SetByHandPage: View {
         .onTapGesture { crownFocused = true }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(reps) reps")
-        // The bell's weight (#271): a tap gives it the Crown, which steps None, 8 … 32 kg; a tap on the green row
+        // The bell's weight (#271): a tap gives it the Crown, which steps None, 8 … 36 kg; a tap on the green row
         // opens every bell as a tile.
         row(green: kgFocused) {
           Text("kg").font(.caption).foregroundStyle(.secondary)
@@ -817,8 +817,15 @@ private struct SetByHandPage: View {
     }
   }
 
-  /// Every bell as a tile, None first, four across (ea-xrf): one tap picks and closes.
+  /// Every bell as a tile, None first, four across (ea-xrf): one tap picks and closes. It scrolls: with 36 kg
+  /// (#334) the three rows pass the 40 mm's sheet.
   private var kgPicker: some View {
+    ScrollView {
+      kgTiles
+    }
+  }
+
+  private var kgTiles: some View {
     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 4), spacing: 5) {
       ForEach(0...HandSet.weights.count, id: \.self) { step in
         let picked = Int(kgStep.rounded()) == step
