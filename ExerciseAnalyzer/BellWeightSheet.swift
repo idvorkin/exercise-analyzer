@@ -12,6 +12,7 @@ struct BellWeightSheet: View {
   let inherited: Bool
   let onSave: (Int?) -> Void
   @State private var other: Int?
+  @State private var detent: PresentationDetent = .large
   @Environment(\.dismiss) private var dismiss
 
   init(kg: Int?, inherited: Bool, onSave: @escaping (Int?) -> Void) {
@@ -22,7 +23,7 @@ struct BellWeightSheet: View {
   }
 
   /// The competition colour code (the detector's map, `BellColor`): 8 pink … 32 red, and 36 grey (#334; Igor: "Add
-  /// 36 as a kb weight"), which the detector does not know. Also the by-hand sheet's weight row (#271).
+  /// 36 as a kb weight"; the competition 36 is lilac, which the detector does not map). Also the by-hand sheet's weight row (#271).
   static let code: [(kg: Int, color: Color)] = [
     (8, .pink), (12, .blue), (16, .yellow), (20, .purple), (24, .green), (28, .orange), (32, .red), (36, .gray),
   ]
@@ -78,8 +79,8 @@ struct BellWeightSheet: View {
       .navigationBarTitleDisplayMode(.inline)
       .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
     }
-    // Large first: with 36 kg the bells take three rows, and with Other open Save fell below a medium sheet (#334).
-    .presentationDetents([.large, .medium])
+    // Opens large: with 36 kg the bells take three rows, and with Other open Save fell below a medium sheet (#334).
+    .presentationDetents([.medium, .large], selection: $detent)
   }
 
   private func save(_ value: Int?) {
