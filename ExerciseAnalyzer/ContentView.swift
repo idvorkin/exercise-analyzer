@@ -42,6 +42,9 @@ struct ContentView: View {
   @State private var showSyncStatus = false
   /// What's new (story 072): the feed the build wrote into the bundle, and its list.
   private static let whatsNew = WhatsNewSeen.bundledFeed()
+  /// This device's own reports (BugKit 0.3.11): What's new says which of them this build fixed. Read once per
+  /// launch; a report filed since is not a fix of this build anyway.
+  private static let myReports = (try? BugStore().readAll().reports) ?? []
   @State private var showWhatsNew = false
   /// About / version (BugKit 0.3.3, bug-kit #45): the build's version, commit and repository from Info.plist.
   @State private var showAbout = false
@@ -118,7 +121,7 @@ struct ContentView: View {
       }
       .sheet(isPresented: $showWhatsNew) {
         NavigationStack {
-          WhatsNewView(feed: Self.whatsNew, logger: session.bugLogger)
+          WhatsNewView(feed: Self.whatsNew, reports: Self.myReports, logger: session.bugLogger)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showWhatsNew = false } } }
         }
       }
@@ -294,7 +297,7 @@ struct ContentView: View {
         }
       },
       onEvent: { session.log.event($0, $1) }, session: session,
-      whatsNew: Self.whatsNew, onWhatsNew: { showWhatsNew = true },
+      whatsNew: Self.whatsNew, myReports: Self.myReports, onWhatsNew: { showWhatsNew = true },
       onOpenWorkout: { workout in fromLog { path = [.workout(WorkoutIdentity(start: workout.start))] } }
     )
     .toolbar {

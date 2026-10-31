@@ -378,7 +378,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# BugKit's What's new (story 072): the last 30 days of git log and docs/stories as whats-new.json in the bundle.\n\"$BUILD_DIR/../../SourcePackages/checkouts/bug-kit/scripts/whats-new.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/whats-new.json\" --repo \"$SRCROOT\" --base-url \"https://github.com/idvorkin/exercise-analyzer/blob/main/docs/stories/\"\n";
+			shellScript = "# BugKit's What's new (story 072): the last 30 days of git log and docs/stories as whats-new.json in the bundle.\n# --fixed-reports (BugKit 0.3.11): the issues a change closed, read with gh (the script finds Homebrew's), so What's new shows people their own fixed reports; no gh or no network builds the feed without them.\n\"$BUILD_DIR/../../SourcePackages/checkouts/bug-kit/scripts/whats-new.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/whats-new.json\" --repo \"$SRCROOT\" --base-url \"https://github.com/idvorkin/exercise-analyzer/blob/main/docs/stories/\" --fixed-reports\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -863,7 +863,7 @@
 			repositoryURL = "https://github.com/idvorkin/bug-kit";
 			requirement = {
 				kind = exactVersion;
-				version = 0.3.5;
+				version = 0.3.11;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
