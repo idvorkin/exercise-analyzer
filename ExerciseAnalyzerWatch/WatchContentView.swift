@@ -32,6 +32,19 @@ struct WatchContentView: View {
         idlePages
       }
     }
+    // Story 077 (#330): a quarter hour at rest with no set, on whatever page is up.
+    .alert(
+      "Looks like you're done",
+      isPresented: Binding(get: { workout.doneOffer != nil }, set: { _ in }),
+      presenting: workout.doneOffer
+    ) { offer in
+      Button("End at \(offer.formatted(date: .omitted, time: .shortened))") {
+        phone.endWorkout(discard: false, at: offer)
+      }
+      Button("Keep going", role: .cancel) { workout.keepGoing() }
+    } message: { offer in
+      Text("Your heart has been resting since \(offer.formatted(date: .omitted, time: .shortened)) with no set.")
+    }
     .onReceive(clock) {
       now = $0
       if !phone.isLive { phone.ping() }
@@ -230,7 +243,7 @@ struct WatchContentView: View {
           .font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit()
           .foregroundStyle(restIsOver(resting) ? .orange : .primary)
       } else {
-        Text(workout.phase == .ending ? "ENDING…" : "WORKOUT")
+        Text(workout.phase == .ending ? "ENDING…" : workout.kind == .elliptical ? "ELLIPTICAL" : "WORKOUT")
           .font(.caption2.weight(.semibold)).kerning(1).foregroundStyle(.green)
         if let startedAt = workout.shownStart {
           Text(startedAt, style: .timer)
@@ -307,6 +320,16 @@ struct WatchContentView: View {
         Button("Continue") { phone.startWorkout(continuing: true) }
         Button("New workout") { phone.startWorkout() }
       }
+      // Under Start (#333): an elliptical session is its own workout in Health, never a continued gym hour.
+      Button {
+        phone.startWorkout(kind: .elliptical)
+      } label: {
+        Label("Elliptical", systemImage: WorkoutKind.elliptical.symbol).frame(maxWidth: .infinity)
+      }
+      .tint(.green)
+      .disabled(workout.phase == .starting)
+      // The option (#332; Igor: "3 as well as an option"): the gym is wherever Start is tapped.
+      Toggle("End when I leave", isOn: Bindable(workout).endWhenLeaving).font(.caption)
     }
   }
 

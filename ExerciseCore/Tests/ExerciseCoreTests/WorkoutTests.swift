@@ -211,6 +211,52 @@ final class WorkoutTests: XCTestCase {
     XCTAssertEqual(apart.sessions().map(\.id), ["x", "y"])
   }
 
+  /// #333: an elliptical workout travels the wire and the row; rows and wires from before #333 read as strength;
+  /// a merged line is elliptical only when every part was.
+  func testEllipticalTravelsAndOldRowsAreStrength() throws {
+    var wire = WorkoutWire(startedAt: 1_000)
+    wire.kind = .elliptical
+    XCTAssertEqual(try JSONDecoder().decode(WorkoutWire.self, from: JSONEncoder().encode(wire)).kind, .elliptical)
+    let oldWire = Data(#"{"startedAt":1000,"sets":0,"reps":0,"ending":false,"discarded":false}"#.utf8)
+    XCTAssertNil(try JSONDecoder().decode(WorkoutWire.self, from: oldWire).kind)
+    let oldRow = Data(#"{"id":"a","start":0,"end":600,"sets":1,"reps":5}"#.utf8)
+    XCTAssertNil(try JSONDecoder().decode(StoredWorkout.self, from: oldRow).kind)
+
+    var cardio = StoredWorkout(id: "e", start: date(16, 7, 0), end: date(16, 7, 20))
+    cardio.kind = .elliptical
+    var more = StoredWorkout(id: "f", start: date(16, 7, 25), end: date(16, 7, 40))
+    more.kind = .elliptical
+    let lifting = StoredWorkout(id: "g", start: date(16, 7, 45), end: date(16, 8, 30), sets: 4, reps: 30)
+    XCTAssertEqual(WorkoutIndex(workouts: [cardio, more]).sessions().map(\.kind), [.elliptical])
+    XCTAssertEqual(WorkoutIndex(workouts: [cardio, more, lifting]).sessions().map(\.kind), [nil])
+    XCTAssertEqual(WorkoutIndex(workouts: [cardio]).sessions().map(\.kind), [.elliptical])
+  }
+
+  /// 078 (#331): trimming a merged line ends the part running past the new end there and drops parts after it.
+  func testTrimEndEndsThePartAcrossItAndDropsTheOnesAfter() {
+    var index = WorkoutIndex(workouts: [
+      StoredWorkout(id: "a", start: date(16, 7, 0), end: date(16, 7, 30)),
+      StoredWorkout(id: "b", start: date(16, 7, 40), end: date(16, 9, 0)),
+      StoredWorkout(id: "c", start: date(16, 9, 10), end: date(16, 11, 30)),
+      StoredWorkout(id: "evening", start: date(16, 18), end: date(16, 19)),
+    ])
+    let morning = index.sessions()[0]
+    XCTAssertEqual(morning.end, date(16, 11, 30))
+    let now = date(16, 20)
+    let result = index.trimEnd(morning, to: date(16, 8, 15), now: now)
+    XCTAssertEqual(result.trimmed.map(\.id), ["b"])
+    XCTAssertEqual(result.removed.map(\.id), ["c"])
+    XCTAssertEqual(index.workouts.map(\.id), ["a", "b", "evening"])
+    XCTAssertEqual(index.workouts[1].end, date(16, 8, 15))
+    XCTAssertEqual(index.workouts[1].modifiedAt, now)
+    XCTAssertEqual(index.sessions()[0].end, date(16, 8, 15))
+    // An end outside the line changes nothing.
+    let unchanged = index
+    XCTAssertTrue(index.trimEnd(index.sessions()[0], to: date(16, 6), now: now).trimmed.isEmpty)
+    XCTAssertTrue(index.trimEnd(index.sessions()[0], to: date(16, 9), now: now).trimmed.isEmpty)
+    XCTAssertEqual(index, unchanged)
+  }
+
   /// 065: deleting a merged line deletes every workout inside it and nothing outside it.
   func testDeletingASessionRemovesEveryWorkoutInIt() {
     var index = WorkoutIndex(workouts: [

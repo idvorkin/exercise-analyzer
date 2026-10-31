@@ -887,6 +887,71 @@ the first frame (story 001).
 
 ---
 
+### User Story 077:
+
+- **Summary:** The watch notices I've stopped and offers to end the workout when my heart came down
+- **Status:** built on `feat/2026-10-29-workout-end` ([#330](https://github.com/idvorkin/exercise-analyzer/issues/330)): the rule is `WorkoutQuiet` in ExerciseCore (`WorkoutQuietTests`, 7 host tests), the ask and the earlier end in `WorkoutController`, `WorkoutWire.endedAt` to the phone; the watch build and a wrist session pending, including whether Health takes an end earlier than the session's (`workout_ended` with `saved`)
+- **Why:** Igor, 2026-10-27 (#330): "If leave gym then end workout and let me trim end time." His 9:05 AM workout ran to 1:34 PM with his heart back at resting from about 10:20, and was discarded. On 2026-10-29 he picked this ask, the phone's trim (078) and leaving the gym as an option (079).
+
+#### Use Case:
+- **As a** lifter who sometimes walks out of the gym without ending the workout on the watch
+- **I want to** be asked, once my heart has been resting a while with no set, whether I'm done, with the end set to when I stopped
+- **so that** Health gets the hour I trained, not the afternoon after it
+
+#### Acceptance Criteria:
+- **Scenario:** A quarter hour at rest after the last set
+- **Given:** a workout runs on the watch, with at least one set or the heart up a minute or more (a slow warm-up never asks)
+- **and Given:** my heart has stayed within 30 BPM of my resting rate (Health's newest, 65 when it has none) for 15 minutes with no set; a rise above that line for under a minute does not restart the 15 minutes
+- **When:** the next heart reading arrives
+- **Then:** the wrist taps and asks "Looks like you're done" with End at 10:20 (the time my heart came down) and Keep going; End at 10:20 writes the workout to Health ending at 10:20 and the phone's row ends there too, its average and peak heart rate from the readings up to 10:20 (`watch_workout_quiet_ask`, then `watch_workout_end` with `end_s_ago`), never before the last set; if Health refuses the earlier end, the workout ends at the tap instead of being lost (`watch_workout_failed` with retry) and Trim end (078) takes it back; Keep going asks again after another 15 minutes at rest, offering the same time; a set at any point cancels the ask and starts the 15 minutes over
+
+- **Issues:** [#330](https://github.com/idvorkin/exercise-analyzer/issues/330)
+
+---
+
+### User Story 079:
+
+- **Summary:** With End when I leave on, walking out of the gym ends the workout at the moment I left
+- **Status:** built on `feat/2026-10-29-workout-end` ([#332](https://github.com/idvorkin/exercise-analyzer/issues/332)): the rule is `LeavingPlace` in ExerciseCore (`LeavingPlaceTests`, 5 host tests), the watch's location in `LeaveWatcher`, the toggle under Start; the watch build, the location prompt and a real walk out of the gym pending (whether fixes keep coming wrist-down, `watch_leave_left`)
+- **Why:** Igor, 2026-10-27 (#330): "If leave gym then end workout and let me trim end time." On 2026-10-29: "3 as well as an option. Gym can be where we start the workout."
+
+#### Use Case:
+- **As a** lifter who forgets the watch when the workout is over
+- **I want to** have the workout end itself once I've left the place I started it, if I turn that on
+- **so that** a forgotten workout stops at the gym door, not hours later, with no gym to set up first
+
+#### Acceptance Criteria:
+- **Scenario:** Leaving the gym with the option on
+- **Given:** End when I leave is on (under Start on the watch; turning it on asks once for the watch's location)
+- **and Given:** I started a workout, and the watch's first fix within 100 m is taken as the gym
+- **When:** two fixes in a row within 100 m are each more than 300 m (plus their own doubt) from it
+- **Then:** the wrist taps and the workout ends as End does, two minutes before the first fix away (never before the last fix still near the gym, the first minute after Start, or the last set) (`watch_leave_left`, then `watch_workout_end` with `end_s_ago`); a single stray fix, a vague fix, the car park, or the watch's remembered place from before Start end nothing; with the option off the watch never reads location, and the phone's Trim end (078) corrects whatever the door time got wrong
+
+- **Issues:** [#332](https://github.com/idvorkin/exercise-analyzer/issues/332)
+
+---
+
+### User Story 080:
+
+- **Summary:** An elliptical session is started from the watch and lands in Health as an elliptical workout
+- **Status:** built on `feat/2026-10-29-workout-end` ([#333](https://github.com/idvorkin/exercise-analyzer/issues/333)): `WorkoutKind` on `WorkoutWire` and `StoredWorkout` in ExerciseCore (`WorkoutTests`, host), Elliptical under Start on the watch, the workout line's word and sign on the phone; the watch and phone builds and a wrist session pending
+- **Why:** Igor, 2026-10-29: "Add another type of workout where it's an elliptical workout"
+
+#### Use Case:
+- **As a** lifter who also does cardio on the elliptical at the gym
+- **I want to** start an elliptical workout from the same watch app
+- **so that** Health and my Workouts list show it as elliptical, not as another hour of strength training
+
+#### Acceptance Criteria:
+- **Scenario:** Starting an elliptical workout
+- **Given:** no workout runs on the watch
+- **When:** I tap Elliptical under Start workout
+- **Then:** the workout page heads with ELLIPTICAL and the clock and heart rate as a workout does (048); End writes an elliptical (indoor) workout to Health; Workouts' line reads "Elliptical · 7:02 AM · 30 min · ♥ 131" with the elliptical sign; it never asks to continue the last workout (#238), and a line that merges it with a strength workout under 30 minutes apart (#169) is the strength line
+
+- **Issues:** [#333](https://github.com/idvorkin/exercise-analyzer/issues/333)
+
+---
+
 ### What a workout session costs
 
 Heart rate during a set, surviving wrist-down (#32) and launching the watch app from the phone all need an

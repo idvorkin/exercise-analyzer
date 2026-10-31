@@ -354,26 +354,34 @@ final class PhoneLink: NSObject {
   }
 
   /// Start on the workout page (048): the wrist's own session, no phone needed. `continuing`: Continue on the ask
-  /// that follows an End by under ten minutes (#238).
-  func startWorkout(continuing: Bool = false) {
+  /// that follows an End by under ten minutes (#238). `kind`: Elliptical starts an elliptical workout (#333).
+  func startWorkout(continuing: Bool = false, kind: WorkoutKind = .strength) {
     logEvent(
       "command",
-      ["command": "workout_start", "reachable": reachable, "live": isLive, "continuing": continuing])
+      [
+        "command": "workout_start", "reachable": reachable, "live": isLive, "continuing": continuing,
+        "kind": kind.rawValue,
+      ])
     guard screenshot == nil else { return }
     // A new workout starts with no rest: the count from the last workout's final set carried over and read as
     // a rest of hours (#273; Igor: "the rest needs to reset when I started a workout").
     rest.clear()
     WKInterfaceDevice.current().play(.click)
-    workout.start(continuing: continuing)
+    workout.start(continuing: continuing, kind: kind)
   }
 
   /// End writes the workout to Health; Discard writes nothing. Either way the wrist goes back to idle.
-  func endWorkout(discard: Bool) {
+  /// `at`: the earlier end taken on "Looks like you're done" (#330).
+  func endWorkout(discard: Bool, at: Date? = nil) {
     logEvent(
-      "command", ["command": discard ? "workout_discard" : "workout_end", "reachable": reachable, "live": isLive])
+      "command",
+      [
+        "command": discard ? "workout_discard" : "workout_end", "reachable": reachable, "live": isLive,
+        "at_done_ask": at != nil,
+      ])
     guard screenshot == nil else { return }
     WKInterfaceDevice.current().play(discard ? .failure : .success)
-    workout.end(discard: discard)
+    workout.end(discard: discard, at: at)
   }
 
   /// Save on the count page (059): the wrist counts the set at once and starts the rest as Done does; the phone
