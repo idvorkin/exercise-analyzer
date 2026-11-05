@@ -454,13 +454,36 @@ private struct WorkoutPageView: View {
     }
   }
 
-  /// "8:43–9:00 AM · 17 min", "9 sets · 78 reps · work 3:40 · rest 11:20", "♥ 129 avg · 153 max".
+  /// "8:43–9:00 AM · 17 min", "9 sets · 78 reps · work 3:40 · rest 11:20", "♥ 129 avg · 153 max"; while it runs,
+  /// the heart rate now large at top right (#347; Igor, on the elliptical: "put big heart rate in upper right see
+  /// dead space here"), readable at arm's length on a machine: laid over the right of the lines under the times,
+  /// which leave it empty, taking no room of its own (Igor: "it should only be in dead space not shift stuff
+  /// down"), so nothing moves when it comes or goes.
   private func totals(_ timeline: WorkoutTimeline) -> some View {
     VStack(alignment: .leading, spacing: 3) {
       Text(
         "\(Self.clock.string(from: workout.start))–\(Self.clock.string(from: workout.end)) · \(Int(workout.duration / 60)) min"
       )
       .font(.title3.bold()).monospacedDigit()
+      totalsLines(timeline)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .trailing) {
+          if workout.id == WorkoutMirror.liveID, let now = snapshot.heartRateNow {
+            // The number alone: a heart beside it ran over the end of "· rest 1:52" (the red line under it says
+            // what it is).
+            Text("\(now)").font(.system(size: 52, weight: .bold, design: .rounded))
+              .monospacedDigit().foregroundStyle(.red)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Heart rate \(now) BPM")
+          }
+        }
+    }
+    .padding(.top, 8)
+  }
+
+  /// The lines under the times: the rest while it runs, sets and reps, the load, the heart line.
+  private func totalsLines(_ timeline: WorkoutTimeline) -> some View {
+    VStack(alignment: .leading, spacing: 3) {
       // While it runs, the rest since the last set ended, ticking (#342; Igor: "Add rest counter from last rep on
       // this screen if doing weights"): from the newest set's end, a recording's trimmed clip (the last rep and
       // about 5 s after it), a typed set's save. The wrist's clock (046) and the lock screen's (#182) start at Done,
@@ -487,7 +510,6 @@ private struct WorkoutPageView: View {
           .font(.subheadline).monospacedDigit().foregroundStyle(.red)
       }
     }
-    .padding(.top, 8)
   }
 
   /// Heart rate as a line, each set as a band behind it, one time axis. Without heart rate the bands still
