@@ -319,6 +319,73 @@ final class WorkoutMirror: NSObject {
     return trim
   }
 
+  /// Where Undo trim takes the line (078, #346; Igor: "Let me undo trim."): its end before Trim end, kept on the
+  /// row since #346. A trim from before has none, but no trim then reached Health (#349), so the wrist's record
+  /// there still runs to the old end; nil when neither is later than the line.
+  func untrimmedEnd(of session: StoredWorkout) async -> Date? {
+    if let kept = index.untrimmedEnd(of: session) { return kept }
+    #if targetEnvironment(simulator)
+      return nil
+    #else
+      guard HKHealthStore.isHealthDataAvailable(), session.id != Self.liveID, isOwn(session) else { return nil }
+      let family = Bundle.main.bundleIdentifier ?? "com.idvorkin.exerciseanalyzer"
+      let query = HKSampleQueryDescriptor(
+        predicates: [
+          .workout(
+            HKQuery.predicateForSamples(
+              withStart: session.start.addingTimeInterval(-60), end: session.end.addingTimeInterval(60)))
+        ],
+        sortDescriptors: [])
+      // Not allowed to read workouts, Health answers nothing or an error: no Undo then.
+      guard let records = try? await query.result(for: store) else { return nil }
+      return records.filter {
+        $0.sourceRevision.source.bundleIdentifier.hasPrefix(family)
+          && $0.startDate >= session.start.addingTimeInterval(-60)
+      }
+      .map(\.endDate).max().flatMap { $0 > session.end.addingTimeInterval(60) ? $0 : nil }
+    #endif
+  }
+
+  /// Undo trim (078, #346): the line runs on to `end` again (`WorkoutIndex.extendEnd`), its heart numbers the
+  /// whole time's (Health keeps the wrist's readings whatever a trim did), and a Health record the trim
+  /// shortened is saved again to `end`. Parts a trim dropped stay gone: their time is the last part's now.
+  func untrim(_ session: StoredWorkout, to end: Date) async -> WorkoutTrim {
+    guard isOwn(session) else {
+      return WorkoutTrim(rows: 0, failure: "Undo this trim on the device that recorded it.")
+    }
+    guard let row = index.extendEnd(session, to: end, now: Date()) else { return WorkoutTrim(rows: 0) }
+    var undo = WorkoutTrim(rows: 1)
+    if let read = await heartRate(from: row.start, to: row.end),
+      let i = index.workouts.firstIndex(where: { $0.id == row.id })
+    {
+      index.workouts[i].heartRateAverage = read.average(from: row.start, to: row.end) ?? row.heartRateAverage
+      index.workouts[i].heartRateMax = read.peak(from: row.start, to: row.end) ?? row.heartRateMax
+    }
+    var failures: [String] = []
+    do {
+      try index.save(root: root)
+    } catch {
+      failures.append("The list could not be saved: \(error.localizedDescription)")
+    }
+    #if !targetEnvironment(simulator)
+      if HKHealthStore.isHealthDataAvailable() {
+        do {
+          undo.healthRecords = try await resaveHealth(session, endingAt: row.end)
+        } catch {
+          failures.append("Health kept the shorter record: \(error.localizedDescription)")
+        }
+      }
+    #endif
+    undo.failure = failures.isEmpty ? nil : failures.joined(separator: "\n")
+    onEvent?(
+      "workout_untrimmed",
+      [
+        "id": session.id, "added_s": Int(row.end.timeIntervalSince(session.end)), "health": undo.healthRecords,
+        "message": undo.failure ?? "",
+      ])
+    return undo
+  }
+
   /// Change type (story 082, #340; Igor: "and then cahnge a workotu if I want later"): every row of the line
   /// becomes `kind`, and each of the wrist's Health records in it is saved again as that type and the old one
   /// deleted; Health cannot change a workout's type in place. The sets stay.
@@ -361,10 +428,11 @@ final class WorkoutMirror: NSObject {
     return change
   }
 
-  /// The wrist's records in the line that Trim end or Change type touches, each saved again and then deleted:
-  /// with `end`, those running past it, from their start to `end` with their sets (activities) up to there, and
-  /// one starting after `end` only deleted; with `type`, those of another type, whole, as `type` with their sets.
-  /// Returns how many changed.
+  /// The wrist's records in the line that Trim end, Undo trim or Change type touches, each saved again and then
+  /// deleted: with `end` before the line's, those running past it, from their start to `end` with their sets
+  /// (activities) up to there, and one starting after `end` only deleted; with `end` after it (Undo trim), the
+  /// one ending where the line was cut, run on to `end`; with `type`, those of another type, whole, as `type`
+  /// with their sets. Returns how many changed.
   /// ponytail: the new record carries no heart-rate or energy samples of its own (the watch's stay in Health,
   /// by time); re-associate them with `HKWorkoutBuilder.add` if Fitness's workout view needs them.
   private func resaveHealth(
@@ -382,6 +450,9 @@ final class WorkoutMirror: NSObject {
       sortDescriptors: [])
     let records = try await query.result(for: store).filter { record in
       guard record.sourceRevision.source.bundleIdentifier.hasPrefix(family) else { return false }
+      if let end, end > session.end {
+        return abs(record.endDate.timeIntervalSince(session.end)) < 60 && record.endDate < end
+      }
       if let end { return record.endDate > end }
       return type.map { record.workoutActivityType != $0 } ?? false
     }
@@ -391,7 +462,7 @@ final class WorkoutMirror: NSObject {
     // both.
     do {
       for record in records where end.map({ record.startDate < $0 }) ?? true {
-        let stop = min(record.endDate, end ?? record.endDate)
+        let stop = end.map { $0 > session.end ? $0 : min(record.endDate, $0) } ?? record.endDate
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = type ?? record.workoutActivityType
         configuration.locationType = .indoor

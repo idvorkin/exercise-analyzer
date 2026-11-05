@@ -276,6 +276,35 @@ final class WorkoutTests: XCTestCase {
     XCTAssertEqual(index, unchanged)
   }
 
+  /// #346: Undo trim gives the line back its first end, as one row, and stops short of the workout after it.
+  func testUndoTrimRunsTheLineOnToItsFirstEnd() {
+    var index = WorkoutIndex(workouts: [
+      StoredWorkout(id: "a", start: date(16, 7, 0), end: date(16, 7, 30)),
+      StoredWorkout(id: "b", start: date(16, 7, 40), end: date(16, 9, 0)),
+      StoredWorkout(id: "c", start: date(16, 9, 10), end: date(16, 11, 30)),
+      StoredWorkout(id: "evening", start: date(16, 18), end: date(16, 19)),
+    ])
+    let now = date(16, 20)
+    XCTAssertNil(index.untrimmedEnd(of: index.sessions()[0]))
+    index.trimEnd(index.sessions()[0], to: date(16, 10), now: now)
+    index.trimEnd(index.sessions()[0], to: date(16, 8, 15), now: now)
+    let trimmed = index.sessions()[0]
+    // Twice trimmed, the first trim's end; kept on the part ending the line only.
+    XCTAssertEqual(index.untrimmedEnd(of: trimmed), date(16, 11, 30))
+    XCTAssertEqual(index.workouts.map(\.untrimmedEnd), [nil, date(16, 11, 30), nil])
+    XCTAssertEqual(index.extendEnd(trimmed, to: date(16, 11, 30), now: now)?.id, "b")
+    XCTAssertEqual(index.sessions()[0].end, date(16, 11, 30))
+    XCTAssertNil(index.untrimmedEnd(of: index.sessions()[0]))
+    XCTAssertTrue(index.workouts.allSatisfy { $0.untrimmedEnd == nil })
+    // A workout recorded inside the time given back stays its own line: a merge gap short of it.
+    XCTAssertEqual(index.extendEnd(index.sessions()[0], to: date(16, 19, 30), now: now)?.end, date(16, 17, 30))
+    XCTAssertEqual(index.sessions().map(\.end), [date(16, 17, 30), date(16, 19)])
+    // Nothing to give back is no change.
+    let unchanged = index
+    XCTAssertNil(index.extendEnd(index.sessions()[0], to: date(16, 9), now: now))
+    XCTAssertEqual(index, unchanged)
+  }
+
   /// 065: deleting a merged line deletes every workout inside it and nothing outside it.
   func testDeletingASessionRemovesEveryWorkoutInIt() {
     var index = WorkoutIndex(workouts: [

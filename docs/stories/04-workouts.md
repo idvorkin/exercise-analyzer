@@ -927,7 +927,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 078:
 
 - **Summary:** A workout left running too long is trimmed to when I stopped, in Workouts and in Health
-- **Status:** built on `feat/2026-10-29-workout-end` ([#331](https://github.com/idvorkin/exercise-analyzer/issues/331)): `WorkoutIndex.trimEnd` and `WorkoutQuiet.suggestedEnd` in ExerciseCore (`WorkoutTests`, `WorkoutQuietTests`, host), Trim end on the workout page, `WorkoutMirror.trimEnd` saving the shorter Health record; on the phone since 2026-11-01, where no trim reached Health (#349: the read-workouts ask timed out unseen); the ask moved to the page's opening on `fix/2026-11-05-bug-pull`, by build only, the sheet and a real Health trim to verify on the phone
+- **Status:** built on `feat/2026-10-29-workout-end` ([#331](https://github.com/idvorkin/exercise-analyzer/issues/331)): `WorkoutIndex.trimEnd` and `WorkoutQuiet.suggestedEnd` in ExerciseCore (`WorkoutTests`, `WorkoutQuietTests`, host), Trim end on the workout page, `WorkoutMirror.trimEnd` saving the shorter Health record; on the phone since 2026-11-01, where no trim reached Health (#349: the read-workouts ask timed out unseen); the ask moved to the page's opening on `fix/2026-11-05-bug-pull`, by build only, the sheet and a real Health trim to verify on the phone; Undo trim (#346) on the same branch, `WorkoutIndex.untrimmedEnd` / `extendEnd` on the host (`WorkoutTests`), the sheet's button and Oct 30's undo to verify on the phone
 - **Why:** Igor, 2026-10-27 (#330): "If leave gym then end workout and let me trim end time." On 2026-10-29 he picked the trim with the watch's ask (077) and leaving the gym as an option (079).
 
 #### Use Case:
@@ -941,12 +941,17 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I tap Trim end, pick an end at least a minute earlier (the sheet opens on "Heart back at rest: 10:20", when the heart settled after the last set, if the heart rate says so) and Save
 - **Then:** the line and the page end there, a merged line's later parts go (065's tombstones carry it to the other devices), the stored heart rate (each trimmed part's and the line's own) is cut to match and the row's average and peak are the kept time's, and in Health the wrist's long record is replaced by one from the same start to the new end with its sets up to there (`workout_trimmed`); the sets stay; when Health refuses, the list is still trimmed, a short record already saved is deleted again so Health never holds both, and an alert says Health kept its longer record
 
+- **Scenario:** Undoing a trim (#346)
+- **Given:** a workout of this device I trimmed from 81 minutes to 24 (on Nov 4 by mistake, on Oct 30's workout)
+- **When:** I tap Trim end and, at the top of the sheet, "Undo trim: ends 10:34 AM again, 81 min"
+- **Then:** the line and the page end at 10:34 again, its heart rate drawn and averaged over the whole time from Health (which keeps the wrist's readings through any trim), and a Health record the trim shortened is saved again to 10:34 (`workout_untrimmed`); after two trims Undo goes back to the first end; parts a trim dropped from a merged line do not come back as their own rows, their time is the last part's; a workout recorded since inside the time given back stays its own line, the end stopping 30 minutes short of it; a trim from before #346 is undone from the end Health still holds, since none of those reached Health (#349); a workout never trimmed offers no Undo
+
 - **Scenario:** Health asks before the first edit (#349)
 - **Given:** Health has never been asked to let this app read workouts (the wrist's records must be found to replace them)
 - **When:** I open a saved workout of this device
 - **Then:** Health's permission sheet shows at once, on the page, with nothing else on screen (`workout_auth` with for: edit), so a Trim end, Change type or Delete afterwards reaches Health; once answered, no page asks again. Before #349 the ask came inside the edit as its sheet closed, never showed, and timed out 14 minutes later, so every trim and type change stayed in Workouts only
 
-- **Issues:** [#331](https://github.com/idvorkin/exercise-analyzer/issues/331); [#349](https://github.com/idvorkin/exercise-analyzer/issues/349) (edits never reached Health)
+- **Issues:** [#331](https://github.com/idvorkin/exercise-analyzer/issues/331); [#349](https://github.com/idvorkin/exercise-analyzer/issues/349) (edits never reached Health); [#346](https://github.com/idvorkin/exercise-analyzer/issues/346) Igor: "Let me undo trim."
 
 ---
 
