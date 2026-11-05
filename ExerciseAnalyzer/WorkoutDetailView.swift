@@ -74,6 +74,11 @@ struct WorkoutDetailView: View {
         // A fresh page per workout: the reused iPad page kept the last workout's chart window, so this one's
         // series drew off the plot (#244). The identity holds across the live → saved hand-over.
         .id(identity)
+        // Health's ask for the edits, before any of them (#349).
+        .task(id: snapshot.workout.id) {
+          guard snapshot.workout.id != WorkoutMirror.liveID, workouts.isOwn(snapshot.workout) else { return }
+          await workouts.requestEditAuthorization()
+        }
         // Twenty seconds matches the set page's Health re-ask (#107). A saved id triggers one final read.
         .task(id: HeartRateRequest(workout: snapshot.workout, active: scenePhase == .active)) {
           guard scenePhase == .active else { return }

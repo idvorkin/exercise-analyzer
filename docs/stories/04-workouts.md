@@ -927,7 +927,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 078:
 
 - **Summary:** A workout left running too long is trimmed to when I stopped, in Workouts and in Health
-- **Status:** built on `feat/2026-10-29-workout-end` ([#331](https://github.com/idvorkin/exercise-analyzer/issues/331)): `WorkoutIndex.trimEnd` and `WorkoutQuiet.suggestedEnd` in ExerciseCore (`WorkoutTests`, `WorkoutQuietTests`, host), Trim end on the workout page, `WorkoutMirror.trimEnd` saving the shorter Health record; the app build, the sheet and a real Health trim on the phone pending
+- **Status:** built on `feat/2026-10-29-workout-end` ([#331](https://github.com/idvorkin/exercise-analyzer/issues/331)): `WorkoutIndex.trimEnd` and `WorkoutQuiet.suggestedEnd` in ExerciseCore (`WorkoutTests`, `WorkoutQuietTests`, host), Trim end on the workout page, `WorkoutMirror.trimEnd` saving the shorter Health record; on the phone since 2026-11-01, where no trim reached Health (#349: the read-workouts ask timed out unseen); the ask moved to the page's opening on `fix/2026-11-05-bug-pull`, by build only, the sheet and a real Health trim to verify on the phone
 - **Why:** Igor, 2026-10-27 (#330): "If leave gym then end workout and let me trim end time." On 2026-10-29 he picked the trim with the watch's ask (077) and leaving the gym as an option (079).
 
 #### Use Case:
@@ -941,7 +941,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I tap Trim end, pick an end at least a minute earlier (the sheet opens on "Heart back at rest: 10:20", when the heart settled after the last set, if the heart rate says so) and Save
 - **Then:** the line and the page end there, a merged line's later parts go (065's tombstones carry it to the other devices), the stored heart rate (each trimmed part's and the line's own) is cut to match and the row's average and peak are the kept time's, and in Health the wrist's long record is replaced by one from the same start to the new end with its sets up to there (`workout_trimmed`); the sets stay; when Health refuses, the list is still trimmed, a short record already saved is deleted again so Health never holds both, and an alert says Health kept its longer record
 
-- **Issues:** [#331](https://github.com/idvorkin/exercise-analyzer/issues/331)
+- **Scenario:** Health asks before the first edit (#349)
+- **Given:** Health has never been asked to let this app read workouts (the wrist's records must be found to replace them)
+- **When:** I open a saved workout of this device
+- **Then:** Health's permission sheet shows at once, on the page, with nothing else on screen (`workout_auth` with for: edit), so a Trim end, Change type or Delete afterwards reaches Health; once answered, no page asks again. Before #349 the ask came inside the edit as its sheet closed, never showed, and timed out 14 minutes later, so every trim and type change stayed in Workouts only
+
+- **Issues:** [#331](https://github.com/idvorkin/exercise-analyzer/issues/331); [#349](https://github.com/idvorkin/exercise-analyzer/issues/349) (edits never reached Health)
 
 ---
 

@@ -91,6 +91,31 @@ final class WorkoutMirror: NSObject {
     }
   }
 
+  /// Delete, Trim end and Change type find the wrist's records in Health, which needs reading workouts, a
+  /// permission nothing else asks for. Asked inside the edit, as its sheet or menu closed, Health's sheet never
+  /// showed and the ask timed out 14 minutes later, so no edit ever reached Health (#349). A saved workout's
+  /// page of this device asks on opening instead, with nothing else on screen; once answered this asks nothing.
+  func requestEditAuthorization() async {
+    // The simulator's sheet would wait for a tap no run can give (as in `delete`).
+    #if !targetEnvironment(simulator)
+      guard HKHealthStore.isHealthDataAvailable(), UIApplication.shared.applicationState == .active else { return }
+      let share: Set<HKSampleType> = [.workoutType()]
+      let read: Set<HKObjectType> = [.workoutType(), HKQuantityType(.heartRate)]
+      do {
+        guard try await store.statusForAuthorizationRequest(toShare: share, read: read) == .shouldRequest else {
+          return
+        }
+        try await store.requestAuthorization(toShare: share, read: read)
+        onEvent?("workout_auth", ["for": "edit", "asked": true])
+      } catch {
+        onEvent?("workout_auth", ["for": "edit", "asked": false, "message": "\(error)"])
+      }
+    #endif
+  }
+
+  /// Every row of the line is this device's own: only those can be edited here (070).
+  func isOwn(_ session: StoredWorkout) -> Bool { index.parts(of: session).allSatisfy { $0.device == nil } }
+
   /// Heart rate from Health between two moments (stories 051, 053), as the watch wrote it during the workout.
   /// Health is only asked about time inside a workout this app knows of, running or ended: the read permission
   /// was requested when that workout arrived, and a set recorded outside a workout never touches Health.
@@ -242,7 +267,7 @@ final class WorkoutMirror: NSObject {
   func trimEnd(_ session: StoredWorkout, to end: Date) async -> WorkoutTrim {
     // Another device's rows are mirrored only by it (070): trimmed here, the change would never reach it while
     // its dropped parts' tombstones would.
-    guard index.parts(of: session).allSatisfy({ $0.device == nil }) else {
+    guard isOwn(session) else {
       return WorkoutTrim(rows: 0, failure: "Trim this workout on the device that recorded it.")
     }
     let now = Date()
