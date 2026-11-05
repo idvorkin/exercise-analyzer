@@ -42,6 +42,12 @@ struct WorkoutGalleryView: View {
   private static let landingWindow: TimeInterval = 10
   /// The list is the screen: a late live workout lands only then, never over a set opened meanwhile.
   @State private var onScreen = false
+  @Environment(\.scenePhase) private var scenePhase
+  /// The list can ask Health for the edits (#349): Delete lives here, so its ask comes before a line's long-press,
+  /// with nothing over the list, and never under the camera or a set.
+  private var canAskHealth: Bool {
+    onScreen && scenePhase == .active && !workouts.index.workouts.isEmpty
+  }
   /// This view life's id in `workouts_appear` (ea-trz), so two lives at launch show as two ids.
   @State private var life = String(UUID().uuidString.prefix(4))
   /// The workout line whose "Delete workout…" is being confirmed (065).
@@ -321,6 +327,9 @@ struct WorkoutGalleryView: View {
     }
     .onDisappear { onScreen = false }
     .onChange(of: workouts.liveWorkout?.start) { landOnLive() }
+    .task(id: canAskHealth) {
+      if canAskHealth { await workouts.requestEditAuthorization() }
+    }
   }
 
   /// Mid-workout, the app opens on the workout (#123; Igor, from the gym: "if I'm in a live workout take me back

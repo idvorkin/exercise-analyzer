@@ -93,8 +93,9 @@ final class WorkoutMirror: NSObject {
 
   /// Delete, Trim end and Change type find the wrist's records in Health, which needs reading workouts, a
   /// permission nothing else asks for. Asked inside the edit, as its sheet or menu closed, Health's sheet never
-  /// showed and the ask timed out 14 minutes later, so no edit ever reached Health (#349). A saved workout's
-  /// page of this device asks on opening instead, with nothing else on screen; once answered this asks nothing.
+  /// showed and the ask timed out 14 minutes later, so no edit ever reached Health (#349). The Workouts list, where
+  /// Delete is, and a saved workout's page of this device ask on opening instead, with nothing else on screen; once
+  /// answered this asks nothing.
   func requestEditAuthorization() async {
     // The simulator's sheet would wait for a tap no run can give (as in `delete`).
     #if !targetEnvironment(simulator)
