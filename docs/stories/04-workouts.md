@@ -122,7 +122,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 014:
 
 - **Summary:** Surface the gym videos I haven't analyzed yet, and mark the ones I have
-- **Status:** implemented in [f4da4a2](https://github.com/idvorkin/exercise-analyzer/commit/f4da4a2), [17f2398](https://github.com/idvorkin/exercise-analyzer/commit/17f2398); on the phone, Igor's check pending (the simulator cannot grant Photos); the tabs are 052's
+- **Status:** implemented in [f4da4a2](https://github.com/idvorkin/exercise-analyzer/commit/f4da4a2), [17f2398](https://github.com/idvorkin/exercise-analyzer/commit/17f2398); on the phone, Igor's check pending (the simulator cannot grant Photos); the tabs are 052's; the cloud-identifier mapping off the main thread (#348) on `fix/2026-11-05-bug-pull`, by build only
 
 #### Use Case:
 - **As a** lifter who records first and reviews later
@@ -136,9 +136,14 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** the two I have not analyzed are under New and the other under Analyzed, dimmed and marked Analyzed;
   tapping the analyzed one opens its set, tapping either new one opens that clip in place
 
+- **Scenario:** A slow Photos never stops the app opening (#348)
+- **Given:** Photos is busy (photolibraryd at work, as at 11:24 PM on Nov 1) and Health opens the app in the background for a workout on the wrist
+- **When:** Workouts appears
+- **Then:** the app opens and the strip fills in when Photos answers which of another device's sets are here (#222); that answer, where the main thread waited on Nov 1, never holds it, so the system's 10 s scene-creation watchdog (0x8BADF00D) does not fire there; the strip's own fetch of recent videos still runs on the main thread (#296)
+
 - **Notes:** How the strip folds, its tabs and what it remembers are story 052's.
 
-- **Issues:** [#8](https://github.com/idvorkin/exercise-analyzer/issues/8)
+- **Issues:** [#8](https://github.com/idvorkin/exercise-analyzer/issues/8); [#348](https://github.com/idvorkin/exercise-analyzer/issues/348) a background launch killed by the scene-create watchdog, the main thread waiting in `RecentsStore.localIdentifiers(forCloud:)` under `WorkoutGalleryView`'s appear
 
 ---
 
