@@ -534,6 +534,9 @@ extension WorkoutMirror: HKWorkoutSessionDelegate {
     let wantsStatus = wires.contains { $0.wantsStatus == true }
     last.wantsStatus = nil
     Task { @MainActor [last] in
+      // A message the wrist sent just before End can land after `ended(at:)` (100 ms later on Nov 1): taken, it
+      // brought the saved workout back as one still running on the watch, for good (#344).
+      guard session === workoutSession else { return }
       if wantsStatus { onStatusWanted?() }
       live = last
       let now = Date()
