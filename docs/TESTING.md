@@ -210,7 +210,9 @@ Results are read from the **session log** (`Documents/logs/*.jsonl` in the app c
 simulator runs the pose model on the CPU at roughly 20 fps, a tenth of the phone, so the script waits for the
 `analyzed` or `trim` event (`wait_for`) instead of sleeping a fixed time. `ONLY=trim just test-sim` runs one check.
 
-Checks today: three clips must detect and count (4 swings, 5 pistols, 8 Bulgarian); the trim check auto-trims the
+Checks today: one clip must detect and count (4 swings), which proves the app wires the model, the detector and the
+analyzer together; every exercise's detection and count, pistols and Bulgarian among them, are pinned on the host
+(`DetectionTests`, `RepCountTests` over `Fixture.all`), and the model's own output on the Mac (rung 1.5). The trim check auto-trims the
 one-hand swing clip (10 reps since the first swing counts, #148) and asserts a lossless passthrough cut that starts on a keyframe within 1.5 s of the requested start and
 a trimmed file whose first keyframe at or after time zero is within 0.2 s of it (ffprobe packets; ea-7sx: the
 player's first tick lands late under load). That keyframe is where AVPlayer starts. The first *decodable* frame is
