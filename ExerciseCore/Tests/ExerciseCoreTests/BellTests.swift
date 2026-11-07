@@ -3,8 +3,11 @@
 //  The bell in play and its colour (#18): the tracker starts on a confident box at a wrist and follows it through
 //  low-confidence frames past the rack bells; the colour code names the weight and stays quiet on cast iron.
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

@@ -1,5 +1,8 @@
 import Foundation
-import os
+
+#if canImport(os)
+  import os
+#endif
 
 /// The one owner of the models (#147): the pose model and the detectors are shared, mutable instances, safe on one
 /// job at a time. An offline pass holds the lease for its whole run and a new pass waits for it (FIFO), so a

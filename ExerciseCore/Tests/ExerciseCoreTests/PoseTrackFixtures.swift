@@ -3,9 +3,12 @@
 //  Pose-track fixtures: real clips, already run through the pose model, stored as normalized keypoints per frame.
 //  Tests replay them through the detector and analyzers on the host, no model or simulator needed.
 
-import CoreGraphics
 import Foundation
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 
@@ -129,6 +132,13 @@ struct Fixture {
       Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures"),
       "missing fixture \(name)")
     return try Self.frames(at: url)
+  }
+
+  /// Every archived track (`Fixtures/tracks`), by file name. Paths, not `urls(forResourcesWithExtension:)`: on
+  /// Linux (just test-linux) that one hands back NSURLs.
+  static func archivedTracks() -> [URL] {
+    Bundle.module.paths(forResourcesOfType: "json", inDirectory: "Fixtures/tracks").map { URL(fileURLWithPath: $0) }
+      .sorted { $0.lastPathComponent < $1.lastPathComponent }
   }
 
   /// Decodes a compact pose track (fixture or archived track) into frames.

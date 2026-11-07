@@ -4,8 +4,11 @@
 //  cut so still and skeleton stay aligned. Pure coordinate math, no images needed (all fixtures use
 //  binary-exact fractions so the asserts are exact).
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

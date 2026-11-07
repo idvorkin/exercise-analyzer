@@ -88,6 +88,21 @@ answered with numbers instead of theories.
 **SwiftPM caps a test's stdout**: a long report is cut off silently, mid-line. Keep a report to a summary table (a
 few dozen lines), `fflush(stdout)` after it, and write long traces to a file under `~/tmp/agent/`.
 
+### Off the Mac: `just test-linux`
+
+On a Linux box, with no Xcode, `just test-linux` runs `just test`'s suites under Linux Swift, then cross-builds the
+package and its tests for arm64 macOS, iOS and the iOS simulator with a Darwin Swift SDK (xtool's): compiled, never
+run. It is not a rung of its own: it lets an agent off the Mac catch an analyzer, detector or type slip in
+`ExerciseCore`, and the Mac's `just test` still decides. 349 of the Mac's 354 run on Linux. It needs a Swift 6 Linux
+toolchain; without a `darwin` Swift SDK the cross-build says it was skipped. The script's header lists the settings
+for a toolchain that is not on `PATH`.
+
+What needs an Apple framework is under `#if canImport`, and so are its tests. Left out on Linux: the bell detector
+and its 5 parse tests (Core ML, Vision), the bell colour sampler (CoreVideo pixel buffers), and the Mac tool
+`posetrack`, which the manifest drops on a Linux host. Linux gets a stand-in for the two Apple types the portable code
+names (`Platform/LinuxStandIns.swift`): an empty `CGImage` (the analyzers only carry a rep's still along) and
+ModelLease's lock over `NSLock`.
+
 ## Rung 1.5: the model on the Mac
 
 [`ExerciseCore/Sources/posetrack/main.swift`](../ExerciseCore/Sources/posetrack/main.swift) is a macOS executable
@@ -210,7 +225,9 @@ Results are read from the **session log** (`Documents/logs/*.jsonl` in the app c
 simulator runs the pose model on the CPU at roughly 20 fps, a tenth of the phone, so the script waits for the
 `analyzed` or `trim` event (`wait_for`) instead of sleeping a fixed time. `ONLY=trim just test-sim` runs one check.
 
-Checks today: three clips must detect and count (4 swings, 5 pistols, 8 Bulgarian); the trim check auto-trims the
+Checks today: one clip must detect and count (4 swings), which proves the app wires the model, the detector and the
+analyzer together; every exercise's detection and count, pistols and Bulgarian among them, are pinned on the host
+(`DetectionTests`, `RepCountTests` over `Fixture.all`), and the model's own output on the Mac (rung 1.5). The trim check auto-trims the
 one-hand swing clip (10 reps since the first swing counts, #148) and asserts a lossless passthrough cut that starts on a keyframe within 1.5 s of the requested start and
 a trimmed file whose first keyframe at or after time zero is within 0.2 s of it (ffprobe packets; ea-7sx: the
 player's first tick lands late under load). That keyframe is where AVPlayer starts. The first *decodable* frame is

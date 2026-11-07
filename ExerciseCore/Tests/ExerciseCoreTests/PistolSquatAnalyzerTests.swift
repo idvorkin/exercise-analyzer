@@ -3,8 +3,11 @@
 //  Pistol shapes no recorded fixture covers, drawn as stick figures: an unmeasured joint (confidence 0, read as 0°
 //  or no head) must never move the phase (AGENTS.md; the 2026-09-28 review, #171).
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

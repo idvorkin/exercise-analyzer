@@ -11,8 +11,11 @@
 //  Each phase captures its peak frame (best extreme for TOP/BOTTOM, first qualifying frame for CONNECT/RELEASE)
 //  so a completed rep carries one position per phase for the gallery and navigation.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 /// Phase-transition thresholds in degrees. Defaults come from analysis of real swing videos.
 public struct SwingThresholds {

@@ -6,8 +6,11 @@
 //  head has risen again for a few frames; the descending/ascending checkpoints are the frames nearest 50% of the
 //  head travel on the way down and up.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct PistolSquatThresholds {
   public init() {}

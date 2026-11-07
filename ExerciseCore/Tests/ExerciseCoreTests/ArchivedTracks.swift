@@ -22,7 +22,7 @@ final class ArchivedTracks: XCTestCase {
     .appendingPathComponent("Fixtures/archived-counts.json")
 
   func testEveryArchivedTrackAnalyzes() throws {
-    let urls = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? []).sorted { $0.lastPathComponent < $1.lastPathComponent }
+    let urls = Fixture.archivedTracks()
     var found: [String: Pin] = [:]
     for url in urls {
       let frames = try Fixture.frames(at: url)

@@ -2,8 +2,11 @@
 
 //  The Bulgarian's drawn legs keep the names they had standing (#131).
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

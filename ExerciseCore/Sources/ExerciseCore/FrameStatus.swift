@@ -3,8 +3,11 @@
 //  Is the athlete in the picture? Computed per live frame from the person box and the pose, and sent to the watch
 //  so a lifter who cannot see the phone knows when to step back or switch cameras.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct FrameStatus: Codable, Equatable, Sendable {
   public enum Edge: String, Codable, CaseIterable, Sendable {

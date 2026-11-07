@@ -6,8 +6,11 @@
 //  scores quality but does not gate the phases. The front leg is the one whose foot sits lower on screen (the
 //  rear foot is up on the bench).
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct BulgarianSplitSquatThresholds {
   public init() {}

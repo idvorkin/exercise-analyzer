@@ -3,8 +3,11 @@
 //  Bulgarian shapes drawn as stick figures (#171 S-07): a side view, the left foot in front on the floor, the right
 //  one up on the bench. The count runs on the head; these pin what a dip must be to count.
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 
