@@ -3,8 +3,11 @@
 //  Split squat shapes no recorded fixture covers yet, drawn as stick figures: hips at a height and feet a split
 //  apart, both in leg lengths (what `BodySkeleton.stance` reads back).
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

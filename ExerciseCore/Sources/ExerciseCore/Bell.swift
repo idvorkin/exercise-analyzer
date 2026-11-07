@@ -4,8 +4,11 @@
 //  in play, and what its colour says about its weight. The detector runs only in the offline pass; the tracker
 //  and the colour map are pure and run wherever the pipeline does (docs/analysis/kettlebell-detector.md).
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 /// A kettlebell the detector saw in one frame: its box normalized to the image, the confidence, and the mean
 /// colour of the pixels inside it (sRGB, 0–1) when the caller sampled it.

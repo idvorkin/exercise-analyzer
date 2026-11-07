@@ -3,8 +3,11 @@
 //  Swings drawn as stick figures (#171 S-07): a side view, the legs straight under the hips, the torso leaning
 //  `spine` degrees from vertical and the arms `arm` degrees from hanging straight down (negative: behind the body).
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

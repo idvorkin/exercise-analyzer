@@ -3,8 +3,11 @@
 //  Not assertions: these print how an analyzer behaves on a fixture under different thresholds, for tuning on
 //  the Mac against real sets. Run with `swift test --filter TuningReports`.
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 
@@ -484,10 +487,7 @@ extension TuningReports {
     for fixture in Fixture.all where fixture.expectedExercise == .kettlebellSwing {
       row(fixture.name, "\(fixture.expectedReps)", try fixture.frames())
     }
-    let tracks = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? [])
-      .filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }.sorted {
-        $0.lastPathComponent < $1.lastPathComponent
-      }
+    let tracks = Fixture.archivedTracks().filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }
     for url in tracks { row(url.deletingPathExtension().lastPathComponent, "-", try Fixture.frames(at: url)) }
   }
 
@@ -518,10 +518,7 @@ extension TuningReports {
     for fixture in Fixture.all where fixture.expectedExercise == .kettlebellSwing {
       row(fixture.name, "\(fixture.expectedReps)", try fixture.frames())
     }
-    let tracks = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? [])
-      .filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }.sorted {
-        $0.lastPathComponent < $1.lastPathComponent
-      }
+    let tracks = Fixture.archivedTracks().filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }
     for url in tracks { row(url.deletingPathExtension().lastPathComponent, "-", try Fixture.frames(at: url)) }
   }
 
@@ -577,10 +574,7 @@ extension TuningReports {
     for fixture in Fixture.all where fixture.expectedExercise == .kettlebellSwing {
       row(fixture.name, "\(fixture.expectedReps)", try fixture.frames())
     }
-    let tracks = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? [])
-      .filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }.sorted {
-        $0.lastPathComponent < $1.lastPathComponent
-      }
+    let tracks = Fixture.archivedTracks().filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }
     for url in tracks { row(url.deletingPathExtension().lastPathComponent, "-", try Fixture.frames(at: url)) }
     print("reps the default adds:\n" + added.joined(separator: "\n"))
   }
@@ -689,10 +683,11 @@ extension TuningReports {
   }
 
   private static func angle(_ a: CGPoint, vertex v: CGPoint, _ b: CGPoint) -> Double {
-    let v1 = CGVector(dx: a.x - v.x, dy: a.y - v.y)
-    let v2 = CGVector(dx: b.x - v.x, dy: b.y - v.y)
-    let dot = Double(v1.dx * v2.dx + v1.dy * v2.dy)
-    let mag = Double(hypot(v1.dx, v1.dy) * hypot(v2.dx, v2.dy))
+    // Plain offsets, not CGVector: Linux Foundation has none (just test-linux).
+    let (dx1, dy1) = (a.x - v.x, a.y - v.y)
+    let (dx2, dy2) = (b.x - v.x, b.y - v.y)
+    let dot = Double(dx1 * dx2 + dy1 * dy2)
+    let mag = Double(hypot(dx1, dy1) * hypot(dx2, dy2))
     guard mag > 0 else { return 0 }
     return acos(max(-1, min(1, dot / mag))) * 180 / .pi
   }
@@ -713,8 +708,7 @@ extension TuningReports {
         print(String(format: "    rep %.1f–%.1fs", interval.start, interval.end))
       }
     }
-    let urls = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? [])
-      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    let urls = Fixture.archivedTracks()
     for url in urls {
       print(genericLine(label: "tracks/" + url.lastPathComponent, known: "—", frames: try Fixture.frames(at: url)))
     }
@@ -939,10 +933,7 @@ extension TuningReports {
     for fixture in Fixture.all where fixture.expectedExercise == .kettlebellSwing {
       row(fixture.name, "\(fixture.expectedReps)", try fixture.frames())
     }
-    let tracks = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? [])
-      .filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }.sorted {
-        $0.lastPathComponent < $1.lastPathComponent
-      }
+    let tracks = Fixture.archivedTracks().filter { $0.lastPathComponent.hasPrefix("kettlebell-swing") }
     for url in tracks { row(url.deletingPathExtension().lastPathComponent, "-", try Fixture.frames(at: url)) }
     print("slow tops (deepest hinge -> top over \(upswingMax) s):\n" + slowLines.joined(separator: "\n"))
   }

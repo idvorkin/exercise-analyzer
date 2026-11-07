@@ -3,7 +3,11 @@
 //  App-owned, Codable copy of a detected pose. The SDK's `Keypoints` can't be constructed outside the package, so
 //  everything the app stores (pose track, rep positions, Recents) uses this instead.
 
-import CoreGraphics
+import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct PosePoint: Codable, Equatable {
   public var x: Float

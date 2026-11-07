@@ -4,8 +4,11 @@
 //  gap between them cut. The numbers are Igor's 2026-09-16 set: reps 1–10 at 5.4–19.9 s, reps 11–20 at
 //  32.6–48.9 s, 51 s of clip.
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

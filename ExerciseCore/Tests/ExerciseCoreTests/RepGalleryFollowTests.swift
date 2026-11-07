@@ -3,8 +3,11 @@
 //  #152: as the playhead moves through a rep, the gallery zooms the position it has reached, the same zoom a
 //  tap on a rep's number and a phase header gives. The rule is which column that is.
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

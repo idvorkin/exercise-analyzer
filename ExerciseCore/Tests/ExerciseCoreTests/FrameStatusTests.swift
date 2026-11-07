@@ -1,7 +1,10 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-import CoreGraphics
 import XCTest
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 @testable import ExerciseCore
 

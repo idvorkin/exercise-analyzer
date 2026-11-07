@@ -3,8 +3,11 @@
 //  Where the picture sits in its area so the lifter is in the middle of it (#98). Pure geometry: the app applies it
 //  by resizing the video layer's frame, never by a transform (HDR).
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 /// How much to scale the picture and where to shift it, for a layer that fills the container and aspect-fits the
 /// video inside itself.

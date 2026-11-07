@@ -13,8 +13,11 @@
 //  tracker only moves forward within a direction and never touches the count. Floor brackets the rep: flat lying
 //  just before the first movement, and back flat after the last descent; lying flat reports floor.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct TurkishGetUpThresholds {
   public init() {}

@@ -7,8 +7,11 @@
 //  Experiment first: TuningReports.testGenericRepCounter runs it over every fixture; the verdict lives in
 //  docs/analysis/generic-reps.md. Not wired into the app until that table is good.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct GenericRepCounter {
   public enum Signal: String, CaseIterable {

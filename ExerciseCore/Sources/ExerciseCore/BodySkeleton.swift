@@ -4,8 +4,11 @@
 //  PoseSkeletonTransformer.ts, remapped from BlazePose-33 to the COCO-17 layout that YOLO pose models emit.
 //  Angles use pixel coordinates (not normalized) so non-square frames don't distort them.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 /// COCO-17 keypoint order produced by YOLO pose models.
 public enum CocoKeypoint: Int, CaseIterable {
