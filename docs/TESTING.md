@@ -31,6 +31,7 @@ camera, a display, or a wrist goes higher.
 | Offline pose pass, import, analysis wiring in the app | Simulator | `check <clip> <exercise> <reps>` in [`sim-smoke.sh`](../scripts/sim-smoke.sh) |
 | Trim (export session, keyframe alignment, player start) | Simulator, then one phone trim on an HDR clip | `check_trim` in `sim-smoke.sh`; phone: tap Done after a recording, read `trim`/`display_frame` events |
 | Player, overlay, HUD, gallery layout | Simulator screenshots, then phone | [`screenshots.sh`](../scripts/screenshots.sh) for the eye; the phone for HDR and real frames |
+| What each camera command (Record, Preview, switch, zoom, Pause, Resume, Done, Cancel) does in each camera stage | Host | [`CameraCommandsTests.swift`](../ExerciseCore/Tests/ExerciseCoreTests/CameraCommandsTests.swift), every cell of `CameraCommands`; the phone only shows the actions happen |
 | Camera, recorder, camera switch, idle timer | Phone only | record a set, `just pull-logs`, check `camera_*`, `recording_partial`, `error` events |
 | HDR washout, EDR, layer transforms | Phone only | `video_track` (`hdr`, `edr_headroom`) and `player_layer` events; the eye |
 | Apple Watch companion | Phone + watch | `watch_session`, `watch_reachable`, `ui` events with `from: watch` |

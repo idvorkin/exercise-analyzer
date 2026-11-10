@@ -76,7 +76,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 ### User Story 017:
 
 - **Summary:** Start, switch camera and finish a set from the wrist
-- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe); verified on phone + watch, the camera cycle from the log; the button never told "1×" on the way to 0.5× (#188) in [745a3cd](https://github.com/idvorkin/exercise-analyzer/commit/745a3cd), verified by build only (the simulator has no camera); the cause of Igor's missed 0.5× is not proven, the next log's `shown_zoom` will say
+- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe); verified on phone + watch, the camera cycle from the log; the button never told "1×" on the way to 0.5× (#188) in [745a3cd](https://github.com/idvorkin/exercise-analyzer/commit/745a3cd), verified by build only (the simulator has no camera); the cause of Igor's missed 0.5× is not proven, the next log's `shown_zoom` will say; every wrist camera command in every camera stage is the `CameraCommands` table, and a switch or zoom with the camera off starts nothing (the 2026-11-07 audit, finding 3), on `humble-ladder-7-camera`, `CameraCommandsTests` on the host (Linux), the app build and a stale wrist tap on the phone to verify
 
 #### Use Case:
 - **As a** lifter who set the phone down across the room
@@ -95,6 +95,12 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **When:** I tap the camera button on the watch
 - **Then:** the phone goes to the back camera at 0.5× and the first thing the watch hears is "0.5×": it is never
   told "1×" on the way, so the button cannot read "1×" while the picture is the wide one
+
+- **Scenario:** A camera tap from a wrist behind the phone starts nothing
+- **Given:** the phone has ended the set (Done or Cancel on the phone) and the wrist still shows its recording page
+- **When:** I tap the camera button or zoom on the watch
+- **Then:** nothing starts: no camera, no recording (`watch_command_ignored` in the log); Record and Preview are
+  the only wrist buttons that open the camera
 
 - **Notes:** The idle page has two buttons: Record, which records from the camera's first frame, and Preview
   (story 047), which opens the camera without recording.
