@@ -169,21 +169,33 @@ final class WorkoutController: NSObject {
     let read: Set<HKObjectType> = [
       Self.heartRateType, HKQuantityType(.activeEnergyBurned), HKQuantityType(.restingHeartRate),
     ]
+    // The ask: Health shows its sheet for anything never answered. A permission once turned off is never asked
+    // again (HealthKit's rule), so then the wrist says where to turn it back on (ea-690, #351/#352).
     store.requestAuthorization(toShare: [.workoutType()], read: read) { [weak self] granted, error in
       Task { @MainActor in
         guard let self else { return }
-        self.log("workout_auth", ["granted": granted, "message": error.map { "\($0)" } ?? ""])
-        // `granted` only says the prompt ran; sharing workouts can still be denied. The session then fails
-        // to start below and says so.
+        // Health hides whether reading heart rate is allowed; sharing workouts is the one it tells, and the
+        // live builder collects nothing without it.
+        let sharing = self.store.authorizationStatus(for: .workoutType())
+        self.log(
+          "workout_auth",
+          ["granted": granted, "sharing": sharing.rawValue, "message": error.map { "\($0)" } ?? ""])
         guard granted else {
           self.phase = .none
           self.fail(error?.localizedDescription ?? "Health permission was not given", event: "workout_failed")
           return
         }
         self.open()
+        // The workout still runs and counts sets; only the heart rate is missing. A session that failed to open
+        // keeps its own error.
+        if sharing == .sharingDenied, self.phase == .running { self.fail(Self.healthOff, event: "workout_health_off") }
       }
     }
   }
+
+  /// What the wrist says when Health refuses the workout: no heart rate until the lifter turns it on.
+  static let healthOff =
+    "No heart rate: Health access is off. On the iPhone: Health › your picture › Apps › Exercise Analyzer › Turn On All"
 
   private func open() {
     let configuration = HKWorkoutConfiguration()
@@ -202,6 +214,10 @@ final class WorkoutController: NSObject {
       builder.beginCollection(withStart: start) { [weak self] ok, error in
         Task { @MainActor in
           self?.log("workout_collection", ["ok": ok, "message": error.map { "\($0)" } ?? ""])
+          // Code 4 "Not authorized" (2026-11-08): the session runs but collects no heart rate.
+          if let error = error as? HKError, error.code == .errorAuthorizationDenied {
+            self?.fail(Self.healthOff, event: "workout_health_off")
+          }
         }
       }
       // The phone gets the session (state changes, and our WorkoutWire messages) through Health's mirroring;
