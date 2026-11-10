@@ -222,6 +222,9 @@ private struct WorkoutPageView: View {
     f.dateStyle = .none
     return f
   }()
+  /// The times line's ends without AM/PM, "10:03–11:45" (Igor, ea-rh8: "don't need am pm"): with both, two-digit
+  /// hours ran under the big heart number.
+  private static let span = Date.FormatStyle().hour(.defaultDigits(amPM: .omitted)).minute()
   private static let day: DateFormatter = {
     let f = DateFormatter()
     f.setLocalizedDateFormatFromTemplate("EEE d MMM")
@@ -454,7 +457,7 @@ private struct WorkoutPageView: View {
     }
   }
 
-  /// "8:43–9:00 AM · 17 min", "9 sets · 78 reps · work 3:40 · rest 11:20", "♥ 129 avg · 153 max"; while it runs,
+  /// "8:43–9:00 · 17 min", "9 sets · 78 reps · work 3:40 · rest 11:20", "♥ 129 avg · 153 max"; while it runs,
   /// the heart rate now large at top right (#347; Igor, on the elliptical: "put big heart rate in upper right see
   /// dead space here"), readable at arm's length on a machine: laid over the right of the times and the Rest line,
   /// which leave it empty above the long sets line, taking no room of its own (Igor: "it should only be in dead
@@ -462,7 +465,7 @@ private struct WorkoutPageView: View {
   private func totals(_ timeline: WorkoutTimeline) -> some View {
     VStack(alignment: .leading, spacing: 3) {
       Text(
-        "\(Self.clock.string(from: workout.start))–\(Self.clock.string(from: workout.end)) · \(Int(workout.duration / 60)) min"
+        "\(workout.start.formatted(Self.span))–\(workout.end.formatted(Self.span)) · \(Int(workout.duration / 60)) min"
       )
       .font(.title3.bold()).monospacedDigit()
       // While it runs, the rest since the last set ended, ticking (#342; Igor: "Add rest counter from last rep on
