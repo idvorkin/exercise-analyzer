@@ -274,42 +274,31 @@ final class SyncStore {
     }
     let me = Self.deviceID
     nameCloudIdentifiers(me: me)
-    var jobs: [Job] = []
-    for entry in recents.entries {
-      guard SyncOwnership.isMine(entry.device, me: me) else { continue }
-      var stamped = entry
-      stamped.device = me
-      let data: Data
-      do { data = try Self.encoder.encode(stamped) } catch {
-        note("sync_encode_failed", ["id": entry.id, "message": "\(error)"])
-        continue
+    // Which rows go up is ExerciseCore's SyncPlan (host-tested with SyncMerge as two devices); here they get their
+    // folders. The heart-rate series is written after the row (more samples as they arrive): its size is part of
+    // the print so a fuller one goes up (#225).
+    let plan = SyncPlan.jobs(
+      sets: recents.entries, workouts: workouts.index.workouts, deletedSets: recents.deleted,
+      deletedWorkouts: workouts.deleted, ledger: ledger, me: me, encoder: Self.encoder
+    ) { row, of in
+      let folder: URL
+      switch of {
+      case .set(let id): folder = recents.folder(for: id)
+      case .workout(let id): folder = workouts.folder(for: id)
       }
-      let folder = recents.folder(for: entry.id)
-      // The heart-rate series is written after the row (more samples as they arrive): its size is part of the
-      // print so a fuller one goes up (#225).
-      let print = Self.fingerprint(data, heartRate: folder.appendingPathComponent(HeartRateSeries.fileName))
-      if ledger[entry.id] != print {
-        jobs.append(.set(id: entry.id, row: data, folder: folder, print: print))
+      return Self.fingerprint(row, heartRate: folder.appendingPathComponent(HeartRateSeries.fileName))
+    }
+    for failure in plan.failures { note("sync_encode_failed", ["id": failure.ledgerID, "message": failure.message]) }
+    let jobs: [Job] = plan.jobs.map { job in
+      switch job {
+      case .set(let id, let row, let print):
+        .set(id: id, row: row, folder: recents.folder(for: id), print: print)
+      case .workout(let id, let row, let print):
+        .workout(id: id, row: row, folder: workouts.folder(for: id), print: print)
+      case .tombstone(let id, let at):
+        .tombstone(id: id, at: at)
       }
     }
-    for workout in workouts.index.workouts {
-      let id = "workout:" + workout.id
-      guard SyncOwnership.isMine(workout.device, me: me) else { continue }
-      var stamped = workout
-      stamped.device = me
-      let data: Data
-      do { data = try Self.encoder.encode(stamped) } catch {
-        note("sync_encode_failed", ["id": id, "message": "\(error)"])
-        continue
-      }
-      let folder = workouts.folder(for: workout.id)
-      let print = Self.fingerprint(data, heartRate: folder.appendingPathComponent(HeartRateSeries.fileName))
-      if ledger[id] != print { jobs.append(.workout(id: workout.id, row: data, folder: folder, print: print)) }
-    }
-    // Sets and workouts deleted here, this device's and others' (step 4): their tombstones, dated when the
-    // delete happened.
-    for (id, at) in recents.deleted { jobs.append(.tombstone(id: id, at: at)) }
-    for (id, at) in workouts.deleted { jobs.append(.tombstone(id: "workout:" + id, at: at)) }
     guard !jobs.isEmpty else { return }
     mirroring = true
     let started = Date()
