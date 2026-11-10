@@ -186,8 +186,9 @@ final class WorkoutController: NSObject {
           return
         }
         self.open()
-        // The workout still runs and counts sets; only the heart rate is missing.
-        if sharing == .sharingDenied { self.fail(Self.healthOff, event: "workout_health_off") }
+        // The workout still runs and counts sets; only the heart rate is missing. A session that failed to open
+        // keeps its own error.
+        if sharing == .sharingDenied, self.phase == .running { self.fail(Self.healthOff, event: "workout_health_off") }
       }
     }
   }
