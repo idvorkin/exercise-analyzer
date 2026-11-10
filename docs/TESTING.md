@@ -23,6 +23,7 @@ camera, a display, or a wrist goes higher.
 | Skeleton geometry (angles, sides, uprightness) | Host | `SkeletonTests` with synthetic poses |
 | Crop / me-view, rep span for trimming | Host | `RepCountTests.testRepSpanAndStableCropCoverTheSet` |
 | Where the zoomed lifter sits in the picture (#98) | Host, then the simulator for the HUD around it | `ZoomTransformTests`; to see it, `ZoomPreviewReport` draws the zoomed picture at both gallery heights from a still, with the HUD's bands, in under a second: `cd ExerciseCore && ZOOM_PREVIEW_IMAGE=<set>/rep-1-top.jpg ZOOM_PREVIEW_CROP=0.43,0.21,0.50,0.60 ZOOM_PREVIEW_FRAME=1080x1920 ZOOM_PREVIEW_OUT=/tmp/zoom.png swift test --filter ZoomPreviewReport` (a stored set's rep stills are cut to its crop, so `ZOOM_PREVIEW_FRAME` places one in an empty frame; leave it out for a full-frame still) |
+| How an offline pass ends (done, cancelled, interrupted, superseded, no model) and what it leaves: Cancel, retry, mode switch, the wrist's "Analyzing…" | Host | [`OfflinePassTests.swift`](../ExerciseCore/Tests/ExerciseCoreTests/OfflinePassTests.swift) |
 | In-frame status, watch messages | Host | [`FrameStatusTests.swift`](../ExerciseCore/Tests/ExerciseCoreTests/FrameStatusTests.swift) |
 | Anything in `AnalysisPipeline` (re-analysis, shifting after a trim, runs of reps and their join, #83) | Host | `PoseTrackTests`, `RepCountTests`, `TrimRunsTests` |
 | Offline pose pass, import, analysis wiring in the app | Simulator | `check <clip> <exercise> <reps>` in [`sim-smoke.sh`](../scripts/sim-smoke.sh) |
@@ -189,8 +190,8 @@ read from the environment (pass them through `simctl` as `SIMCTL_CHILD_<name>`):
 | `SWING_CANCEL_ANALYSIS=1` | cancel the offline pass one second in |
 | `SWING_CANCEL_ANALYSIS=reopen` | cancel one second in and reopen the clip at once, while the cancelled worker holds the models half a second past the cancel (a slow last frame); `ONLY=cancel just test-sim` asserts the new pass logged `model_wait` (who pass) after the cancel and was the only pass to finish (#147) |
 | `SWING_CLIP_SWITCH=render\|mode\|photos\|trim` | simulator-only: suspend A at its render, mode replay, Photos-save or trim completion; open stored B (zero reps), then release A. The Photos case returns a fake identifier without library access. `ONLY=clip_switch just test-sim` asserts B's analysis, local video and entry survive and A neither saves nor starts playback; `clip_switch_begin`, `clip_switch_release`, `clip_switch_checked` mark the boundaries |
-| `SWING_INTERRUPT_READER=<frame>` | fail the first pass at that frame with `readerFailed("Operation Interrupted")`, like a backgrounded decoder (#57) |
-| `SWING_MODE=<exercise\|auto>` | switch exercise 2 s after an interrupted pass, proving a mode switch re-runs the clip (#57); launch-only, persists no default, and every smoke check resets the mode default first |
+| `SWING_INTERRUPT_READER=<frame>` | fail the first pass at that frame with `readerFailed("Operation Interrupted")`, like a backgrounded decoder (#57). By hand only since the rule moved to `OfflinePassTests` |
+| `SWING_MODE=<exercise\|auto>` | switch exercise 2 s after an interrupted pass, so a mode switch re-runs the clip (#57); launch-only, persists no default, and every smoke check resets the mode default first. By hand only, with the hook above |
 | `SWING_OPEN_RECENT=1` | reopen the newest Recents entry |
 | `SWING_OPEN_RECENT=<A>,<B>` | `1,2` for the two newest: open A as a tap does, play 4 s, leave by "‹", open B as a tap does, in one launch (`hook_second_open` marks the second). `ONLY=second_open just test-sim` asks that the player's `hud_reps` showed B's set and count: on iOS 27 a pushed player that did not observe the session kept A's HUD over B's video (2026-10-18) |
 | `SWING_CLIP_MISSING=<id>` | opens that set as if its clip were gone after the player was pushed (a Photos clip no longer there). With `SWING_OPEN_RECENT=1,2`, `ONLY=clip_missing just test-sim` asks that `clip_not_here` says the player left: it kept the previous set on screen (#303) |
@@ -234,8 +235,10 @@ player's first tick lands late under load). That keyframe is where AVPlayer star
 no oracle: AVFoundation's passthrough export keeps the earlier keyframe as discarded edit-list pre-roll and ffmpeg
 decodes through it, so it reads 0 even on a bad cut. Measured 2026-10-25 on AVAssetExportSession passthrough cuts
 of `igor-1h-swing` (the oracle against AVPlayer's first frame): mid-GOP from 3 s, the #13 bug, 5.333 vs 5.333 s
-(FAIL); from the keyframe's decode time 0.067 vs 0.067 s; from 0, 0 vs 0. Cancel must leave playback paused and save nothing; interruption followed
-by a mode switch must re-extract. Four `clip_switch` checks force late foreground completions after another
+(FAIL); from the keyframe's decode time 0.067 vs 0.067 s; from 0, 0 vs 0. What Cancel and a failed pass leave behind (paused or playing, Cancel shown,
+retry offered, a mode switch re-reading or re-running, the wrist's "Analyzing…" ended) is ExerciseCore's
+`OfflinePass`, asserted on the host by `OfflinePassTests`, one test per exit; the simulator keeps only
+`cancel_reopen`, where a real worker holds the models past the cancel (#147). Four `clip_switch` checks force late foreground completions after another
 stored set opens, including a simulated Photos response; real Photos permission/replacement/undo remains a
 phone check.
 

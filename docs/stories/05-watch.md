@@ -406,7 +406,7 @@ the first frame (story 001).
 ### User Story 045:
 
 - **Summary:** The final count reaches the wrist
-- **Status:** implemented in [0ea930c](https://github.com/idvorkin/exercise-analyzer/commit/0ea930c); on phone + watch since 2026-09-13, Igor's check pending
+- **Status:** implemented in [0ea930c](https://github.com/idvorkin/exercise-analyzer/commit/0ea930c); on phone + watch since 2026-09-13, Igor's check pending; "Analyzing…" is `OfflinePass.awaitingLastSet` on `humble-ladder-3-pass`, so a missing pose model takes it down too (the 2026-11-07 audit, finding 4), `OfflinePassTests` on the host (Linux), the app build and the phone to verify
 - **Why:** the watch dropped to "Phone ready" the moment the camera stopped, and the live count it showed is not the one the offline pass settles a few seconds later; Igor walked to the phone to learn the set.
 
 #### Use Case:
@@ -418,7 +418,7 @@ the first frame (story 001).
 - **Scenario:** Done from the wrist
 - **Given:** a set was recorded and finished from the watch
 - **When:** the phone's offline pass completes, a few seconds after Done
-- **Then:** the watch shows "Analyzing…" while the pass runs and then a "Last set" caption over "12 reps · Kettlebell Swing · 1:02" above the Record button until the next set starts; a pass that cannot land a count (interrupted, cancelled, nothing recorded, another set opened) takes "Analyzing…" down with it
+- **Then:** the watch shows "Analyzing…" while the pass runs and then a "Last set" caption over "12 reps · Kettlebell Swing · 1:02" above the Record button until the next set starts; a pass that cannot land a count (interrupted, cancelled, nothing recorded, its trim failed, another set opened, no pose model) takes "Analyzing…" down with it, and the phone's progress bar too
 
 - **Notes:** Wire: `WatchStatus.lastSet` (reps, exercise, seconds, when), optional, ignored by an old watch app.
 

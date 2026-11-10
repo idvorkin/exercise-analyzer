@@ -99,22 +99,9 @@ check_clip_missing() {  # the second open finds its clip gone after the push (#3
     echo "ok    clip_missing: the player left and the page said the clip is not here"
   else echo "FAIL  clip_missing: left_player '${left}' for set '${second}'"; fail=1; fi
 }
-check_cancel() {  # clip wait-seconds: cancels one second into the analysis (#37), expects the pass to stop within 3 s
-  reset_mode
-  SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" SIMCTL_CHILD_SWING_CANCEL_ANALYSIS=1 xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
-  sleep 3
-  wait_for analysis_cancelled "$2" || echo "      (timed out after $2 s waiting for the cancel to land)"
-  sleep 2  # observe the completion path too: Cancel must not fall through to playback
-  local f; f=$(newest_log)
-  local asked landed analyzed played
-  asked=$(jq -r 'select(.type=="analysis_cancel") | .t' "$f" | head -1)
-  landed=$(jq -r 'select(.type=="analysis_cancelled") | .t' "$f" | head -1)
-  analyzed=$(jq -r 'select(.type=="analyzed" or .type=="recents_saved") | .type' "$f" | head -1)
-  played=$(jq -r 'select(.type=="play") | .t' "$f" | head -1)
-  if [ -n "$asked" ] && [ -n "$landed" ] && [ -z "$analyzed" ] && [ -z "$played" ] && [ $((landed - asked)) -lt 3000 ]; then
-    echo "ok    cancel $1: stopped $((landed - asked)) ms after Cancel, paused, nothing analyzed or saved"
-  else echo "FAIL  cancel $1: asked=$asked landed=$landed analyzed=$analyzed played=$played"; fail=1; fi
-}
+# Cancel and a failed pass (#37, #57) are decided by ExerciseCore's OfflinePass: OfflinePassTests asserts what each
+# exit leaves (paused or playing, Cancel shown, retry offered, a mode switch re-reading or re-running) on the host.
+# The real worker letting go of the models after a cancel stays here, in check_cancel_reopen.
 check_cancel_reopen() {  # clip expected-reps wait-seconds: cancels one second in and reopens the clip at once while
   # the cancelled worker holds the models half a second longer (#147); the new pass must wait for them
   # (model_wait) and be the only pass that finishes.
@@ -133,31 +120,6 @@ check_cancel_reopen() {  # clip expected-reps wait-seconds: cancels one second i
     && [ "$passes" = "1" ] && [ "$reps" = "$2" ]; then
     echo "ok    cancel_reopen $1: second pass waited $ms ms for the models, one pass finished, $reps reps"
   else echo "FAIL  cancel_reopen $1: asked=$asked waited=$waited ms=$ms passes=$passes reps=$reps (wanted $2)"; fail=1; fi
-}
-check_interrupt() {  # clip interrupt-frame mode expected-reps wait-seconds: fails the first pass the way a
-  # backgrounded decoder does (#57); the mode switch must then re-run the clip, so an offline_pass comes before
-  # any analyzed and the failed pass alone analyzes nothing.
-  reset_mode
-  SIMCTL_CHILD_SWING_VIDEO="$SAMPLES/$1.mp4" SIMCTL_CHILD_SWING_INTERRUPT_READER="$2" SIMCTL_CHILD_SWING_MODE="$3" \
-    xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
-  sleep 3
-  wait_for offline_interrupted "$5" || echo "      (timed out after $5 s waiting for the interruption)"
-  wait_for analyzed "$5" || echo "      (timed out after $5 s waiting for the re-run analysis)"
-  local f; f=$(newest_log)
-  local interrupted mode pass analyzed reps
-  interrupted=$(jq -r 'select(.type=="offline_interrupted") | .t' "$f" | head -1)
-  mode=$(jq -r 'select(.type=="exercise_mode") | .t' "$f" | head -1)
-  pass=$(jq -r 'select((.type=="offline_pass") and (.where == null)) | .t' "$f" | head -1)
-  analyzed=$(jq -r 'select(.type=="analyzed") | .t' "$f" | head -1)
-  reps=$(jq -r 'select(.type=="analyzed") | .reps' "$f" | tail -1)
-  if [ -n "$interrupted" ] && [ -n "$mode" ] && [ -n "$pass" ] && [ -n "$analyzed" ] && [ "$reps" = "$4" ] \
-    && [ "$interrupted" -lt "$mode" ] && [ "$mode" -lt "$pass" ] && [ "$pass" -lt "$analyzed" ]; then
-    echo "ok    interrupt $1: failed at $interrupted, mode at $mode, pass at $pass, analyzed at $analyzed ($reps reps)"
-  else echo "FAIL  interrupt $1: interrupted=$interrupted mode=$mode pass=$pass analyzed=$analyzed reps=$reps (wanted $4)"; fail=1; fi
-  # The hook must not persist its mode: the next launch has to detect again (#57 pollution).
-  local mode_default
-  mode_default=$(xcrun simctl spawn "$SIM" defaults read "$BUNDLE" exerciseMode 2>/dev/null || true)
-  if [ -n "$mode_default" ]; then echo "FAIL  interrupt $1: hook persisted exerciseMode=$mode_default"; fail=1; fi
 }
 check_clip_switch() {  # stage: force A's render/replay/Photos/trim result to arrive after stored B opens
   reset_mode
@@ -285,9 +247,7 @@ run() { if [ -z "${ONLY:-}" ] || [[ "$*" == *"${ONLY}"* ]]; then "$@"; fi; }
 # and count are pinned on the host (Fixture.all: DetectionTests, RepCountTests), pistols and Bulgarian included.
 run check swing-sample-4reps kettlebell-swing 4 90
 run check_trim igor-1h-swing 10 150  # 9 until the first swing counted (#148)
-run check_cancel pistols 60
 run check_cancel_reopen pistols 5 180
-run check_interrupt pistols 60 pistol-squat 5 180
 run check_clip_switch render
 run check_clip_switch mode
 run check_clip_switch photos
