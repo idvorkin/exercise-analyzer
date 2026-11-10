@@ -34,7 +34,9 @@ state and is not in the table.
 The rule behind the table (Igor, 2026-09-13, after the picture page lost its controls in #74): the framing loop
 needs the picture, the in-frame hint, Camera, Done and Cancel on the camera-live page, inside the safe area,
 from the camera's first frame. Preview (047) is the framing state; the phone's own Live still records from
-the first frame (story 001).
+the first frame (story 001). Which of the pages shows is `WatchPage.of` in ExerciseCore (the link, the camera
+being up, the phone app's state, no videos), held as a table in `WatchPageTests` on the host (Linux, on
+`humble-ladder-6-watch-page`); this table and the screenshots stay the check of what each page holds.
 
 ---
 

@@ -107,6 +107,11 @@ final class PhoneLink: NSObject {
       wakeAge: now.timeIntervalSince(wokeAt), recording: status.recording)
   }
 
+  /// The page the watch shows (ExerciseCore's `WatchPage`, host-tested; #74).
+  var page: WatchPage {
+    WatchPage.of(link: link, recording: status.recording, phoneActive: status.phoneActive, noVideos: noVideos)
+  }
+
   /// The phone's status and the recording controls are trustworthy.
   var isLive: Bool { link.isLive }
   /// What the screen trusts: a live phone, or the last status it heard for the first seconds after a raise.

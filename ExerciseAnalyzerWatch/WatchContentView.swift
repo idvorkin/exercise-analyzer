@@ -27,8 +27,9 @@ struct WatchContentView: View {
     Group {
       // The picture page whenever the camera is live: `recording` means the camera is up. `phoneActive` is the
       // follow-the-wrist decision (041), never a gate on the picture (2026-09-13 regression: the wrist dropped to
-      // the idle pages whenever the phone app was not .active, and lost its framing controls with it).
-      if (phone.showsAsLive || phone.answersLost) && status.recording {
+      // the idle pages whenever the phone app was not .active, and lost its framing controls with it). The choice
+      // is `WatchPage.of` in ExerciseCore, host-tested in WatchPageTests.
+      if phone.page == .recording {
         recordingPages
       } else {
         idlePages
@@ -70,7 +71,8 @@ struct WatchContentView: View {
       ScrollView {
         VStack(spacing: 8) {
           if workout.running { workoutHeader }
-          if phone.noVideos {
+          switch phone.page {
+          case .noVideos:
             // Workout only, no videos (071, #236): nothing about the phone, no Record, no Preview; the workout,
             // the sets typed by hand and the rest are the wrist's own; the count page picks the exercise (#154).
             if !workout.running {
@@ -88,7 +90,7 @@ struct WatchContentView: View {
             if !workout.running { restStatus }
             restPicker
             noVideosToggle
-          } else if !phone.showsAsLive {
+          case .notConnected:
             if !workout.running {
               Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
             }
@@ -114,7 +116,7 @@ struct WatchContentView: View {
             }
             setByHandButton  // the set waits for the phone (059)
             noVideosToggle
-          } else if !status.phoneActive {
+          case .phoneInBackground:
             if !workout.running {
               Image(systemName: "iphone.gen3").font(.largeTitle).foregroundStyle(.secondary)
             }
@@ -130,7 +132,7 @@ struct WatchContentView: View {
             }
             setByHandButton
             noVideosToggle
-          } else {
+          case .ready, .recording:  // .recording never reaches the idle pages (body)
             if !workout.running {
               Image(systemName: "figure.strengthtraining.traditional").font(.largeTitle).foregroundStyle(.secondary)
               Text(phone.reachable ? "Phone ready" : "Open Exercise Analyzer on the phone")
