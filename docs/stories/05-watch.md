@@ -556,7 +556,7 @@ the first frame (story 001).
 - **Given:** Health's permission for the app was turned off, or reset by a reinstall (2026-11-08: every start got "Not authorized" and no heart rate showed on the wrist or the phone)
 - **When:** I tap Start workout
 - **Then:** Health's sheet shows when anything was never answered; when it was answered no, Health will not ask again, so the workout still starts and counts sets, and red text under the buttons reads "No heart rate: Health access is off. On the iPhone: Health › your picture › Apps › Exercise Analyzer › Turn On All" (`watch_workout_health_off`; `watch_workout_auth` carries sharing)
-- **Status:** built on `fix/2026-11-09-hr-access` (ea-690), by build only; to verify on the wrist
+- **Status:** built on `fix/2026-11-09-hr-access` (ea-690), installed on the phone and watch 2026-11-09; heart rate came back once Health access was turned on again; the Health-off line itself to verify on the wrist
 
 - **Scenario:** The phone shows the workout too
 - **Given:** a workout running on the wrist and the phone app open
