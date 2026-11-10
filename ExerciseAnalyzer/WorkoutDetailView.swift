@@ -127,11 +127,13 @@ struct WorkoutDetailView: View {
     #if targetEnvironment(simulator)
       .task {
         guard ProcessInfo.processInfo.environment["SWING_WORKOUT_EVOLVE"] == "1" else { return }
+        // The check asks one thing: does the open page survive the real save/clear hand-over with both sets. The
+        // counts, the duration and the window are host tests (WorkoutTimelineTests, WorkoutJoinTests), so the
+        // pretend workout no longer waits ~25 s of wall clock for them to grow (the 2026-11-07 audit, move 8).
         store.seedWorkoutPageSet(id: "live-page-first", start: identity.start.addingTimeInterval(10))
-        do { try await Task.sleep(for: .seconds(3)) } catch { return }
+        do { try await Task.sleep(for: .seconds(1)) } catch { return }
         store.seedWorkoutPageSet(id: "live-page-second", start: Date())
-        // Leave the page up beyond one refresh, then exercise the real save/clear hand-over.
-        do { try await Task.sleep(for: .seconds(22)) } catch { return }
+        do { try await Task.sleep(for: .seconds(2)) } catch { return }
         workouts.endSeededWorkout()
       }
     #endif
