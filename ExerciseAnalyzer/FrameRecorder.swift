@@ -19,7 +19,7 @@ final class FrameRecorder: @unchecked Sendable {
 
   init() {
     url = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "swing-recording-\(UUID().uuidString).mov")
+      "\(RecentEntry.recordingNamePrefix)\(UUID().uuidString).mov")
   }
 
   /// Drops appended frames until resumed: a pause must not start the new segment's session mid-pause (#67).

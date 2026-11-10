@@ -73,15 +73,15 @@ final class PhotosExporter {
 
   func backlog(excluding current: String?) -> Backlog {
     var backlog = Backlog()
-    for entry in recents.entries where entry.id != current && !isNew(entry) {
-      guard let url = exportableClip(entry) else { continue }
+    for entry in PhotosExportPlan.backlog(recents.entries, since: since, excluding: current) {
+      guard let url = recents.clipFileURL(for: entry) else { continue }
       backlog.count += 1
       backlog.bytes += (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
     }
     return backlog
   }
 
-  private func isNew(_ entry: RecentEntry) -> Bool { (entry.recordedAt ?? entry.analyzedAt) >= since }
+  private func isNew(_ entry: RecentEntry) -> Bool { PhotosExportPlan.isNew(entry, since: since) }
 
   private func exportableClip(_ entry: RecentEntry) -> URL? {
     entry.recordedOnlyInApp ? recents.clipFileURL(for: entry) : nil
@@ -95,8 +95,9 @@ final class PhotosExporter {
       again = reason
       return
     }
-    let due = recents.entries.filter { entry in
-      !failed.contains(entry.id) && (approved || isNew(entry)) && exportableClip(entry) != nil
+    // Which sets is ExerciseCore's PhotosExportPlan (host-tested over the camera's own rows); the file must be here.
+    let due = PhotosExportPlan.due(recents.entries, approved: approved, since: since, failed: failed).filter {
+      recents.clipFileURL(for: $0) != nil
     }
     guard !due.isEmpty else { return }
     running = true

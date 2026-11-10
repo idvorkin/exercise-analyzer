@@ -74,6 +74,13 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   /// the same set (`SyncMerge`), and a count kept by hand is not a weight edit. Nil for a weight never typed, or
   /// one from before this.
   public var bellKgEditedAt: Date? = nil
+  /// The clip was recorded by this app's camera (story 070, step 3), set once by the save that knows: true for the
+  /// camera's rows (`RecentSave.recording`), false for a new row of any other clip. Nil on rows from before
+  /// 2026-11-10, which `isRecordedHere` reads by the old guess.
+  public var recordedHere: Bool? = nil
+
+  /// What a recording's file is called when the camera writes it (`FrameRecorder`).
+  public static let recordingNamePrefix = "swing-recording-"
 
   public var changedAt: Date { modifiedAt ?? analyzedAt }
 
@@ -171,9 +178,19 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   }
 
   /// A recording made here whose clip lives only in the app: what goes to Photos by itself. An imported file
-  /// (`originalName`) stays: its original is in the library already, most likely (Igor, 2026-10-08: the 13
-  /// imported clips among the 49 in-app ones would have been duplicates).
-  public var recordedOnlyInApp: Bool { clipOnlyInApp && originalName == nil }
+  /// stays: its original is in the library already, most likely (Igor, 2026-10-08: the 13 imported clips among the
+  /// 49 in-app ones would have been duplicates).
+  public var recordedOnlyInApp: Bool { clipOnlyInApp && isRecordedHere }
+
+  /// `recordedHere`, or for a row from before it the guess it was written under: no `originalName` meant
+  /// recorded here. That guess took every recording since #200 (2026-10-08) for an import, because the camera's
+  /// save names the recorder's file (the 2026-11-07 state-machine audit, finding 1); a name the camera gives its
+  /// files reads as recorded here too, so those sets go to Photos as 070 meant.
+  public var isRecordedHere: Bool {
+    if let recordedHere { return recordedHere }
+    guard let originalName else { return true }
+    return originalName.hasPrefix(Self.recordingNamePrefix)
+  }
 
   /// A day with every set on video (#242; Igor: "add a diamond to a workout that has all its videos … when I
   /// wanna demo it, I can show the right one"): at least one set, none of them by hand. A day of only a wrist

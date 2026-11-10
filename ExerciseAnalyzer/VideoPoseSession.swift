@@ -43,6 +43,11 @@ final class VideoPoseSession: NSObject {
     /// The picker's copy of a Photos video, picked without library access: kept as a file, not exported (070).
     case photosCopy
     case recording
+
+    var isRecording: Bool {
+      if case .recording = self { return true }
+      return false
+    }
   }
 
   let player = AVPlayer()
@@ -1186,9 +1191,10 @@ final class VideoPoseSession: NSObject {
   ) {
     do {
       try recents.save(
-        id: id, source: .file(name: "clip." + clipURL.pathExtension), recordedAt: recordedAt, duration: duration,
-        pipeline: live, clipURL: clipURL, thumbnail: setThumbnail(live, id: id),
-        originalName: clipURL.lastPathComponent, models: StoredSetPlan.liveTrackModels, clipStartedAt: clipStartedAt)
+        .recording(
+          id: id, clipFile: clipURL, recordedAt: recordedAt, duration: duration, live: live,
+          clipStartedAt: clipStartedAt),
+        pipeline: live, clipURL: clipURL, thumbnail: setThumbnail(live, id: id))
       log.event(
         "recording_kept",
         ["id": id, "live_reps": live.reps.count, "clip": clipURL.lastPathComponent, "on_screen": onScreen])
@@ -1226,7 +1232,7 @@ final class VideoPoseSession: NSObject {
         id: id, source: source, recordedAt: clip?.recordedAt ?? Date(), duration: duration,
         pipeline: pipeline, clipURL: clipURL, thumbnail: setThumbnail(pipeline, id: id),
         originalName: clip?.trimmedURL == nil ? clip?.url.lastPathComponent : nil, models: models.names,
-        clipStartedAt: clip?.startedAt, photosCopy: photosCopy)
+        clipStartedAt: clip?.startedAt, photosCopy: photosCopy, recordedHere: operation.origin.isRecording)
       clip?.entryID = id
       loadHeartRate()  // the set has a folder now, so a series read before the save can be kept
       log.event("recents_saved", ["id": id, "reps": pipeline.reps.count, "in_photos": source.isPhotos])
