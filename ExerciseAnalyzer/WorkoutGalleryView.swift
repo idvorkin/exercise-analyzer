@@ -42,6 +42,12 @@ struct WorkoutGalleryView: View {
   private static let landingWindow: TimeInterval = 10
   /// The list is the screen: a late live workout lands only then, never over a set opened meanwhile.
   @State private var onScreen = false
+  @Environment(\.scenePhase) private var scenePhase
+  /// The list can ask Health for the edits (#349): Delete lives here, so its ask comes before a line's long-press,
+  /// with nothing over the list, and never under the camera or a set.
+  private var canAskHealth: Bool {
+    onScreen && scenePhase == .active && !workouts.index.workouts.isEmpty
+  }
   /// This view life's id in `workouts_appear` (ea-trz), so two lives at launch show as two ids.
   @State private var life = String(UUID().uuidString.prefix(4))
   /// The workout line whose "Delete workout…" is being confirmed (065).
@@ -61,13 +67,22 @@ struct WorkoutGalleryView: View {
     return f
   }()
 
-  /// The Photos assets already analyzed, by this device's identifiers: this device's sets name theirs; another
-  /// device's set names the owner's, which means nothing here, so its cloud identifier is mapped back (#222).
-  private var knownPhotosIDs: Set<String> {
+  /// Refreshes From Photos with the assets already analyzed, by this device's identifiers: this device's sets name
+  /// theirs; another device's set names the owner's, which means nothing here, so its cloud identifier is mapped
+  /// back (#222). The mapping is an XPC call to Photos that can wait on a busy photolibraryd: made on the main
+  /// thread as Workouts appeared, it held a background launch past the 10 s scene-create watchdog (#348), so it
+  /// runs off it.
+  /// ponytail: `suggestions.refresh` still fetches the recent videos from Photos on the main thread, the same
+  /// daemon; the crash's stack waited in the mapping only. Upgrade: fetch in the detached task too (#296 measures
+  /// it).
+  private func refreshSuggestions() {
     let mine = store.entries.compactMap(\.photosIdentifier)
     let theirs = store.entries.filter { !SyncOwnership.isMine($0.device, me: SyncStore.deviceID) }.compactMap(
       \.cloudIdentifier)
-    return Set(mine + RecentsStore.localIdentifiers(forCloud: theirs))
+    Task {
+      let mapped = await Task.detached(priority: .utility) { RecentsStore.localIdentifiers(forCloud: theirs) }.value
+      suggestions.refresh(known: Set(mine + mapped))
+    }
   }
 
   /// Older than a week: the days that start folded.
@@ -217,7 +232,7 @@ struct WorkoutGalleryView: View {
                         } else {
                           store.keepByHand(id: entry.id, exercise: kind, reps: reps)
                         }
-                        if entry.isInPhotos { suggestions.refresh(known: knownPhotosIDs) }
+                        if entry.isInPhotos { refreshSuggestions() }
                       },
                       onSetBellKg: { entry, kg in
                         if let session {
@@ -282,7 +297,7 @@ struct WorkoutGalleryView: View {
         "workouts_appear",
         ["landed": Self.landed, "life": life, "empty": days.isEmpty && suggestions.clips.isEmpty])
       suggestions.onEvent = onEvent
-      suggestions.refresh(known: knownPhotosIDs)
+      refreshSuggestions()
       if Self.listSince == nil { Self.listSince = Date() }
       onScreen = true
       landOnLive()
@@ -312,6 +327,9 @@ struct WorkoutGalleryView: View {
     }
     .onDisappear { onScreen = false }
     .onChange(of: workouts.liveWorkout?.start) { landOnLive() }
+    .task(id: canAskHealth) {
+      if canAskHealth { await workouts.requestEditAuthorization() }
+    }
   }
 
   /// Mid-workout, the app opens on the workout (#123; Igor, from the gym: "if I'm in a live workout take me back

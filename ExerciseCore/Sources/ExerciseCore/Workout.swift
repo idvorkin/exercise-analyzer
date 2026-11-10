@@ -235,6 +235,9 @@ public struct StoredWorkout: Codable, Hashable, Identifiable, Sendable {
   public var modifiedAt: Date? = nil
   /// What the wrist recorded it as (#333); nil is strength.
   public var kind: WorkoutKind? = nil
+  /// The line's end before Trim end (#346), kept on the part that ends the line now so Undo trim can give it
+  /// back; after two trims, the first one's.
+  public var untrimmedEnd: Date? = nil
 
   public var changedAt: Date { modifiedAt ?? end }
 
@@ -367,12 +370,16 @@ public struct WorkoutIndex: Codable, Equatable, Sendable {
 
   /// Trim end (story 078, #331): the line ends at `end`. Its parts that end later end there, stamped `now` so the
   /// change syncs; parts that start at or after it go. Returns both; nothing changes for an end outside the line.
+  /// The kept part that ends the line keeps the old end for Undo trim (#346).
   @discardableResult public mutating func trimEnd(
     _ session: StoredWorkout, to end: Date, now: Date
   ) -> (trimmed: [StoredWorkout], removed: [StoredWorkout]) {
     guard end > session.start, end < session.end else { return ([], []) }
     let parts = parts(of: session)
+    let original = max(session.end, parts.compactMap(\.untrimmedEnd).max() ?? session.end)
     let removed = parts.filter { $0.start >= end }
+    let gone = Set(removed.map(\.id))
+    workouts.removeAll { gone.contains($0.id) }
     var trimmed: [StoredWorkout] = []
     for part in parts where part.start < end && part.end > end {
       guard let i = workouts.firstIndex(where: { $0.id == part.id }) else { continue }
@@ -380,9 +387,44 @@ public struct WorkoutIndex: Codable, Equatable, Sendable {
       workouts[i].modifiedAt = now
       trimmed.append(workouts[i])
     }
-    let gone = Set(removed.map(\.id))
-    workouts.removeAll { gone.contains($0.id) }
+    keepUntrimmedEnd(original, in: parts.filter { !gone.contains($0.id) }.map(\.id), now: now)
     return (trimmed, removed)
+  }
+
+  /// Where Undo trim takes the line (#346): its end before Trim end, when that is later than its end now.
+  public func untrimmedEnd(of session: StoredWorkout) -> Date? {
+    parts(of: session).compactMap(\.untrimmedEnd).max().flatMap { $0 > session.end ? $0 : nil }
+  }
+
+  /// Undo trim (#346): the line runs on to `end` again, its last part ending there, stamped `now`. A workout
+  /// recorded since inside the time given back stays its own line: the end stops a merge gap short of it.
+  /// Returns that part; nil when nothing is left to give back.
+  @discardableResult public mutating func extendEnd(
+    _ session: StoredWorkout, to end: Date, now: Date
+  ) -> StoredWorkout? {
+    let parts = parts(of: session)
+    let ids = Set(parts.map(\.id))
+    let next = workouts.filter { !ids.contains($0.id) && $0.start >= session.end }.map(\.start).min()
+    let stop = next.map { $0 < end ? min(end, $0.addingTimeInterval(-Self.sessionGap)) : end } ?? end
+    guard stop > session.end, let last = parts.max(by: { $0.end < $1.end }),
+      let i = workouts.firstIndex(where: { $0.id == last.id })
+    else { return nil }
+    keepUntrimmedEnd(nil, in: Array(ids), now: now)
+    workouts[i].end = stop
+    workouts[i].modifiedAt = now
+    return workouts[i]
+  }
+
+  /// Puts `end` on the part of `ids` ending last and clears it from the others, stamping what changed.
+  private mutating func keepUntrimmedEnd(_ end: Date?, in ids: [String], now: Date) {
+    let indices = workouts.indices.filter { ids.contains(workouts[$0].id) }
+    let last = indices.max { workouts[$0].end < workouts[$1].end }
+    for i in indices {
+      let value = i == last ? end : nil
+      guard workouts[i].untrimmedEnd != value else { continue }
+      workouts[i].untrimmedEnd = value
+      workouts[i].modifiedAt = now
+    }
   }
 
   /// Deletes a line (065): every workout inside it, since a merged line cannot be half deleted. Returns them.

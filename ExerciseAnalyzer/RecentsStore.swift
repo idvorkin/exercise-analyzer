@@ -407,8 +407,9 @@ final class RecentsStore {
   }
 
   /// This device's identifiers for assets other devices named by cloud identifier (#222): the ones iCloud Photos
-  /// has brought here. One Photos call for the lot.
-  static func localIdentifiers(forCloud clouds: [String]) -> [String] {
+  /// has brought here. One Photos call for the lot, an XPC round trip: nonisolated so Workouts makes it off the
+  /// main thread (#348).
+  nonisolated static func localIdentifiers(forCloud clouds: [String]) -> [String] {
     guard !clouds.isEmpty else { return [] }
     let mappings = PHPhotoLibrary.shared().localIdentifierMappings(
       for: clouds.map { PHCloudIdentifier(stringValue: $0) })
