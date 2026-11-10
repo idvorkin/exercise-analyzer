@@ -552,6 +552,12 @@ the first frame (story 001).
 - **When:** I tap Start workout (the first time: Health asks once to share workouts and read heart rate)
 - **Then:** the page heads with WORKOUT, the clock counting from now, the heart rate as soon as the sensor reports it, and no sets line until the first set; Start workout is gone and Record and Preview sit below the head
 
+- **Scenario:** Health access turned off (#351, #352)
+- **Given:** Health's permission for the app was turned off, or reset by a reinstall (2026-11-08: every start got "Not authorized" and no heart rate showed on the wrist or the phone)
+- **When:** I tap Start workout
+- **Then:** Health's sheet shows when anything was never answered; when it was answered no, Health will not ask again, so the workout still starts and counts sets, and red text under the buttons reads "No heart rate: Health access is off. On the iPhone: Health › your picture › Apps › Exercise Analyzer › Turn On All" (`watch_workout_health_off`; `watch_workout_auth` carries sharing)
+- **Status:** built on `fix/2026-11-09-hr-access` (ea-690), by build only; to verify on the wrist
+
 - **Scenario:** The phone shows the workout too
 - **Given:** a workout running on the wrist and the phone app open
 - **When:** I look at the phone
