@@ -47,9 +47,15 @@ enum WatchScreenshotState: String, CaseIterable {
     #endif
   }
 
-  /// The disconnected and silent-phone pages distrust the status; every other state renders as
-  /// heard-from-the-phone.
-  var isLive: Bool { self != .disconnected && self != .answersLost }
+  /// The link the state presents (ExerciseCore's `WatchLink`): the disconnected and silent-phone pages distrust
+  /// the status; every other state renders as heard from the phone.
+  var link: WatchLink {
+    switch self {
+    case .disconnected: return .disconnected
+    case .answersLost: return .notAnswering
+    default: return .live
+    }
+  }
 
   /// The status the link presents, with reachability and the preview the page shows.
   var fixed: (status: WatchStatus, reachable: Bool, preview: UIImage?) {

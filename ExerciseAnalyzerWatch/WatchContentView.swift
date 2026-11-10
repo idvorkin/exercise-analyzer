@@ -57,7 +57,7 @@ struct WatchContentView: View {
     // Redraw when the wake grace runs out, so a phone that never answered is shown as such on time.
     .task(id: scenePhase) {
       guard scenePhase == .active else { return }
-      try? await Task.sleep(for: .seconds(PhoneLink.wakeGrace + 0.1))
+      try? await Task.sleep(for: .seconds(WatchLink.wakeGrace + 0.1))
       now = Date()
     }
   }
@@ -93,9 +93,9 @@ struct WatchContentView: View {
               Image(systemName: "iphone.slash").font(.largeTitle).foregroundStyle(.secondary)
             }
             Text(
-              phone.reachable
-                ? "Waiting for the phone…"
-                : "Not connected to the phone. It reconnects on its own; if it doesn't, open Exercise Analyzer on the phone."
+              phone.link == .disconnected
+                ? "Not connected to the phone. It reconnects on its own; if it doesn't, open Exercise Analyzer on the phone."
+                : "Waiting for the phone…"
             )
             .font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
             if status.rolling {
