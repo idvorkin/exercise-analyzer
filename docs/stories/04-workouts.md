@@ -830,10 +830,10 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I leave the set (the next set, the camera, the app to the background) or launch the app again
 - **Then:** the clip has been saved to Photos by itself, as "Save to Photos" does, into the "Exercise Analyzer" album, so iCloud Photos carries it to the iPad; while the set is on screen it stays in the app, so Undo trim still works (leaving the app from the set saves its clip too, unless a trim can still be undone; the set points at the asset once I leave it in the app), and nothing is written while the camera is live; a clip that is a copy of a video already in Photos (a trim whose replace I declined, a pick without library access) is not saved again; the set's counts and pictures stay in the app either way
 
-- **Scenario:** The recordings stuck in the app since 2026-10-08 go too
+- **Scenario:** The recordings left in the app since 2026-10-08 stay there
 - **Given:** sets recorded on the phone since the live count was kept at Done (#200), whose rows name the recorder's file, so the exporter took them for imports and left their clips only in the app (the 2026-11-07 state-machine audit, finding 1)
 - **When:** I launch the build that marks recordings as recorded here
-- **Then:** those sets read as recordings (a row from before the mark that names a `swing-recording-` file), and their clips go to Photos as any recording does: the new ones by themselves, the older ones with the backlog once I said yes; an imported file stays in the app
+- **Then:** those sets keep the guess they were saved under and their clips stay in the app, nothing goes to Photos without asking (Igor's ea-359 pick); a set I record from this build on is marked and goes to Photos as any recording does
 
 - **Scenario:** The sets from before go to Photos once
 - **Given:** 49 sets from before this build have their clips only in the app, 36 of them recordings made here

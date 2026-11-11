@@ -184,13 +184,9 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
 
   /// `recordedHere`, or for a row from before it the guess it was written under: no `originalName` meant
   /// recorded here. That guess took every recording since #200 (2026-10-08) for an import, because the camera's
-  /// save names the recorder's file (the 2026-11-07 state-machine audit, finding 1); a name the camera gives its
-  /// files reads as recorded here too, so those sets go to Photos as 070 meant.
-  public var isRecordedHere: Bool {
-    if let recordedHere { return recordedHere }
-    guard let originalName else { return true }
-    return originalName.hasPrefix(Self.recordingNamePrefix)
-  }
+  /// save names the recorder's file (the 2026-11-07 state-machine audit, finding 1); those old rows keep the
+  /// guess and stay in the app (Igor's ea-359 pick), only recordings saved with the mark go to Photos.
+  public var isRecordedHere: Bool { recordedHere ?? (originalName == nil) }
 
   /// A day with every set on video (#242; Igor: "add a diamond to a workout that has all its videos … when I
   /// wanna demo it, I can show the right one"): at least one set, none of them by hand. A day of only a wrist

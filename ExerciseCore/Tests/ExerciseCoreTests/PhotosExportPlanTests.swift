@@ -55,21 +55,21 @@ final class PhotosExportPlanTests: XCTestCase {
     }
   }
 
-  /// Old index.json rows decode, and read by the guess they were written under, except that the camera's own file
-  /// name now reads as recorded here: the recordings stuck in the app since #200 go to Photos.
-  func testRowsFromBeforeTheFieldKeepTheirGuessAndTheStuckRecordingsGo() throws {
+  /// Old index.json rows decode and read by the guess they were written under, the camera's own file name included:
+  /// the recordings left in the app since #200 stay there (Igor's ea-359 pick); only marked rows go.
+  func testRowsFromBeforeTheFieldKeepTheirGuess() throws {
     let date = since.addingTimeInterval(60)
     let camera = try legacy(cameraRow(at: date))
     XCTAssertNil(camera.recordedHere)
     XCTAssertEqual(camera.originalName, recorded.lastPathComponent)
-    XCTAssertTrue(camera.recordedOnlyInApp)
+    XCTAssertFalse(camera.recordedOnlyInApp)
     let imported = try legacy(importRow(at: date))
     XCTAssertFalse(imported.recordedOnlyInApp)
     var unnamed = try legacy(importRow(id: "old", at: date))
     unnamed.originalName = nil  // a recording from before #200, saved without a name
     XCTAssertTrue(unnamed.recordedOnlyInApp)
     XCTAssertEqual(
-      PhotosExportPlan.due([camera, imported, unnamed], approved: false, since: since).map(\.id), ["rec", "old"])
+      PhotosExportPlan.due([camera, imported, unnamed], approved: false, since: since).map(\.id), ["old"])
   }
 
   /// A later save of an old row that does not know (the launch refresh) leaves its nil, and its guess, alone.
