@@ -94,7 +94,7 @@ few dozen lines), `fflush(stdout)` after it, and write long traces to a file und
 On a Linux box, with no Xcode, `just test-linux` runs `just test`'s suites under Linux Swift, then cross-builds the
 package and its tests for arm64 macOS, iOS and the iOS simulator with a Darwin Swift SDK (xtool's): compiled, never
 run. It is not a rung of its own: it lets an agent off the Mac catch an analyzer, detector or type slip in
-`ExerciseCore`, and the Mac's `just test` still decides. 349 of the Mac's 354 run on Linux. It needs a Swift 6 Linux
+`ExerciseCore`, and the Mac's `just test` still decides. All of the Mac's tests run on Linux except the 5 bell-detector parse tests. It needs a Swift 6 Linux
 toolchain; without a `darwin` Swift SDK the cross-build says it was skipped. The script's header lists the settings
 for a toolchain that is not on `PATH`.
 
