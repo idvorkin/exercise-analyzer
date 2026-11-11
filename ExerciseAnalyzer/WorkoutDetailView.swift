@@ -401,7 +401,8 @@ private struct WorkoutPageView: View {
       chart(timeline)
         // The iPad's full-screen chart (#357; Igor: "a full screen button … when I'm looking at the heart graph, I
         // want to make it take over the whole screen … every 10 … graph paper").
-        .overlay(alignment: .topTrailing) {
+        // Top left, over the workout's start: top right is where a running workout's newest readings draw.
+        .overlay(alignment: .topLeading) {
           if UIDevice.current.userInterfaceIdiom == .pad {
             Button {
               chartFull = true
@@ -411,7 +412,6 @@ private struct WorkoutPageView: View {
                 .font(.body.bold()).padding(10).background(.ultraThinMaterial, in: Circle())
             }
             .accessibilityLabel("Heart rate full screen")
-            .padding(.trailing, 44)  // clear of the bpm labels
           }
         }
         .fullScreenCover(isPresented: $chartFull) {

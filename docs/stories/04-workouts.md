@@ -465,7 +465,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Scenario:** The heart chart full screen on the iPad (#357)
 - **Given:** a workout's page on the iPad
-- **When:** I tap the round see-through button at the chart's top right
+- **When:** I tap the round see-through button at the chart's top left (over the workout's start; the top right is where a running workout's newest readings draw)
 - **Then:** the chart takes the whole screen, with the workout's day as its title and Done at top right; it keeps the zoom and place it had; a labelled line every 10 bpm (the page has one about every 20) and a time line halfway between each labelled one, so it reads like graph paper; pinch and drag still zoom and pan, a tap opens nothing (Done first); Done returns to the page as it was; the phone has no button (`ui workout_chart_full`, on true / false) (Igor, 2026-11-10: "Give me a full screen button on the iPad … I want to make it take over the whole screen … maybe it goes to every 10 … I can see graph paper, not just horizontal lines")
 
 - **Scenario:** The line draws live while the workout runs (#308)
