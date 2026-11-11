@@ -2,11 +2,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 /// #98: Igor's set of 2026-09-18 08:45 (5C13D496), a portrait clip with him at the right of the frame, on a
 /// 402 pt wide phone. The picture area is 375 pt tall with the gallery up and 650 pt with it down.

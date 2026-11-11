@@ -5,11 +5,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class TuningReports: XCTestCase {
   /// #119: wide lunges as a share of lowered poses survive long standing/setup footage.

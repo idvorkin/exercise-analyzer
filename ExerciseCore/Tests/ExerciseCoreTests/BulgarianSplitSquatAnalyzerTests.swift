@@ -5,11 +5,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class BulgarianSplitSquatAnalyzerTests: XCTestCase {
   /// `drop` lowers the head, shoulders and hips together (pixels of a 1000 px frame). `kneesTogether` puts both

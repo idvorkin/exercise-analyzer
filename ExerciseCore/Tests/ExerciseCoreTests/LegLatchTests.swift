@@ -4,11 +4,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class LegLatchTests: XCTestCase {
   /// Only the legs matter here: knees above ankles, the left foot in front at x 0.4, the right on the bench at 0.7.

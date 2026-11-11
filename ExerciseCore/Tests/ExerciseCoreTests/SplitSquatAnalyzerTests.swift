@@ -5,11 +5,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class SplitSquatAnalyzerTests: XCTestCase {
   private let leg = 400.0

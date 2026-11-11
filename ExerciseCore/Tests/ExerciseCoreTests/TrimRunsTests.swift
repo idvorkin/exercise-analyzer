@@ -6,11 +6,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class TrimRunsTests: XCTestCase {
   private let pose = Pose(

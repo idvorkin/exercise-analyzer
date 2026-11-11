@@ -5,11 +5,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class PistolSquatAnalyzerTests: XCTestCase {
   /// A side view: hips at y 500, ankles at 900, the left knee pushed forward to bend it to `knee` degrees, the

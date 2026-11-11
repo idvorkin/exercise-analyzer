@@ -6,11 +6,11 @@
 import Foundation
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 struct Fixture {
   let name: String

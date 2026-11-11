@@ -5,11 +5,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class KettlebellSwingAnalyzerTests: XCTestCase {
   private func pose(spine: Double, arm: Double, hideElbows: Bool = false) -> Pose {

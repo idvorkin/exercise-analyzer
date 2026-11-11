@@ -16,18 +16,25 @@
     /// a region under 64 px is read at every pixel: at most 63 × 63 points), a bounded cost per box.
     public static func averageColor(in pixelBuffer: CVPixelBuffer, box: CGRect) -> [Float]? {
       guard CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_32BGRA else { return nil }
-      let width = CVPixelBufferGetWidth(pixelBuffer), height = CVPixelBufferGetHeight(pixelBuffer)
+      let width = CVPixelBufferGetWidth(pixelBuffer)
+      let height = CVPixelBufferGetHeight(pixelBuffer)
       let inner = box.insetBy(dx: box.width / 4, dy: box.height / 4)
-      let x0 = max(0, Int(inner.minX * CGFloat(width))), x1 = min(width, Int(inner.maxX * CGFloat(width)))
-      let y0 = max(0, Int(inner.minY * CGFloat(height))), y1 = min(height, Int(inner.maxY * CGFloat(height)))
+      let x0 = max(0, Int(inner.minX * CGFloat(width)))
+      let x1 = min(width, Int(inner.maxX * CGFloat(width)))
+      let y0 = max(0, Int(inner.minY * CGFloat(height)))
+      let y1 = min(height, Int(inner.maxY * CGFloat(height)))
       guard x1 > x0, y1 > y0 else { return nil }
       CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
       defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
       guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
       let rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer)
       let bytes = base.assumingMemoryBound(to: UInt8.self)
-      let stepX = max(1, (x1 - x0) / 32), stepY = max(1, (y1 - y0) / 32)
-      var r = 0, g = 0, b = 0, n = 0
+      let stepX = max(1, (x1 - x0) / 32)
+      let stepY = max(1, (y1 - y0) / 32)
+      var r = 0
+      var g = 0
+      var b = 0
+      var n = 0
       var y = y0
       while y < y1 {
         var x = x0

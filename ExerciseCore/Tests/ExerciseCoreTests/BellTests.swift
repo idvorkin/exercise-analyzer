@@ -5,11 +5,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class BellTests: XCTestCase {
   /// A pose with both wrists at `wrist` and everything else confident but elsewhere.

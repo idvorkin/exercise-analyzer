@@ -2,11 +2,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 /// Rung one of the test ladder: detector and analyzers replayed over real pose tracks on the host.
 final class DetectionTests: XCTestCase {

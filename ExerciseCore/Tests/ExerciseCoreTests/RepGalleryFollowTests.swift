@@ -5,11 +5,11 @@
 
 import XCTest
 
+@testable import ExerciseCore
+
 #if canImport(CoreGraphics)
   import CoreGraphics
 #endif
-
-@testable import ExerciseCore
 
 final class RepGalleryFollowTests: XCTestCase {
   private func position(_ phase: String, _ time: Double) -> RepPosition {
