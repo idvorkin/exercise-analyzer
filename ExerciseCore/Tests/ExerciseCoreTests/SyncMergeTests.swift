@@ -37,6 +37,23 @@ final class SyncMergeTests: XCTestCase {
     XCTAssertEqual(index.entries.first?.device, phone)
   }
 
+  /// A recording's mark survives a newer row from a build that does not know it (PR #367 review): the clip still
+  /// goes to Photos.
+  func testANewerRowWithoutTheRecordedMarkKeepsIt() throws {
+    var mine = entry("rec", device: me, at: 1_000_000)
+    mine.originalName = "swing-recording-0A1B.mov"
+    mine.recordedHere = true
+    var theirs = mine
+    theirs.recordedHere = nil
+    theirs.device = phone
+    theirs.bellKg = 24
+    theirs.modifiedAt = Date(timeIntervalSince1970: 1_000_100)
+    let merged = try XCTUnwrap(mine.merged(remote: theirs, me: me))
+    XCTAssertEqual(merged.bellKg, 24)
+    XCTAssertEqual(merged.recordedHere, true)
+    XCTAssertTrue(merged.isRecordedHere)
+  }
+
   func testTheLaterChangeWinsWhoeverOwnsTheSet() {
     // The phone's set, changed on the phone after our copy: taken. Changed before ours was: kept as ours.
     var index = RecentsIndex(entries: [entry("a", reps: 10, device: phone, modified: 1_000_100)])
