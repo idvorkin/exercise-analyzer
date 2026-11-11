@@ -133,6 +133,9 @@ struct WorkoutDetailView: View {
         store.seedWorkoutPageSet(id: "live-page-first", start: identity.start.addingTimeInterval(10))
         do { try await Task.sleep(for: .seconds(1)) } catch { return }
         store.seedWorkoutPageSet(id: "live-page-second", start: Date())
+        // The live page counts sets up to its tick, and the 5 s tick would come after the end below: move it now,
+        // so the live page shows (and logs) both sets before the hand-over.
+        tick = Date()
         do { try await Task.sleep(for: .seconds(2)) } catch { return }
         workouts.endSeededWorkout()
       }
