@@ -1,0 +1,15 @@
+# The worktree pool (https://github.com/kunchenguid/treehouse; mac-driver docs/build-turn.md, "Worktrees come from
+# treehouse"). A slot is a worktree that is leased (`treehouse get --lease -b <branch>`), worked in, returned
+# (`treehouse return <path>`) and leased again; its git-ignored Build/ and .mlpackage stay in it, so disk stays
+# bounded and the next branch's build reuses them. A fresh slot still needs `just model` and the bench detector
+# copied from the main checkout (AGENTS.md).
+
+# Three slots: this repo's pane, an outside agent's branch (Codex, Muse) and a background build at once; each slot
+# holds a build folder and the models, so more would cost disk for no gain.
+max_trees = 3
+
+# Named so a missing main is an error, never a quiet fall back to whatever branch the checkout is on.
+base_branch = "main"
+
+# No hooks: treehouse ignores hooks in a repository's file. Returning a slot runs `git clean -fd` without -x, which
+# leaves ignored files alone.
