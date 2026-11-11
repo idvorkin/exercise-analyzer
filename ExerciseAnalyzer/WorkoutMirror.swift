@@ -162,7 +162,7 @@ final class WorkoutMirror: NSObject {
     guard let read, read.samples.count > (stored?.samples.count ?? 0) else { return stored }
     // Kept only for the row as it still is: a late Discard removed it, or a late earlier end re-cut it, during
     // Health's answer (ea-iwi review), and its folder must not come back with the longer series.
-    if workout.id != Self.liveID, index.workouts.contains(where: { $0.id == workout.id && $0.end == workout.end }) {
+    if workout.id != Self.liveID, index.sessions().contains(where: { $0.id == workout.id && $0.end == workout.end }) {
       try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       try? read.save(to: folder)
       onHeartRateSaved?()
