@@ -160,7 +160,9 @@ final class WorkoutMirror: NSObject {
         "median_interval_s": read?.medianInterval ?? 0,
       ])
     guard let read, read.samples.count > (stored?.samples.count ?? 0) else { return stored }
-    if workout.id != Self.liveID {
+    // Kept only for the row as it still is: a late Discard removed it, or a late earlier end re-cut it, during
+    // Health's answer (ea-iwi review), and its folder must not come back with the longer series.
+    if workout.id != Self.liveID, index.workouts.contains(where: { $0.id == workout.id && $0.end == workout.end }) {
       try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
       try? read.save(to: folder)
       onHeartRateSaved?()
@@ -561,8 +563,9 @@ final class WorkoutMirror: NSObject {
   /// The ending message that landed after the session's end (ea-iwi): it amends the row saved from the message
   /// before it, at most 30 s on; any other late message is still dropped (#344).
   private func lateEnding(_ wire: WorkoutWire, from workoutSession: HKWorkoutSession) {
+    // Within 2 s on the start: with no wire heard, the saved one is adopt's placeholder from the session's own date.
     guard wire.ending, let just = justEnded, just.session === workoutSession, !just.live.ending,
-      wire.startedAt == just.live.startedAt, Date().timeIntervalSince(just.at) < 30
+      abs(wire.startedAt - just.live.startedAt) < 2, Date().timeIntervalSince(just.at) < 30
     else { return }
     justEnded = nil
     onEvent?(
@@ -580,15 +583,20 @@ final class WorkoutMirror: NSObject {
   private func save(_ live: WorkoutWire, sessionEnd: Date, replacing id: String? = nil) -> String? {
     // The end the lifter took on the wrist's "Looks like you're done" (#330), never after the session's.
     let date = live.endedAt.map { min(Date(timeIntervalSince1970: $0), sessionEnd) } ?? sessionEnd
-    liveHeartRate.end(at: date)
+    // The readings are this workout's only while no next one has begun (a Start within the 30 s, ea-iwi review).
+    let ownReadings = liveHeartRate.startedAt == live.startedAt
+    if ownReadings { liveHeartRate.end(at: date) }
     let late: [String: Any] = id == nil ? [:] : ["late": true]
+    // An amend's stamp is never older than the row: the row's end is the watch's clock, the stamp the phone's, and
+    // a tombstone or row older than the copy the mirror holds loses to it (SyncStore, SyncMerge).
+    let old = id.flatMap { id in index.workouts.first { $0.id == id } }
+    let stamp = max(Date(), (old?.changedAt ?? .distantPast).addingTimeInterval(0.001))
     if live.discarded {
-      if let id, index.workouts.contains(where: { $0.id == id }) {
+      if let id, old != nil {
         index.workouts.removeAll { $0.id == id }
-        deleted[id] = Date()  // its tombstone, in case the mirror already took it (070, step 4)
+        deleted[id] = stamp  // its tombstone, in case the mirror already took it (070, step 4)
         UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
-        try? FileManager.default.removeItem(
-          at: root.appendingPathComponent("workouts", isDirectory: true).appendingPathComponent(id, isDirectory: true))
+        try? FileManager.default.removeItem(at: folder(for: id))
         try? index.save(root: root)
       }
       var fields: [String: Any] = ["seconds": Int(date.timeIntervalSince(live.startDate))]
@@ -597,17 +605,26 @@ final class WorkoutMirror: NSObject {
       return nil
     }
     // The wire's numbers are the whole session's; an earlier end keeps only its own span's readings.
-    let kept = live.endedAt == nil ? nil : liveHeartRate.series(from: live.startDate, to: date, now: date)
+    let kept =
+      live.endedAt == nil || !ownReadings ? nil : liveHeartRate.series(from: live.startDate, to: date, now: date)
     var workout = StoredWorkout(
       start: live.startDate, end: date,
       heartRateAverage: kept?.average(from: live.startDate, to: date) ?? live.heartRateAverage,
       heartRateMax: kept?.peak(from: live.startDate, to: date) ?? live.heartRateMax,
       sets: live.sets, reps: live.reps)
     workout.kind = live.kind
-    if let id, let i = index.workouts.firstIndex(where: { $0.id == id }) {
+    if let id {
+      // A row deleted here in the meantime stays deleted.
+      guard let i = index.workouts.firstIndex(where: { $0.id == id }) else { return nil }
       workout.id = id
-      workout.modifiedAt = Date()  // the mirror takes the amended row (070)
+      workout.modifiedAt = stamp  // the mirror takes the amended row (070)
       index.workouts[i] = workout
+      // A series stored for the longer end is cut to the earlier one, as Trim end cuts it (078).
+      if let series = HeartRateSeries.load(from: folder(for: id)) {
+        try? series.slice(from: live.startDate.addingTimeInterval(-60), to: date.addingTimeInterval(180))
+          .save(to: folder(for: id))
+        onHeartRateSaved?()
+      }
     } else {
       index.workouts.append(workout)
     }
