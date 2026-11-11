@@ -1,5 +1,10 @@
 # Decision: an outside agent that writes to the repo works in a Herdr worktree (2026-09-26)
 
+> **Update 2026-11-11 (Igor):** every extra checkout is now a slot from the repo's treehouse pool
+> (`treehouse.toml`), not a `herdr worktree create` worktree: `treehouse get --lease -b <name>` to take one,
+> `treehouse return <path>` once merged. The rest of this decision stands: the agent starts in the slot's pane,
+> commits on its own branch, never pushes, and `main` takes it by `--ff-only` after review.
+
 ## Context
 
 Codex (gpt-6-astra) ran the full code review of 2026-09-25 and made six commits. It worked in a worktree made by
