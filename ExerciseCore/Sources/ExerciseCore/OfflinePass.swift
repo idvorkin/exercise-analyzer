@@ -19,8 +19,6 @@ public struct OfflinePass: Equatable, Sendable {
     case interrupted
     /// The lifter cancelled: the clip stays loaded and paused, with no analysis (story 028).
     case cancelled
-    /// No pose model to run (package missing or load failed).
-    case unavailable
   }
 
   public enum Event: Equatable, Sendable {
@@ -40,6 +38,8 @@ public struct OfflinePass: Equatable, Sendable {
     case lastSetLanded
     case cancelled
     case failed
+    /// No pose model to run (package missing or load failed): the stage stays, so stored poses still re-read and an
+    /// interrupted pass keeps its retry.
     case modelUnavailable
     /// Another operation took over (a new clip, a mode switch, Done): a running pass is dropped.
     case superseded
@@ -121,7 +121,6 @@ public struct OfflinePass: Equatable, Sendable {
       stage = .interrupted
       return endLastSet("interrupted")
     case .modelUnavailable:
-      stage = .unavailable
       return endLastSet("no pose model")
     case .abandoned(let reason):
       return endLastSet(reason)

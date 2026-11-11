@@ -406,7 +406,7 @@ the first frame (story 001).
 ### User Story 045:
 
 - **Summary:** The final count reaches the wrist
-- **Status:** implemented in [0ea930c](https://github.com/idvorkin/exercise-analyzer/commit/0ea930c); on phone + watch since 2026-09-13, Igor's check pending; "Analyzing…" is `OfflinePass.awaitingLastSet` on `humble-ladder-3-pass`, so a missing pose model takes it down too (the 2026-11-07 audit, finding 4), `OfflinePassTests` on the host (Linux), the app build and the phone to verify
+- **Status:** implemented in [0ea930c](https://github.com/idvorkin/exercise-analyzer/commit/0ea930c); on phone + watch since 2026-09-13, Igor's check pending; "Analyzing…" is `OfflinePass.awaitingLastSet` in [d0b4333](https://github.com/idvorkin/exercise-analyzer/commit/d0b4333), so a missing pose model takes it down too (the 2026-11-07 audit, finding 4), `OfflinePassTests` on the host (Linux), the app build and the phone to verify
 - **Why:** the watch dropped to "Phone ready" the moment the camera stopped, and the live count it showed is not the one the offline pass settles a few seconds later; Igor walked to the phone to learn the set.
 
 #### Use Case:

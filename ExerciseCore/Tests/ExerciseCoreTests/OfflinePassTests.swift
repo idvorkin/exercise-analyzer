@@ -81,9 +81,27 @@ final class OfflinePassTests: XCTestCase {
     pass.apply(.recordingStopped)
     XCTAssertEqual(pass.apply(.modelUnavailable), .lastSetEnded("no pose model"))
     XCTAssertFalse(pass.awaitingLastSet)
-    XCTAssertEqual(pass.stage, .unavailable)
+    XCTAssertEqual(pass.stage, .none)
     XCTAssertFalse(pass.canCancel)
     XCTAssertEqual(pass.modeSwitch(hasFrames: false), .rerun)
+  }
+
+  /// A stored set whose re-run found no pose model still has its poses: another exercise re-reads them.
+  func testNoPoseModelKeepsAStoredSetsPoses() {
+    var pass = OfflinePass()
+    pass.apply(.framesLoaded)
+    pass.apply(.modelUnavailable)
+    XCTAssertTrue(pass.complete)
+    XCTAssertEqual(pass.modeSwitch(hasFrames: true), .reread)
+  }
+
+  /// Retry after an interruption found no pose model: the retry stays offered.
+  func testNoPoseModelKeepsTheRetry() {
+    var pass = OfflinePass()
+    pass.apply(.started)
+    pass.apply(.failed)
+    pass.apply(.modelUnavailable)
+    XCTAssertTrue(pass.interrupted)
   }
 
   /// Another set opened mid-pass: the pass is dropped, Cancel goes, and the wrist stops waiting.
