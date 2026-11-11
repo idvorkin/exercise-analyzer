@@ -46,9 +46,13 @@ final class PistolSquatAnalyzerTests: XCTestCase {
   func testAHiddenKneeWhileStandingStartsNoDescent() {
     let analyzer = PistolSquatAnalyzer()
     var phase = ""
-    for i in 0..<10 { phase = analyzer.process(pose: pose(knee: 170, earY: 200), time: Double(i) / 30, image: { nil }).phase }
+    for i in 0..<10 {
+      phase = analyzer.process(pose: pose(knee: 170, earY: 200), time: Double(i) / 30, image: { nil }).phase
+    }
     for i in 10..<20 {
-      phase = analyzer.process(pose: pose(knee: 170, earY: 200, hideLeftKnee: true), time: Double(i) / 30, image: { nil }).phase
+      phase =
+        analyzer.process(pose: pose(knee: 170, earY: 200, hideLeftKnee: true), time: Double(i) / 30, image: { nil })
+        .phase
     }
     XCTAssertEqual(phase, PistolSquatAnalyzer.standing)
   }

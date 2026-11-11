@@ -123,12 +123,16 @@ public final class BellTracker {
   public struct HeldSummary: Equatable {
     public var handFrames = 0, seenAtHand = 0, heldAtHand = 0, handFramesInReps = 0, heldInReps = 0
     public var fields: [String: Int] {
-      ["hand_frames": handFrames, "bell_seen_at_hand": seenAtHand, "bell_held": heldAtHand,
-       "hand_frames_in_reps": handFramesInReps, "bell_held_in_reps": heldInReps]
+      [
+        "hand_frames": handFrames, "bell_seen_at_hand": seenAtHand, "bell_held": heldAtHand,
+        "hand_frames_in_reps": handFramesInReps, "bell_held_in_reps": heldInReps,
+      ]
     }
   }
 
-  public static func heldSummary(frames: [FrameRecord], reps: [(start: Double, end: Double)], reach: CGFloat = 0.2) -> HeldSummary {
+  public static func heldSummary(
+    frames: [FrameRecord], reps: [(start: Double, end: Double)], reach: CGFloat = 0.2
+  ) -> HeldSummary {
     var s = HeldSummary()
     for f in frames {
       let wrists = wrists(of: f.pose)
@@ -186,7 +190,8 @@ public final class BellTracker {
       let steps = CGFloat(missed + 1)
       // Of several boxes in reach, the one nearest a visible wrist wins (a bell clutched to the chest beside a
       // chest-sized box: the bell is the one at the hands), nearest the last position when no wrist is visible.
-      let followed = sightings
+      let followed =
+        sightings
         .filter {
           $0.conf >= thresholds.followConf && !still.contains($0) && nearAHand($0.center) && !onHead($0)
             && !Self.colorsDiffer($0, last) && Self.distance($0.center, last.center) <= thresholds.followDistance
@@ -197,7 +202,8 @@ public final class BellTracker {
             : wristDistance($0) < wristDistance($1)
         }
       if let followed {
-        velocity = CGPoint(x: (followed.center.x - last.center.x) / steps, y: (followed.center.y - last.center.y) / steps)
+        velocity = CGPoint(
+          x: (followed.center.x - last.center.x) / steps, y: (followed.center.y - last.center.y) / steps)
         current = followed
         missed = 0
         return followed
@@ -213,7 +219,8 @@ public final class BellTracker {
           x: min(max(last.center.x + velocity.x * steps, 0), 1), y: min(max(last.center.y + velocity.y * steps, 0), 1))
         if nearAHand(carried) {
           return BellSighting(
-            box: last.box.offsetBy(dx: carried.x - last.center.x, dy: carried.y - last.center.y), conf: 0, color: last.color)
+            box: last.box.offsetBy(dx: carried.x - last.center.x, dy: carried.y - last.center.y), conf: 0,
+            color: last.color)
         }
       }
     }
@@ -222,7 +229,8 @@ public final class BellTracker {
     // A new track while one is briefly unseen, or within a second of losing it, must be the same bell by colour (a
     // rack of coloured bells beside the one in play); later, any bell may start, since the set may have changed bells.
     let reference = current ?? lastLost?.bell
-    let started = sightings
+    let started =
+      sightings
       .filter { s in
         s.conf >= thresholds.startConf && !still.contains(s) && !flat(s) && !onHead(s)
           && !(reference.map { Self.colorsDiffer(s, $0) } ?? false)
@@ -259,7 +267,9 @@ public final class BellTracker {
 
   /// The visible head keypoints: a round dark thing containing one is the lifter's head, not a bell (a get-up
   /// clip had the tracker follow the head for whole phases at 0.7 confidence).
-  private static func head(of pose: Pose?) -> [CGPoint] { points(of: pose, [.nose, .leftEye, .rightEye, .leftEar, .rightEar]) }
+  private static func head(of pose: Pose?) -> [CGPoint] {
+    points(of: pose, [.nose, .leftEye, .rightEye, .leftEar, .rightEar])
+  }
 
   private static func points(of pose: Pose?, _ keys: [CocoKeypoint]) -> [CGPoint] {
     guard let pose else { return [] }
@@ -298,8 +308,11 @@ public enum BellColor {
   /// Hue 0–360, saturation and value 0–1; nil for an empty colour.
   public static func hsv(_ rgb: [Float]) -> (h: Double, s: Double, v: Double)? {
     guard rgb.count >= 3 else { return nil }
-    let r = Double(rgb[0]), g = Double(rgb[1]), b = Double(rgb[2])
-    let maxC = max(r, g, b), minC = min(r, g, b)
+    let r = Double(rgb[0])
+    let g = Double(rgb[1])
+    let b = Double(rgb[2])
+    let maxC = max(r, g, b)
+    let minC = min(r, g, b)
     let delta = maxC - minC
     guard maxC > 0 else { return (0, 0, 0) }
     let s = delta / maxC

@@ -45,7 +45,8 @@
     /// out of the twelve). The wrist box is kept past the cap.
     private func crowdedCandidates() -> (boxes: [(conf: Float, box: CGRect)], wristBox: (conf: Float, box: CGRect)) {
       let boxes: [(conf: Float, box: CGRect)] = (0..<13).map { i in
-        let x = 0.02 + 0.06 * Double(i % 7), y = 0.1 + 0.1 * Double(i / 7)
+        let x = 0.02 + 0.06 * Double(i % 7)
+        let y = 0.1 + 0.1 * Double(i / 7)
         return (conf: 0.9 - Float(i) * 0.01, box: CGRect(x: x, y: y, width: 0.04, height: 0.08))
       }
       let wristBox = (conf: Float(0.5), box: CGRect(x: 0.48, y: 0.46, width: 0.04, height: 0.08))  // centre (0.5, 0.5)

@@ -12,11 +12,15 @@ import XCTest
 
 final class LegLatchTests: XCTestCase {
   /// Only the legs matter here: knees above ankles, the left foot in front at x 0.4, the right on the bench at 0.7.
-  private func pose(leftAnkle: CGPoint, rightAnkle: CGPoint, leftKnee: CGPoint = CGPoint(x: 0.42, y: 0.7),
-    rightKnee: CGPoint = CGPoint(x: 0.6, y: 0.72)) -> Pose {
+  private func pose(
+    leftAnkle: CGPoint, rightAnkle: CGPoint, leftKnee: CGPoint = CGPoint(x: 0.42, y: 0.7),
+    rightKnee: CGPoint = CGPoint(x: 0.6, y: 0.72)
+  ) -> Pose {
     var xyn = Array(repeating: PosePoint(x: 0.5, y: 0.5), count: 17)
     let conf = Array(repeating: Float(0.9), count: 17)
-    for (k, p) in [(CocoKeypoint.leftAnkle, leftAnkle), (.rightAnkle, rightAnkle), (.leftKnee, leftKnee), (.rightKnee, rightKnee)] {
+    for (k, p) in [
+      (CocoKeypoint.leftAnkle, leftAnkle), (.rightAnkle, rightAnkle), (.leftKnee, leftKnee), (.rightKnee, rightKnee),
+    ] {
       xyn[k.rawValue] = PosePoint(x: Float(p.x), y: Float(p.y))
     }
     return Pose(xyn: xyn, conf: conf, imageSize: CGSize(width: 1000, height: 1000))
@@ -27,7 +31,8 @@ final class LegLatchTests: XCTestCase {
   func testTradedNamesAreSwappedBack() {
     let latch = LegLatch()
     _ = latch.process(pose(leftAnkle: front, rightAnkle: back), standing: true)
-    let traded = pose(leftAnkle: back, rightAnkle: front, leftKnee: CGPoint(x: 0.6, y: 0.72), rightKnee: CGPoint(x: 0.42, y: 0.7))
+    let traded = pose(
+      leftAnkle: back, rightAnkle: front, leftKnee: CGPoint(x: 0.6, y: 0.72), rightKnee: CGPoint(x: 0.42, y: 0.7))
     let (out, fix) = latch.process(traded, standing: false)
     XCTAssertEqual(fix, .swapped)
     XCTAssertEqual(out.xyn[CocoKeypoint.leftAnkle.rawValue].x, 0.4, accuracy: 0.001)
@@ -58,12 +63,16 @@ final class LegLatchTests: XCTestCase {
   func testTheTrackDrawsLatchedLegsAndKeepsTheModels() {
     let track = PoseTrack()
     track.latchesLegs = true
-    let standing = ExerciseFrameResult(phase: BulgarianSplitSquatAnalyzer.standing, repCount: 0, metrics: [:], completedRep: nil)
-    let down = ExerciseFrameResult(phase: BulgarianSplitSquatAnalyzer.descending, repCount: 0, metrics: [:], completedRep: nil)
+    let standing = ExerciseFrameResult(
+      phase: BulgarianSplitSquatAnalyzer.standing, repCount: 0, metrics: [:], completedRep: nil)
+    let down = ExerciseFrameResult(
+      phase: BulgarianSplitSquatAnalyzer.descending, repCount: 0, metrics: [:], completedRep: nil)
     let size = CGSize(width: 1000, height: 1000)
     let stray = pose(leftAnkle: front, rightAnkle: CGPoint(x: 0.43, y: 0.88))
     track.append(FrameRecord(time: 0, imageSize: size, pose: stray, box: nil, analysis: down))
-    track.append(FrameRecord(time: 0.1, imageSize: size, pose: pose(leftAnkle: front, rightAnkle: back), box: nil, analysis: standing))
+    track.append(
+      FrameRecord(
+        time: 0.1, imageSize: size, pose: pose(leftAnkle: front, rightAnkle: back), box: nil, analysis: standing))
     track.append(FrameRecord(time: 0.2, imageSize: size, pose: stray, box: nil, analysis: down))
     let ankle = CocoKeypoint.rightAnkle.rawValue
     XCTAssertEqual(track.drawn(track.frames[0]).pose?.xyn[ankle].x ?? 0, 0.43, accuracy: 0.001)

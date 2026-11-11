@@ -17,10 +17,12 @@ final class BulgarianSplitSquatAnalyzerTests: XCTestCase {
   private func pose(drop: Double, kneesTogether: Bool = false, hideHead: Bool = false) -> Pose {
     let size = CGSize(width: 1000, height: 1000)
     let points: [CocoKeypoint: CGPoint] = [
-      .nose: CGPoint(x: 520, y: 210 + drop), .leftEar: CGPoint(x: 500, y: 200 + drop), .rightEar: CGPoint(x: 500, y: 200 + drop),
+      .nose: CGPoint(x: 520, y: 210 + drop), .leftEar: CGPoint(x: 500, y: 200 + drop),
+      .rightEar: CGPoint(x: 500, y: 200 + drop),
       .leftShoulder: CGPoint(x: 500, y: 300 + drop), .rightShoulder: CGPoint(x: 500, y: 300 + drop),
       .leftHip: CGPoint(x: 500, y: 500 + drop), .rightHip: CGPoint(x: 500, y: 500 + drop),
-      .leftKnee: CGPoint(x: kneesTogether ? 480 : 420, y: 700), .rightKnee: CGPoint(x: kneesTogether ? 480 : 620, y: 700),
+      .leftKnee: CGPoint(x: kneesTogether ? 480 : 420, y: 700),
+      .rightKnee: CGPoint(x: kneesTogether ? 480 : 620, y: 700),
       .leftAnkle: CGPoint(x: 400, y: 900), .rightAnkle: CGPoint(x: 700, y: 700),
       .leftWrist: CGPoint(x: 500, y: 550 + drop), .rightWrist: CGPoint(x: 500, y: 550 + drop),
     ]

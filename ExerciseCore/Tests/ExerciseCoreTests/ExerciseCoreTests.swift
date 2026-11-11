@@ -80,18 +80,22 @@ final class RepCountTests: XCTestCase {
     ]
     for (exercise, reps, duration) in miscounts {
       XCTAssertTrue(
-        TrimPolicy.countIsImplausible(exercise: exercise, reps: reps, duration: duration), "\(exercise) \(reps) in \(duration) s")
+        TrimPolicy.countIsImplausible(exercise: exercise, reps: reps, duration: duration),
+        "\(exercise) \(reps) in \(duration) s")
     }
     let normal: [(ExerciseKind, Int, Double)] = [
-      (.kettlebellSwing, 10, 25.9), (.kettlebellSwing, 11, 28.6), (.kettlebellSwing, 9, 44.3), (.kettlebellSwing, 10, 43.0),
+      (.kettlebellSwing, 10, 25.9), (.kettlebellSwing, 11, 28.6), (.kettlebellSwing, 9, 44.3),
+      (.kettlebellSwing, 10, 43.0),
       (.kettlebellSwing, 20, 59.2), (.pistolSquat, 24, 121.9), (.pistolSquat, 7, 96.8), (.bulgarianSplitSquat, 7, 82.6),
       (.bulgarianSplitSquat, 10, 101.2), (.pullUp, 5, 97.4), (.turkishGetUp, 2, 113.5), (.turkishGetUp, 2, 90.4),
     ]
     for (exercise, reps, duration) in normal {
       XCTAssertFalse(
-        TrimPolicy.countIsImplausible(exercise: exercise, reps: reps, duration: duration), "\(exercise) \(reps) in \(duration) s")
+        TrimPolicy.countIsImplausible(exercise: exercise, reps: reps, duration: duration),
+        "\(exercise) \(reps) in \(duration) s")
     }
-    XCTAssertFalse(TrimPolicy.countIsImplausible(exercise: .kettlebellSwing, reps: 0, duration: 30), "no reps is its own skip")
+    XCTAssertFalse(
+      TrimPolicy.countIsImplausible(exercise: .kettlebellSwing, reps: 0, duration: 30), "no reps is its own skip")
   }
 }
 
@@ -108,26 +112,34 @@ final class SkeletonTests: XCTestCase {
 
   func testUprightSpineIsZeroAndHingeIsMeasured() {
     let upright = BodySkeleton(
-      pose: pose([.leftShoulder: CGPoint(x: 500, y: 200), .rightShoulder: CGPoint(x: 500, y: 200),
-                  .leftHip: CGPoint(x: 500, y: 500), .rightHip: CGPoint(x: 500, y: 500)]))
+      pose: pose([
+        .leftShoulder: CGPoint(x: 500, y: 200), .rightShoulder: CGPoint(x: 500, y: 200),
+        .leftHip: CGPoint(x: 500, y: 500), .rightHip: CGPoint(x: 500, y: 500),
+      ]))
     XCTAssertEqual(upright.spineAngle, 0, accuracy: 0.01)
     let hinged = BodySkeleton(
-      pose: pose([.leftShoulder: CGPoint(x: 800, y: 500), .rightShoulder: CGPoint(x: 800, y: 500),
-                  .leftHip: CGPoint(x: 500, y: 500), .rightHip: CGPoint(x: 500, y: 500)]))
+      pose: pose([
+        .leftShoulder: CGPoint(x: 800, y: 500), .rightShoulder: CGPoint(x: 800, y: 500),
+        .leftHip: CGPoint(x: 500, y: 500), .rightHip: CGPoint(x: 500, y: 500),
+      ]))
     XCTAssertEqual(hinged.spineAngle, 90, accuracy: 0.01)
   }
 
   func testArmAngleUsesTheRaisedReliableArm() {
     let skeleton = BodySkeleton(
-      pose: pose([.leftShoulder: CGPoint(x: 500, y: 300), .leftElbow: CGPoint(x: 500, y: 400),  // hanging
-                  .rightShoulder: CGPoint(x: 500, y: 300), .rightElbow: CGPoint(x: 600, y: 300)]))  // horizontal
+      pose: pose([
+        .leftShoulder: CGPoint(x: 500, y: 300), .leftElbow: CGPoint(x: 500, y: 400),  // hanging
+        .rightShoulder: CGPoint(x: 500, y: 300), .rightElbow: CGPoint(x: 600, y: 300),
+      ]))  // horizontal
     XCTAssertEqual(skeleton.armToVerticalAngle, 90, accuracy: 0.01)
   }
 
   func testKneeAngleSkipsSideWithMissingJoints() {
     let skeleton = BodySkeleton(
-      pose: pose([.leftHip: CGPoint(x: 500, y: 500), .leftKnee: CGPoint(x: 500, y: 700),
-                  .leftAnkle: CGPoint(x: 500, y: 900), .rightHip: CGPoint(x: 520, y: 500)]))
+      pose: pose([
+        .leftHip: CGPoint(x: 500, y: 500), .leftKnee: CGPoint(x: 500, y: 700),
+        .leftAnkle: CGPoint(x: 500, y: 900), .rightHip: CGPoint(x: 520, y: 500),
+      ]))
     XCTAssertEqual(skeleton.kneeAngle, 180, accuracy: 0.01)
     XCTAssertEqual(skeleton.kneeAngle(.right), 0)
   }
@@ -140,14 +152,14 @@ final class PoseTrackTests: XCTestCase {
 
   func testNearestRespectsTolerance() {
     let track = PoseTrack()
-    [0, 1, 2].forEach { track.append(frame(Double($0) / 30)) }
+    for i in [0, 1, 2] { track.append(frame(Double(i) / 30)) }
     XCTAssertEqual(track.nearest(to: 0.034, tolerance: 0.02)?.time, 1.0 / 30)
     XCTAssertNil(track.nearest(to: 0.5, tolerance: 0.02))
   }
 
   func testShiftedKeepsOnlyTheRangeAndRetimes() {
     let track = PoseTrack()
-    stride(from: 0.0, through: 5.0, by: 0.5).forEach { track.append(frame($0)) }
+    for t in stride(from: 0.0, through: 5.0, by: 0.5) { track.append(frame(t)) }
     let shifted = track.shifted(toStartAt: 2, end: 3)
     XCTAssertEqual(shifted.frames.map(\.time), [0, 0.5, 1.0])
   }
