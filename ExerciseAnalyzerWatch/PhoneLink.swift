@@ -56,7 +56,6 @@ final class PhoneLink: NSObject {
   /// The workout on the wrist (story 048): its own HealthKit session, fed the set transitions heard here.
   private(set) var workout: WorkoutController!
 
-
   /// The link, measured (#122): one small message a second to the phone while this app is in front or a
   /// workout keeps it running, answered by the phone, so a drop is a gap in the phone's log with a time on it.
   /// WatchConnectivity publishes no rate limit for `sendMessage`; the floor is the round trip (~100–300 ms over
