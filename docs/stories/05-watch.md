@@ -954,7 +954,13 @@ the first frame (story 001).
 - **When:** I tap Elliptical under Other… below Start workout (a button of its own until #339, story 081)
 - **Then:** the workout page heads with ELLIPTICAL and the clock and heart rate as a workout does (048); End writes an elliptical (indoor) workout to Health; Workouts' line reads "Elliptical · 7:02 AM · 30 min · ♥ 131" with the elliptical sign; it never asks to continue the last workout (#238), and a line that merges it with a strength workout under 30 minutes apart (#169) is the strength line
 
-- **Issues:** [#333](https://github.com/idvorkin/exercise-analyzer/issues/333)
+- **Scenario:** An elliptical's page has no sets to add (#356)
+- **Given:** an elliptical workout (or any type but strength) with no sets recorded inside it, on the phone or the iPad
+- **When:** I open its page and tap the heart-rate chart
+- **Then:** the page shows its times, heart rate and chart, with its type's sign at top right (Change type, 082); no "0 sets · 0 reps · work 0:00 · rest 0:00" line, no "No sets were recorded inside this workout." and no kg; a tap on the chart opens no "Add a set" sheet, so no weight is asked; a set that was recorded during it still shows as on any workout (Igor, 2026-11-10: "If it's an elliptical workout don't let me set weights and put the little icon in the corner for elliptical")
+- **Status:** on `fix/2026-11-10-elliptical-ipad-zoom` (ea-aq0), by build only; the iPad was on d1e9136 (2026-10-17), before this story and 082's sign
+
+- **Issues:** [#333](https://github.com/idvorkin/exercise-analyzer/issues/333), [#356](https://github.com/idvorkin/exercise-analyzer/issues/356)
 
 ---
 

@@ -180,9 +180,14 @@ private struct WorkoutPageView: View {
   @State private var editing: RecentEntry?
   /// The set a tap on the chart's empty plot would add, until its sheet saves or cancels (#178).
   @State private var adding: RecentEntry?
+  /// The chart over the whole screen (#357, the iPad).
+  @State private var chartFull = false
   /// The set list by exercise instead of by time (#164), remembered across workouts.
   @AppStorage("workoutPageGrouped") private var grouped = false
   private var workout: StoredWorkout { snapshot.workout }
+  /// An elliptical, a run, any type but strength (#356; Igor: "If it's an elliptical workout don't let me set
+  /// weights"): no set is added from its chart, and with none recorded it carries no sets lines.
+  private var cardio: Bool { (workout.kind ?? .strength) != .strength }
   /// The rows' pictures by set id, read once (see `.task`).
   @State private var thumbnails: [String: UIImage] = [:]
   /// The chart's window in seconds (#125): the whole workout until a pinch narrows it, never under a minute.
@@ -394,6 +399,37 @@ private struct WorkoutPageView: View {
     VStack(alignment: .leading, spacing: 14) {
       totals(timeline)
       chart(timeline)
+        // The iPad's full-screen chart (#357; Igor: "a full screen button … when I'm looking at the heart graph, I
+        // want to make it take over the whole screen … every 10 … graph paper").
+        // Top left, over the workout's start: top right is where a running workout's newest readings draw.
+        .overlay(alignment: .topLeading) {
+          if UIDevice.current.userInterfaceIdiom == .pad {
+            Button {
+              chartFull = true
+              onEvent?("ui", ["action": "workout_chart_full", "on": true])
+            } label: {
+              Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.body.bold()).padding(10).background(.ultraThinMaterial, in: Circle())
+            }
+            .accessibilityLabel("Heart rate full screen")
+          }
+        }
+        .fullScreenCover(isPresented: $chartFull) {
+          NavigationStack {
+            chart(timeline, full: true)
+              .padding()
+              .navigationTitle(Self.day.string(from: workout.start))
+              .navigationBarTitleDisplayMode(.inline)
+              .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                  Button("Done") {
+                    chartFull = false
+                    onEvent?("ui", ["action": "workout_chart_full", "on": false])
+                  }
+                }
+              }
+          }
+        }
       if timeline.rows.contains(where: { $0.peak != nil }) {
         Text(
           "♥ peak · drop in the 60 s after the set, or in the rest when it was shorter (−20/30s) · rest before the next"
@@ -452,7 +488,7 @@ private struct WorkoutPageView: View {
         add(draft, exercise: $0, reps: $1, kg: $2)
       }
     }
-    if timeline.rows.isEmpty {
+    if timeline.rows.isEmpty, !cardio {
       Text("No sets were recorded inside this workout.").font(.subheadline).foregroundStyle(.secondary)
     }
   }
@@ -480,10 +516,12 @@ private struct WorkoutPageView: View {
         }
         .font(.title2.bold()).monospacedDigit().foregroundStyle(.orange)
       }
-      Text(
-        "\(timeline.rows.count) set\(timeline.rows.count == 1 ? "" : "s") · \(timeline.rows.reduce(0) { $0 + $1.reps }) reps · work \(Self.minutes(timeline.workSeconds)) · rest \(Self.minutes(timeline.restSeconds))"
-      )
-      .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+      if !(cardio && timeline.rows.isEmpty) {
+        Text(
+          "\(timeline.rows.count) set\(timeline.rows.count == 1 ? "" : "s") · \(timeline.rows.reduce(0) { $0 + $1.reps }) reps · work \(Self.minutes(timeline.workSeconds)) · rest \(Self.minutes(timeline.restSeconds))"
+        )
+        .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+      }
       // Reps × kg over the sets with a weight (066).
       if let load = timeline.loadKg {
         Text("\(load.formatted()) kg moved").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
@@ -509,8 +547,9 @@ private struct WorkoutPageView: View {
   }
 
   /// Heart rate as a line, each set as a band behind it, one time axis. Without heart rate the bands still
-  /// show when the sets fell.
-  private func chart(_ timeline: WorkoutTimeline) -> some View {
+  /// show when the sets fell. `full`: the iPad's full-screen chart (#357): as tall as the screen, a line every
+  /// 10 bpm and twice the time lines (graph paper); taps open nothing there, pinch and drag still zoom and pan.
+  private func chart(_ timeline: WorkoutTimeline, full: Bool = false) -> some View {
     // The series runs a minute before and three after the workout (for the last set's drop); the chart draws
     // the workout only, or the line runs off the plot. Zoomed, only the window and a minute either side are
     // drawn (the y scale stays the workout's, so the line does not jump as the window moves).
@@ -557,12 +596,22 @@ private struct WorkoutPageView: View {
         ? workout.start...workout.start.addingTimeInterval(wholeSeconds) : windowStart...windowEnd
     )
     .chartYScale(domain: low...high)
-    .chartYAxis(whole.isEmpty ? .hidden : .automatic)
+    .chartYAxis {
+      if !whole.isEmpty {
+        if full { AxisMarks(position: .trailing, values: .stride(by: 10)) } else { AxisMarks(position: .trailing) }
+      }
+    }
     // Time into the workout, not time of day (#165): "15 min", or "12:30" zoomed in.
     .chartXAxis {
       let from = windowStart == .distantPast ? 0 : windowStart.timeIntervalSince(workout.start)
       let ticks = ElapsedAxis.ticks(window: from...(from + visibleSeconds))
       let fine = ElapsedAxis.isFine(ticks)
+      // Full screen: a line halfway between the labelled ones, unlabelled.
+      if full, ticks.count > 1 {
+        AxisMarks(values: zip(ticks, ticks.dropFirst()).map { workout.start.addingTimeInterval(($0 + $1) / 2) }) { _ in
+          AxisGridLine()
+        }
+      }
       AxisMarks(values: ticks.map { workout.start.addingTimeInterval($0) }) { value in
         AxisGridLine()
         AxisValueLabel {
@@ -579,6 +628,8 @@ private struct WorkoutPageView: View {
         let plot = proxy.plotFrame.map { geo[$0] } ?? .zero
         let moment = { (x: CGFloat) -> Date? in proxy.value(atX: x - plot.minX) }
         let open = { (x: CGFloat) in
+          // A sheet cannot open over the full-screen chart; Done first.
+          guard !full else { return }
           let slop = 24 * visibleSeconds / max(plot.width, 1)
           let row = moment(x).flatMap { timeline.row(near: $0, slop: slop) }
           // A typed set's mark opens its by-hand sheet to check or correct it (#178).
@@ -591,7 +642,7 @@ private struct WorkoutPageView: View {
           // time to give the set (it used to land at the end, wherever the finger was). `contains`, not a range:
           // `start...end` traps on a row whose end is before its start (#201).
           let draft =
-            row == nil && typed == nil && onAddByHand != nil
+            row == nil && typed == nil && onAddByHand != nil && !cardio
             ? moment(x).flatMap { workout.contains($0) ? timeline.handSet(at: $0).entry : nil }
             : nil
           onEvent?(
@@ -711,7 +762,8 @@ private struct WorkoutPageView: View {
           }
       }
     }
-    .frame(height: 180)
+    .frame(height: full ? nil : 180)
+    .frame(maxHeight: full ? .infinity : nil)
     .overlay {
       if samples.isEmpty {
         Text("No heart rate for this workout").font(.caption).foregroundStyle(.secondary)
