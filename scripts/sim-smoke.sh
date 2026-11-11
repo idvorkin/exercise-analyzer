@@ -171,21 +171,21 @@ check_live_workout() {
   stash
   SIMCTL_CHILD_SWING_LIVE_WORKOUT=2 SIMCTL_CHILD_SWING_WORKOUT_EVOLVE=1 \
     xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
-  wait_for workout_saved 60 || echo "      (timed out waiting for live workout to end)"
+  wait_for workout_saved 30 || echo "      (timed out waiting for live workout to end)"
   sleep 2
   local f; f=$(newest_log)
+  # The hand-over only: the counts, the duration and the window are host tests (WorkoutTimelineTests,
+  # WorkoutJoinTests); the evolve hook ends the workout 3 s in, not 25.
   if jq -se '
     [.[] | select(.type=="workout_page")] as $pages |
     ([$pages[] | select(.live == true and .sets == 1)][0]) as $first |
     ([$pages[] | select(.live == true and .sets == 2)][-1]) as $later |
     ([$pages[] | select(.live == false)][-1]) as $saved |
-    $first != null and $later != null and $saved != null and
-    $later.reps == 16 and $later.duration_s > $first.duration_s + 15 and
-    $later.window_s > $first.window_s + 15 and
+    $first != null and $later != null and $saved != null and $later.reps == 16 and
     $saved.sets == 2 and $saved.reps == 16 and $saved.workout_id != "live" and
-    ([.[] | select(.type=="workout_heart_rate")] | length) >= 3
+    ([.[] | select(.type=="workout_heart_rate")] | length) >= 2
   ' "$f" >/dev/null; then
-    echo "ok    live_workout: 1 → 2 sets / 16 reps, clock and window advanced, Health re-asked, saved page retained both sets"
+    echo "ok    live_workout: 1 → 2 sets / 16 reps live, Health asked again for the saved one, saved page retained both sets"
   else echo "FAIL  live_workout: $f"; fail=1; fi
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   # #178: a tap on the saved workout's chart where no set is adds a set by hand there, as Save on its sheet would.
@@ -265,32 +265,32 @@ check_photos_export() {  # 070 step 3: once approved, clips of sets not on scree
   restart_prefs
   local docs; docs=$(dirname "$LOGS")
   local index="$docs/recents/index.json"
-  # The sample clips were opened, so their sets are imports (originalName), which stay in the app (#229): all but
-  # the oldest become recordings, which go to Photos by themselves; the oldest stays an import (none with one set).
-  local kept; kept=$(jq -r '[.[] | select(.source.file != null)]
-    | if length > 1 then min_by(.recordedAt // .analyzedAt).id else "" end' "$index")
-  jq --arg kept "$kept" 'map(if .source.file != null and .id != $kept then del(.originalName) else . end)' \
+  # Which sets are due (recordings yes, imports no, the backlog only once approved) is PhotosExportPlan, decided on
+  # the host over the camera's own row (PhotosExportPlanTests). Here one clip goes through Photos for real: the
+  # simulator has no camera, so the newest in-app set (an opened sample, an import) is marked recorded here, the
+  # field the camera's save sets; every other in-app set stays an import and must stay in the app.
+  local kept; kept=$(jq -r '[.[] | select(.source.file != null)] | if length > 0 then max_by(.recordedAt // .analyzedAt).id else "" end' "$index")
+  jq --arg kept "$kept" 'map(if .id == $kept then .recordedHere = true else . end)' \
     "$index" > "$index.new" && mv "$index.new" "$index"
-  local before; before=$(jq --arg kept "$kept" '[.[] | select(.source.file != null and .id != $kept)] | length' "$index")
-  xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null  # nothing open: every recording's clip is due
-  wait_for photos_export 120 || echo "      (timed out waiting for the first export)"
-  sleep 15
+  local before; before=$(jq '[.[] | select(.source.file != null)] | length' "$index")
+  xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null  # nothing open: the recording's clip is due
+  wait_for photos_export 120 || echo "      (timed out waiting for the export)"
+  sleep 5
   local f; f=$(newest_log)
   local exported left imported
   exported=$(jq -s '[.[] | select(.type=="photos_export")] | length' "$f")
-  left=$(jq --arg kept "$kept" '[.[] | select(.source.file != null and .id != $kept)] | length' "$index")
-  imported=$(jq --arg kept "$kept" '[.[] | select(.source.file != null and .id == $kept)] | length' "$index")
+  left=$(jq --arg kept "$kept" '[.[] | select(.source.file != null and .id == $kept)] | length' "$index")
+  imported=$(jq '[.[] | select(.source.file != null)] | length' "$index")
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   # The newest set is now in the simulator's Photos: it opens from there, its stored analysis read, not re-run.
   previous_log=$(newest_log)
   SIMCTL_CHILD_SWING_OPEN_RECENT=1 xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null
   wait_for recents_open 60 || echo "      (timed out waiting for the reopened set)"
   local g; g=$(newest_log)
-  if [ "$before" -gt 0 ] && [ "$exported" -eq "$before" ] && [ "$left" -eq 0 ] &&
-    { [ -z "$kept" ] || [ "$imported" -eq 1 ]; } &&
+  if [ -n "$kept" ] && [ "$exported" -eq 1 ] && [ "$left" -eq 0 ] && [ "$imported" -eq $((before - 1)) ] &&
     ! jq -se 'any(.[]; .type=="photos_export_failed")' "$f" >/dev/null &&
     jq -se '([.[] | select(.type=="photos_fetch")][-1] | .found == true) and any(.[]; .type=="recents_open")' "$g" >/dev/null; then
-    echo "ok    photos_export: $exported recordings into Photos, none left in the app, ${imported:-0} import kept, the newest set reopened from Photos"
+    echo "ok    photos_export: the recording went into Photos, $imported imports kept in the app, the newest set reopened from Photos"
   else echo "FAIL  photos_export: before=$before exported=$exported left=$left imported=$imported kept=$kept, $f $g"; fail=1; fi
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
   plutil -remove photosExportApproved "$prefs" 2>/dev/null || true

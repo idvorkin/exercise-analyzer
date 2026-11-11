@@ -43,6 +43,11 @@ final class VideoPoseSession: NSObject {
     /// The picker's copy of a Photos video, picked without library access: kept as a file, not exported (070).
     case photosCopy
     case recording
+
+    var isRecording: Bool {
+      if case .recording = self { return true }
+      return false
+    }
   }
 
   let player = AVPlayer()
@@ -1186,9 +1191,10 @@ final class VideoPoseSession: NSObject {
   ) {
     do {
       try recents.save(
-        id: id, source: .file(name: "clip." + clipURL.pathExtension), recordedAt: recordedAt, duration: duration,
-        pipeline: live, clipURL: clipURL, thumbnail: setThumbnail(live, id: id),
-        originalName: clipURL.lastPathComponent, models: StoredSetPlan.liveTrackModels, clipStartedAt: clipStartedAt)
+        .recording(
+          id: id, clipFile: clipURL, recordedAt: recordedAt, duration: duration, live: live,
+          clipStartedAt: clipStartedAt),
+        pipeline: live, clipURL: clipURL, thumbnail: setThumbnail(live, id: id))
       log.event(
         "recording_kept",
         ["id": id, "live_reps": live.reps.count, "clip": clipURL.lastPathComponent, "on_screen": onScreen])
@@ -1226,7 +1232,7 @@ final class VideoPoseSession: NSObject {
         id: id, source: source, recordedAt: clip?.recordedAt ?? Date(), duration: duration,
         pipeline: pipeline, clipURL: clipURL, thumbnail: setThumbnail(pipeline, id: id),
         originalName: clip?.trimmedURL == nil ? clip?.url.lastPathComponent : nil, models: models.names,
-        clipStartedAt: clip?.startedAt, photosCopy: photosCopy)
+        clipStartedAt: clip?.startedAt, photosCopy: photosCopy, recordedHere: operation.origin.isRecording)
       clip?.entryID = id
       loadHeartRate()  // the set has a folder now, so a series read before the save can be kept
       log.event("recents_saved", ["id": id, "reps": pipeline.reps.count, "in_photos": source.isPhotos])
@@ -2192,51 +2198,59 @@ final class VideoPoseSession: NSObject {
         "action": command.rawValue, "from": "watch", "source": "\(source)",
         "app_state": UIApplication.shared.applicationState.rawValue,
       ])
+    // What a camera command does in each stage is ExerciseCore's CameraCommands table (host-tested in every cell).
+    // A switch or zoom with the camera off does nothing: it used to start a recording (the 2026-11-07 audit,
+    // finding 3).
+    if let action = CameraCommands.action(for: command, in: cameraStage) {
+      perform(action, command: command)
+      return
+    }
     switch command {
-    case .start:
-      // Record from the viewfinder starts the set without touching the camera; otherwise as today (047).
-      // Backgrounded (the phone locked while framing), iOS has stopped the capture, so a recorder armed now
-      // would get no frames and the set would end in "Nothing recorded": ask for the notification tap, whose
-      // handler begins the recording once the app is in front.
-      if source == .camera, viewfinder {
-        if UIApplication.shared.applicationState == .active {
-          beginRecording()
-        } else {
-          RecordPrompt.post(log: log)
-        }
-        break
-      }
-      if source == .camera { break }
+    case .status: pushWatchStatus(force: true)
+    case .watchMode: setWatchMode(!watchMode, from: "watch")
+    default: break  // .exercise, .watchActive, .watchInactive, .heartbeat: handled in the bridge
+    }
+  }
+
+  /// The camera as the command table sees it.
+  private var cameraStage: CameraStage {
+    CameraStage.of(cameraLive: source == .camera, viewfinder: viewfinder, paused: paused)
+  }
+
+  /// One cell of the wrist's camera table, done.
+  private func perform(_ action: CameraAction, command: WatchCommand) {
+    let inFront = UIApplication.shared.applicationState == .active
+    switch action {
+    case .beginRecording:
+      // Record from the viewfinder starts the set without touching the camera (047). Backgrounded (the phone
+      // locked while framing), iOS has stopped the capture, so a recorder armed now would get no frames and the
+      // set would end in "Nothing recorded": ask for the notification tap, whose handler begins the recording
+      // once the app is in front.
+      if inFront { beginRecording() } else { RecordPrompt.post(log: log) }
+    case .startRecording:
       // The set about to record was asked from the wrist: it opens in watch mode (#68), whether the camera
       // starts now or later from the notification tap, which inherits the flag. A start from the phone's own
       // Record button never sets it.
       startRequestedFromWatch = true
-      if UIApplication.shared.applicationState == .active {
-        startCamera(position: cameraPosition)
-      } else {
-        // The watch woke the app in the background; iOS will not let it come forward or use the camera from
-        // there, so ask the lifter to tap the notification, which opens the app straight into recording.
-        RecordPrompt.post(log: log)
-      }
-    case .viewfinder:
-      if source == .camera { break }
+      // Backgrounded, iOS will not let the app come forward or use the camera, so ask the lifter to tap the
+      // notification, which opens the app straight into recording.
+      if inFront { startCamera(position: cameraPosition) } else { RecordPrompt.post(log: log) }
+    case .startFraming:
       // Framing from the wrist: the camera without the recorder, in watch mode like Record (047, #73).
       // Backgrounded, the notification carries the flag so the tap opens into the viewfinder, not recording.
       startRequestedFromWatch = true
-      if UIApplication.shared.applicationState == .active {
+      if inFront {
         startCamera(position: cameraPosition, viewfinder: true)
       } else {
         RecordPrompt.post(log: log, viewfinder: true)
       }
-    case .switchCamera: cycleCameraLevel()
+    case .switchLevel: cycleCameraLevel()
     case .pause: pauseCamera(from: "watch")
     case .resume: resumeCamera(from: "watch")
-    case .finish: if source == .camera { finishCamera() }
-    case .cancel: if source == .camera { cancelCamera() }
-    case .status: pushWatchStatus(force: true)
-    case .zoom: cycleCameraLevel()
-    case .watchMode: setWatchMode(!watchMode, from: "watch")
-    case .exercise, .watchActive, .watchInactive, .heartbeat: break  // handled in the bridge
+    case .finish: finishCamera()
+    case .cancel: cancelCamera()
+    case .ignore:
+      log.event("watch_command_ignored", ["command": command.rawValue, "stage": "\(cameraStage)"])
     }
   }
 
@@ -2582,8 +2596,9 @@ final class VideoPoseSession: NSObject {
   /// The pause is a segment boundary, the same mechanism as rotating the phone mid-set (#22): the current
   /// recorder is finished off and a fresh suspended one takes its place (#67).
   func pauseCamera(from: String) {
-    // No pause in the viewfinder: there is no recorder to suspend and nothing to freeze (047).
-    guard source == .camera, !viewfinder, !paused else { return }
+    // Only while recording: no pause in the viewfinder, where there is no recorder to suspend (047). The same
+    // table cell the wrist's Pause reads, so the phone's button follows it too.
+    guard CameraCommands.action(for: .pause, in: cameraStage) == .pause else { return }
     let finished = recorder
     let next = FrameRecorder()
     next.onError = finished?.onError
@@ -2604,7 +2619,7 @@ final class VideoPoseSession: NSObject {
   /// Carries on where the pause began: the gap leaves live time on the next frame, and the suspended recorder
   /// wakes on its own queue so no paused frame can overtake the resume (#67).
   func resumeCamera(from: String) {
-    guard source == .camera, paused else { return }
+    guard CameraCommands.action(for: .resume, in: cameraStage) == .resume else { return }
     paused = false
     recorder?.setSuspended(false)
     pushWatchStatus(force: true)

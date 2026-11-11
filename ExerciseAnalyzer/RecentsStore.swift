@@ -69,38 +69,35 @@ final class RecentsStore {
   func save(
     id: String, source: RecentEntry.Source, recordedAt: Date?, duration: Double, pipeline: AnalysisPipeline,
     clipURL: URL?, thumbnail: UIImage?, originalName: String? = nil, models: [String] = [],
-    clipStartedAt: Date? = nil, photosCopy: Bool = false, encoded: EncodedFiles? = nil
+    clipStartedAt: Date? = nil, photosCopy: Bool = false, recordedHere: Bool = false, encoded: EncodedFiles? = nil
   ) throws {
+    try save(
+      RecentSave(
+        id: id, source: source, recordedAt: recordedAt, duration: duration, pipeline: pipeline,
+        originalName: originalName, models: models, clipStartedAt: clipStartedAt, photosCopy: photosCopy,
+        recordedHere: recordedHere),
+      pipeline: pipeline, clipURL: clipURL, thumbnail: thumbnail, encoded: encoded)
+  }
+
+  /// The same, with the row described by `RecentSave` (ExerciseCore), whose `row(over:)` is the merge: the camera
+  /// builds its save with `RecentSave.recording`, as the host tests do.
+  func save(
+    _ save: RecentSave, pipeline: AnalysisPipeline, clipURL: URL?, thumbnail: UIImage?, encoded: EncodedFiles? = nil
+  ) throws {
+    let id = save.id
+    let source = save.source
     // A pass that was under way when its set was deleted must not bring it back (#111, the 2026-09-19 review):
     // the launch refresh and a re-run save by id minutes after they started. Nor may it put a video back over
     // a set the lifter has since kept by hand (#157).
     guard !removedIDs.contains(id), entry(id: id)?.isByHand != true else { throw RemovedSetError(id: id) }
-    let files = try encoded ?? Self.encode(pipeline: pipeline, models: models, thumbnail: thumbnail)
-    let fresh = RecentEntry(
-      id: id, analyzedAt: Date(), recordedAt: recordedAt, duration: duration,
-      repCount: pipeline.reps.count, bestScore: pipeline.reps.map(\.quality.score).max(),
-      source: source, thumbnail: nil, exercise: pipeline.exercise, originalName: originalName,
-      analysisVersion: AnalysisVersion.current, models: models, clipStartedAt: clipStartedAt)
+    let files = try encoded ?? Self.encode(pipeline: pipeline, models: save.models, thumbnail: thumbnail)
+    let analyzedAt = Date()
     let newClip = clipURL.map { !ownsClip($0, id: id) } ?? false
     let saved = try RecentsSave.save(
       root: root, index: RecentsIndex(entries: entries), id: id, source: source,
-      originalName: originalName, duration: duration
+      originalName: save.originalName, duration: save.duration
     ) { old in
-      var entry = old ?? fresh
-      entry.id = id
-      entry.analyzedAt = fresh.analyzedAt
-      entry.recordedAt = recordedAt ?? entry.recordedAt
-      entry.duration = duration
-      entry.repCount = fresh.repCount
-      entry.bestScore = fresh.bestScore
-      entry.setSource(source)
-      if newClip { entry.exportedAsset = nil }
-      if photosCopy { entry.photosCopy = true }
-      entry.exercise = pipeline.exercise
-      entry.originalName = originalName ?? entry.originalName
-      entry.analysisVersion = AnalysisVersion.current
-      entry.models = models
-      entry.clipStartedAt = clipStartedAt ?? entry.clipStartedAt
+      var entry = save.row(over: old, analyzedAt: analyzedAt, newClip: newClip)
       if files.thumbnail != nil { entry.thumbnail = "thumbnail.jpg" }
       Self.refreshed(&entry)  // a re-analysis or a new clip: never outweighs a weight typed elsewhere (F1)
       return entry

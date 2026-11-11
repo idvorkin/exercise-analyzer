@@ -56,9 +56,6 @@ final class PhoneLink: NSObject {
   /// The workout on the wrist (story 048): its own HealthKit session, fed the set transitions heard here.
   private(set) var workout: WorkoutController!
 
-  /// Status older than this is stale: the phone app may be gone without having sent an idle status.
-  static let maxStatusAge: TimeInterval = 8
-
   /// The link, measured (#122): one small message a second to the phone while this app is in front or a
   /// workout keeps it running, answered by the phone, so a drop is a gap in the phone's log with a time on it.
   /// WatchConnectivity publishes no rate limit for `sendMessage`; the floor is the round trip (~100–300 ms over
@@ -93,34 +90,33 @@ final class PhoneLink: NSObject {
   /// ...and its exercise list open over it (#154).
   var screenshotOpensExerciseList: Bool { screenshot == .setByHandExercise }
 
-  /// The phone is reachable and has reported within the last few seconds; only then are its status and the
-  /// recording controls trustworthy (a stored application context can say "recording" long after the fact).
-  var isLive: Bool {
-    if let screenshot { return screenshot.isLive }
-    guard reachable, let receivedAt else { return false }
-    return Date().timeIntervalSince(receivedAt) < Self.maxStatusAge
-  }
-
   /// When the watch app last came to the front.
   private var wokeAt = Date.distantPast
-  /// How long a raised wrist keeps showing what it last knew before it says "not connected": the link comes back
-  /// ~0.5 s after the raise (≤ 1.1 s over 32 raises at the gym, 2026-09-22), fresh status one round trip later.
-  static let wakeGrace: TimeInterval = 2
 
-  /// What the screen trusts: a live phone, or the last status it heard for the first seconds after a raise, so
-  /// a raised wrist does not flash "Not connected" while the link it is about to get back comes up.
-  var showsAsLive: Bool {
-    isLive || (receivedAt != nil && Date().timeIntervalSince(wokeAt) < Self.wakeGrace)
-  }
-
-  /// A set the phone last said it was recording, from a phone that still reads as reachable but has stopped
-  /// answering (#137): the link can die one way, the phone's sends failing for minutes while every tap from
-  /// here still arrives. The recording controls stay, so Done and Cancel still reach it.
+  /// The link as the wrist sees it now (ExerciseCore's `WatchLink`, host-tested): live, waking (the last status
+  /// kept for `WatchLink.wakeGrace` after a raise), not answering mid-set (#137), waiting, or disconnected. The
+  /// screenshot rung fixes it.
   /// ponytail: a stored context can say "recording" long after the fact (review finding 8), so a phone that
-  /// quit mid-set also shows the controls; its taps are harmless, and context age would tell them apart.
-  var answersLost: Bool {
-    !showsAsLive && reachable && status.recording
+  /// quit mid-set also reads as not answering and shows the controls; context age would tell them apart.
+  var link: WatchLink {
+    if let screenshot { return screenshot.link }
+    let now = Date()
+    return WatchLink.of(
+      reachable: reachable, statusAge: receivedAt.map { now.timeIntervalSince($0) },
+      wakeAge: now.timeIntervalSince(wokeAt), recording: status.recording)
   }
+
+  /// The page the watch shows (ExerciseCore's `WatchPage`, host-tested; #74).
+  var page: WatchPage {
+    WatchPage.of(link: link, recording: status.recording, phoneActive: status.phoneActive, noVideos: noVideos)
+  }
+
+  /// The phone's status and the recording controls are trustworthy.
+  var isLive: Bool { link.isLive }
+  /// What the screen trusts: a live phone, or the last status it heard for the first seconds after a raise.
+  var showsAsLive: Bool { link.showsAsLive }
+  /// A set the phone last said it was recording, from a phone that reads reachable but stopped answering (#137).
+  var answersLost: Bool { link.answersLost }
 
   /// Asks the phone for a fresh status (a reachable phone app answers with one). Only from an app in front: a
   /// workout keeps the app running wrist-down (048), where a ping every 2 s would wake the phone for a screen nobody
@@ -443,7 +439,7 @@ final class PhoneLink: NSObject {
     status = next
     // Which channel ends a silence, and how long it was (#137): says whether the application context still
     // gets through when the phone's messages do not.
-    if let last = receivedAt, Date().timeIntervalSince(last) >= Self.maxStatusAge {
+    if let last = receivedAt, Date().timeIntervalSince(last) >= WatchLink.maxStatusAge {
       logEvent(
         "status_back", ["via": channel, "silent_s": Int(Date().timeIntervalSince(last)), "reachable": reachable])
     }

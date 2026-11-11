@@ -34,7 +34,9 @@ state and is not in the table.
 The rule behind the table (Igor, 2026-09-13, after the picture page lost its controls in #74): the framing loop
 needs the picture, the in-frame hint, Camera, Done and Cancel on the camera-live page, inside the safe area,
 from the camera's first frame. Preview (047) is the framing state; the phone's own Live still records from
-the first frame (story 001).
+the first frame (story 001). Which of the pages shows is `WatchPage.of` in ExerciseCore (the link, the camera
+being up, the phone app's state, no videos), held as a table in `WatchPageTests` on the host (Linux, on
+`humble-ladder-6-watch-page`); this table and the screenshots stay the check of what each page holds.
 
 ---
 
@@ -74,7 +76,7 @@ the first frame (story 001).
 ### User Story 017:
 
 - **Summary:** Start, switch camera and finish a set from the wrist
-- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe); verified on phone + watch, the camera cycle from the log; the button never told "1×" on the way to 0.5× (#188) in [745a3cd](https://github.com/idvorkin/exercise-analyzer/commit/745a3cd), verified by build only (the simulator has no camera); the cause of Igor's missed 0.5× is not proven, the next log's `shown_zoom` will say
+- **Status:** implemented in [af22b11](https://github.com/idvorkin/exercise-analyzer/commit/af22b11), [b829ebe](https://github.com/idvorkin/exercise-analyzer/commit/b829ebe); verified on phone + watch, the camera cycle from the log; the button never told "1×" on the way to 0.5× (#188) in [745a3cd](https://github.com/idvorkin/exercise-analyzer/commit/745a3cd), verified by build only (the simulator has no camera); the cause of Igor's missed 0.5× is not proven, the next log's `shown_zoom` will say; every wrist camera command in every camera stage is the `CameraCommands` table, and a switch or zoom with the camera off starts nothing (the 2026-11-07 audit, finding 3), on `humble-ladder-7-camera`, `CameraCommandsTests` on the host (Linux), the app build and a stale wrist tap on the phone to verify
 
 #### Use Case:
 - **As a** lifter who set the phone down across the room
@@ -94,6 +96,12 @@ the first frame (story 001).
 - **Then:** the phone goes to the back camera at 0.5× and the first thing the watch hears is "0.5×": it is never
   told "1×" on the way, so the button cannot read "1×" while the picture is the wide one
 
+- **Scenario:** A camera tap from a wrist behind the phone starts nothing
+- **Given:** the phone has ended the set (Done or Cancel on the phone) and the wrist still shows its recording page
+- **When:** I tap the camera button or zoom on the watch
+- **Then:** nothing starts: no camera, no recording (`watch_command_ignored` in the log); Record and Preview are
+  the only wrist buttons that open the camera
+
 - **Notes:** The idle page has two buttons: Record, which records from the camera's first frame, and Preview
   (story 047), which opens the camera without recording.
 
@@ -104,7 +112,7 @@ the first frame (story 001).
 ### User Story 018:
 
 - **Summary:** The watch never lies about the phone
-- **Status:** implemented in [c5c2d13](https://github.com/idvorkin/exercise-analyzer/commit/c5c2d13), [6199d9d](https://github.com/idvorkin/exercise-analyzer/commit/6199d9d), [b6c5d43](https://github.com/idvorkin/exercise-analyzer/commit/b6c5d43); verified on phone + watch; the heartbeat (#122) in [0fed44b](https://github.com/idvorkin/exercise-analyzer/commit/0fed44b), verified on the host, the watch simulator and phone + watch (the gym log of 2026-09-22); the wake grace (#76) in [bcf3b59](https://github.com/idvorkin/exercise-analyzer/commit/bcf3b59) and the wrist-up edge (#76) in [66167c8](https://github.com/idvorkin/exercise-analyzer/commit/66167c8), built for the device; the one-way link (#137) in [1474aae](https://github.com/idvorkin/exercise-analyzer/commit/1474aae), verified by `just watch-screens` (answersLost); on the phone and the watch since 2026-09-26, Igor's check pending (a raised wrist, a real one-way outage); the status's second road through the workout session and newest-wins ordering (#189) in [9739d23](https://github.com/idvorkin/exercise-analyzer/commit/9739d23), verified on the host (`FrameStatusTests`) and by build; whether the road delivers shows in the first workout's `status_workout` tally, whether it survives an outage only in the next outage; Retry by every road (#189) in [59946af](https://github.com/idvorkin/exercise-analyzer/commit/59946af), verified on the host (`WorkoutTests`) and by build, not yet run against a lost phone
+- **Status:** implemented in [c5c2d13](https://github.com/idvorkin/exercise-analyzer/commit/c5c2d13), [6199d9d](https://github.com/idvorkin/exercise-analyzer/commit/6199d9d), [b6c5d43](https://github.com/idvorkin/exercise-analyzer/commit/b6c5d43); verified on phone + watch; the heartbeat (#122) in [0fed44b](https://github.com/idvorkin/exercise-analyzer/commit/0fed44b), verified on the host, the watch simulator and phone + watch (the gym log of 2026-09-22); the wake grace (#76) in [bcf3b59](https://github.com/idvorkin/exercise-analyzer/commit/bcf3b59) and the wrist-up edge (#76) in [66167c8](https://github.com/idvorkin/exercise-analyzer/commit/66167c8), built for the device; the one-way link (#137) in [1474aae](https://github.com/idvorkin/exercise-analyzer/commit/1474aae), verified by `just watch-screens` (answersLost); on the phone and the watch since 2026-09-26, Igor's check pending (a raised wrist, a real one-way outage); the status's second road through the workout session and newest-wins ordering (#189) in [9739d23](https://github.com/idvorkin/exercise-analyzer/commit/9739d23), verified on the host (`FrameStatusTests`) and by build; whether the road delivers shows in the first workout's `status_workout` tally, whether it survives an outage only in the next outage; Retry by every road (#189) in [59946af](https://github.com/idvorkin/exercise-analyzer/commit/59946af), verified on the host (`WorkoutTests`) and by build, not yet run against a lost phone; the rule behind live, the wake grace, "Waiting for the phone…", "Not connected" and "PHONE NOT ANSWERING" as one value, `WatchLink` (the 2026-11-07 audit, finding 5), on `humble-ladder-link`, `WatchLinkTests` on the host (Linux), the watch sources typechecked against the iOS SDK only (no watchOS SDK there), the watch build and `just watch-screens` to verify on the Mac
 
 #### Use Case:
 - **As a** lifter glancing at the watch

@@ -45,7 +45,8 @@ final class PhotosExporter {
   }
 
   init(
-    recents: RecentsStore, verdict: @escaping (String, String) -> Verdict, log: @escaping (String, [String: Any]) -> Void
+    recents: RecentsStore, verdict: @escaping (String, String) -> Verdict,
+    log: @escaping (String, [String: Any]) -> Void
   ) {
     self.recents = recents
     self.verdict = verdict
@@ -73,15 +74,15 @@ final class PhotosExporter {
 
   func backlog(excluding current: String?) -> Backlog {
     var backlog = Backlog()
-    for entry in recents.entries where entry.id != current && !isNew(entry) {
-      guard let url = exportableClip(entry) else { continue }
+    for entry in PhotosExportPlan.backlog(recents.entries, since: since, excluding: current) {
+      guard let url = recents.clipFileURL(for: entry) else { continue }
       backlog.count += 1
       backlog.bytes += (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
     }
     return backlog
   }
 
-  private func isNew(_ entry: RecentEntry) -> Bool { (entry.recordedAt ?? entry.analyzedAt) >= since }
+  private func isNew(_ entry: RecentEntry) -> Bool { PhotosExportPlan.isNew(entry, since: since) }
 
   private func exportableClip(_ entry: RecentEntry) -> URL? {
     entry.recordedOnlyInApp ? recents.clipFileURL(for: entry) : nil
@@ -95,8 +96,9 @@ final class PhotosExporter {
       again = reason
       return
     }
-    let due = recents.entries.filter { entry in
-      !failed.contains(entry.id) && (approved || isNew(entry)) && exportableClip(entry) != nil
+    // Which sets is ExerciseCore's PhotosExportPlan (host-tested over the camera's own rows); the file must be here.
+    let due = PhotosExportPlan.due(recents.entries, approved: approved, since: since, failed: failed).filter {
+      recents.clipFileURL(for: $0) != nil
     }
     guard !due.isEmpty else { return }
     running = true
@@ -154,10 +156,15 @@ final class PhotosExporter {
           recents.markSavedToPhotos(id: entry.id, identifier: asset)
           log(
             "photos_export",
-            ["id": entry.id, "bytes": bytes, "ms": 0, "reason": reason, "left": left, "new": isNew(entry), "asset": asset])
+            [
+              "id": entry.id, "bytes": bytes, "ms": 0, "reason": reason, "left": left, "new": isNew(entry),
+              "asset": asset,
+            ])
           continue
         case .wait:
-          log("photos_export_skipped", ["id": entry.id, "reason": reason, "asset": asset, "why": found ? "open" : "unreadable"])
+          log(
+            "photos_export_skipped",
+            ["id": entry.id, "reason": reason, "asset": asset, "why": found ? "open" : "unreadable"])
           continue
         case .forget:
           recents.update(id: entry.id) { $0.exportedAsset = nil }
@@ -165,7 +172,9 @@ final class PhotosExporter {
       }
       let modified = Self.modified(url)
       do {
-        guard let identifier = try await VideoFile.saveToPhotos(url) else { throw VideoFile.VideoFileError.exportFailed("no asset") }
+        guard let identifier = try await VideoFile.saveToPhotos(url) else {
+          throw VideoFile.VideoFileError.exportFailed("no asset")
+        }
         // The set may have moved on while its clip was being written (the 2026-10-07 review): opened, it keeps its
         // clip until it is left and the next run points it at this asset; trimmed or kept by hand, the asset is of
         // a clip that is gone and nothing may point at it; still the same clip and closed, it points at the asset,
@@ -184,8 +193,11 @@ final class PhotosExporter {
           recents.markSavedToPhotos(id: entry.id, identifier: identifier)
           log(
             "photos_export",
-            ["id": entry.id, "bytes": bytes, "ms": Int(Date().timeIntervalSince(started) * 1000), "reason": reason, "left": left,
-             "new": isNew(entry)])
+            [
+              "id": entry.id, "bytes": bytes, "ms": Int(Date().timeIntervalSince(started) * 1000), "reason": reason,
+              "left": left,
+              "new": isNew(entry),
+            ])
         }
       } catch {
         failed.insert(entry.id)

@@ -45,6 +45,9 @@ extension RecentEntry {
       result.bellKgEditedAt = other.bellKgEditedAt
       result.editedAt = [result.editedAt, other.bellKgEditedAt].compactMap { $0 }.max()
     }
+    // A build from before `recordedHere` drops it when it rewrites the row: the mark survives, or the old guess
+    // takes the recording for an import and its clip never reaches Photos (PR #367 review).
+    if result.recordedHere == nil { result.recordedHere = other.recordedHere }
     if result == self && !newer { return nil }
     var asTheirs = result
     asTheirs.device = row.device
