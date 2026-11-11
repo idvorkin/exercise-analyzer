@@ -131,10 +131,10 @@ carry only what was decided.
   Shell is for building, testing, git and device commands.
 - **Background agents** that investigate are read-only, in a worktree, notes under `~/tmp/agent/notes/`; confirm scope
   before an agent that writes to the repo. Reap background commands when done.
-- **An outside agent that writes (Codex, Muse) works in a Herdr worktree**: `herdr worktree create --cwd <repo>
-  --branch <name> --base main`, the agent started in that worktree's pane (never `cd`'d into it), commits on its
-  branch, never pushes; review every commit, then `git merge --ff-only <name>` and remove the worktree
-  ([decision](docs/architecture/2026-09-26-agent-worktrees.md)). A fresh worktree has no `.mlpackage` (gitignored):
+- **An outside agent that writes (Codex, Muse) works in a treehouse slot** (`treehouse.toml`; Igor, 2026-11-11):
+  `treehouse get --lease -b <name>`, the agent started in that slot's pane (never `cd`'d into it), commits on its
+  branch, never pushes; review every commit, then `git merge --ff-only <name>` and `treehouse return <path>`
+  ([decision](docs/architecture/2026-09-26-agent-worktrees.md)). A fresh slot has no `.mlpackage` (gitignored):
   `just model` for the pose model, and copy the untracked bench detector `ExerciseAnalyzer/yoloe-26s-bench.mlpackage`
   from the main checkout before building; never commit either.
 - **Gym-first UI**: few large targets, HUD on the video, Recents point at Photos. Propose with a numeric plan or a
