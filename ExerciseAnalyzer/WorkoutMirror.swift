@@ -546,16 +546,55 @@ final class WorkoutMirror: NSObject {
 
   private func ended(at sessionEnd: Date) {
     guard let live else { return }
-    // The end the lifter took on the wrist's "Looks like you're done" (#330), never after the session's.
-    let date = live.endedAt.map { min(Date(timeIntervalSince1970: $0), sessionEnd) } ?? sessionEnd
-    liveHeartRate.end(at: date)
     defer {
       self.live = nil
       session = nil
     }
+    let id = save(live, sessionEnd: sessionEnd)
+    if let session { justEnded = (session, sessionEnd, live, id, Date()) }
+  }
+
+  /// The session that just ended, the wire it ended on and the row saved from it (ea-iwi): the wrist's ending
+  /// message (Discard, an earlier end) may still be on its way.
+  private var justEnded: (session: HKWorkoutSession, end: Date, live: WorkoutWire, id: String?, at: Date)?
+
+  /// The ending message that landed after the session's end (ea-iwi): it amends the row saved from the message
+  /// before it, at most 30 s on; any other late message is still dropped (#344).
+  private func lateEnding(_ wire: WorkoutWire, from workoutSession: HKWorkoutSession) {
+    guard wire.ending, let just = justEnded, just.session === workoutSession, !just.live.ending,
+      wire.startedAt == just.live.startedAt, Date().timeIntervalSince(just.at) < 30
+    else { return }
+    justEnded = nil
+    onEvent?(
+      "workout_late_ending",
+      [
+        "discarded": wire.discarded,
+        "ended_s_early": wire.endedAt.map { Int(just.end.timeIntervalSince1970 - $0) } ?? 0,
+        "ms_after_end": Int(Date().timeIntervalSince(just.at) * 1000),
+      ])
+    _ = save(wire, sessionEnd: just.end, replacing: just.id)
+  }
+
+  /// Saves the workout `live` ended (or drops it on Discard) and returns its row's id; `replacing` amends the row a
+  /// late ending message corrects, keeping its id.
+  private func save(_ live: WorkoutWire, sessionEnd: Date, replacing id: String? = nil) -> String? {
+    // The end the lifter took on the wrist's "Looks like you're done" (#330), never after the session's.
+    let date = live.endedAt.map { min(Date(timeIntervalSince1970: $0), sessionEnd) } ?? sessionEnd
+    liveHeartRate.end(at: date)
+    let late: [String: Any] = id == nil ? [:] : ["late": true]
     if live.discarded {
-      onEvent?("workout_discarded", ["seconds": Int(date.timeIntervalSince(live.startDate))])
-      return
+      if let id, index.workouts.contains(where: { $0.id == id }) {
+        index.workouts.removeAll { $0.id == id }
+        deleted[id] = Date()  // its tombstone, in case the mirror already took it (070, step 4)
+        UserDefaults.standard.set(deleted, forKey: Self.deletedKey)
+        try? FileManager.default.removeItem(
+          at: root.appendingPathComponent("workouts", isDirectory: true).appendingPathComponent(id, isDirectory: true))
+        try? index.save(root: root)
+      }
+      var fields: [String: Any] = ["seconds": Int(date.timeIntervalSince(live.startDate))]
+      fields.merge(late) { $1 }
+      onEvent?("workout_discarded", fields)
+      return nil
     }
     // The wire's numbers are the whole session's; an earlier end keeps only its own span's readings.
     let kept = live.endedAt == nil ? nil : liveHeartRate.series(from: live.startDate, to: date, now: date)
@@ -565,11 +604,18 @@ final class WorkoutMirror: NSObject {
       heartRateMax: kept?.peak(from: live.startDate, to: date) ?? live.heartRateMax,
       sets: live.sets, reps: live.reps)
     workout.kind = live.kind
-    index.workouts.append(workout)
+    if let id, let i = index.workouts.firstIndex(where: { $0.id == id }) {
+      workout.id = id
+      workout.modifiedAt = Date()  // the mirror takes the amended row (070)
+      index.workouts[i] = workout
+    } else {
+      index.workouts.append(workout)
+    }
     var fields: [String: Any] = [
       "seconds": Int(workout.duration), "hr_avg": workout.heartRateAverage ?? 0, "hr_max": workout.heartRateMax ?? 0,
       "sets": workout.sets, "reps": workout.reps,
     ]
+    fields.merge(late) { $1 }
     do {
       try index.save(root: root)
       fields["saved"] = true
@@ -578,6 +624,7 @@ final class WorkoutMirror: NSObject {
       fields["message"] = "\(error)"
     }
     onEvent?("workout_saved", fields)
+    return workout.id
   }
 
   #if targetEnvironment(simulator)
@@ -633,8 +680,14 @@ extension WorkoutMirror: HKWorkoutSessionDelegate {
     Task { @MainActor [last] in
       // A message the wrist sent just before End can land after `ended(at:)` (100 ms later on Nov 1): taken, it
       // brought the saved workout back as one still running on the watch, for good (#344).
-      guard session === workoutSession else { return }
+      guard session === workoutSession else {
+        lateEnding(last, from: workoutSession)
+        return
+      }
       if wantsStatus { onStatusWanted?() }
+      // The ending message stands: an earlier message of the same workout arriving after it would undo its
+      // Discard or earlier end (ea-iwi review).
+      if live?.ending == true, !last.ending, last.startedAt == live?.startedAt { return }
       live = last
       let now = Date()
       var buffer = liveHeartRate

@@ -427,16 +427,17 @@ final class WorkoutController: NSObject {
     // end never reached the phone's list (ea-iwi). Health answers within the round trip, or at once with an error
     // when the phone is away; 3 s caps the wait.
     pendingEnd = (session, Date())
-    sendWire(ending: true) { [weak self] ok in self?.endPendingSession(after: ok ? "sent" : "failed") }
+    sendWire(ending: true) { [weak self] ok in self?.endPendingSession(session, after: ok ? "sent" : "failed") }
     Task { [weak self] in
       try? await Task.sleep(for: .seconds(3))
-      self?.endPendingSession(after: "timeout")
+      self?.endPendingSession(session, after: "timeout")
     }
     stopMotion()  // a set still rolling at End: its motion so far goes
   }
 
-  private func endPendingSession(after wire: String) {
-    guard let pending = pendingEnd else { return }
+  /// Only `session`'s own wait: a timer left from an End 3 s ago never ends the next workout early.
+  private func endPendingSession(_ session: HKWorkoutSession, after wire: String) {
+    guard let pending = pendingEnd, pending.session === session else { return }
     pendingEnd = nil
     log("workout_session_end", ["wire": wire, "ms": Int(Date().timeIntervalSince(pending.at) * 1000)])
     pending.session.end()
@@ -704,6 +705,7 @@ final class WorkoutController: NSObject {
     doneOffer = nil
     endAt = nil
     lastWorkedAt = nil
+    pendingEnd = nil  // ended by another road during the wait: nothing left to end
     leave?.stop()
   }
 }
