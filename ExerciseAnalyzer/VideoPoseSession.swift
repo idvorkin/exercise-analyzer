@@ -128,11 +128,13 @@ final class VideoPoseSession: NSObject {
   private var pipeline = AnalysisPipeline(exercise: .kettlebellSwing)
   /// Poses of the loaded clip (offline pass or Recents), kept so a different exercise can be analyzed instantly.
   private var extractedFrames: [FrameRecord] = []
-  /// True once the current clip's pass finished and `extractedFrames` covers it: the mode switch may re-read
-  /// without re-scanning (story 003). False during a pass and after any failure, so a switch re-runs (#57).
-  private var extractionComplete = false
+  /// The loaded clip's offline pass as one value (ExerciseCore's `OfflinePass`, host-tested): whether
+  /// `extractedFrames` covers the clip (a mode switch re-reads, story 003; after a failure it re-runs, #57), whether
+  /// Cancel shows, whether the pass was interrupted, and whether the wrist says "Analyzing…" (045). Changed only
+  /// through `passEvent`.
+  private var pass = OfflinePass()
   /// Set when a pass fails (not on cancel): the status line offers a retry and the HUD shows a gym-sized button.
-  private(set) var analysisInterrupted = false
+  var analysisInterrupted: Bool { pass.interrupted }
   /// Frames the interrupted pass had reported via heartbeats; logged with `offline_interrupted` (#57).
   private var passFramesSeen = 0
   private let liveDetector = ExerciseDetector()
@@ -205,13 +207,12 @@ final class VideoPoseSession: NSObject {
 
   /// Claim before creating a Task or awaiting. The target survives first-save allocation and clip switches.
   private func beginOperation(entryID: String, origin: Origin) -> Operation {
-    lastSetPassEnded("superseded")
+    passEvent(.superseded)
     currentTask?.cancel()
     jobGeneration += 1
     currentJob = nil
     currentTask = nil
     loadRetry?.cancel()
-    canCancelAnalysis = false
     activity = .idle
     liveInferenceEnabled = true
     let operation = clipOperations.begin(entryID: entryID, origin: origin)
@@ -1062,8 +1063,7 @@ final class VideoPoseSession: NSObject {
           recordedAt: entry.recordedAt, startedAt: entry.clipStartedAt))
       canSave = !entry.isInPhotos
       extractedFrames = pipeline.track.frames
-      extractionComplete = true
-      analysisInterrupted = false
+      passEvent(.framesLoaded)
       detection = nil
       installPlayerItem(url: url, pipeline: pipeline)
       activity = .idle
@@ -1283,7 +1283,7 @@ final class VideoPoseSession: NSObject {
   }
   private(set) var instrumentedRun: InstrumentedRun?
   private var instrumentedRunCancelled = false
-  private(set) var canCancelAnalysis = false
+  var canCancelAnalysis: Bool { pass.canCancel }
   /// Set after an analysis that found no reps in a recording made by this app: offer to delete it.
   var emptyRecordingPrompt = false
 
@@ -1294,10 +1294,9 @@ final class VideoPoseSession: NSObject {
     cancelledJobGeneration = currentJob?.generation
     task.cancel()
     clipOperations.invalidate()
-    canCancelAnalysis = false
     activity = .idle
     liveInferenceEnabled = true
-    lastSetPassEnded("cancelled")
+    passEvent(.cancelled)
     statusMessage = "Analysis cancelled"
   }
 
@@ -1326,6 +1325,9 @@ final class VideoPoseSession: NSObject {
     guard let predictor = readyPredictor else {
       statusMessage = "Pose model unavailable"
       log.event("error", ["where": "offline_pass", "message": "no pose model (package missing or load failed)"])
+      // The wrist's "Analyzing…" and the recording's progress bar end here too (the 2026-11-07 audit, finding 4).
+      passEvent(.modelUnavailable)
+      activity = .idle
       return
     }
     // One pass at a time: whatever holds the slot now yields to the set the user opened. The cancel comes after
@@ -1337,18 +1339,16 @@ final class VideoPoseSession: NSObject {
     installPlayerItem(url: url, pipeline: AnalysisPipeline(exercise: exercise))
     // A new pass owns the track: stale poses from the previous clip must not survive a failure (#57).
     extractedFrames = []
-    extractionComplete = false
-    analysisInterrupted = false
+    passEvent(.started)
     passFramesSeen = 0
     liveInferenceEnabled = false
     activity = .working("Analyzing", progress: 0)
-    canCancelAnalysis = true
     defer {
       if cancelledJobGeneration == job.generation, jobGeneration == job.generation {
         log.event("analysis_cancelled", ["url": url.lastPathComponent])
       }
       // A superseded pass leaves the newer pass's Cancel alone.
-      if isCurrent(operation) { canCancelAnalysis = false }
+      if isCurrent(operation) { pass.settle() }
       clearJob(job)
       updateKeepAwake()
     }
@@ -1375,18 +1375,17 @@ final class VideoPoseSession: NSObject {
     case .done(let frames, let summary):
       await finishAnalysis(job: job, operation: operation, frames: frames, summary: summary)
       guard isCurrent(operation) else { return }
-      lastSetPassEnded("no final count")  // a pass that was not the recording's own leaves nothing to land
+      // A finish that returned before its track was complete still lands nothing on the wrist.
+      passEvent(.abandoned("no final count"))
     case .cancelled:
-      lastSetPassEnded("cancelled")
+      passEvent(.cancelled)
       statusMessage = "Analysis cancelled"
       log.event("analysis_cancelled", ["url": url.lastPathComponent])
     case .failed(let error):
-      lastSetPassEnded("interrupted")
       // A failed pass leaves no partial track: the mode switch re-runs from the clip (#57).
+      passEvent(.failed)
       extractedFrames = []
-      extractionComplete = false
       adopt(pipeline: AnalysisPipeline(exercise: exercise))
-      analysisInterrupted = true
       statusMessage = "Analysis interrupted – tap to retry"
       log.event("offline_interrupted", ["frames": passFramesSeen, "message": "\(error)"])
       // Test hook: SWING_MODE=<exercise|auto> switches exercise after an interrupted pass, proving a mode
@@ -1402,7 +1401,7 @@ final class VideoPoseSession: NSObject {
     activity = .idle
     liveInferenceEnabled = true
     // Cancel leaves the loaded clip paused (story 028); it must not fall through to playback or auto-trim.
-    if case .cancelled = result { return }
+    guard pass.resumesPlayback else { return }
     play()
     #if targetEnvironment(simulator)
       if !switchCheckStarted {
@@ -1431,8 +1430,7 @@ final class VideoPoseSession: NSObject {
     extractedFrames = frames
     await analyzeExtracted(url: job.url, operation: operation, reason: reason, stored: exercise)
     guard isCurrent(operation) else { return }
-    extractionComplete = true
-    analysisInterrupted = false
+    passEvent(.finished)
     statusMessage =
       recordedLine(reps: pipeline.reps.count)
       + String(
@@ -1552,8 +1550,7 @@ final class VideoPoseSession: NSObject {
     source = .none
     reps = []
     extractedFrames = []
-    extractionComplete = false
-    analysisInterrupted = false
+    passEvent(.clipDeleted)
     latestFrame = nil
     duration = 0
     statusMessage = status
@@ -1598,7 +1595,7 @@ final class VideoPoseSession: NSObject {
       lastSet = LastSet(
         reps: analyzed.reps.count, exercise: chosen.definition.name, seconds: clipSeconds,
         at: Date().timeIntervalSince1970)
-      analyzingLastSet = false
+      pass.apply(.lastSetLanded)
       pushWatchStatus(force: true)
       log.event(
         "watch_last_set",
@@ -1622,7 +1619,7 @@ final class VideoPoseSession: NSObject {
     log.event("exercise_mode", ["mode": mode.storageValue])
     if case .fixed(let kind) = mode { exercise = kind }
     switch source {
-    case .file where extractionComplete && !extractedFrames.isEmpty:
+    case .file where pass.modeSwitch(hasFrames: !extractedFrames.isEmpty) == .reread:
       guard let url = clip?.playing else { return }
       let operation = beginCurrentOperation()
       Task {
@@ -1634,9 +1631,9 @@ final class VideoPoseSession: NSObject {
         rememberCurrent(clipURL: url, operation: operation)
         activity = .idle
       }
-    case .file where !extractionComplete:
+    case .file where pass.modeSwitch(hasFrames: !extractedFrames.isEmpty) == .rerun:
       // No complete extraction (an interrupted pass left none, #57): re-run from the clip instead of
-      // re-reading partial frames. A pass already running picks the new mode up when it finishes.
+      // re-reading partial frames. A pass already running (`.wait`) picks the new mode up when it finishes.
       guard !userPassActive, let url = clip?.playing else { return }
       let reason = lastUserPass.reason
       let operation = beginCurrentOperation()
@@ -2116,9 +2113,9 @@ final class VideoPoseSession: NSObject {
   // MARK: - Watch companion
 
   private var lastWatchHeartbeat = Date.distantPast
-  /// The last analyzed recording for the watch idle screen, and whether its offline pass is still running (045).
+  /// The last analyzed recording for the watch idle screen (045); whether its pass is still running is
+  /// `pass.awaitingLastSet`.
   private var lastSet: LastSet?
-  private var analyzingLastSet = false
   /// The camera is up for framing only: the pipeline runs but the recorder does not (story 047, #73).
   private(set) var viewfinder = false
   /// When the viewfinder attached, for the `viewfinder_s` framing seconds on `record_start`.
@@ -2177,7 +2174,7 @@ final class VideoPoseSession: NSObject {
     status.bellKg = Dictionary(
       uniqueKeysWithValues: RecentEntry.lastBellKg(recents.entries).map { ($0.key.rawValue, $0.value) })
     // No new field: phase is free when not recording, and the old watch app never reads it (045).
-    if analyzingLastSet { status.phase = "analyzing" }
+    if pass.awaitingLastSet { status.phase = "analyzing" }
     watch.send(status, force: force || heartbeat)
   }
 
@@ -2293,8 +2290,7 @@ final class VideoPoseSession: NSObject {
     // A viewfinder is not a set: the last set's line and its pass flag stay until Record (045, 047).
     resetSet(clearingLastSet: !viewfinder)
     extractedFrames = []
-    extractionComplete = false
-    analysisInterrupted = false
+    passEvent(.cameraStarted)
     watchModeDeclined = false
     latestFrame = nil
     statusMessage = nil
@@ -2353,7 +2349,7 @@ final class VideoPoseSession: NSObject {
     if clearingLastSet {
       // A new set owns the idle screen: the old final count and any pass flag go (045).
       lastSet = nil
-      analyzingLastSet = false
+      pass.apply(.newSet)
     }
     reps = []
     lastQuality = nil
@@ -2645,11 +2641,11 @@ final class VideoPoseSession: NSObject {
     pushWatchStatus(force: true)
   }
 
-  /// The recording's pass will not land a final count (cancelled, interrupted, superseded by another set,
-  /// nothing to trim): the wrist must not sit on "Analyzing…" until the next Record (the 2026-09-15 review).
-  private func lastSetPassEnded(_ reason: String) {
-    guard analyzingLastSet else { return }
-    analyzingLastSet = false
+  /// Feeds one event to the pass. When the recording's pass will not land a final count (cancelled, interrupted,
+  /// superseded by another set, nothing to trim, no pose model), the wrist must not sit on "Analyzing…" until the
+  /// next Record (the 2026-09-15 review, the 2026-11-07 audit's finding 4): `OfflinePass` says so, and this tells it.
+  private func passEvent(_ event: OfflinePass.Event) {
+    guard case .lastSetEnded(let reason) = pass.apply(event) else { return }
     log.event("watch_last_set", ["ended": reason])
     pushWatchStatus(force: true)
   }
@@ -2676,7 +2672,7 @@ final class VideoPoseSession: NSObject {
     guard let recorder else { return }
     self.recorder = nil
     let operation = beginOperation(entryID: UUID().uuidString, origin: .recording)
-    analyzingLastSet = true
+    pass.apply(.recordingStopped)
     pushWatchStatus(force: true)
     let closing = segmentFinishes
     segmentFinishes = []
@@ -2712,7 +2708,7 @@ final class VideoPoseSession: NSObject {
         log.event("error", ["where": "recorder", "message": "finish returned no file"])
         guard isCurrent(operation) else { return }
         statusMessage = "Nothing recorded"
-        lastSetPassEnded("nothing recorded")
+        passEvent(.abandoned("nothing recorded"))
         activity = .idle
         return
       }
@@ -2920,8 +2916,7 @@ final class VideoPoseSession: NSObject {
     let dropped: URL? = clip?.undo(to: before) ?? nil
     installPlayerItem(url: before.url, pipeline: before.pipeline, keepUndo: true)
     extractedFrames = before.frames
-    extractionComplete = true
-    analysisInterrupted = false
+    passEvent(.framesLoaded)
     statusMessage = "Trim undone"
     log.event("trim_undo", ["dropped": dropped?.lastPathComponent ?? ""])
     let saved = rememberCurrent(clipURL: before.url, operation: operation)
@@ -3025,8 +3020,7 @@ final class VideoPoseSession: NSObject {
       } else {
         installPlayerItem(url: cut, pipeline: analyzed.joined(spans: trimmed.spans), keepUndo: true)
         extractedFrames = pipeline.track.frames
-        extractionComplete = true
-        analysisInterrupted = false
+        passEvent(.framesLoaded)
         statusMessage = String(format: "Trimmed to %.1fs", kept)
         clip?.url = cut
         canUndoTrim = clip?.untrimmed != nil
@@ -3051,7 +3045,7 @@ final class VideoPoseSession: NSObject {
       guard isCurrent(operation) else { return }
       statusMessage = "Trim failed: \(error.localizedDescription)"
       log.event("error", ["where": "trim", "message": "\(error)"])
-      lastSetPassEnded("trim failed")
+      passEvent(.abandoned("trim failed"))
       activity = .idle
     }
   }

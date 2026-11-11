@@ -22,6 +22,11 @@ test:
     cd ExerciseCore && swift test --skip TuningReports --skip DetectionReport --skip SwingThresholdSweep --skip ZoomPreviewReport 2>&1 \
       | grep -E "Test Suite|passed|failed|error" | tail -20
 
+# Rung 1 on a Linux box, no Xcode (scripts/test-linux.sh says what it needs): ExerciseCore's tests under Linux Swift,
+# then the package and its tests cross-built for macOS, iOS and the simulator with a Darwin Swift SDK.
+test-linux:
+    bash scripts/test-linux.sh
+
 # Rung 0: the smell check and the formatter's lint (docs/TESTING.md "Lint"). SwiftLint runs over the whole tree
 # (errors fail, warnings print: the tree has none, so any is new); swift-format lints only the
 # Swift files this branch touched against main, until the one-time reformat lands. Both tools run in the gate.

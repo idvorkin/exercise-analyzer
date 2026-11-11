@@ -7,8 +7,11 @@
 //  The elbows only score: from behind they fold onto the upper arm and read 5–95° at the top.
 //  Notes and the numbers behind the thresholds: docs/analysis/pull-up.md.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct PullUpThresholds {
   public init() {}

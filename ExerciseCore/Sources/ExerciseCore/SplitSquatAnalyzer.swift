@@ -8,8 +8,11 @@
 //  feet split during the dip or its approach, so a squat or a bend to the floor is not a rep. The knees only score.
 //  Notes and the numbers behind the thresholds: docs/analysis/split-squat.md.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct SplitSquatThresholds {
   public init() {}

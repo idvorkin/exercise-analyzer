@@ -1,9 +1,12 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-import CoreGraphics
 import XCTest
 
 @testable import ExerciseCore
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 final class FrameStatusTests: XCTestCase {
   func testNoBoxIsOutOfFrame() {

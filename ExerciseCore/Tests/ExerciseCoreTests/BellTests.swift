@@ -3,10 +3,13 @@
 //  The bell in play and its colour (#18): the tracker starts on a confident box at a wrist and follows it through
 //  low-confidence frames past the rack bells; the colour code names the weight and stays quiet on cast iron.
 
-import CoreGraphics
 import XCTest
 
 @testable import ExerciseCore
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 final class BellTests: XCTestCase {
   /// A pose with both wrists at `wrist` and everything else confident but elsewhere.
@@ -70,7 +73,8 @@ final class BellTests: XCTestCase {
     // apex reaches about a quarter of the frames, which is why the share is 60 %.)
     let rack = bell(0.9, 0.9, conf: 0.95)
     let frames = (0..<100).map { i in
-      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: nil, box: nil, analysis: nil,
+      FrameRecord(
+        time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: nil, box: nil, analysis: nil,
         bells: i % 10 < 7 ? [rack] : [])
     }
     let zones = BellTracker.staticZones(in: frames)
@@ -85,12 +89,14 @@ final class BellTests: XCTestCase {
     let tracker = BellTracker()
     let red = BellSighting(box: CGRect(x: 0.47, y: 0.57, width: 0.06, height: 0.06), conf: 0.9, color: [0.9, 0.1, 0.1])
     _ = tracker.track([red], pose: pose(wrist: CGPoint(x: 0.5, y: 0.6)))
-    let blue = BellSighting(box: CGRect(x: 0.49, y: 0.55, width: 0.06, height: 0.06), conf: 0.9, color: [0.1, 0.2, 0.9])
+    let blue = BellSighting(
+      box: CGRect(x: 0.49, y: 0.55, width: 0.06, height: 0.06), conf: 0.9, color: [0.1, 0.2, 0.9])
     // A blue bell is not the red one: the tracker refuses to switch and coasts the red box instead.
     let coasted = tracker.track([blue], pose: pose(wrist: CGPoint(x: 0.52, y: 0.58)))
     XCTAssertEqual(coasted?.center.x ?? 0, 0.5, accuracy: 0.001)
     XCTAssertEqual(coasted?.center.y ?? 0, 0.6, accuracy: 0.001)
-    let darkRed = BellSighting(box: CGRect(x: 0.49, y: 0.55, width: 0.06, height: 0.06), conf: 0.5, color: [0.5, 0.1, 0.1])
+    let darkRed = BellSighting(
+      box: CGRect(x: 0.49, y: 0.55, width: 0.06, height: 0.06), conf: 0.5, color: [0.5, 0.1, 0.1])
     XCTAssertNotNil(tracker.track([darkRed], pose: pose(wrist: CGPoint(x: 0.52, y: 0.58))), "the same red, darker")
   }
 
@@ -184,11 +190,13 @@ final class BellTests: XCTestCase {
     // are the same bell followed from the confident one, written with their detected boxes.
     let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
     func frame(_ i: Int, _ bells: [BellSighting]) -> FrameRecord {
-      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
+      FrameRecord(
+        time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
         box: CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8), analysis: nil, bells: bells)
     }
     let frames = [
-      frame(0, [bell(0.5, 0.64, conf: 0.3)]), frame(1, [bell(0.5, 0.62, conf: 0.3)]), frame(2, [bell(0.5, 0.6, conf: 0.9)]),
+      frame(0, [bell(0.5, 0.64, conf: 0.3)]), frame(1, [bell(0.5, 0.62, conf: 0.3)]),
+      frame(2, [bell(0.5, 0.6, conf: 0.9)]),
       frame(3, []),
     ]
     let forward = AnalysisPipeline.analyze(frames: frames, exercise: .kettlebellSwing).track.frames
@@ -206,14 +214,17 @@ final class BellTests: XCTestCase {
     let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
     let stale = bell(0.1, 0.9, conf: 0.9)
     let frames = (0..<6).map { i in
-      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
+      FrameRecord(
+        time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
         box: CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8), analysis: nil,
         bells: [bell(0.5, 0.6 + 0.03 * Double(i), conf: 0.9)], bell: stale)
     }
     let replayed = AnalysisPipeline.analyze(frames: frames, exercise: .kettlebellSwing).track.frames
-    XCTAssertEqual(replayed.map { $0.bell?.center.x }, Array(repeating: 0.5, count: 6), "the tracker's choice, not the stored one")
+    XCTAssertEqual(
+      replayed.map { $0.bell?.center.x }, Array(repeating: 0.5, count: 6), "the tracker's choice, not the stored one")
     let restored = AnalysisPipeline.restored(frames: frames, reps: [], exercise: .kettlebellSwing).track.frames
-    XCTAssertEqual(restored.map { $0.bell?.center.x }, Array(repeating: 0.1, count: 6), "a restore keeps the stored analysis as is")
+    XCTAssertEqual(
+      restored.map { $0.bell?.center.x }, Array(repeating: 0.1, count: 6), "a restore keeps the stored analysis as is")
   }
 
   func testOnlyBellExercisesTrackABell() {
@@ -221,7 +232,8 @@ final class BellTests: XCTestCase {
     // the same frames analyzed as a swing still find it.
     let hands = pose(wrist: CGPoint(x: 0.5, y: 0.6))
     let frames = (0..<6).map { i in
-      FrameRecord(time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
+      FrameRecord(
+        time: Double(i) / 30, imageSize: CGSize(width: 1080, height: 1920), pose: hands,
         box: CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8), analysis: nil,
         bells: [bell(0.5, 0.6 + 0.03 * Double(i), conf: 0.9)])
     }

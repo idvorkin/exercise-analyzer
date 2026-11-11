@@ -3,10 +3,13 @@
 //  #152: as the playhead moves through a rep, the gallery zooms the position it has reached, the same zoom a
 //  tap on a rep's number and a phase header gives. The rule is which column that is.
 
-import CoreGraphics
 import XCTest
 
 @testable import ExerciseCore
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 final class RepGalleryFollowTests: XCTestCase {
   private func position(_ phase: String, _ time: Double) -> RepPosition {

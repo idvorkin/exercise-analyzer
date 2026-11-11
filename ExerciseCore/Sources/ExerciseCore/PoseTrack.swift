@@ -3,8 +3,11 @@
 //  A time-ordered record of analyzed frames. Playback and scrubbing replay stored poses instead of re-running
 //  inference, and a camera session's track becomes the trimmed clip's track by shifting its times.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public struct FrameRecord: Codable {
   public let time: Double

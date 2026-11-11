@@ -4,8 +4,11 @@
 //  phases, gallery column order, and HUD metrics, and provides an analyzer that turns poses into phases, reps, and
 //  quality scores.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public enum ExerciseKind: String, Codable, CaseIterable, Identifiable, Sendable {
   case kettlebellSwing = "kettlebell-swing"

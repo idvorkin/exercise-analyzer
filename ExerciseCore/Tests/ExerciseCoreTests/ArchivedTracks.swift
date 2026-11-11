@@ -22,7 +22,7 @@ final class ArchivedTracks: XCTestCase {
     .appendingPathComponent("Fixtures/archived-counts.json")
 
   func testEveryArchivedTrackAnalyzes() throws {
-    let urls = (Bundle.module.urls(forResourcesWithExtension: "json", subdirectory: "Fixtures/tracks") ?? []).sorted { $0.lastPathComponent < $1.lastPathComponent }
+    let urls = Fixture.archivedTracks()
     var found: [String: Pin] = [:]
     for url in urls {
       let frames = try Fixture.frames(at: url)
@@ -30,7 +30,10 @@ final class ArchivedTracks: XCTestCase {
       let pipeline = AnalysisPipeline.analyze(frames: frames, exercise: detection.exercise)
       XCTAssertFalse(frames.isEmpty, url.lastPathComponent)
       found[url.lastPathComponent] = Pin(exercise: detection.exercise.rawValue, reps: pipeline.reps.count)
-      print(String(format: "%-48@ %-22@ %3d%%  %2d reps  %@", url.lastPathComponent, detection.exercise.rawValue, detection.confidence, pipeline.reps.count, detection.reason))
+      print(
+        String(
+          format: "%-48@ %-22@ %3d%%  %2d reps  %@", url.lastPathComponent, detection.exercise.rawValue,
+          detection.confidence, pipeline.reps.count, detection.reason))
     }
     print("archived tracks: \(urls.count)")
 

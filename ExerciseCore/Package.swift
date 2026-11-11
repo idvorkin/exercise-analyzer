@@ -23,3 +23,10 @@ let package = Package(
       resources: [.copy("Fixtures")]),
   ]
 )
+
+#if os(Linux)
+  // just test-linux: posetrack needs AVFoundation, Core ML and Vision, so a Linux host builds only the library and
+  // its tests. The dependency stays declared, so Package.resolved is the same on both.
+  package.products.removeAll { $0.name == "posetrack" }
+  package.targets.removeAll { $0.name == "posetrack" }
+#endif

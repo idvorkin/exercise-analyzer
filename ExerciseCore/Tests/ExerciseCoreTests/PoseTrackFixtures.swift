@@ -3,11 +3,14 @@
 //  Pose-track fixtures: real clips, already run through the pose model, stored as normalized keypoints per frame.
 //  Tests replay them through the detector and analyzers on the host, no model or simulator needed.
 
-import CoreGraphics
 import Foundation
 import XCTest
 
 @testable import ExerciseCore
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 struct Fixture {
   let name: String
@@ -90,19 +93,23 @@ struct Fixture {
     // just me setting up. I think rep 2 was garbage too. I think there were only 8 reps here." Rep 1 (5.8–6.7 s) is
     // the rear foot going up to the bench mid-crouch (elevated in 77 % of its frames, 0.83 s long); rep 2
     // (10.0–10.8 s) is a 0.10 L head wobble. The eight real dips are 0.43–0.51 L deep and 1.5–2.5 s long.
-    Fixture(name: "bulgarian-4CF19A9A-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: true),
+    Fixture(
+      name: "bulgarian-4CF19A9A-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: true),
     // Igor's gym set (2026-09-22, #134), dumbbells, camera front-left with the bench nearer the camera than him:
     // Igor counted 6 on the video (the live count said 7, the offline pass 0). Perspective puts the rear ankle level
     // with the front one on screen, so only the bench box (every second, from `posetrack`) shows the foot up.
-    Fixture(name: "bulgarian-7424BEDD-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 6, humanVerified: true),
+    Fixture(
+      name: "bulgarian-7424BEDD-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 6, humanVerified: true),
     // Igor's gym set (2026-09-22 evening, #135), side camera, rear foot on the bench: 8 reps by Muse over one strip
     // per head drop (bottoms 6.1–36.1 s, then the dumbbells put down), the first one checked by eye. It counted 6:
     // the first rep came back 0.06 L short of the standing height and waited to be merged into the second.
     // Not confirmed by Igor.
-    Fixture(name: "bulgarian-599F988A-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
+    Fixture(
+      name: "bulgarian-599F988A-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
     // Igor's gym set (2026-09-22, #135, #172), set up near the camera: eight reps, then the dumbbells put down with
     // the feet together (34.9 s), which counted as a ninth. 8 by Muse's strip and checked by eye; not Igor's count.
-    Fixture(name: "bulgarian-79271425-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
+    Fixture(
+      name: "bulgarian-79271425-phone", expectedExercise: .bulgarianSplitSquat, expectedReps: 8, humanVerified: false),
     // Igor's TGU clip (2026-09-12, IMG_4342): two get-ups, one per side, with a rest lying between them.
     Fixture(name: "tgu-phone-2min", expectedExercise: .turkishGetUp, expectedReps: 2, humanVerified: false),
     // Igor's second TGU clip (IMG_4343, issue #14): one get-up per side; a pose glitch at 14 s once counted as a rep.
@@ -131,6 +138,13 @@ struct Fixture {
     return try Self.frames(at: url)
   }
 
+  /// Every archived track (`Fixtures/tracks`), by file name. Paths, not `urls(forResourcesWithExtension:)`: on
+  /// Linux (just test-linux) that one hands back NSURLs.
+  static func archivedTracks() -> [URL] {
+    Bundle.module.paths(forResourcesOfType: "json", inDirectory: "Fixtures/tracks").map { URL(fileURLWithPath: $0) }
+      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+  }
+
   /// Decodes a compact pose track (fixture or archived track) into frames.
   static func frames(at url: URL) throws -> [FrameRecord] {
     let data = try Data(contentsOf: url)
@@ -143,7 +157,9 @@ struct Fixture {
         box: f.box.map { CGRect(x: $0[0][0], y: $0[0][1], width: $0[1][0], height: $0[1][1]) },
         analysis: nil,
         bells: (f.bells ?? []).map {
-          BellSighting(box: CGRect(x: $0.box[0][0], y: $0.box[0][1], width: $0.box[1][0], height: $0.box[1][1]), conf: $0.conf, color: $0.color)
+          BellSighting(
+            box: CGRect(x: $0.box[0][0], y: $0.box[0][1], width: $0.box[1][0], height: $0.box[1][1]), conf: $0.conf,
+            color: $0.color)
         },
         bench: f.bench.map { CGRect(x: $0[0][0], y: $0[0][1], width: $0[1][0], height: $0[1][1]) })
     }
@@ -183,7 +199,9 @@ extension Array where Element == FrameRecord {
       }
       let box = frame.box.map { CGRect(x: 1 - $0.maxX, y: $0.minY, width: $0.width, height: $0.height) }
       let bells = frame.bells.map {
-        BellSighting(box: CGRect(x: 1 - $0.box.maxX, y: $0.box.minY, width: $0.box.width, height: $0.box.height), conf: $0.conf, color: $0.color)
+        BellSighting(
+          box: CGRect(x: 1 - $0.box.maxX, y: $0.box.minY, width: $0.box.width, height: $0.box.height), conf: $0.conf,
+          color: $0.color)
       }
       let bench = frame.bench.map { CGRect(x: 1 - $0.maxX, y: $0.minY, width: $0.width, height: $0.height) }
       return FrameRecord(

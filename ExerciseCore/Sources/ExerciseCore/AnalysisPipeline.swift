@@ -5,8 +5,11 @@
 //  results as they arrive; the offline path feeds it already-extracted frames, so re-analysis (another exercise,
 //  auto-detect) never touches the model.
 
-import CoreGraphics
 import Foundation
+
+#if canImport(CoreGraphics)
+  import CoreGraphics
+#endif
 
 public final class AnalysisPipeline: @unchecked Sendable {
   public let exercise: ExerciseKind
