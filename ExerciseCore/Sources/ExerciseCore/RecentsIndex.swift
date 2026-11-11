@@ -79,9 +79,6 @@ public struct RecentEntry: Codable, Equatable, Identifiable, Sendable {
   /// 2026-11-10, which `isRecordedHere` reads by the old guess.
   public var recordedHere: Bool? = nil
 
-  /// What a recording's file is called when the camera writes it (`FrameRecorder`).
-  public static let recordingNamePrefix = "swing-recording-"
-
   public var changedAt: Date { modifiedAt ?? analyzedAt }
 
   /// The lifter set the bell's weight on `device` (066); nil clears it.
