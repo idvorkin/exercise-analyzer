@@ -183,6 +183,9 @@ private struct WorkoutPageView: View {
   /// The set list by exercise instead of by time (#164), remembered across workouts.
   @AppStorage("workoutPageGrouped") private var grouped = false
   private var workout: StoredWorkout { snapshot.workout }
+  /// An elliptical, a run, any type but strength (#356; Igor: "If it's an elliptical workout don't let me set
+  /// weights"): no set is added from its chart, and with none recorded it carries no sets lines.
+  private var cardio: Bool { (workout.kind ?? .strength) != .strength }
   /// The rows' pictures by set id, read once (see `.task`).
   @State private var thumbnails: [String: UIImage] = [:]
   /// The chart's window in seconds (#125): the whole workout until a pinch narrows it, never under a minute.
@@ -452,7 +455,7 @@ private struct WorkoutPageView: View {
         add(draft, exercise: $0, reps: $1, kg: $2)
       }
     }
-    if timeline.rows.isEmpty {
+    if timeline.rows.isEmpty, !cardio {
       Text("No sets were recorded inside this workout.").font(.subheadline).foregroundStyle(.secondary)
     }
   }
@@ -480,10 +483,12 @@ private struct WorkoutPageView: View {
         }
         .font(.title2.bold()).monospacedDigit().foregroundStyle(.orange)
       }
-      Text(
-        "\(timeline.rows.count) set\(timeline.rows.count == 1 ? "" : "s") · \(timeline.rows.reduce(0) { $0 + $1.reps }) reps · work \(Self.minutes(timeline.workSeconds)) · rest \(Self.minutes(timeline.restSeconds))"
-      )
-      .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+      if !(cardio && timeline.rows.isEmpty) {
+        Text(
+          "\(timeline.rows.count) set\(timeline.rows.count == 1 ? "" : "s") · \(timeline.rows.reduce(0) { $0 + $1.reps }) reps · work \(Self.minutes(timeline.workSeconds)) · rest \(Self.minutes(timeline.restSeconds))"
+        )
+        .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+      }
       // Reps × kg over the sets with a weight (066).
       if let load = timeline.loadKg {
         Text("\(load.formatted()) kg moved").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
@@ -591,7 +596,7 @@ private struct WorkoutPageView: View {
           // time to give the set (it used to land at the end, wherever the finger was). `contains`, not a range:
           // `start...end` traps on a row whose end is before its start (#201).
           let draft =
-            row == nil && typed == nil && onAddByHand != nil
+            row == nil && typed == nil && onAddByHand != nil && !cardio
             ? moment(x).flatMap { workout.contains($0) ? timeline.handSet(at: $0).entry : nil }
             : nil
           onEvent?(
