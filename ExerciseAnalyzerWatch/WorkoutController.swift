@@ -106,6 +106,8 @@ final class WorkoutController: NSObject {
   private var discarding = false
   private var activityOpen = false
   private var lastWireAt = Date.distantPast
+  /// The session End or Discard ends once its ending message is through (ea-iwi), and when.
+  @ObservationIgnored private var pendingEnd: (session: HKWorkoutSession, at: Date)?
   private let log: (String, [String: Any]) -> Void
   /// What the phone sent through the mirrored session: its status, when WatchConnectivity may not carry it (#189).
   var onPhoneData: ((Data) -> Void)?
@@ -420,9 +422,25 @@ final class WorkoutController: NSObject {
     var fields = summaryFields
     if let endAt { fields["end_s_ago"] = Int(Date().timeIntervalSince(endAt)) }
     log(discard ? "workout_discard" : "workout_end", fields)
-    sendWire(ending: true)
+    // The ending message first, the session's end after it: a message sent just before the end can reach the phone
+    // after the session's end (100 ms later on Nov 1), where the phone drops it (#344), so a Discard or an earlier
+    // end never reached the phone's list (ea-iwi). Health answers within the round trip, or at once with an error
+    // when the phone is away; 3 s caps the wait.
+    pendingEnd = (session, Date())
+    sendWire(ending: true) { [weak self] ok in self?.endPendingSession(session, after: ok ? "sent" : "failed") }
+    Task { [weak self] in
+      try? await Task.sleep(for: .seconds(3))
+      self?.endPendingSession(session, after: "timeout")
+    }
     stopMotion()  // a set still rolling at End: its motion so far goes
-    session.end()
+  }
+
+  /// Only `session`'s own wait: a timer left from an End 3 s ago never ends the next workout early.
+  private func endPendingSession(_ session: HKWorkoutSession, after wire: String) {
+    guard let pending = pendingEnd, pending.session === session else { return }
+    pendingEnd = nil
+    log("workout_session_end", ["wire": wire, "ms": Int(Date().timeIntervalSince(pending.at) * 1000)])
+    pending.session.end()
   }
 
   // MARK: - Sets inside the workout
@@ -577,8 +595,15 @@ final class WorkoutController: NSObject {
     sendWire(wantsStatus: true)
   }
 
-  private func sendWire(ending: Bool = false, throttled: Bool = false, wantsStatus: Bool = false) {
-    guard let session, !fixed else { return }
+  /// `sent`: when Health has taken the message (true) or refused it (false); also false when nothing was sent.
+  private func sendWire(
+    ending: Bool = false, throttled: Bool = false, wantsStatus: Bool = false,
+    sent: (@MainActor @Sendable (Bool) -> Void)? = nil
+  ) {
+    guard let session, !fixed else {
+      sent?(false)
+      return
+    }
     // After the ending message nothing else goes: a late heart reading's message would replace it on the phone,
     // and with it the earlier end and Discard.
     if !ending, phase != .running { return }
@@ -590,11 +615,15 @@ final class WorkoutController: NSObject {
     message.discarded = ending && discarding
     if ending { message.endedAt = endAt?.timeIntervalSince1970 }
     if wantsStatus { message.wantsStatus = true }
-    guard let data = try? JSONEncoder().encode(message) else { return }
+    guard let data = try? JSONEncoder().encode(message) else {
+      sent?(false)
+      return
+    }
     session.sendToRemoteWorkoutSession(data: data) { [weak self] ok, error in
-      guard !ok else { return }
+      let message = error.map { "\($0)" } ?? ""
       Task { @MainActor in
-        self?.log("workout_wire_failed", ["ending": ending, "message": error.map { "\($0)" } ?? ""])
+        if !ok { self?.log("workout_wire_failed", ["ending": ending, "message": message]) }
+        sent?(ok)
       }
     }
   }
@@ -676,6 +705,7 @@ final class WorkoutController: NSObject {
     doneOffer = nil
     endAt = nil
     lastWorkedAt = nil
+    pendingEnd = nil  // ended by another road during the wait: nothing left to end
     leave?.stop()
   }
 }
