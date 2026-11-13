@@ -70,6 +70,21 @@ final class WorkoutTimelineTests: XCTestCase {
     XCTAssertEqual(ended.heartLine, "142 avg · 157 max")
   }
 
+  /// #371 (Igor, on the elliptical: "When I'm elliptical do not set reps"): the running workout's page carries the
+  /// wrist's type, so #356's rule (no set to add on a type but strength) holds while it runs, not only once saved.
+  func testTheRunningWorkoutsPageKnowsItsType() throws {
+    let identity = WorkoutIdentity(start: date(1000))
+    var live = WorkoutWire(startedAt: 1000, heartRate: 120)
+    live.kind = .elliptical
+    let running = try XCTUnwrap(
+      WorkoutPageSnapshot(identity: identity, live: live, saved: [], now: date(1600), sets: [], heartRate: nil))
+    XCTAssertEqual(running.workout.id, WorkoutIdentity.liveID)
+    XCTAssertEqual(running.workout.kind, .elliptical)
+    // Strength stays nil, as on the wire and a saved row.
+    let strength = identity.resolve(live: WorkoutWire(startedAt: 1000), saved: [], now: date(1600))
+    XCTAssertNil(try XCTUnwrap(strength).kind)
+  }
+
   func testOpenLivePageHandsOverToSavedRecordEvenBeforeMirrorClears() throws {
     let identity = WorkoutIdentity(start: date(1000))
     let live = WorkoutWire(startedAt: 1000, heartRateAverage: 125)

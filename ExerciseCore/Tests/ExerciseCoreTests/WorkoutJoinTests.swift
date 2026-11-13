@@ -30,6 +30,19 @@ final class WorkoutJoinTests: XCTestCase {
     XCTAssertEqual(shown?.heartRateAverage, 125)
   }
 
+  /// #371: the running workout's type shows through the join only when the session shares it, as an ended line
+  /// does (`sessions()`): a strength hour then an elliptical is strength, two ellipticals are an elliptical.
+  func testAJoinedRunningWorkoutKeepsItsTypeOnlyWhenTheSessionSharesIt() {
+    var elliptical = WorkoutWire(startedAt: 1504, heartRate: 120)
+    elliptical.kind = .elliptical
+    XCTAssertNil(WorkoutIndex(workouts: [first]).joining(elliptical, now: date(2000)).live?.kind)
+    var earlier = first
+    earlier.kind = .elliptical
+    XCTAssertEqual(WorkoutIndex(workouts: [earlier]).joining(elliptical, now: date(2000)).live?.kind, .elliptical)
+    // Alone, it is its own type.
+    XCTAssertEqual(WorkoutIndex(workouts: []).joining(elliptical, now: date(2000)).live?.kind, .elliptical)
+  }
+
   /// Once it ends, the saved pair is the same session the running one was: the page keeps its identity.
   func testTheJoinedStartIsTheStartOfTheSessionItBecomes() {
     let live = WorkoutWire(startedAt: 1504, sets: 2, reps: 4)

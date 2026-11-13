@@ -360,6 +360,9 @@ public struct WorkoutIndex: Codable, Equatable, Sendable {
     shown.startedAt = last.start.timeIntervalSince1970
     shown.sets += last.sets
     shown.reps += last.reps
+    // A type only when both share it, as for an ended line (`sessions()`): a strength hour then an elliptical is
+    // strength, so its sets can still be added from the chart (#371).
+    if last.kind != shown.kind { shown.kind = nil }
     return (shown, sessions)
   }
 
