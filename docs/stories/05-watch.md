@@ -227,7 +227,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** Held awake, dimmed (#160)
 - **Given:** the phone is held awake for a wrist workout or the ten minutes after the watch's last message, and nothing is recording, analyzing or in watch mode
 - **When:** 30 seconds pass without a touch on the screen
-- **Then:** the screen dims to 5 % and stays on; a touch anywhere (the touch still does what it touches), Record from the wrist, a pass starting, the app leaving the front or the hold ending puts my own brightness back at once; if the app is killed while dimmed, the next launch puts my brightness back (a level set this way outlives the app), unless I changed the brightness myself since
+- **Then:** the screen dims to 5 % and stays on; a touch anywhere (that touch only wakes the screen and presses nothing, #370; Igor: "When screen dimmed do not have click action … then can press something else"; the next touch does what it touches), Record from the wrist, a pass starting, the app leaving the front or the hold ending puts my own brightness back at once; if the app is killed while dimmed, the next launch puts my brightness back (a level set this way outlives the app), unless I changed the brightness myself since
 
 #### Notes:
 - The rule is `KeepAwake.decide` in ExerciseCore (host tests in `KeepAwakeTests`); recording, an offline pass and watch mode keep the phone awake too, and a backgrounded app never does. The phone re-checks it on every watch message, on the workout starting or ending, and on its 3 s tick. `keep_awake` logs `reason` (recording, analyzing, watch_mode, workout, watch_contact, idle, background) and `contact_s`.
