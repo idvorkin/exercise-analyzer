@@ -16,9 +16,12 @@ public struct WorkoutIdentity: Hashable, Sendable {
     // workout saved within 30 minutes of the one before is part of that session (#169), so it is found inside it.
     if let ended = saved.last(where: { $0.start <= start && start <= $0.end }) { return ended }
     guard let live, live.startDate == start else { return nil }
-    return StoredWorkout(
+    var running = StoredWorkout(
       id: Self.liveID, start: start, end: max(start, now), heartRateAverage: live.heartRateAverage,
       heartRateMax: live.heartRateMax, sets: live.sets, reps: live.reps)
+    // The wrist's type (#371): without it a running elliptical's page read strength and offered a set to add.
+    running.kind = live.kind
+    return running
   }
 
   public static let liveID = "live"
