@@ -968,7 +968,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Then:** the page shows its times, heart rate and chart, with its type's sign at top right (Change type, 082); no "0 sets · 0 reps · work 0:00 · rest 0:00" line, no "No sets were recorded inside this workout." and no kg; a tap on the chart opens no "Add a set" sheet, so no weight is asked; a set that was recorded during it still shows as on any workout (Igor, 2026-11-10: "If it's an elliptical workout don't let me set weights and put the little icon in the corner for elliptical")
 - **Status:** on `fix/2026-11-10-elliptical-ipad-zoom` (ea-aq0), by build only; the iPad was on d1e9136 (2026-10-17), before this story and 082's sign. Changed for #371: the running workout's page takes the wrist's type (`WorkoutIdentity.resolve`), so while it runs the chart adds no set either (on the phone on Nov 12 the page read strength and a tap opened "Add a set at 9:04 AM"); a running workout joined to the session before it (#238) keeps the type only when that session shares it, as an ended line does. Verified: host `swift test` (`WorkoutTimelineTests`: a running elliptical's page is an elliptical; `WorkoutJoinTests`: strength then elliptical is strength, two ellipticals an elliptical)
 
-- **Issues:** [#333](https://github.com/idvorkin/exercise-analyzer/issues/333), [#356](https://github.com/idvorkin/exercise-analyzer/issues/356)
+- **Issues:** [#333](https://github.com/idvorkin/exercise-analyzer/issues/333), [#356](https://github.com/idvorkin/exercise-analyzer/issues/356), [#371](https://github.com/idvorkin/exercise-analyzer/issues/371)
 
 ---
 
