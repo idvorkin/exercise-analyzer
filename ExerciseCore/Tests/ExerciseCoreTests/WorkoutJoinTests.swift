@@ -39,6 +39,7 @@ final class WorkoutJoinTests: XCTestCase {
     var earlier = first
     earlier.kind = .elliptical
     XCTAssertEqual(WorkoutIndex(workouts: [earlier]).joining(elliptical, now: date(2000)).live?.kind, .elliptical)
+    XCTAssertNil(WorkoutIndex(workouts: [earlier]).joining(WorkoutWire(startedAt: 1504), now: date(2000)).live?.kind)
     // Alone, it is its own type.
     XCTAssertEqual(WorkoutIndex(workouts: []).joining(elliptical, now: date(2000)).live?.kind, .elliptical)
   }
