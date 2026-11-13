@@ -48,7 +48,7 @@ final class ScreenDimmer {
     restoreTo = screen.brightness
     screen.brightness = CGFloat(KeepAwake.dimBrightness)
     if let window {
-      let cover = WakeCover(frame: window.bounds)
+      let cover = WakeCover(frame: window.bounds) { [weak self] in self?.touched(onCover: true) }
       window.addSubview(cover)
       self.cover = cover
     }
@@ -108,9 +108,14 @@ final class ScreenDimmer {
 }
 
 /// The clear cover over a dimmed window (#370): it is the hit view for every touch while it lies there, so the
-/// waking touch, a drag or a pinch included, reaches nothing underneath; it leaves when that touch ends.
+/// waking touch, a drag or a pinch included, reaches nothing underneath; it leaves when that touch ends. It wakes
+/// the screen itself too: the window's recognizer misses a finger that lands while another was already down when
+/// the dim came (the #370 review).
 private final class WakeCover: UIView {
-  override init(frame: CGRect) {
+  private let onWake: () -> Void
+
+  init(frame: CGRect, onWake: @escaping () -> Void) {
+    self.onWake = onWake
     super.init(frame: frame)
     backgroundColor = .clear
     autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -120,6 +125,7 @@ private final class WakeCover: UIView {
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { onWake() }
   override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) { leaveWhenNoTouchIsLeft(event) }
   override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { leaveWhenNoTouchIsLeft(event) }
 
