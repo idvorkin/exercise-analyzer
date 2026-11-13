@@ -200,7 +200,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 ### User Story 019:
 
 - **Summary:** The phone stays awake while the watch is in charge
-- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); on the phone, Igor's check pending; the workout and ten-minute rule (#142) in [cb20f99](https://github.com/idvorkin/exercise-analyzer/commit/cb20f99), verified on the host (`KeepAwakeTests`), on the phone since 2026-09-26, Igor's check pending (a long rest wrist-down); the dim (#160) in [a2ea685](https://github.com/idvorkin/exercise-analyzer/commit/a2ea685), verified on the host and the simulator (`SWING_LIVE_WORKOUT`), on the phone since 2026-09-27, the touch restore pending; the level put back after a kill while dimmed in [d80c7ed](https://github.com/idvorkin/exercise-analyzer/commit/d80c7ed), verified by build, the force-quit pending the phone; the waking touch presses nothing (#370) in d99d3a1 and its review fix, verified by the simulator build only (the simulator gives no taps), the tap pending the phone
+- **Status:** implemented in [73d41d5](https://github.com/idvorkin/exercise-analyzer/commit/73d41d5); on the phone, Igor's check pending; the workout and ten-minute rule (#142) in [cb20f99](https://github.com/idvorkin/exercise-analyzer/commit/cb20f99), verified on the host (`KeepAwakeTests`), on the phone since 2026-09-26, Igor's check pending (a long rest wrist-down); the dim (#160) in [a2ea685](https://github.com/idvorkin/exercise-analyzer/commit/a2ea685), verified on the host and the simulator (`SWING_LIVE_WORKOUT`), on the phone since 2026-09-27, the touch restore pending; the level put back after a kill while dimmed in [d80c7ed](https://github.com/idvorkin/exercise-analyzer/commit/d80c7ed), verified by build, the force-quit pending the phone; the waking touch presses nothing (#370) in [bd66c77](https://github.com/idvorkin/exercise-analyzer/commit/bd66c77) and its review fix [37bf892](https://github.com/idvorkin/exercise-analyzer/commit/37bf892), typechecked on the host against the iOS simulator SDK only; the simulator build and a seeded-live-workout launch pending, and the tap pending the phone (the simulator gives no taps)
 - **Why:** Igor (2026-09-26, #142): keep the phone awake while a workout runs on the watch, and outside one for 10 minutes after the last contact. Reachability could not decide it: with the wrist down the watch reads as unreachable most of the time (#76).
 
 #### Use Case:
@@ -227,7 +227,17 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** Held awake, dimmed (#160)
 - **Given:** the phone is held awake for a wrist workout or the ten minutes after the watch's last message, and nothing is recording, analyzing or in watch mode
 - **When:** 30 seconds pass without a touch on the screen
-- **Then:** the screen dims to 5 % and stays on; a touch anywhere (that touch only wakes the screen and presses nothing, #370; Igor: "When screen dimmed do not have click action … then can press something else"; the next touch does what it touches; a sheet that opened while dimmed, a bug report from a shake say, takes the touch as usual), Record from the wrist, a pass starting, the app leaving the front or the hold ending puts my own brightness back at once; if the app is killed while dimmed, the next launch puts my brightness back (a level set this way outlives the app), unless I changed the brightness myself since
+- **Then:** the screen dims to 5 % and stays on; a touch anywhere, Record from the wrist, a pass starting, the app leaving the front or the hold ending puts my own brightness back at once; if the app is killed while dimmed, the next launch puts my brightness back (a level set this way outlives the app), unless I changed the brightness myself since
+
+- **Scenario:** The waking touch presses nothing (#370)
+- **Given:** the screen is dimmed
+- **When:** I touch it, a drag or a pinch included
+- **Then:** my brightness comes back and nothing under my finger is pressed (Igor: "When screen dimmed do not have click action … then can press something else"); the next touch does what it touches
+
+- **Scenario:** A sheet that opened while dimmed (#370)
+- **Given:** the screen is dimmed and a sheet has opened over it, a bug report from a shake say
+- **When:** I touch the sheet
+- **Then:** my brightness comes back and the sheet takes that touch as usual
 
 #### Notes:
 - The rule is `KeepAwake.decide` in ExerciseCore (host tests in `KeepAwakeTests`); recording, an offline pass and watch mode keep the phone awake too, and a backgrounded app never does. The phone re-checks it on every watch message, on the workout starting or ending, and on its 3 s tick. `keep_awake` logs `reason` (recording, analyzing, watch_mode, workout, watch_contact, idle, background) and `contact_s`.
