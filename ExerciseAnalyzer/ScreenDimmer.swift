@@ -4,6 +4,8 @@
 //  the phone between sets (KeepAwake.dims), it drops to KeepAwake.dimBrightness after KeepAwake.dimAfter without a
 //  touch. Any touch, or the hold changing to something looked at (Record, a pass, watch mode) or ending, puts the
 //  lifter's own brightness back. Touches are seen by a recognizer on the window that never claims them.
+//  #370 (Igor: "When screen dimmed do not have click action"): while dimmed a clear cover lies over the window, so
+//  the touch that wakes the screen only wakes it; it lands on the cover, which leaves when that touch ends.
 
 import ExerciseCore
 import UIKit
@@ -29,6 +31,8 @@ final class ScreenDimmer {
   }
   private static let leftDimmedKey = "screenDimmerLeftDimmed"
   private weak var watchedWindow: UIWindow?
+  /// Over the window while dimmed (#370); gone once the waking touch ends or the level is back for another reason.
+  private weak var cover: WakeCover?
 
   /// Called on every keep-awake decision and on the session's 3 s tick.
   func update(_ reason: KeepAwake, now: Date = Date()) {
@@ -43,6 +47,11 @@ final class ScreenDimmer {
     guard restoreTo == nil, now.timeIntervalSince(lastTouch) >= KeepAwake.dimAfter, let screen else { return }
     restoreTo = screen.brightness
     screen.brightness = CGFloat(KeepAwake.dimBrightness)
+    if let window {
+      let cover = WakeCover(frame: window.bounds) { [weak self] in self?.touched(onCover: true) }
+      window.addSubview(cover)
+      self.cover = cover
+    }
     onEvent?("screen_dim", ["on": true, "reason": reason.rawValue, "brightness": Double(restoreTo ?? 0)])
   }
 
@@ -62,20 +71,30 @@ final class ScreenDimmer {
     onEvent?("screen_dim", ["on": false, "reason": "relaunch", "brightness": left])
   }
 
-  private func touched() {
+  /// `onCover`: the touch landed on the cover, which keeps it to the end; one on anything above the cover (a sheet
+  /// that opened while dimmed) does what it touches, and the cover goes at once so the next tap is not eaten.
+  private func touched(onCover: Bool) {
     lastTouch = Date()
-    restore(reason: "touch")
+    if !onCover { removeCover() }
+    restore(reason: "touch", wokeOnly: onCover)
   }
 
-  private func restore(reason: String) {
+  private func restore(reason: String, wokeOnly: Bool = false) {
+    if reason != "touch" { removeCover() }
     guard let level = restoreTo else { return }
     restoreTo = nil
     screen?.brightness = level
-    onEvent?("screen_dim", ["on": false, "reason": reason, "brightness": Double(level)])
+    onEvent?("screen_dim", ["on": false, "reason": reason, "brightness": Double(level), "woke_only": wokeOnly])
+  }
+
+  private func removeCover() {
+    cover?.removeFromSuperview()
+    cover = nil
   }
 
   private var window: UIWindow? {
-    UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first(where: \.isKeyWindow)
+    UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+      .first(where: \.isKeyWindow)
   }
 
   private var screen: UIScreen? { window?.windowScene?.screen }
@@ -84,15 +103,44 @@ final class ScreenDimmer {
   private func watchTouches() {
     guard let window, window !== watchedWindow else { return }
     watchedWindow = window
-    window.addGestureRecognizer(TouchSeen { [weak self] in self?.touched() })
+    window.addGestureRecognizer(TouchSeen { [weak self] onCover in self?.touched(onCover: onCover) })
   }
 }
 
-/// Reports the start of every touch and never recognizes, so every control underneath behaves as before.
-private final class TouchSeen: UIGestureRecognizer, UIGestureRecognizerDelegate {
-  private let onTouch: () -> Void
+/// The clear cover over a dimmed window (#370): it is the hit view for every touch while it lies there, so the
+/// waking touch, a drag or a pinch included, reaches nothing underneath; it leaves when that touch ends. It wakes
+/// the screen itself too: the window's recognizer misses a finger that lands while another was already down when
+/// the dim came (the #370 review).
+private final class WakeCover: UIView {
+  private let onWake: () -> Void
 
-  init(onTouch: @escaping () -> Void) {
+  init(frame: CGRect, onWake: @escaping () -> Void) {
+    self.onWake = onWake
+    super.init(frame: frame)
+    backgroundColor = .clear
+    autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    isMultipleTouchEnabled = true
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { onWake() }
+  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) { leaveWhenNoTouchIsLeft(event) }
+  override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { leaveWhenNoTouchIsLeft(event) }
+
+  private func leaveWhenNoTouchIsLeft(_ event: UIEvent?) {
+    let held = event?.touches(for: self)?.filter { $0.phase != .ended && $0.phase != .cancelled } ?? []
+    if held.isEmpty { removeFromSuperview() }
+  }
+}
+
+/// Reports the start of every touch, and whether it landed on the cover, and never recognizes, so every control
+/// underneath behaves as before.
+private final class TouchSeen: UIGestureRecognizer, UIGestureRecognizerDelegate {
+  private let onTouch: (Bool) -> Void
+
+  init(onTouch: @escaping (Bool) -> Void) {
     self.onTouch = onTouch
     super.init(target: nil, action: nil)
     cancelsTouchesInView = false
@@ -102,11 +150,13 @@ private final class TouchSeen: UIGestureRecognizer, UIGestureRecognizerDelegate 
   }
 
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-    onTouch()
+    onTouch(touches.contains { $0.view is WakeCover })
     state = .failed
   }
 
-  func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+  func gestureRecognizer(
+    _ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+  ) -> Bool {
     true
   }
 }
