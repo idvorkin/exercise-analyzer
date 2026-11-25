@@ -331,7 +331,7 @@ final class WorkoutSyncTests: XCTestCase {
     XCTAssertNil(refused.retry, "a refusal does not stop the others")
   }
 
-  func testA409OnALiveEventIsARefusal() {
+  func testA409NamingAnIDIsAConflict() {
     let outcome = WorkoutEventWire.outcome(status: 409, body: FakeCockpit.json(["ok": false, "workout_id": "X"]))
     XCTAssertEqual(outcome, .conflict(workoutID: "X"))
     XCTAssertEqual(

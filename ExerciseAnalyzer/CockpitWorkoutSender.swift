@@ -233,7 +233,8 @@ final class CockpitWorkoutSender {
           break
         }
         self.syncBudget -= 1
-        let series = [planned.workout.id: self.storedHeartRate(of: planned.workout, in: mirror)].compactMapValues { $0 }
+        let read = await self.heartRate(of: planned.workout, in: mirror)
+        let series = [planned.workout.id: read].compactMapValues { $0 }
         let report = await WorkoutSync.send(
           [planned], heartRate: series, cockpit: Self.cockpit, now: { Date() }, transport: Self.transport)
         self.refusedSummaries += report.refused
@@ -265,9 +266,11 @@ final class CockpitWorkoutSender {
     }
   }
 
-  /// The workout's stored heart rate (its own folder, or the folder of the line it was merged into, #169).
-  private func storedHeartRate(of workout: StoredWorkout, in mirror: WorkoutMirror) -> HeartRateSeries? {
-    if let own = HeartRateSeries.load(from: mirror.folder(for: workout.id)) { return own }
+  /// The workout's heart rate: its own series, read from Health and kept when fuller than its folder's (a just-ended
+  /// workout, or one whose page was never opened, has none stored yet), else the folder of the line it was merged
+  /// into (#169).
+  private func heartRate(of workout: StoredWorkout, in mirror: WorkoutMirror) async -> HeartRateSeries? {
+    if let own = await mirror.heartRate(for: workout), !own.samples.isEmpty { return own }
     let line = mirror.index.sessions().first { $0.start <= workout.start && $0.end >= workout.end }
     return line.flatMap { HeartRateSeries.load(from: mirror.folder(for: $0.id)) }
   }
