@@ -285,6 +285,17 @@ public enum WorkoutEventWire {
   /// The route the Cockpit does not have yet answers 404 (or 405): "not yet", so the events wait.
   public static let notYet = "The Cockpit does not take workouts yet"
 
+  /// Larry's Cockpit, as Grabber reaches it.
+  public static let liveCockpit = URL(string: "https://c-5004.squeaker-teeth.ts.net") ?? URL(fileURLWithPath: "/")
+
+  /// Where the events go: `SWING_COCKPIT_URL` when it names one (a stand-in Cockpit for a test), else Larry's.
+  /// A simulator without a stand-in sends nowhere (ea-d8k): its fake workout reached the live Cockpit on
+  /// 2026-11-25 as BF2CB74A, the archive's first file, with an empty set list.
+  public static func cockpit(environment: [String: String], simulator: Bool) -> URL? {
+    if let named = environment["SWING_COCKPIT_URL"], !named.isEmpty, let url = URL(string: named) { return url }
+    return simulator ? nil : liveCockpit
+  }
+
   /// ISO 8601 in UTC: `2026-11-24T13:56:00Z`.
   public static func iso(_ date: Date) -> String {
     let f = ISO8601DateFormatter()
