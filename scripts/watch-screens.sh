@@ -12,7 +12,12 @@ if [ -z "${WATCHAPP:-}" ]; then
   exit 1
 fi
 mkdir -p "$SCREENS"
-xcrun simctl boot "$WATCH" 2>/dev/null || true
+# Boot and wait for the boot to finish: `simctl boot` returns while the watch still shows the Apple-logo boot
+# screen, and the first states' shots were that screen, passing as rendered (ea-cj5).
+if ! xcrun simctl bootstatus "$WATCH" -b >/dev/null; then
+  echo "FAIL  the watch simulator $WATCH did not finish booting"
+  exit 1
+fi
 xcrun simctl install "$WATCH" "$WATCHAPP" >/dev/null
 fail=0
 shoot() {  # state: relaunch with the fixed state, wait for first render, screenshot

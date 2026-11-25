@@ -264,8 +264,9 @@ hand the name straight to `simctl`, so give them a UDID (`SIM=<udid> just run-si
 ## Rung 2b: the watch simulator
 
 Every watch change runs [`scripts/watch-screens.sh`](../scripts/watch-screens.sh) (`just watch-screens`,
-after `just build-sim`): it finds the watch app inside the phone build, installs it on the watch simulator,
-and relaunches it once per state with `WATCH_STATE` naming a fixed status (`SIMCTL_CHILD_WATCH_STATE`, the
+after `just build-sim`): it finds the watch app inside the phone build, installs it on the watch simulator
+once the simulator has finished booting (`simctl bootstatus -b`; on a cold boot the first states used to be
+shot on the Apple-logo boot screen and pass, ea-cj5), and relaunches it once per state with `WATCH_STATE` naming a fixed status (`SIMCTL_CHILD_WATCH_STATE`, the
 same launch-hook pattern as rung 2) — no phone, no pairing, no taps. Each state sleeps 3 s for first render,
 then screenshots to `~/tmp/agent/sim/watch-<state>.png`. The nineteen shots are compared by eye against the
 control inventory at the top of [`05-watch.md`](stories/05-watch.md); a missing button is a failed rung. This
