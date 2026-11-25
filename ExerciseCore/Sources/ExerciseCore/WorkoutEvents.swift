@@ -16,6 +16,8 @@ import Foundation
 public struct WorkoutEvent: Codable, Equatable, Sendable {
   public enum EventType: String, Codable, Sendable {
     case started, tick, set, level, ended
+    /// A whole ended workout, sent again for the archive (story 087, `WorkoutSync`); never a live event.
+    case summary
   }
 
   /// Where the workout's numbers come from: the wrist's mirrored session, or the phone alone.
@@ -90,6 +92,9 @@ public struct WorkoutEvent: Codable, Equatable, Sendable {
   public var set: SetFacts?
   public var endedAt: Date?
   public var discarded: Bool?
+  /// On a `summary` (087): every set of the workout, and when the phone built it.
+  public var setList: [SetFacts]? = nil
+  public var computedAt: Date? = nil
 
   /// Whole seconds from the start to the event (to the end, on `ended`).
   public var elapsedSeconds: Int { max(0, Int((endedAt ?? at).timeIntervalSince(startedAt).rounded())) }
@@ -215,25 +220,32 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
   private mutating func countSets(_ entries: [RecentEntry], heartRate: HeartRateSeries?, now: Date) {
     guard let start = running?.startedAt else { return }
     let inside = entries.filter { $0.span.lowerBound >= start && $0.repCount > 0 }
-      .sorted { $0.span.lowerBound < $1.span.lowerBound }
+    for facts in Self.setFacts(inside, heartRate: heartRate) {
+      let sent = SentSet(
+        exercise: facts.exercise, reps: facts.reps, score: facts.score, bellKg: facts.bellKg, barbell: facts.barbell)
+      guard running?.sentSets[facts.id] != sent else { continue }
+      running?.sentSets[facts.id] = sent
+      var set = event(.set, at: facts.endedAt)
+      set.set = facts
+      waiting.append(set)
+    }
+  }
+
+  /// The facts of a workout's sets, in time order, each with the weight it shows (its own, or carried from the
+  /// exercise's set before inside these, 066 and 083) and its heart-rate peak: what a live `set` carries and
+  /// what a summary's `set_list` carries (087).
+  static func setFacts(_ inside: [RecentEntry], heartRate: HeartRateSeries?) -> [WorkoutEvent.SetFacts] {
     var lastWeight: [ExerciseKind: SetWeight] = [:]
-    for entry in inside {
+    return inside.sorted { $0.span.lowerBound < $1.span.lowerBound }.map { entry in
       let weight = entry.weight ?? lastWeight[entry.exerciseKind]
       if let own = entry.weight { lastWeight[entry.exerciseKind] = own }
-      let facts = SentSet(
-        exercise: entry.exerciseKind, reps: entry.repCount, score: entry.bestScore, bellKg: weight?.bellKg,
-        barbell: weight?.barbell)
-      guard running?.sentSets[entry.id] != facts else { continue }
-      running?.sentSets[entry.id] = facts
       let span = entry.span
-      var set = event(.set, at: span.upperBound)
-      set.set = WorkoutEvent.SetFacts(
+      return WorkoutEvent.SetFacts(
         id: entry.id, exercise: entry.exerciseKind, reps: entry.repCount, startedAt: span.lowerBound,
         endedAt: span.upperBound,
         hrPeakBpm: heartRate?.peak(
           from: span.lowerBound, to: span.upperBound.addingTimeInterval(WorkoutTimeline.peakLag)),
         byHand: entry.isByHand, score: entry.bestScore, bellKg: weight?.bellKg, barbell: weight?.barbell)
-      waiting.append(set)
     }
   }
 
@@ -265,6 +277,9 @@ public enum WorkoutEventWire {
     /// The request itself is wrong: not retried.
     case refused(status: Int, reason: String)
     case retry(reason: String)
+    /// A summary for a workout the Cockpit holds under another id, one that started within 2 s (087): nothing
+    /// was stored; send it again under that id.
+    case conflict(workoutID: String)
   }
 
   /// The route the Cockpit does not have yet answers 404 (or 405): "not yet", so the events wait.
@@ -295,24 +310,29 @@ public enum WorkoutEventWire {
       ]
       body["machine"] = facts
     }
-    if let set = event.set {
-      var facts: [String: Any] = [
-        "id": set.id, "exercise": set.exercise.rawValue, "reps": set.reps, "started_at": iso(set.startedAt),
-        "ended_at": iso(set.endedAt), "hr_peak_bpm": set.hrPeakBpm ?? NSNull(), "by_hand": set.byHand,
-        "score": set.score ?? NSNull(),
-      ]
-      if let load = set.barbell {
-        facts["weight"] = [
-          "lb": load.totalLb, "bar": load.bar.rawValue, "bar_lb": load.bar.lb, "plates_per_side_lb": load.plates,
-        ]
-      } else if let kg = set.bellKg {
-        facts["weight"] = ["kg": kg]
-      }
-      body["set"] = facts
-    }
+    if let set = event.set { body["set"] = setBody(set) }
+    if let list = event.setList { body["set_list"] = list.map(setBody) }
+    if let computedAt = event.computedAt { body["computed_at"] = iso(computedAt) }
     if let endedAt = event.endedAt { body["ended_at"] = iso(endedAt) }
     if let discarded = event.discarded { body["discarded"] = discarded }
     return body
+  }
+
+  /// A set as a live `set` event and a summary's `set_list` both carry it.
+  static func setBody(_ set: WorkoutEvent.SetFacts) -> [String: Any] {
+    var facts: [String: Any] = [
+      "id": set.id, "exercise": set.exercise.rawValue, "reps": set.reps, "started_at": iso(set.startedAt),
+      "ended_at": iso(set.endedAt), "hr_peak_bpm": set.hrPeakBpm ?? NSNull(), "by_hand": set.byHand,
+      "score": set.score ?? NSNull(),
+    ]
+    if let load = set.barbell {
+      facts["weight"] = [
+        "lb": load.totalLb, "bar": load.bar.rawValue, "bar_lb": load.bar.lb, "plates_per_side_lb": load.plates,
+      ]
+    } else if let kg = set.bellKg {
+      facts["weight"] = ["kg": kg]
+    }
+    return facts
   }
 
   /// `scheme://host[:port]`: the Cockpit's write boundary takes a native app by its own Origin.
@@ -341,6 +361,7 @@ public enum WorkoutEventWire {
       return .sent(duplicate: json?["duplicate"] as? Bool == true)
     }
     if status == 404 || status == 405 { return .retry(reason: "\(notYet) (HTTP \(status))") }
+    if status == 409, let other = json?["workout_id"] as? String, !other.isEmpty { return .conflict(workoutID: other) }
     let reason = (json?["reason"] as? String) ?? (json?["error"] as? String) ?? "HTTP \(status)"
     if (400..<500).contains(status) { return .refused(status: status, reason: reason) }
     return .retry(reason: reason)

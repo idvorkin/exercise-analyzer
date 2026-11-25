@@ -1066,3 +1066,36 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Issues:** [#376](https://github.com/idvorkin/exercise-analyzer/issues/376)
 
 ---
+
+### User Story 087:
+
+- **Summary:** Every workout the phone holds reaches Larry's Cockpit whole, even one the live events missed
+- **Status:** implemented on `feat/2026-11-25-workout-sync` (ea-ya3), to the Cockpit's contract of 2026-11-25 and Larry's answers on the thread; verified on the host (`WorkoutSyncTests` against a fake Cockpit: paging, not-yet, matching by id and start, what is and is not sent, a set in a merged line's gap, the summary body, a pass then a second pass sending nothing, the 409, no answer and refusals); the simulator check is in the PR; on the phone against the real Cockpit, pending
+- **Why:** Igor, 2026-11-25 (via Larry, thread igor2-88g.1620): "Can we have cockpit required missing workouts and last version it has of a workout… Really for igor2 storage."
+
+#### Use Case:
+- **As a** lifter whose coach is Larry
+- **I want to** have the Cockpit ask for any workout it is missing, or holds an older version of, and get it whole
+- **so that** igor2 keeps a complete archive of my workouts, even when a live event was dropped or a set changed later
+
+#### Acceptance Criteria:
+- **Scenario:** The Cockpit is missing a workout
+- **Given:** "Send workouts to Larry" on, and a workout the wrist recorded that the Cockpit never heard (the switch was off, the events waited over a day, the app was not running)
+- **When:** the app launches, comes to the front, or a workout's live events have all gone
+- **Then:** the phone asks the Cockpit which workouts it holds (every page, from the phone's oldest workout on), and sends the missing workout once, whole: its type, start, end, heart rate average and peak, the wrist's sets and reps, and every set inside it (exercise, reps, start and end, score, by hand, the weight it shows as in 084, and its heart-rate peak from the stored heart rate); it goes under an id the phone uses for that workout every time, so a resend is not a second copy
+
+- **Scenario:** The Cockpit holds an older version
+- **Given:** the switch on and a workout the Cockpit holds
+- **When:** the phone's record of it is newer than the last whole copy the Cockpit took (a weight picked later, a recount, a set added or synced in, Trim end), or the Cockpit never took a whole copy (it only heard the live events), or the Cockpit only guessed its end, or a set of it is one the Cockpit does not have
+- **Then:** the whole workout is sent again, matched to the Cockpit's workout by id or else by a start within 2 s, and sent under the Cockpit's id; a workout the Cockpit already holds as the phone has it is not sent; a workout the Cockpit says it holds under another id (it started within 2 s of it) is sent again under that id
+
+- **Scenario:** It never gets in the way
+- **Given:** the switch on
+- **When:** a workout is running, or live events still wait, or the Cockpit does not answer the question (an older Cockpit without it, no signal)
+- **Then:** nothing is sent by this; the live events of 084 always go first, and a whole workout only once none wait; an older Cockpit is sent no whole workout at all; one whole workout goes at a time, oldest first, at most 50 per launch (the rest on a later launch), and the question is asked again at most every 5 minutes except right after a workout's live events have gone; a whole workout the Cockpit refuses is logged and not sent again until it changes; no answer is tried again as the live events are (30 s doubling to 10 min, and on coming to the front), under the same id; with the switch off nothing is asked or sent
+
+- **Notes:** `GET /workout/have` (paged by `next`) and a `type: "summary"` body on `POST /workout`, the Cockpit's contract `docs/workout-sync-contract.md` (story 340 there). One summary per workout the wrist recorded, the same unit as the live events' workout; a set in the gap between two workouts shown as one line goes with the earlier one. Only this phone's own workouts are sent, never a row synced in from another device. A workout the Cockpit heard discarded is not sent back. The Cockpit keeps what the phone deleted: for now a deleted workout is not sent at all, and Larry's answer (2026-11-25), a summary with `discarded: true`, is ea-a6d; a deleted set is ea-hp8. A set's heart-rate peak in a summary replaces the live one, so it is read from the workout's stored heart rate.
+
+- **Issues:** ea-ya3
+
+---

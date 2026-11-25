@@ -1,0 +1,341 @@
+// Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+
+//  Story 087 (ea-ya3): the phone asks the Cockpit what it holds (`GET /workout/have`, paged) and sends, whole, every
+//  workout it is missing or holds an older version of (`type: "summary"` on `POST /workout`), to the Cockpit's
+//  contract (cockpit `docs/workout-sync-contract.md`, 2026-11-25). A fake Cockpit here answers both routes the way
+//  `workout_events.py` does: paging by `next`, the 2 s same-start 409, the newest `computed_at` as `rev`.
+
+import Foundation
+import XCTest
+
+@testable import ExerciseCore
+
+#if canImport(FoundationNetworking)
+  import FoundationNetworking
+#endif
+
+/// A stand-in Cockpit holding workouts as `have` rows, taking summaries as the real one does.
+final class FakeCockpit: @unchecked Sendable {
+  struct Held {
+    var id: String
+    var start: Date
+    var endImplied = false
+    var discarded = false
+    var sets: [String: String] = [:]
+    var rev: String? = nil
+  }
+
+  private let lock = NSLock()
+  private var _held: [Held] = []
+  private var _seen: Set<String> = []
+  private(set) var requests: [URLRequest] = []
+  private(set) var summaries: [[String: Any]] = []
+  /// The answer `have` gives instead of the rows (404 for an older Cockpit), when set.
+  var haveStatus: Int? = nil
+  /// The status the next POSTs get instead of taking them (a 503), when set.
+  var postStatus: Int? = nil
+  var pageLimit = 2
+
+  var held: [Held] {
+    lock.lock()
+    defer { lock.unlock() }
+    return _held
+  }
+
+  init(_ held: [Held] = []) { _held = held }
+
+  func handle(_ request: URLRequest) -> (status: Int?, body: Data?, error: String?) {
+    lock.lock()
+    defer { lock.unlock() }
+    requests.append(request)
+    let url = request.url!
+    let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+    func param(_ name: String) -> String? { query.first { $0.name == name }?.value }
+    if request.httpMethod == "GET", url.path.hasSuffix("/workout/have") {
+      if let haveStatus { return (haveStatus, Data(), nil) }
+      var rows = _held.sorted { $0.start < $1.start }
+      if let since = param("since").flatMap(Self.date) { rows = rows.filter { $0.start >= since } }
+      if let after = param("after") {
+        rows = rows.firstIndex { $0.id == after }.map { Array(rows[($0 + 1)...]) } ?? []
+      }
+      let limit = min(Int(param("limit") ?? "") ?? 200, pageLimit)
+      let page = Array(rows.prefix(limit))
+      let json: [String: Any] = [
+        "ok": true, "next": rows.count > limit ? page.last!.id : NSNull(),
+        "workouts": page.map { row -> [String: Any] in
+          [
+            "workout_id": row.id, "started_at": WorkoutEventWire.iso(row.start), "ended": true,
+            "end_implied": row.endImplied, "discarded": row.discarded, "sets": row.sets,
+            "rev": row.rev ?? NSNull(), "version": "v", "events": 1,
+          ]
+        },
+      ]
+      return (200, Self.json(json), nil)
+    }
+    if request.httpMethod == "POST", url.path.hasSuffix("/workout") {
+      if let postStatus { return (postStatus, Data(), nil) }
+      guard let data = request.httpBody,
+        let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+        let id = body["id"] as? String, let workoutID = body["workout_id"] as? String,
+        let start = (body["started_at"] as? String).flatMap(Self.date),
+        let computed = body["computed_at"] as? String, let computedAt = Self.date(computed)
+      else { return (400, Self.json(["ok": false, "reason": "bad summary"]), nil) }
+      summaries.append(body)
+      if _seen.contains(id) { return (200, Self.json(["ok": true, "id": id, "duplicate": true]), nil) }
+      if let other = _held.first(where: { $0.id != workoutID && abs($0.start.timeIntervalSince(start)) <= 2 }) {
+        return (409, Self.json(["ok": false, "reason": "same start", "workout_id": other.id]), nil)
+      }
+      _seen.insert(id)
+      var row = _held.first { $0.id == workoutID } ?? Held(id: workoutID, start: start)
+      let kept = row.rev.flatMap(Self.date).map { computedAt > $0 } ?? true
+      if kept { row.rev = computed }
+      for set in body["set_list"] as? [[String: Any]] ?? [] {
+        if let setID = set["id"] as? String { row.sets[setID] = id }
+      }
+      row.endImplied = false
+      _held.removeAll { $0.id == workoutID }
+      _held.append(row)
+      return (200, Self.json(["ok": true, "id": id, "kept": kept, "woke": false]), nil)
+    }
+    return (404, Data(), nil)
+  }
+
+  static func date(_ text: String) -> Date? { ISO8601DateFormatter().date(from: text) }
+  static func json(_ object: [String: Any]) -> Data { (try? JSONSerialization.data(withJSONObject: object)) ?? Data() }
+}
+
+final class WorkoutSyncTests: XCTestCase {
+  private let t0 = Date(timeIntervalSince1970: 1_795_500_000)
+  private let cockpit = URL(string: "https://cockpit.example:8443")!
+
+  private func at(_ seconds: TimeInterval) -> Date { t0.addingTimeInterval(seconds) }
+
+  private func workout(
+    _ id: String, from start: TimeInterval, to end: TimeInterval, changed: TimeInterval? = nil
+  )
+    -> StoredWorkout
+  {
+    var w = StoredWorkout(
+      id: id, start: at(start), end: at(end), heartRateAverage: 120, heartRateMax: 150, sets: 2, reps: 20)
+    w.modifiedAt = changed.map(at)
+    return w
+  }
+
+  private func set(_ id: String, at seconds: TimeInterval, reps: Int = 10, weight: SetWeight? = nil) -> RecentEntry {
+    var entry = HandSet(id: id, exercise: .kettlebellSwing, reps: reps, at: at(seconds).timeIntervalSince1970).entry
+    if let weight { entry.setWeight(weight, by: "phone", at: at(seconds + 1)) }
+    return entry
+  }
+
+  private func have(
+    _ id: String, start: TimeInterval, rev: TimeInterval? = nil, implied: Bool = false, discarded: Bool = false,
+    sets: [String] = []
+  ) -> WorkoutHave {
+    WorkoutHave(
+      workoutID: id, startedAt: at(start), endImplied: implied, discarded: discarded,
+      sets: Dictionary(uniqueKeysWithValues: sets.map { ($0, "e") }), rev: rev.map(at))
+  }
+
+  // MARK: - have
+
+  func testHavePagesUntilNextIsNullFromTheOldestStart() async throws {
+    let fake = FakeCockpit((0..<5).map { FakeCockpit.Held(id: "c\($0)", start: at(Double($0) * 3600)) })
+    let fetched = await WorkoutSync.fetchHave(cockpit: cockpit, since: at(3600), transport: { fake.handle($0) })
+    let rows = try XCTUnwrap(fetched)
+    XCTAssertEqual(rows.map(\.workoutID), ["c1", "c2", "c3", "c4"], "every page, from `since` on")
+    let gets = fake.requests.filter { $0.httpMethod == "GET" }
+    XCTAssertEqual(gets.count, 2, "pages of two, until next is null")
+    XCTAssertEqual(gets.first?.value(forHTTPHeaderField: "Origin"), "https://cockpit.example:8443")
+    let query = try XCTUnwrap(URLComponents(url: gets[1].url!, resolvingAgainstBaseURL: false)?.queryItems)
+    XCTAssertEqual(query.first { $0.name == "after" }?.value, "c2")
+    XCTAssertEqual(query.first { $0.name == "since" }?.value, WorkoutEventWire.iso(at(3600)))
+  }
+
+  func testAnOlderCockpitIsNotYet() async {
+    for status in [404, 403, 500] {
+      let fake = FakeCockpit()
+      fake.haveStatus = status
+      let rows = await WorkoutSync.fetchHave(cockpit: cockpit, since: nil, transport: { fake.handle($0) })
+      XCTAssertNil(rows, "HTTP \(status) is not a have")
+    }
+    XCTAssertNil(WorkoutSync.havePage(status: 200, body: FakeCockpit.json(["ok": false])), "only ok: true")
+    XCTAssertNil(WorkoutSync.havePage(status: nil, body: nil), "no answer")
+  }
+
+  func testHavePagingStopsAtTheBound() async {
+    // A Cockpit whose `next` never ends (a bug there) must not keep the phone paging for ever.
+    let looping: WorkoutSync.Transport = { _ in
+      (200, FakeCockpit.json(["ok": true, "next": "again", "workouts": []]), nil)
+    }
+    let rows = await WorkoutSync.fetchHave(cockpit: cockpit, since: nil, transport: looping)
+    XCTAssertNil(rows, "an unfinished listing is not a have: sending on half of it would 409 or duplicate")
+  }
+
+  // MARK: - plan
+
+  func testAMissingWorkoutGoesUnderItsOwnID() {
+    let w = workout("W1", from: 0, to: 3600)
+    let plan = WorkoutSync.plan(workouts: [w], entries: [set("a", at: 100)], have: [], refused: [])
+    XCTAssertEqual(plan.map(\.sendAs), ["W1"])
+    XCTAssertEqual(plan.first?.sets.map(\.id), ["a"])
+  }
+
+  func testAMatchByStartWithin2sGoesUnderTheCockpitsID() {
+    let w = workout("W1", from: 0, to: 3600)
+    let plan = WorkoutSync.plan(workouts: [w], entries: [], have: [have("LIVE", start: 1.5)], refused: [])
+    XCTAssertEqual(plan.map(\.sendAs), ["LIVE"], "the live stream's id, not a second copy")
+    let far = WorkoutSync.plan(workouts: [w], entries: [], have: [have("OTHER", start: 2.5)], refused: [])
+    XCTAssertEqual(far.map(\.sendAs), ["W1"], "past 2 s it is another workout")
+  }
+
+  func testAWorkoutTheCockpitHoldsAsThePhoneDoesIsNotSent() {
+    let w = workout("W1", from: 0, to: 3600)
+    let entries = [set("a", at: 100)]
+    let upToDate = have("W1", start: 0, rev: 3600, sets: ["a"])
+    XCTAssertEqual(WorkoutSync.plan(workouts: [w], entries: entries, have: [upToDate], refused: []), [])
+    let sameSecond = have("W1", start: 0, rev: 101.4, sets: ["a"])
+    let later = workout("W1", from: 0, to: 3600, changed: 101.9)
+    XCTAssertEqual(
+      WorkoutSync.plan(workouts: [later], entries: entries, have: [sameSecond], refused: []), [],
+      "the wire's rev has whole seconds: the same second is not newer")
+  }
+
+  func testAnOlderVersionIsSentAgain() {
+    let entries = [set("a", at: 100)]
+    let w = workout("W1", from: 0, to: 3600)
+    let cases: [(String, StoredWorkout, [RecentEntry], WorkoutHave)] = [
+      ("live only, no rev", w, entries, have("W1", start: 0, sets: ["a"])),
+      ("end only guessed", w, entries, have("W1", start: 0, rev: 4000, implied: true, sets: ["a"])),
+      (
+        "trimmed after rev", workout("W1", from: 0, to: 3000, changed: 5000), entries,
+        have("W1", start: 0, rev: 4000, sets: ["a"])
+      ),
+      ("a set it lacks", w, entries + [set("b", at: 200)], have("W1", start: 0, rev: 4000, sets: ["a"])),
+    ]
+    for (name, local, sets, row) in cases {
+      let plan = WorkoutSync.plan(workouts: [local], entries: sets, have: [row], refused: [])
+      XCTAssertEqual(plan.map(\.sendAs), ["W1"], name)
+    }
+    var reweighed = set("a", at: 100)
+    reweighed.setWeight(.bell(24), by: "phone", at: at(5000))
+    let plan = WorkoutSync.plan(
+      workouts: [w], entries: [reweighed], have: [have("W1", start: 0, rev: 4000, sets: ["a"])], refused: [])
+    XCTAssertEqual(plan.first?.changedAt, at(5000), "a weight picked after the last summary")
+  }
+
+  func testOnlyThisPhonesWorkoutsOldestFirstAndNoRefusedOrDiscardedOnes() {
+    var synced = workout("IPAD", from: 9000, to: 9600)
+    synced.device = "ipad"
+    let older = workout("W0", from: 0, to: 600)
+    let newer = workout("W1", from: 20000, to: 20600)
+    let refusedID = WorkoutSync.summaryID(workoutID: "W1", changedAt: newer.changedAt)
+    let plan = WorkoutSync.plan(workouts: [newer, synced, older], entries: [], have: [], refused: [refusedID])
+    XCTAssertEqual(
+      plan.map(\.sendAs), ["W0"], "the other device's row is its own; a refused summary waits for a change")
+    let discarded = WorkoutSync.plan(
+      workouts: [older], entries: [], have: [have("W0", start: 0, discarded: true)], refused: [])
+    XCTAssertEqual(discarded, [], "a workout the Cockpit heard discarded is not brought back")
+  }
+
+  func testASetBetweenTwoWorkoutsOfOneLineGoesWithTheEarlierOne() {
+    // Two workouts 10 min apart are one line (#169); a set recorded in the gap belongs to no workout's span.
+    let first = workout("W1", from: 0, to: 1800)
+    let second = workout("W2", from: 2400, to: 4000)
+    let bell = set("a", at: 100, weight: .bell(24))
+    let entries = [bell, set("gap", at: 2000), set("b", at: 3000), set("after", at: 9000)]
+    let plan = WorkoutSync.plan(workouts: [first, second], entries: entries, have: [], refused: [])
+    XCTAssertEqual(plan.map { $0.sets.map(\.id) }, [["a", "gap"], ["b"]], "each set in exactly one summary")
+    let summary = WorkoutSync.summary(plan[0], heartRate: nil, computedAt: at(9999))
+    XCTAssertEqual(summary.setList?.map(\.bellKg), [24, 24], "the weight carries as on the live events")
+  }
+
+  // MARK: - summary
+
+  func testTheSummaryBodyHoldsTheWholeWorkout() throws {
+    let w = workout("E621E1F8-C36C-495A-93FC-0C247A3E6E5F", from: 0, to: 2400, changed: 2500)
+    let plan = WorkoutSync.plan(workouts: [w], entries: [set("a", at: 100)], have: [], refused: [])
+    let series = HeartRateSeries(samples: [
+      .init(at: at(90).timeIntervalSince1970, bpm: 110), .init(at: at(120).timeIntervalSince1970, bpm: 141),
+    ])
+    let event = WorkoutSync.summary(try XCTUnwrap(plan.first), heartRate: series, computedAt: at(9000))
+    XCTAssertEqual(event.id, "E621E1F8-C36C-495A-93FC-0C247A3E6E5F-s\(Int(at(2500).timeIntervalSince1970))")
+    XCTAssertLessThanOrEqual(event.id.count, 64, "the Cockpit's id limit")
+    let body = WorkoutEventWire.body(event, sentAt: at(9001))
+    XCTAssertEqual(body["type"] as? String, "summary")
+    XCTAssertEqual(body["workout_id"] as? String, w.id)
+    XCTAssertEqual(body["at"] as? String, WorkoutEventWire.iso(at(2400)), "at is the end")
+    XCTAssertEqual(body["started_at"] as? String, WorkoutEventWire.iso(at(0)))
+    XCTAssertEqual(body["ended_at"] as? String, WorkoutEventWire.iso(at(2400)))
+    XCTAssertEqual(body["computed_at"] as? String, WorkoutEventWire.iso(at(9000)))
+    XCTAssertEqual(body["discarded"] as? Bool, false)
+    XCTAssertEqual(body["elapsed_s"] as? Int, 2400)
+    XCTAssertEqual(body["hr_avg_bpm"] as? Int, 120)
+    XCTAssertEqual(body["sets"] as? Int, 2)
+    XCTAssertEqual(body["kind"] as? String, "strength")
+    let list = try XCTUnwrap(body["set_list"] as? [[String: Any]])
+    XCTAssertEqual(list.map { $0["id"] as? String }, ["a"])
+    XCTAssertEqual(list.first?["hr_peak_bpm"] as? Int, 141, "the stored heart rate's peak, not null")
+    XCTAssertNil(body["set"], "a summary carries set_list, not set")
+  }
+
+  // MARK: - a pass against the fake Cockpit
+
+  func testAPassSendsWhatIsMissingAndASecondPassSendsNothing() async throws {
+    let fake = FakeCockpit([FakeCockpit.Held(id: "LIVE", start: at(0.5))])
+    let local = [workout("W0", from: 0, to: 600), workout("W1", from: 10000, to: 10600)]
+    let entries = [set("a", at: 100), set("b", at: 10100)]
+    func pass() async -> WorkoutSync.Report {
+      let rows = await WorkoutSync.fetchHave(cockpit: cockpit, since: at(-60), transport: { fake.handle($0) })
+      let plan = WorkoutSync.plan(workouts: local, entries: entries, have: rows ?? [], refused: [])
+      return await WorkoutSync.send(
+        plan, heartRate: [:], cockpit: cockpit, now: { self.at(20000) }, transport: { fake.handle($0) })
+    }
+    let first = await pass()
+    XCTAssertEqual(first.sent, 2)
+    XCTAssertNil(first.retry)
+    XCTAssertEqual(
+      fake.summaries.map { $0["workout_id"] as? String }, ["LIVE", "W1"], "oldest first, matched by start")
+    XCTAssertEqual(Set(fake.held.map(\.id)), ["LIVE", "W1"], "no second copy of the live workout")
+    let second = await pass()
+    XCTAssertEqual(second.sent, 0, "the Cockpit now holds both as the phone does")
+    XCTAssertEqual(fake.summaries.count, 2)
+  }
+
+  func testA409IsSentAgainUnderTheCockpitsID() async throws {
+    // The Cockpit's listing missed it (a page taken before the live `started` landed): the summary 409s.
+    let fake = FakeCockpit([FakeCockpit.Held(id: "LIVE", start: at(1))])
+    let plan = WorkoutSync.plan(workouts: [workout("W0", from: 0, to: 600)], entries: [], have: [], refused: [])
+    let report = await WorkoutSync.send(
+      plan, heartRate: [:], cockpit: cockpit, now: { self.at(9000) }, transport: { fake.handle($0) })
+    XCTAssertEqual(report.sent, 1)
+    XCTAssertEqual(fake.summaries.map { $0["workout_id"] as? String }, ["W0", "LIVE"])
+    XCTAssertEqual(fake.held.map(\.id), ["LIVE"])
+    XCTAssertTrue(report.lines.contains { $0.action == "moved" && $0.workoutID == "LIVE" })
+  }
+
+  func testNoAnswerStopsThePassAndARefusalIsRemembered() async {
+    let plan = WorkoutSync.plan(
+      workouts: [workout("W0", from: 0, to: 600), workout("W1", from: 9000, to: 9600)], entries: [], have: [],
+      refused: [])
+    let down = FakeCockpit()
+    down.postStatus = 503
+    let waiting = await WorkoutSync.send(
+      plan, heartRate: [:], cockpit: cockpit, now: { self.at(20000) }, transport: { down.handle($0) })
+    XCTAssertNotNil(waiting.retry, "a 5xx waits")
+    XCTAssertEqual(waiting.tried, 1, "the rest would wait the same way")
+    let refusing = FakeCockpit()
+    refusing.postStatus = 400
+    let refused = await WorkoutSync.send(
+      plan, heartRate: [:], cockpit: cockpit, now: { self.at(20000) }, transport: { refusing.handle($0) })
+    XCTAssertEqual(refused.refused, plan.map { WorkoutSync.summaryID(workoutID: $0.sendAs, changedAt: $0.changedAt) })
+    XCTAssertNil(refused.retry, "a refusal does not stop the others")
+  }
+
+  func testA409OnALiveEventIsARefusal() {
+    let outcome = WorkoutEventWire.outcome(status: 409, body: FakeCockpit.json(["ok": false, "workout_id": "X"]))
+    XCTAssertEqual(outcome, .conflict(workoutID: "X"))
+    XCTAssertEqual(
+      WorkoutEventWire.outcome(status: 409, body: FakeCockpit.json(["ok": false])),
+      .refused(status: 409, reason: "HTTP 409"))
+  }
+}
