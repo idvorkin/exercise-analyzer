@@ -87,10 +87,12 @@ final class PhoneLink: NSObject {
   var screenshotScrollsToEnd: Bool { screenshot == .workoutEnd }
   /// The screenshot rung wants the count page of a set typed by hand open over the workout page (059).
   var screenshotOpensSetByHand: Bool {
-    screenshot == .setByHand || screenshot == .setByHandExercise || screenshot == .setByHandBarbell
+    screenshot == .setByHand || screenshot == .setByHandExercise || screenshotOpensPlates
   }
   /// ...and its plates page open over it (086).
-  var screenshotOpensPlates: Bool { screenshot == .setByHandBarbell }
+  var screenshotOpensPlates: Bool { screenshot == .setByHandBarbell || screenshotScrollsPlatesToEnd }
+  /// ...scrolled to its bottom: the last "−", "Empty bar" and "Bells instead" (ea-71t).
+  var screenshotScrollsPlatesToEnd: Bool { screenshot == .setByHandBarbellEnd }
   /// ...and its exercise list open over it (#154).
   var screenshotOpensExerciseList: Bool { screenshot == .setByHandExercise }
   /// The screenshot rung wants the machine rows' Incline holding the Crown (085).
