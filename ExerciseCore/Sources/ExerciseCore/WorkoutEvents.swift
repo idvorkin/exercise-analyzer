@@ -72,6 +72,8 @@ public struct WorkoutEvent: Codable, Equatable, Sendable {
     /// The weight the set shows, its own or carried from the exercise's set before (066, 083).
     public var bellKg: Int?
     public var barbell: BarbellLoad?
+    /// In a summary's `set_list` only: the set was deleted from the phone (ea-hp8), sent as `deleted: true`.
+    public var deleted: Bool? = nil
   }
 
   public let id: String
@@ -343,6 +345,7 @@ public enum WorkoutEventWire {
     } else if let kg = set.bellKg {
       facts["weight"] = ["kg": kg]
     }
+    if set.deleted == true { facts["deleted"] = true }
     return facts
   }
 

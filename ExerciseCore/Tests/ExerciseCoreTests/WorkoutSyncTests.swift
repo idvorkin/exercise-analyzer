@@ -92,6 +92,8 @@ final class FakeCockpit: @unchecked Sendable {
         row.rev = computed
         row.discarded = body["discarded"] as? Bool == true  // a summary's `discarded` stands (workout_events.py)
       }
+      // A set marked `deleted: true` (ea-hp8) is upserted like any other: `have` keeps listing it, with the id of
+      // the summary that last carried it (the contract as of Cockpit main 17f5c28).
       for set in body["set_list"] as? [[String: Any]] ?? [] {
         if let setID = set["id"] as? String { row.sets[setID] = id }
       }
@@ -547,6 +549,129 @@ final class WorkoutSyncTests: XCTestCase {
     var later = WorkoutIndex(workouts: [edited])
     let outlived = later.merge(remote: [], tombstones: ["W2": at(5000)], me: "phone")
     XCTAssertEqual(outlived.removedIDs, [], "a workout changed after the delete stays, and nothing goes")
+  }
+
+  // MARK: - a set deleted from a workout the Cockpit holds (ea-hp8)
+
+  /// The pass the sender makes: ask, settle the deleted sets the listing has done with, plan, send one at a time,
+  /// and note which summaries carried each deleted set.
+  private func setPass(
+    _ workouts: [StoredWorkout], entries: [RecentEntry], deleted pending: [DeletedSet], fake: FakeCockpit,
+    now: TimeInterval, transport: WorkoutSync.Transport? = nil
+  ) async -> (left: [DeletedSet], report: WorkoutSync.Report) {
+    let since = WorkoutSync.since(workouts: workouts, deleted: [], deletedSets: pending)
+    let rows = await WorkoutSync.fetchHave(cockpit: cockpit, since: since, transport: { fake.handle($0) }) ?? []
+    let settled = Set(WorkoutSync.settledSets(pending, have: rows, workouts: workouts))
+    var left = pending.filter { !settled.contains($0.entry.id) }
+    let plan = WorkoutSync.plan(workouts: workouts, entries: entries, have: rows, refused: [], deletedSets: left)
+    var report = WorkoutSync.Report()
+    for planned in plan {
+      let one = await WorkoutSync.send(
+        [planned], heartRate: ["W1": series], cockpit: cockpit, now: { self.at(now) },
+        transport: transport ?? { fake.handle($0) })
+      left = WorkoutSync.carried(left, by: planned, report: one)
+      report.sent += one.sent
+      report.lines += one.lines
+      report.retry = report.retry ?? one.retry
+    }
+    return (left, report)
+  }
+
+  func testADeletedSetGoesMarkedDeletedWithItsFactsThenIsForgotten() async throws {
+    let w1 = workout("W1", from: 0, to: 2400)
+    let kept = set("a", at: 100, weight: .bell(24))
+    let gone = set("b", at: 110)
+    let fake = FakeCockpit([
+      FakeCockpit.Held(id: "W1", start: at(0), sets: ["a": "W1-s1", "b": "W1-s1"], rev: WorkoutEventWire.iso(at(4000)))
+    ])
+    let tombstone = DeletedSet(entry: gone, deletedAt: at(5000))
+    let first = await setPass([w1], entries: [kept], deleted: [tombstone], fake: fake, now: 6000)
+    XCTAssertEqual(first.report.sent, 1, "the workout goes again because a set it holds was deleted")
+    let body = try XCTUnwrap(fake.summaries.first)
+    let id = try XCTUnwrap(body["id"] as? String)
+    XCTAssertEqual(id, "W1-x\(Int(at(5000).timeIntervalSince1970))", "its own id, from the delete")
+    let list = try XCTUnwrap(body["set_list"] as? [[String: Any]])
+    XCTAssertEqual(list.map { $0["id"] as? String }, ["a", "b"])
+    XCTAssertNil(list[0]["deleted"], "a live set carries no flag")
+    XCTAssertEqual(list[1]["deleted"] as? Bool, true)
+    XCTAssertEqual(list[1]["reps"] as? Int, 10, "all its facts, so the Cockpit's copy is not blanked")
+    XCTAssertEqual((list[1]["weight"] as? [String: Any])?["kg"] as? Int, 24, "the weight it showed, carried")
+    XCTAssertEqual(list[1]["hr_peak_bpm"] as? Int, 141, "its peak from the workout's heart rate")
+    XCTAssertEqual(first.report.lines.first?.sets, 1, "only the live sets are counted")
+    XCTAssertEqual(first.report.lines.first?.deletedSets, 1)
+    XCTAssertEqual(first.left.first?.carriedIn, [id], "kept until the listing shows it")
+    let second = await setPass([w1], entries: [kept], deleted: first.left, fake: fake, now: 7000)
+    XCTAssertEqual(second.left, [], "the listing shows it last carried by the summary that marked it deleted")
+    XCTAssertEqual(second.report.sent, 0)
+    XCTAssertEqual(fake.summaries.count, 1)
+    let relaunched = try JSONDecoder().decode([DeletedSet].self, from: JSONEncoder().encode(first.left))
+    XCTAssertEqual(relaunched, first.left, "kept across launches")
+  }
+
+  func testADeletedSetInTheSameSecondAsTheLastCopyIsStillNewer() async throws {
+    // The last summary (W1-s<5000>) and rev share the second the set was deleted in: a summary of that same id
+    // would be answered as a duplicate, and one whose computed_at equals rev changes nothing.
+    let w1 = workout("W1", from: 0, to: 2400, changed: 5000.1)
+    let fake = FakeCockpit([
+      FakeCockpit.Held(id: "W1", start: at(0), sets: ["a": "e", "b": "e"], rev: WorkoutEventWire.iso(at(5000)))
+    ])
+    let tombstone = DeletedSet(entry: set("b", at: 200), deletedAt: at(5000.4))
+    let pass = await setPass([w1], entries: [set("a", at: 100)], deleted: [tombstone], fake: fake, now: 5000.6)
+    let body = try XCTUnwrap(fake.summaries.first)
+    XCTAssertEqual(
+      body["id"] as? String, "W1-x\(Int(at(5000).timeIntervalSince1970))", "not the last copy's W1-s id")
+    XCTAssertEqual(body["computed_at"] as? String, WorkoutEventWire.iso(at(5001)), "a second past rev")
+    XCTAssertEqual(pass.report.sent, 1)
+    XCTAssertEqual(fake.held.first?.rev, WorkoutEventWire.iso(at(5001)), "kept")
+  }
+
+  func testADeletedSetNoWorkoutOfThisPhonesHoldsIsForgottenUnsent() {
+    var ipad = workout("IPAD", from: 9000, to: 9600)
+    ipad.device = "ipad"
+    let own = workout("W1", from: 0, to: 600)
+    let pending = [
+      DeletedSet(entry: set("never", at: 100), deletedAt: at(5000)),
+      DeletedSet(entry: set("theirs", at: 9100), deletedAt: at(9700)),
+      DeletedSet(entry: set("in-discarded", at: 200), deletedAt: at(5000)),
+    ]
+    let rows = [
+      have("W1", start: 0, rev: 700, discarded: true, sets: ["in-discarded"]),
+      have("IPAD", start: 9000, rev: 9700, sets: ["theirs"]),
+    ]
+    XCTAssertEqual(
+      Set(WorkoutSync.settledSets(pending, have: rows, workouts: [own, ipad])), ["never", "theirs", "in-discarded"],
+      "never held: nothing to mark; another device's workout: its to send; a discarded workout: marked with it")
+    XCTAssertEqual(
+      WorkoutSync.plan(workouts: [own, ipad], entries: [], have: rows, refused: [], deletedSets: pending), [],
+      "nothing sent for any of them")
+  }
+
+  func testNoAnswerKeepsTheDeletedSetAndTheRetryUsesTheSameID() async throws {
+    let w1 = workout("W1", from: 0, to: 2400)
+    let fake = FakeCockpit([
+      FakeCockpit.Held(id: "W1", start: at(0), sets: ["a": "e", "b": "e"], rev: WorkoutEventWire.iso(at(4000)))
+    ])
+    let tombstone = DeletedSet(entry: set("b", at: 200), deletedAt: at(5000))
+    let lost: WorkoutSync.Transport = { request in
+      _ = fake.handle(request)
+      return (nil, nil, "The request timed out.")
+    }
+    let first = await setPass(
+      [w1], entries: [set("a", at: 100)], deleted: [tombstone], fake: fake, now: 6000, transport: lost)
+    XCTAssertNotNil(first.report.retry)
+    XCTAssertEqual(first.left, [tombstone], "no answer: kept, nothing noted")
+    let second = await setPass([w1], entries: [set("a", at: 100)], deleted: first.left, fake: fake, now: 7000)
+    XCTAssertEqual(second.report.lines.first?.duplicate, true, "the same id again: the Cockpit had taken it")
+    let third = await setPass([w1], entries: [set("a", at: 100)], deleted: second.left, fake: fake, now: 8000)
+    XCTAssertEqual(third.left, [])
+    XCTAssertEqual(Set(fake.summaries.compactMap { $0["id"] as? String }).count, 1)
+  }
+
+  func testADeletedSetWidensTheListing() {
+    let kept = workout("W5", from: 50000, to: 50600)
+    let pending = [DeletedSet(entry: set("old", at: 100), deletedAt: at(60000))]
+    XCTAssertEqual(
+      WorkoutSync.since(workouts: [kept], deleted: [], deletedSets: pending), at(100 - WorkoutSync.sinceMargin))
   }
 
   func testA409NamingAnIDIsAConflict() {

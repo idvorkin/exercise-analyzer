@@ -30,6 +30,23 @@ public struct DeletedWorkout: Codable, Equatable, Sendable {
   }
 }
 
+/// A set deleted from the phone (ea-hp8; Larry, 2026-11-25: "a per-set deleted: true in set_list"), as it was just
+/// before: the Cockpit updates sets by id and never deletes one a summary leaves out, so the workout holding it goes
+/// again with it marked deleted. Kept, across launches, until the Cockpit's `have` shows it last carried by a
+/// summary that marked it, or shows it in no workout this phone sends.
+public struct DeletedSet: Codable, Equatable, Sendable {
+  public var entry: RecentEntry
+  public var deletedAt: Date
+  /// The summaries that carried it marked deleted.
+  public var carriedIn: [String]
+
+  public init(entry: RecentEntry, deletedAt: Date, carriedIn: [String] = []) {
+    self.entry = entry
+    self.deletedAt = deletedAt
+    self.carriedIn = carriedIn
+  }
+}
+
 /// One row of the Cockpit's `have`: a workout it holds, as far as the phone needs to know.
 public struct WorkoutHave: Equatable, Sendable {
   public var workoutID: String
@@ -79,6 +96,9 @@ public enum WorkoutSync {
     /// sent in place of `sets`. It goes marked discarded, under its own id.
     public var discardedAt: Date? = nil
     public var setList: [WorkoutEvent.SetFacts]? = nil
+    /// Sets deleted from it that the Cockpit still holds live (ea-hp8): sent with `deleted: true`, under an id of
+    /// their own (`-x…`).
+    public var deletedSets: [RecentEntry] = []
     /// Its `computed_at` is at least this: a second past the Cockpit's `rev`, which has whole seconds, since only
     /// a newer one wins.
     public var notBefore: Date? = nil
@@ -100,6 +120,8 @@ public enum WorkoutSync {
       /// The wrist's set count, named only when the sets sent (`sets`) differ from it (ea-d8k): the summary goes
       /// as it is, and the log says the archive copy holds fewer (or more) sets than the wrist counted.
       public var wristSets: Int? = nil
+      /// Sets it carried marked deleted (ea-hp8), not counted in `sets`.
+      public var deletedSets: Int? = nil
     }
 
     /// Summaries tried (a 409's resend is the same one).
@@ -168,9 +190,11 @@ public enum WorkoutSync {
   // MARK: - plan
 
   /// The id of a summary: the same for the same version of the workout (a retry is a duplicate, not a second
-  /// copy), a new one once it changes. A UUID workout id makes 48 characters, inside the Cockpit's 64.
-  public static func summaryID(workoutID: String, changedAt: Date) -> String {
-    "\(workoutID)-s\(wholeSeconds(changedAt))"
+  /// copy), a new one once it changes. A UUID workout id makes 48 characters, inside the Cockpit's 64. One that
+  /// carries a deleted set (ea-hp8) is `-x…`: a delete in the same second as the last copy's change must not be
+  /// answered as a repeat of it.
+  public static func summaryID(workoutID: String, changedAt: Date, deleting: Bool = false) -> String {
+    "\(workoutID)-\(deleting ? "x" : "s")\(wholeSeconds(changedAt))"
   }
 
   /// This phone's own workouts the Cockpit lacks or holds older, oldest first, each with its sets. A workout is
@@ -178,39 +202,93 @@ public enum WorkoutSync {
   /// when no row matches, or the row has no whole copy yet (`rev` null), or only a guessed end, or lacks one of
   /// its sets, or the phone changed it after `rev` (in whole seconds, as the wire carries `rev`). Not sent: a row
   /// synced from another device (that device sends its own), a workout the Cockpit heard discarded, a summary
-  /// whose id is in `refused`.
+  /// whose id is in `refused`. A set deleted from it (ea-hp8) that the Cockpit's row still holds, last carried by
+  /// a summary that did not mark it deleted, makes it stale too, and goes in it marked deleted.
   public static func plan(
-    workouts: [StoredWorkout], entries: [RecentEntry], have: [WorkoutHave], refused: Set<String>
+    workouts: [StoredWorkout], entries: [RecentEntry], have: [WorkoutHave], refused: Set<String>,
+    deletedSets: [DeletedSet] = []
   ) -> [Planned] {
     let setsOf = assignSets(entries, to: workouts)
     var plan: [Planned] = []
     for workout in workouts.sorted(by: { $0.start < $1.start }) where workout.device == nil {
       let sets = setsOf[workout.id] ?? []
-      let changedAt = ([workout.changedAt] + sets.map(\.changedAt)).max() ?? workout.changedAt
-      let row =
-        have.first { $0.workoutID == workout.id }
-        ?? have.first { abs($0.startedAt.timeIntervalSince(workout.start)) <= sameStart }
+      let row = match(workout, in: have)
       if let row, row.discarded { continue }
+      let gone = row.map { row in deletedSets.filter { unmarked($0, in: row) } } ?? []
+      let changedAt =
+        ([workout.changedAt] + sets.map(\.changedAt) + gone.map(\.deletedAt)).max() ?? workout.changedAt
       let sendAs = row?.workoutID ?? workout.id
-      guard !refused.contains(summaryID(workoutID: sendAs, changedAt: changedAt)) else { continue }
+      let id = summaryID(workoutID: sendAs, changedAt: changedAt, deleting: !gone.isEmpty)
+      guard !refused.contains(id) else { continue }
       let stale: Bool
       if let row, let rev = row.rev {
         stale =
           row.endImplied || wholeSeconds(changedAt) > wholeSeconds(rev)
-          || sets.contains { row.sets[$0.id] == nil }
+          || sets.contains { row.sets[$0.id] == nil } || !gone.isEmpty
       } else {
         stale = true
       }
-      if stale { plan.append(Planned(workout: workout, sendAs: sendAs, sets: sets, changedAt: changedAt)) }
+      guard stale else { continue }
+      var planned = Planned(workout: workout, sendAs: sendAs, sets: sets, changedAt: changedAt)
+      if !gone.isEmpty {
+        planned.deletedSets = gone.map(\.entry)
+        // Only a newer `computed_at` than `rev` (whole seconds) wins.
+        planned.notBefore = row?.rev.map { Date(timeIntervalSince1970: TimeInterval(wholeSeconds($0) + 1)) }
+      }
+      plan.append(planned)
     }
     return plan
   }
 
+  /// The Cockpit's row for a workout: by id, else by a start within `sameStart`.
+  static func match(_ workout: StoredWorkout, in have: [WorkoutHave]) -> WorkoutHave? {
+    have.first { $0.workoutID == workout.id }
+      ?? have.first { abs($0.startedAt.timeIntervalSince(workout.start)) <= sameStart }
+  }
+
+  /// The row holds the deleted set, last carried by a summary that did not mark it deleted.
+  static func unmarked(_ gone: DeletedSet, in row: WorkoutHave) -> Bool {
+    guard let carrier = row.sets[gone.entry.id] else { return false }
+    return !gone.carriedIn.contains(carrier)
+  }
+
+  // MARK: - deleted sets (ea-hp8)
+
+  /// The deleted sets the Cockpit's whole listing is done with, by set id, to forget: shown last carried by a
+  /// summary that marked them deleted, or held by no row (it never had them), or held only by a discarded workout
+  /// (marked with it) or one this phone does not send (another device's, or none of the phone's).
+  public static func settledSets(
+    _ deleted: [DeletedSet], have: [WorkoutHave], workouts: [StoredWorkout]
+  ) -> [String] {
+    let sendable = Set(workouts.filter { $0.device == nil }.compactMap { match($0, in: have)?.workoutID })
+    return deleted.filter { gone in
+      !have.contains { row in !row.discarded && sendable.contains(row.workoutID) && unmarked(gone, in: row) }
+    }.map(\.entry.id)
+  }
+
+  /// After `planned` went: each of its deleted sets notes the summary that carried it, once the Cockpit took it
+  /// (or answered it as a duplicate). No answer notes nothing; the retry goes under the same id.
+  public static func carried(_ deleted: [DeletedSet], by planned: Planned, report: Report) -> [DeletedSet] {
+    let taken = report.lines.filter { $0.action == "sent" }.map(\.id)
+    guard !taken.isEmpty, !planned.deletedSets.isEmpty else { return deleted }
+    let ids = Set(planned.deletedSets.map(\.id))
+    return deleted.map { gone in
+      guard ids.contains(gone.entry.id) else { return gone }
+      var noted = gone
+      for id in taken where !noted.carriedIn.contains(id) { noted.carriedIn.append(id) }
+      return noted
+    }
+  }
+
   /// Where `have` is listed from: the oldest start of this phone's own workouts, those left and those deleted and
   /// waiting to go marked discarded (deleting the oldest workout must not drop its row from the listing, which
-  /// would read as "never held"), less `sinceMargin`.
-  public static func since(workouts: [StoredWorkout], deleted: [DeletedWorkout]) -> Date? {
-    let starts = workouts.filter { $0.device == nil }.map(\.start) + deleted.map(\.workout.start)
+  /// would read as "never held"), and the deleted sets waiting (ea-hp8), less `sinceMargin`.
+  public static func since(
+    workouts: [StoredWorkout], deleted: [DeletedWorkout], deletedSets: [DeletedSet] = []
+  ) -> Date? {
+    let starts =
+      workouts.filter { $0.device == nil }.map(\.start) + deleted.map(\.workout.start)
+      + deletedSets.map(\.entry.span.lowerBound)
     return starts.min()?.addingTimeInterval(-sinceMargin)
   }
 
@@ -301,14 +379,32 @@ public enum WorkoutSync {
     let workout = planned.workout
     let id =
       planned.discardedAt.map { discardID(workoutID: planned.sendAs, deletedAt: $0) }
-      ?? summaryID(workoutID: planned.sendAs, changedAt: planned.changedAt)
+      ?? summaryID(
+        workoutID: planned.sendAs, changedAt: planned.changedAt, deleting: !planned.deletedSets.isEmpty)
     return WorkoutEvent(
       id: id, type: .summary, workoutID: planned.sendAs, kind: workout.kind ?? .strength, source: .watch,
       at: workout.end, startedAt: workout.start, hrBpm: nil, hrAvgBpm: workout.heartRateAverage,
       hrMaxBpm: workout.heartRateMax, sets: workout.sets, reps: workout.reps, machine: nil, set: nil,
       endedAt: workout.end, discarded: planned.discardedAt != nil,
-      setList: planned.setList ?? WorkoutStream.setFacts(planned.sets, heartRate: heartRate),
+      setList: planned.setList ?? setList(planned, heartRate: heartRate),
       computedAt: max(computedAt, planned.notBefore ?? computedAt))
+  }
+
+  /// The live sets as always, then each deleted one (ea-hp8) with its full last facts and `deleted: true`, in time
+  /// order: its weight as it showed among the sets before it, its peak from the workout's heart rate. The live
+  /// sets' carried weights are worked out without it, as the phone now shows them.
+  static func setList(_ planned: Planned, heartRate: HeartRateSeries?) -> [WorkoutEvent.SetFacts] {
+    let live = WorkoutStream.setFacts(planned.sets, heartRate: heartRate)
+    guard !planned.deletedSets.isEmpty else { return live }
+    let gone = Set(planned.deletedSets.map(\.id))
+    let deleted = WorkoutStream.setFacts(planned.sets + planned.deletedSets, heartRate: heartRate)
+      .filter { gone.contains($0.id) }
+      .map { facts -> WorkoutEvent.SetFacts in
+        var marked = facts
+        marked.deleted = true
+        return marked
+      }
+    return (live + deleted).sorted { $0.startedAt < $1.startedAt }
   }
 
   // MARK: - send
@@ -333,9 +429,11 @@ public enum WorkoutSync {
         event = summary(moved, heartRate: heartRate[planned.workout.id], computedAt: now())
         outcome = await post(event, cockpit: cockpit, now: now(), transport: transport)
       }
+      let marked = event.setList?.filter { $0.deleted == true }.count ?? 0
       var line = Report.Line(
-        action: "sent", id: event.id, workoutID: event.workoutID, sets: event.setList?.count ?? 0,
+        action: "sent", id: event.id, workoutID: event.workoutID, sets: (event.setList?.count ?? 0) - marked,
         discarded: planned.discardedAt != nil ? true : nil)
+      if marked > 0 { line.deletedSets = marked }
       if line.sets != event.sets { line.wristSets = event.sets }
       switch outcome {
       case .sent(let duplicate):
