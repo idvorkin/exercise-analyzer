@@ -88,7 +88,10 @@ final class FakeCockpit: @unchecked Sendable {
       _seen.insert(id)
       var row = _held.first { $0.id == workoutID } ?? Held(id: workoutID, start: start)
       let kept = row.rev.flatMap(Self.date).map { computedAt > $0 } ?? true
-      if kept { row.rev = computed }
+      if kept {
+        row.rev = computed
+        row.discarded = body["discarded"] as? Bool == true  // a summary's `discarded` stands (workout_events.py)
+      }
       for set in body["set_list"] as? [[String: Any]] ?? [] {
         if let setID = set["id"] as? String { row.sets[setID] = id }
       }
@@ -329,6 +332,146 @@ final class WorkoutSyncTests: XCTestCase {
       plan, heartRate: [:], cockpit: cockpit, now: { self.at(20000) }, transport: { refusing.handle($0) })
     XCTAssertEqual(refused.refused, plan.map { WorkoutSync.summaryID(workoutID: $0.sendAs, changedAt: $0.changedAt) })
     XCTAssertNil(refused.retry, "a refusal does not stop the others")
+  }
+
+  // MARK: - a workout deleted on the phone (ea-a6d)
+
+  private let series = HeartRateSeries(samples: [
+    .init(at: 1_795_500_090, bpm: 110), .init(at: 1_795_500_120, bpm: 141), .init(at: 1_795_502_420, bpm: 133),
+  ])
+
+  /// The pass the sender makes for deletions: ask, plan, send; the copies settled or taken go.
+  private func discardPass(
+    _ pending: [DeletedWorkout], fake: FakeCockpit, now: TimeInterval, transport: WorkoutSync.Transport? = nil
+  ) async -> (left: [DeletedWorkout], report: WorkoutSync.Report?) {
+    let since = WorkoutSync.since(workouts: [], deleted: pending)
+    guard
+      let rows = await WorkoutSync.fetchHave(cockpit: cockpit, since: since, transport: { fake.handle($0) })
+    else { return (pending, nil) }
+    let (plan, settled) = WorkoutSync.planDiscards(pending, have: rows)
+    let report = await WorkoutSync.send(
+      plan, heartRate: [:], cockpit: cockpit, now: { self.at(now) }, transport: transport ?? { fake.handle($0) })
+    let sent = Set(report.retry == nil ? plan.map(\.workout.id) : [])
+    return (pending.filter { !settled.contains($0.workout.id) && !sent.contains($0.workout.id) }, report)
+  }
+
+  func testADeletedWorkoutKeepsItsLastCopyOfItsOwnWorkoutsAndSurvivesARelaunch() throws {
+    // A merged line of two workouts 10 min apart, deleted whole (065): one copy per workout the wrist recorded.
+    let first = workout("W1", from: 0, to: 1800)
+    let second = workout("W2", from: 2400, to: 4000)
+    var other = workout("IPAD", from: 9000, to: 9100)
+    other.device = "ipad"
+    let entries = [set("a", at: 100, weight: .bell(24)), set("gap", at: 2000), set("b", at: 3000)]
+    let copies = WorkoutSync.deleted(
+      [first, second, other], from: [first, second, other], entries: entries, heartRate: ["W1": series],
+      at: at(9000))
+    XCTAssertEqual(copies.map(\.workout.id), ["W1", "W2"], "another device's row is its own to send")
+    XCTAssertEqual(copies.map { $0.setList.map(\.id) }, [["a", "gap"], ["b"]], "each set in exactly one copy")
+    XCTAssertEqual(copies[0].setList.map(\.bellKg), [24, 24], "the weight it showed, carried as on the live events")
+    XCTAssertEqual(copies[0].setList.first?.hrPeakBpm, 141, "the peak from the heart rate read before it went")
+    XCTAssertEqual(copies.map(\.deletedAt), [at(9000), at(9000)])
+    let relaunched = try JSONDecoder().decode([DeletedWorkout].self, from: JSONEncoder().encode(copies))
+    XCTAssertEqual(relaunched, copies, "kept across launches")
+  }
+
+  func testADeletedWorkoutTheCockpitHoldsGoesOnceMarkedDiscarded() async throws {
+    let fake = FakeCockpit([
+      FakeCockpit.Held(id: "W1", start: at(0), sets: ["a": "e"], rev: WorkoutEventWire.iso(at(4000)))
+    ])
+    let copy = WorkoutSync.deleted(
+      [workout("W1", from: 0, to: 2400)], from: [workout("W1", from: 0, to: 2400)], entries: [set("a", at: 100)],
+      heartRate: ["W1": series], at: at(5000))
+    let first = await discardPass(copy, fake: fake, now: 6000)
+    XCTAssertEqual(first.left, [], "taken: the copy goes")
+    XCTAssertEqual(first.report?.sent, 1)
+    let body = try XCTUnwrap(fake.summaries.first)
+    XCTAssertEqual(body["type"] as? String, "summary")
+    XCTAssertEqual(body["discarded"] as? Bool, true)
+    XCTAssertEqual(body["workout_id"] as? String, "W1")
+    XCTAssertEqual(body["id"] as? String, "W1-d\(Int(at(5000).timeIntervalSince1970))", "its own id, from the delete")
+    XCTAssertEqual(body["computed_at"] as? String, WorkoutEventWire.iso(at(6000)))
+    XCTAssertEqual(body["ended_at"] as? String, WorkoutEventWire.iso(at(2400)))
+    let list = try XCTUnwrap(body["set_list"] as? [[String: Any]])
+    XCTAssertEqual(list.map { $0["id"] as? String }, ["a"], "the whole last copy, sets and all")
+    XCTAssertEqual(list.first?["hr_peak_bpm"] as? Int, 141)
+    XCTAssertEqual(fake.held.first?.discarded, true, "the Cockpit keeps it, marked deleted")
+    // Were it still waiting (the app killed before it heard the answer), `have` now settles it unsent.
+    let again = await discardPass(copy, fake: fake, now: 7000)
+    XCTAssertEqual(again.left, [])
+    XCTAssertEqual(fake.summaries.count, 1, "never sent again once the Cockpit shows it discarded")
+    let rows = await WorkoutSync.fetchHave(cockpit: cockpit, since: nil, transport: { fake.handle($0) }) ?? []
+    XCTAssertEqual(
+      WorkoutSync.plan(workouts: [workout("W1", from: 0, to: 2400)], entries: [], have: rows, refused: []), [],
+      "and never brought back as live")
+  }
+
+  func testADeletedWorkoutGoesUnderTheCockpitsIDAndOneItNeverHadIsNotSent() {
+    let held = workout("W1", from: 0, to: 600)
+    let never = workout("W2", from: 9000, to: 9600)
+    let gone = workout("W3", from: 20000, to: 20600)
+    let copies = WorkoutSync.deleted(
+      [held, never, gone], from: [held, never, gone], entries: [], heartRate: [:], at: at(30000))
+    let (plan, settled) = WorkoutSync.planDiscards(
+      copies, have: [have("LIVE", start: 1.5, rev: 700), have("W3", start: 20000, discarded: true)])
+    XCTAssertEqual(plan.map(\.sendAs), ["LIVE"], "matched by start, under the live stream's id")
+    XCTAssertEqual(plan.first?.discardedAt, at(30000))
+    XCTAssertEqual(Set(settled), ["W2", "W3"], "never held: nothing to mark; held discarded: already marked")
+  }
+
+  func testNoAnswerKeepsTheCopyAndTheNextTryUsesTheSameID() async throws {
+    let fake = FakeCockpit([FakeCockpit.Held(id: "W1", start: at(0))])
+    let copy = WorkoutSync.deleted(
+      [workout("W1", from: 0, to: 600)], from: [workout("W1", from: 0, to: 600)], entries: [], heartRate: [:],
+      at: at(5000))
+    fake.postStatus = 503
+    let down = await discardPass(copy, fake: fake, now: 6000)
+    XCTAssertNotNil(down.report?.retry)
+    XCTAssertEqual(down.left, copy, "kept, to try again")
+    fake.postStatus = nil
+    let up = await discardPass(copy, fake: fake, now: 7000)
+    XCTAssertEqual(up.left, [])
+    XCTAssertEqual(fake.summaries.compactMap { $0["id"] as? String }, ["W1-d\(Int(at(5000).timeIntervalSince1970))"])
+    XCTAssertEqual(fake.held.first?.discarded, true)
+  }
+
+  func testATakenDiscardWhoseAnswerWasLostIsNotSentAgain() async {
+    let fake = FakeCockpit([FakeCockpit.Held(id: "W1", start: at(0))])
+    let copy = WorkoutSync.deleted(
+      [workout("W1", from: 0, to: 600)], from: [workout("W1", from: 0, to: 600)], entries: [], heartRate: [:],
+      at: at(5000))
+    let lost: WorkoutSync.Transport = { request in
+      _ = fake.handle(request)
+      return (nil, nil, "The request timed out.")
+    }
+    let first = await discardPass(copy, fake: fake, now: 6000, transport: lost)
+    XCTAssertEqual(first.left, copy, "no answer: kept")
+    let second = await discardPass(copy, fake: fake, now: 7000)
+    XCTAssertEqual(second.left, [], "the listing shows it discarded")
+    XCTAssertEqual(fake.summaries.count, 1, "so it is not sent again")
+  }
+
+  func testADiscardInTheSameSecondAsTheLastCopyIsStillNewer() async {
+    // The Cockpit's rev is whole seconds and the newest computed_at wins: one equal to rev changes nothing.
+    let fake = FakeCockpit([FakeCockpit.Held(id: "W1", start: at(0), rev: WorkoutEventWire.iso(at(5000)))])
+    let copy = WorkoutSync.deleted(
+      [workout("W1", from: 0, to: 600)], from: [workout("W1", from: 0, to: 600)], entries: [], heartRate: [:],
+      at: at(5000.2))
+    _ = await discardPass(copy, fake: fake, now: 5000.4)
+    XCTAssertEqual(fake.held.first?.discarded, true, "sent a second past rev, so it is kept")
+  }
+
+  func testDeletingTheOldestWorkoutStillListsItsRow() {
+    let kept = workout("W5", from: 50000, to: 50600)
+    let copies = WorkoutSync.deleted(
+      [workout("W0", from: 0, to: 600)], from: [workout("W0", from: 0, to: 600), kept], entries: [], heartRate: [:],
+      at: at(60000))
+    XCTAssertEqual(
+      WorkoutSync.since(workouts: [kept], deleted: copies), at(-WorkoutSync.sinceMargin),
+      "the deleted workout's start, not only the ones left")
+    var synced = workout("IPAD", from: -9000, to: -8000)
+    synced.device = "ipad"
+    XCTAssertEqual(WorkoutSync.since(workouts: [kept, synced], deleted: []), at(50000 - WorkoutSync.sinceMargin))
+    XCTAssertNil(WorkoutSync.since(workouts: [], deleted: []))
   }
 
   func testA409NamingAnIDIsAConflict() {

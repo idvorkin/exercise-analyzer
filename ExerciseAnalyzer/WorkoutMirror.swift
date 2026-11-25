@@ -29,6 +29,15 @@ final class WorkoutMirror: NSObject {
   var onStatusWanted: (() -> Void)?
   /// A workout's heart-rate series was written to its folder: the sync store mirrors it (#225).
   var onHeartRateSaved: (() -> Void)?
+  /// Workouts went from the list (Delete, Trim end's dropped parts, a late Discard): the rows as they were, the
+  /// list just before, and each one's heart rate read before its folder went, for the Cockpit sender to keep
+  /// their last copy and send it marked discarded (story 087, ea-a6d). `refined`: Delete read a fuller heart rate
+  /// from Health after handing them over; the copies still waiting take it.
+  var onRemoved:
+    (
+      (_ parts: [StoredWorkout], _ before: [StoredWorkout], _ heartRate: [String: HeartRateSeries], _ refined: Bool)
+        -> Void
+    )?
 
   private let store = HKHealthStore()
   private var session: HKWorkoutSession?
@@ -130,6 +139,12 @@ final class WorkoutMirror: NSObject {
       requestAuthorizationIfNeeded(forReading: true)
       return nil
     }
+    return await readHeartRate(from: start, to: end)
+  }
+
+  /// Health's heart-rate samples between two moments, asked without the check above: Delete reads a workout
+  /// already gone from the list, its permission asked just before (ea-a6d).
+  private func readHeartRate(from start: Date, to end: Date) async -> HeartRateSeries? {
     let type = HKQuantityType(.heartRate)
     let query = HKSampleQueryDescriptor(
       predicates: [.quantitySample(type: type, predicate: HKQuery.predicateForSamples(withStart: start, end: end))],
@@ -212,7 +227,12 @@ final class WorkoutMirror: NSObject {
   /// app delete only what this app or its watch app wrote; when it refuses, the rows go anyway and the answer
   /// says so, so the lifter can delete the record in Health.
   func delete(_ session: StoredWorkout) async -> WorkoutDeletion {
+    let before = index
     let parts = index.removeSession(session)
+    // The last copy (ea-a6d), handed over before anything here waits (Health can take minutes, the app can be
+    // killed meanwhile), with the heart rate read before the folders go; Health's, when fuller, below.
+    let kept = keptHeartRate(of: parts, before: before)
+    if !parts.isEmpty { onRemoved?(parts, before.workouts, kept, false) }
     var deletion = WorkoutDeletion(rows: parts.count)
     // Their tombstones, dated now, for SyncStore to write (070, step 4).
     if !parts.isEmpty {
@@ -238,6 +258,17 @@ final class WorkoutMirror: NSObject {
           // what was not asked yet.
           try await store.requestAuthorization(
             toShare: [.workoutType()], read: [.workoutType(), HKQuantityType(.heartRate)])
+          // Health's heart rate for the last copy (ea-a6d), as a whole workout's summary reads it, while the
+          // record is still there; a copy still waiting takes it when fuller.
+          var fuller: [String: HeartRateSeries] = [:]
+          for part in parts where part.device == nil {
+            let read = await readHeartRate(
+              from: part.start.addingTimeInterval(-60), to: part.end.addingTimeInterval(180))
+            if let read, read.samples.count > (kept[part.id]?.samples.count ?? 0) { fuller[part.id] = read }
+          }
+          if !fuller.isEmpty {
+            onRemoved?(parts.filter { fuller[$0.id] != nil }, before.workouts, fuller, true)
+          }
           let family = Bundle.main.bundleIdentifier ?? "com.idvorkin.exerciseanalyzer"
           let query = HKSampleQueryDescriptor(
             predicates: [
@@ -263,6 +294,26 @@ final class WorkoutMirror: NSObject {
     return deletion
   }
 
+  /// The heart rate each removed row's last copy keeps (ea-a6d), read before its folder goes, as a whole
+  /// workout's summary picks it: the fuller of its own folder's and the wrist's live readings, else the folder
+  /// of the line it was merged into (#169).
+  private func keptHeartRate(of parts: [StoredWorkout], before: WorkoutIndex) -> [String: HeartRateSeries] {
+    var kept: [String: HeartRateSeries] = [:]
+    let lines = before.sessions()
+    for part in parts where part.device == nil {
+      let own = [HeartRateSeries.load(from: folder(for: part.id)), liveHeartRateSeries(for: part)]
+        .compactMap { $0 }.max { $0.samples.count < $1.samples.count }
+      if let own, !own.samples.isEmpty {
+        kept[part.id] = own
+      } else if let line = lines.first(where: { $0.start <= part.start && $0.end >= part.end }),
+        let series = HeartRateSeries.load(from: folder(for: line.id))
+      {
+        kept[part.id] = series
+      }
+    }
+    return kept
+  }
+
   /// Trim end (story 078, #331; Igor: "let me trim end time"): the line ends at `end`. Its rows end there (a part
   /// after it goes, with a tombstone), the stored heart rate is cut to match, and each of the wrist's Health
   /// records running past it is saved again ending there and the long one deleted; Health cannot shorten a
@@ -274,9 +325,12 @@ final class WorkoutMirror: NSObject {
       return WorkoutTrim(rows: 0, failure: "Trim this workout on the device that recorded it.")
     }
     let now = Date()
+    let before = index
     let (trimmed, removed) = index.trimEnd(session, to: end, now: now)
     var trim = WorkoutTrim(rows: trimmed.count + removed.count)
     guard trim.rows > 0 else { return trim }
+    // A dropped part goes to the Cockpit marked discarded, as a deleted workout does (ea-a6d).
+    if !removed.isEmpty { onRemoved?(removed, before.workouts, keptHeartRate(of: removed, before: before), false) }
     for part in removed {
       deleted[part.id] = now
       try? FileManager.default.removeItem(at: folder(for: part.id))
@@ -592,7 +646,9 @@ final class WorkoutMirror: NSObject {
     let old = id.flatMap { id in index.workouts.first { $0.id == id } }
     let stamp = max(Date(), (old?.changedAt ?? .distantPast).addingTimeInterval(0.001))
     if live.discarded {
-      if let id, old != nil {
+      if let id, let old {
+        // The Cockpit may hold it from its live events: it goes there marked discarded (ea-a6d).
+        onRemoved?([old], index.workouts, keptHeartRate(of: [old], before: index), false)
         index.workouts.removeAll { $0.id == id }
         deleted[id] = stamp  // its tombstone, in case the mirror already took it (070, step 4)
         UserDefaults.standard.set(deleted, forKey: Self.deletedKey)

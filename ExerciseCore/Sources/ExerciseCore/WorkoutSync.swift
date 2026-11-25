@@ -13,6 +13,23 @@ import Foundation
   import FoundationNetworking
 #endif
 
+/// A workout deleted on the phone, as it was just before (ea-a6d; Larry, 2026-11-25: "don't tombstone and don't
+/// drop it. Send a fresh summary with a newer computed_at and discarded: true"): kept, across launches, until the
+/// Cockpit has taken it marked discarded, shows it discarded, or turns out never to have held it.
+public struct DeletedWorkout: Codable, Equatable, Sendable {
+  public var workout: StoredWorkout
+  /// Its sets' facts, with the weights and heart-rate peaks they had: the set folders and Health stay, but the
+  /// workout's own heart rate goes with it.
+  public var setList: [WorkoutEvent.SetFacts]
+  public var deletedAt: Date
+
+  public init(workout: StoredWorkout, setList: [WorkoutEvent.SetFacts], deletedAt: Date) {
+    self.workout = workout
+    self.setList = setList
+    self.deletedAt = deletedAt
+  }
+}
+
 /// One row of the Cockpit's `have`: a workout it holds, as far as the phone needs to know.
 public struct WorkoutHave: Equatable, Sendable {
   public var workoutID: String
@@ -58,6 +75,13 @@ public enum WorkoutSync {
     public var sets: [RecentEntry]
     /// When the phone last changed the workout or one of its sets.
     public var changedAt: Date
+    /// Set for a workout deleted on the phone (ea-a6d): when, and the set facts kept from just before it went,
+    /// sent in place of `sets`. It goes marked discarded, under its own id.
+    public var discardedAt: Date? = nil
+    public var setList: [WorkoutEvent.SetFacts]? = nil
+    /// Its `computed_at` is at least this: a second past the Cockpit's `rev`, which has whole seconds, since only
+    /// a newer one wins.
+    public var notBefore: Date? = nil
   }
 
   /// What one `send` did, for the session log and the sender's memory of refusals.
@@ -68,6 +92,8 @@ public enum WorkoutSync {
       public var id: String
       public var workoutID: String
       public var sets: Int
+      /// A deleted workout's summary (ea-a6d).
+      public var discarded: Bool? = nil
       public var duplicate: Bool? = nil
       public var status: Int? = nil
       public var reason: String? = nil
@@ -177,6 +203,64 @@ public enum WorkoutSync {
     return plan
   }
 
+  /// Where `have` is listed from: the oldest start of this phone's own workouts, those left and those deleted and
+  /// waiting to go marked discarded (deleting the oldest workout must not drop its row from the listing, which
+  /// would read as "never held"), less `sinceMargin`.
+  public static func since(workouts: [StoredWorkout], deleted: [DeletedWorkout]) -> Date? {
+    let starts = workouts.filter { $0.device == nil }.map(\.start) + deleted.map(\.workout.start)
+    return starts.min()?.addingTimeInterval(-sinceMargin)
+  }
+
+  // MARK: - deleted on the phone (ea-a6d)
+
+  /// The id of a deleted workout's summary: its own, from when it was deleted, so it is never answered as a
+  /// repeat of the last live copy (`-s…`), and the same on every retry.
+  public static func discardID(workoutID: String, deletedAt: Date) -> String {
+    "\(workoutID)-d\(wholeSeconds(deletedAt))"
+  }
+
+  /// The last copy of each of this phone's own workouts in `parts`, taken as they go: their sets from `before`
+  /// (the workouts as they were, the deleted ones still among them, so each set lands where its summary put it),
+  /// with each workout's heart rate by id. Another device's row is left to it.
+  public static func deleted(
+    _ parts: [StoredWorkout], from before: [StoredWorkout], entries: [RecentEntry],
+    heartRate: [String: HeartRateSeries], at: Date
+  ) -> [DeletedWorkout] {
+    let setsOf = assignSets(entries, to: before)
+    return parts.filter { $0.device == nil }.sorted { $0.start < $1.start }.map { part in
+      DeletedWorkout(
+        workout: part, setList: WorkoutStream.setFacts(setsOf[part.id] ?? [], heartRate: heartRate[part.id]),
+        deletedAt: at)
+    }
+  }
+
+  /// What to do with each deleted workout's copy once the Cockpit has said what it holds: send it, marked
+  /// discarded and under the Cockpit's id (matched by id, else by a start within `sameStart`), when the Cockpit
+  /// holds it live; settle it (the ids in `settled`, to forget) when the Cockpit holds it discarded already or
+  /// does not hold it at all. Oldest first.
+  public static func planDiscards(
+    _ deleted: [DeletedWorkout], have: [WorkoutHave]
+  ) -> (plan: [Planned], settled: [String]) {
+    var plan: [Planned] = []
+    var settled: [String] = []
+    for copy in deleted.sorted(by: { $0.workout.start < $1.workout.start }) {
+      let workout = copy.workout
+      let row =
+        have.first { $0.workoutID == workout.id }
+        ?? have.first { abs($0.startedAt.timeIntervalSince(workout.start)) <= sameStart }
+      guard let row, !row.discarded else {
+        settled.append(workout.id)
+        continue
+      }
+      plan.append(
+        Planned(
+          workout: workout, sendAs: row.workoutID, sets: [], changedAt: copy.deletedAt, discardedAt: copy.deletedAt,
+          setList: copy.setList,
+          notBefore: row.rev.map { Date(timeIntervalSince1970: TimeInterval(wholeSeconds($0) + 1)) }))
+    }
+    return (plan, settled)
+  }
+
   /// Each counted set inside a line of `WorkoutIndex.sessions()` goes to the workout of that line that started
   /// last before it: a set in the gap between two workouts shown as one line goes with the earlier one, so every
   /// set lands in exactly one summary. A set outside every line belongs to no workout.
@@ -201,14 +285,19 @@ public enum WorkoutSync {
   /// The whole workout as one `summary`: its type, span, heart rate and the wrist's totals, and every set with
   /// the weight it shows and its heart-rate peak read from `heartRate` (the workout's stored series): the
   /// Cockpit takes a summary's set in place of the live one, so a peak left out would erase the live one.
+  /// A deleted workout's (ea-a6d) goes marked discarded, under `discardID`, with the set facts kept as it went.
   public static func summary(_ planned: Planned, heartRate: HeartRateSeries?, computedAt: Date) -> WorkoutEvent {
     let workout = planned.workout
+    let id =
+      planned.discardedAt.map { discardID(workoutID: planned.sendAs, deletedAt: $0) }
+      ?? summaryID(workoutID: planned.sendAs, changedAt: planned.changedAt)
     return WorkoutEvent(
-      id: summaryID(workoutID: planned.sendAs, changedAt: planned.changedAt), type: .summary,
-      workoutID: planned.sendAs, kind: workout.kind ?? .strength, source: .watch, at: workout.end,
-      startedAt: workout.start, hrBpm: nil, hrAvgBpm: workout.heartRateAverage, hrMaxBpm: workout.heartRateMax,
-      sets: workout.sets, reps: workout.reps, machine: nil, set: nil, endedAt: workout.end, discarded: false,
-      setList: WorkoutStream.setFacts(planned.sets, heartRate: heartRate), computedAt: computedAt)
+      id: id, type: .summary, workoutID: planned.sendAs, kind: workout.kind ?? .strength, source: .watch,
+      at: workout.end, startedAt: workout.start, hrBpm: nil, hrAvgBpm: workout.heartRateAverage,
+      hrMaxBpm: workout.heartRateMax, sets: workout.sets, reps: workout.reps, machine: nil, set: nil,
+      endedAt: workout.end, discarded: planned.discardedAt != nil,
+      setList: planned.setList ?? WorkoutStream.setFacts(planned.sets, heartRate: heartRate),
+      computedAt: max(computedAt, planned.notBefore ?? computedAt))
   }
 
   // MARK: - send
@@ -229,11 +318,13 @@ public enum WorkoutSync {
         var moved = planned
         moved.sendAs = other
         report.lines.append(
-          .init(action: "moved", id: event.id, workoutID: other, sets: planned.sets.count, status: 409))
+          .init(action: "moved", id: event.id, workoutID: other, sets: event.setList?.count ?? 0, status: 409))
         event = summary(moved, heartRate: heartRate[planned.workout.id], computedAt: now())
         outcome = await post(event, cockpit: cockpit, now: now(), transport: transport)
       }
-      var line = Report.Line(action: "sent", id: event.id, workoutID: event.workoutID, sets: planned.sets.count)
+      var line = Report.Line(
+        action: "sent", id: event.id, workoutID: event.workoutID, sets: event.setList?.count ?? 0,
+        discarded: planned.discardedAt != nil ? true : nil)
       switch outcome {
       case .sent(let duplicate):
         report.sent += 1
