@@ -303,6 +303,11 @@ with the phone app in front, terminated, and brought back). `watch_retry` and `w
 `devicectl`, and launches (fails harmlessly if the phone is locked). Then a person uses the app, and
 `just pull-logs` brings back the logs and bug reports.
 
+Over the air (story 089): `just run-device` also copies the installed bundle to the Cockpit's /builds page in the
+background (BugKit's `ota-upload.sh`), and `just ota` puts this checkout's commit there as a Release,
+development-signed `ea-<sha8>.ipa`, with the pose model checked inside it. The iPhone or the iPad installs it from
+the page, anywhere.
+
 What only the phone can show: the Neural Engine (offline pass at 100–190 fps), the camera path
 (`CameraSource`, `FrameRecorder`, camera switch, idle timer), HDR playback (`video_track.hdr`,
 `edr_headroom`; never transform or clip an `AVPlayerLayer` ancestor), Photos in-place import, audio mixing, and the
