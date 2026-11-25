@@ -19,6 +19,14 @@ extension BarbellLoad {
     default: Color(white: 0.92)
     }
   }
+
+  /// A loaded plate button's outline: its colour, but the white 10 takes the text colour so it shows on a white sheet.
+  static func outline(_ plate: Int) -> Color {
+    switch plate {
+    case 45, 35, 25: color(plate)
+    default: .primary
+    }
+  }
 }
 
 struct LoadedBarView: View {
@@ -35,9 +43,9 @@ struct LoadedBarView: View {
         with: .color(.gray.opacity(0.7)))
       let collar = CGSize(width: max(3, size.width * 0.012), height: size.height * 0.3)
       let sleeveRoom = size.width / 2 - inner - collar.width - 4
-      // As thick as the 45s would be at full load, thinner only when more plates than that are on.
-      let count = CGFloat(max(load.plates.count, 1))
-      let thickness = min(size.width * 0.045, sleeveRoom / max(count, CGFloat(BarbellLoad.maxPlatesPerSide)))
+      // Room for a full side; a stored load over the cap (#387 keeps it) draws thinner so it still fits the sleeve.
+      let slots = CGFloat(max(load.plates.count, BarbellLoad.maxPlatesPerSide))
+      let thickness = min(size.width * 0.045, sleeveRoom / slots)
       for side in [-1.0, 1.0] {
         let collarX = size.width / 2 + side * inner - (side < 0 ? collar.width : 0)
         context.fill(

@@ -79,7 +79,7 @@ struct BarbellPicker: View {
       BarbellLoad.color(plate).opacity(count > 0 ? 0.5 : 0.2), in: RoundedRectangle(cornerRadius: 12)
     )
     .overlay(
-      RoundedRectangle(cornerRadius: 12).stroke(count > 0 ? BarbellLoad.color(plate) : .clear, lineWidth: 3)
+      RoundedRectangle(cornerRadius: 12).stroke(count > 0 ? BarbellLoad.outline(plate) : .clear, lineWidth: 3)
     )
     .contentShape(RoundedRectangle(cornerRadius: 12))
     // A full side takes no more (#387): the plates dim until one comes off.
