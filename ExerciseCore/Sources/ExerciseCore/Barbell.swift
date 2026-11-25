@@ -6,16 +6,19 @@
 
 import Foundation
 
-/// The bar under the plates: Igor's two.
+/// The bar under the plates: Igor's three.
 public enum BarKind: String, Codable, CaseIterable, Sendable {
   case regular
   case safetySquat = "safety-squat"
+  /// #375: "show full weight x2 + 65", the reverse lunges' bar.
+  case sixtyFive = "65-lb"
 
-  /// The bar's own weight: a standard 45 lb bar, and Igor's safety squat bar at 58 lb.
+  /// The bar's own weight: a standard 45 lb bar, Igor's safety squat bar at 58 lb, and the 65 lb bar.
   public var lb: Int {
     switch self {
     case .regular: 45
     case .safetySquat: 58
+    case .sixtyFive: 65
     }
   }
 
@@ -23,6 +26,16 @@ public enum BarKind: String, Codable, CaseIterable, Sendable {
     switch self {
     case .regular: "Barbell"
     case .safetySquat: "Safety squat bar"
+    case .sixtyFive: "65 lb bar"
+    }
+  }
+
+  /// What a tile or a segment has room for: "Barbell 45", "SSB 58", "Bar 65".
+  public var short: String {
+    switch self {
+    case .regular: "Barbell 45"
+    case .safetySquat: "SSB 58"
+    case .sixtyFive: "Bar 65"
     }
   }
 }
@@ -140,5 +153,11 @@ extension RecentEntry {
       newest[entry.exerciseKind] = (at, weight)
     }
     return newest.mapValues(\.weight)
+  }
+
+  /// Each exercise's last plates, where they are its newest weight: what the phone tells the wrist beside
+  /// `lastBellKg` (`WatchStatus.barbell`, story 086).
+  public static func lastPlates(_ entries: [RecentEntry]) -> [ExerciseKind: BarbellLoad] {
+    lastWeight(entries).compactMapValues(\.barbell)
   }
 }

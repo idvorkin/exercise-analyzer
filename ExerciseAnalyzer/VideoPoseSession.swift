@@ -2191,6 +2191,9 @@ final class VideoPoseSession: NSObject {
     // What the wrist's by-hand picker opens on (#271).
     status.bellKg = Dictionary(
       uniqueKeysWithValues: RecentEntry.lastBellKg(recents.entries).map { ($0.key.rawValue, $0.value) })
+    // And its plates, where they are the newer weight (086).
+    status.barbell = Dictionary(
+      uniqueKeysWithValues: RecentEntry.lastPlates(recents.entries).map { ($0.key.rawValue, $0.value) })
     // No new field: phase is free when not recording, and the old watch app never reads it (045).
     if pass.awaitingLastSet { status.phase = "analyzing" }
     watch.send(status, force: force || heartbeat)

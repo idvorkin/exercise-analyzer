@@ -129,6 +129,9 @@ public struct WatchStatus: Codable, Equatable, Sendable {
   /// Each exercise's last weight on the phone by raw value (#271): what the wrist's by-hand picker opens on.
   /// Old payloads decode as empty.
   public var bellKg: [String: Int] = [:]
+  /// Each exercise's last plates by raw value, where they are its newest weight (story 086): the wrist's by-hand
+  /// picker opens on them before `bellKg`. Old payloads decode as empty.
+  public var barbell: [String: BarbellLoad] = [:]
   /// The recorder rolls: a set is being written. The face and the rest count key off this, never off
   /// `recording` alone, so a Preview (camera live, nothing written) is not a set (043, 046, 047).
   public var rolling: Bool { recording && !viewfinder }
@@ -149,7 +152,7 @@ public struct WatchStatus: Codable, Equatable, Sendable {
 
   enum CodingKeys: String, CodingKey {
     case recording, frame, reps, phase, elapsed, camera, exercise, phoneActive, mode, zoom, zoomPresets, watchMode,
-      paused, lastSet, viewfinder, sentAt, bellKg
+      paused, lastSet, viewfinder, sentAt, bellKg, barbell
   }
 
   /// Whether the wrist should show this in place of `shown`: only when the phone sent it later. The same status
@@ -181,6 +184,8 @@ public struct WatchStatus: Codable, Equatable, Sendable {
     viewfinder = try c.decodeIfPresent(Bool.self, forKey: .viewfinder) ?? false
     sentAt = try c.decodeIfPresent(Double.self, forKey: .sentAt)
     bellKg = try c.decodeIfPresent([String: Int].self, forKey: .bellKg) ?? [:]
+    // Never fatal: plates on a bar this build does not know must not cost the wrist the whole status.
+    barbell = (try? c.decodeIfPresent([String: BarbellLoad].self, forKey: .barbell)) ?? [:]
   }
 
   public static let idle = WatchStatus(

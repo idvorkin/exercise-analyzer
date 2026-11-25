@@ -1028,7 +1028,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I give it a barbell weight on one device
 - **Then:** the bell's weight is gone from the set, the later weight edit wins on every device as for a bell (070), and a device on an older build that rewrites the set (a re-analysis) does not erase the plates
 
-- **Notes:** the plates are stored as the bar and a count of each plate on one side, in pounds; the total is the bar plus twice the side. The watch's by-hand picker keeps its bells; a count-only reverse lunge exercise, a typed weight and the 65 lb bar of #375 are not part of this story.
+- **Notes:** the plates are stored as the bar and a count of each plate on one side, in pounds; the total is the bar plus twice the side. The watch's plates and #375's 65 lb bar are story 086; a count-only reverse lunge exercise and a typed weight are not part of this story.
 
 - **Issues:** [#377](https://github.com/idvorkin/exercise-analyzer/issues/377); [#375](https://github.com/idvorkin/exercise-analyzer/issues/375) (the same ask for reverse lunges, earlier)
 

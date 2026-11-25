@@ -55,6 +55,24 @@ public struct HandSet: Codable, Equatable, Sendable {
     return phoneKg
   }
 
+  /// What the wrist's weight row opens on, bell or plates (story 086): as `startKg`, the set typed here when it
+  /// is of this exercise with a weight and newer than the phone's last set (or the phone has no weight for it);
+  /// else the phone's last weight of the exercise, its plates (`WatchStatus.barbell`) when those are the newer,
+  /// else its bell; nil for none.
+  public static func startWeight(
+    for exercise: ExerciseKind, bells: [String: Int], plates: [String: BarbellLoad], typed: HandSet?,
+    analyzed: LastSet?
+  ) -> SetWeight? {
+    let phone = plates[exercise.rawValue].map(SetWeight.barbell) ?? bells[exercise.rawValue].map(SetWeight.bell)
+    if let typed, typed.exercise == exercise, let weight = typed.weight, phone == nil || typed.isNewer(than: analyzed) {
+      return weight
+    }
+    return phone
+  }
+
+  /// The set's weight, a bell's or plates.
+  public var weight: SetWeight? { barbell.map(SetWeight.barbell) ?? kg.map(SetWeight.bell) }
+
   /// The count page's range and its start with no set before it.
   public static let range = 1...200
   public static let defaultReps = 10
@@ -120,13 +138,43 @@ public struct HandSet: Codable, Equatable, Sendable {
     while let key = text.range(of: userInfoKey, range: search..<text.endIndex) {
       search = key.upperBound
       guard let open = text.range(of: "{\"", range: key.upperBound..<text.endIndex),
-        let close = text.range(of: "}", range: open.lowerBound..<text.endIndex)
+        let close = matchingBrace(in: text, from: open.lowerBound)
       else { continue }
-      let json = String(text[open.lowerBound..<close.upperBound])
+      let json = String(text[open.lowerBound...close])
       if let set = try? JSONDecoder().decode(HandSet.self, from: Data(json.utf8)) { sets.append(set) }
-      search = close.upperBound
+      search = text.index(after: close)
     }
     return sets
+  }
+
+  /// The `}` that closes the object opening at `open`, past any nested object (a set's plates, 086) and any brace
+  /// inside a string; nil when the text ends first.
+  private static func matchingBrace(in text: String, from open: String.Index) -> String.Index? {
+    var depth = 0
+    var inString = false
+    var escaped = false
+    var at = open
+    while at < text.endIndex {
+      let c = text[at]
+      if inString {
+        if escaped {
+          escaped = false
+        } else if c == "\\" {
+          escaped = true
+        } else if c == "\"" {
+          inString = false
+        }
+      } else if c == "\"" {
+        inString = true
+      } else if c == "{" {
+        depth += 1
+      } else if c == "}" {
+        depth -= 1
+        if depth == 0 { return at }
+      }
+      at = text.index(after: at)
+    }
+    return nil
   }
 
   /// The transfers WatchConnectivity holds undelivered under the app's Documents (#197), oldest first.

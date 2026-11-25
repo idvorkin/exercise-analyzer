@@ -197,12 +197,14 @@ struct WatchContentView: View {
         NavigationStack {
           SetByHandPage(
             exercise: start.exercise, start: start.reps, choosing: phone.screenshotOpensExerciseList,
-            startKg: {
-              HandSet.startKg(for: $0, phone: status.bellKg, typed: phone.lastTyped, analyzed: status.lastSet)
+            openPlates: phone.screenshotOpensPlates,
+            startWeight: {
+              HandSet.startWeight(
+                for: $0, bells: status.bellKg, plates: status.barbell, typed: phone.lastTyped, analyzed: status.lastSet)
             },
             log: { phone.logEvent($0, $1) }
-          ) { exercise, reps, kg in
-            phone.saveSetByHand(exercise: exercise, reps: reps, kg: kg)
+          ) { exercise, reps, weight in
+            phone.saveSetByHand(exercise: exercise, reps: reps, weight: weight)
           }
         }
       }
@@ -679,11 +681,17 @@ struct WatchContentView: View {
 /// one with a tick each, 1…200, then the weight. The exercise row opens the drawings, and the one tapped there is the
 /// set's (#154). The green checkmark at top right saves the set; the sheet's close button adds nothing.
 private struct SetByHandPage: View {
-  /// Exercise, reps and the bell's weight (nil for none).
-  let onSave: (ExerciseKind, Int, Int?) -> Void
-  /// Each exercise's last weight (#271): the weight row opens on it and follows the exercise until turned.
-  let startKg: (ExerciseKind) -> Int?
+  /// Exercise, reps and the weight, a bell or plates (nil for none).
+  let onSave: (ExerciseKind, Int, SetWeight?) -> Void
+  /// Each exercise's last weight, bell or plates (#271, 086): the weight row opens on it and follows the exercise
+  /// until turned.
+  let startWeight: (ExerciseKind) -> SetWeight?
   let log: (String, [String: Any]) -> Void
+  /// The set's plates (086): while set, the weight row reads "lb 155" and opens the plates page; nil is a bell.
+  @State private var plates: BarbellLoad?
+  @State private var pickingPlates = false
+  @State private var platesNext = false
+  @State private var bellsNext = false
   /// Taps on the weight row so far, for `kg_row_tap`: whether the first one opened the tiles (ea-bgi).
   @State private var kgTaps = 0
   @State private var exercise: ExerciseKind
@@ -699,16 +707,20 @@ private struct SetByHandPage: View {
   @Environment(\.dismiss) private var dismiss
 
   init(
-    exercise: ExerciseKind, start: Int, choosing: Bool = false, startKg: @escaping (ExerciseKind) -> Int?,
-    log: @escaping (String, [String: Any]) -> Void, onSave: @escaping (ExerciseKind, Int, Int?) -> Void
+    exercise: ExerciseKind, start: Int, choosing: Bool = false, openPlates: Bool = false,
+    startWeight: @escaping (ExerciseKind) -> SetWeight?, log: @escaping (String, [String: Any]) -> Void,
+    onSave: @escaping (ExerciseKind, Int, SetWeight?) -> Void
   ) {
     self.onSave = onSave
-    self.startKg = startKg
+    self.startWeight = startWeight
     self.log = log
     _exercise = State(initialValue: exercise)
     _count = State(initialValue: Double(start))
     _choosing = State(initialValue: choosing)
-    _kgStep = State(initialValue: Self.step(for: startKg(exercise)))
+    let weight = startWeight(exercise)
+    _kgStep = State(initialValue: Self.step(for: weight?.bellKg))
+    _plates = State(initialValue: weight?.barbell)
+    _pickingPlates = State(initialValue: openPlates)
   }
 
   private var reps: Int { HandSet.clamp(Int(count.rounded())) }
@@ -717,6 +729,9 @@ private struct SetByHandPage: View {
     let step = Int(kgStep.rounded())
     return HandSet.weights.indices.contains(step - 1) ? HandSet.weights[step - 1] : nil
   }
+
+  /// What Save sends: the plates while set, else the bell.
+  private var weight: SetWeight? { plates.map(SetWeight.barbell) ?? kg.map(SetWeight.bell) }
 
   /// A weight off the code (a 34 kg tapped on the phone) opens on the nearest bell.
   private static func step(for kg: Int?) -> Double {
@@ -762,39 +777,13 @@ private struct SetByHandPage: View {
         .onTapGesture { crownFocused = true }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(reps) reps")
-        // The bell's weight (#271): a tap gives it the Crown, which steps None, 12 … 36 kg; a tap on the green row
-        // opens every bell as a tile.
-        row(green: kgFocused) {
-          Text("kg").font(.caption).foregroundStyle(.secondary)
-          Text(kg.map { "\($0)" } ?? "None")
-            .font(.system(size: 24, weight: .bold, design: .rounded)).monospacedDigit()
-            .foregroundStyle(kg == nil ? .secondary : .primary)
-          Spacer(minLength: 0)
-          Image(systemName: kgFocused ? "square.grid.2x2" : "chevron.right").font(.caption.bold())
-            .foregroundStyle(.secondary)
-        }
-        .focusable()
-        .focused($kgFocused)
-        .digitalCrownRotation(
-          $kgStep, from: 0, through: Double(HandSet.weights.count), by: 1, sensitivity: .low, isContinuous: false,
-          isHapticFeedbackEnabled: true
-        )
-        .onTapGesture {
-          kgTaps += 1
-          // Instrumented (ea-bgi): whether watchOS had already focused the row when the tap's closure ran.
-          log("kg_row_tap", ["tap": kgTaps, "focused": kgFocused])
-          if kgFocused { pickingKg = true } else { kgFocused = true }
-        }
-        // Given the Crown, the weight is the lifter's: a change of exercise no longer moves it.
-        .onChange(of: kgFocused) { _, focused in if focused { kgPicked = true } }
-        .accessibilityLabel(kg.map { "\($0) kilograms. Turn the Crown to change" } ?? "No weight")
-        .accessibilityAddTraits(.isButton)
+        weightRow
       }
     }
     .toolbar {
       ToolbarItem(placement: .confirmationAction) {
         Button {
-          onSave(exercise, reps, kg)
+          onSave(exercise, reps, weight)
           dismiss()
         } label: {
           Image(systemName: "checkmark")
@@ -805,7 +794,94 @@ private struct SetByHandPage: View {
     }
     .onAppear { crownFocused = true }
     .sheet(isPresented: $choosing, onDismiss: { crownFocused = true }, content: { exercisePicker })
-    .sheet(isPresented: $pickingKg, onDismiss: { kgFocused = true }, content: { kgPicker })
+    // One sheet at a time: "Bar" on the bell tiles and "Bells instead" on the plates page each open the other
+    // once their own sheet has gone.
+    .sheet(isPresented: $pickingKg, onDismiss: bellsClosed, content: { kgPicker })
+    .sheet(isPresented: $pickingPlates, onDismiss: platesClosed, content: { platesPage })
+  }
+
+  private func bellsClosed() {
+    if platesNext {
+      platesNext = false
+      pickingPlates = true
+    } else {
+      kgFocused = true
+    }
+  }
+
+  private func platesClosed() {
+    if bellsNext {
+      bellsNext = false
+      pickingKg = true
+    } else {
+      crownFocused = true
+    }
+  }
+
+  private var platesPage: some View {
+    NavigationStack {
+      WatchBarbellPage(
+        load: plates ?? startWeight(exercise)?.barbell ?? BarbellLoad.start,
+        onDone: { load in
+          plates = load
+          kgPicked = true
+        },
+        onBells: {
+          plates = nil
+          kgPicked = true
+          bellsNext = true
+        })
+    }
+  }
+
+  /// The weight: on plates (086), "lb 155" and a tap opens the plates page; else the bell's (#271), where a tap
+  /// gives it the Crown, which steps None, 12 … 36 kg, and a tap on the green row opens every bell as a tile.
+  @ViewBuilder private var weightRow: some View {
+    if let plates {
+      Button {
+        pickingPlates = true
+      } label: {
+        row(green: false) {
+          Text("lb").font(.caption).foregroundStyle(.secondary)
+          Text("\(plates.totalLb)").font(.system(size: 24, weight: .bold, design: .rounded)).monospacedDigit()
+          Text(plates.sideLabel).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.6)
+          Spacer(minLength: 0)
+          Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.secondary)
+        }
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("\(SetWeight.barbell(plates).spoken). Change")
+    } else {
+      bellRow
+    }
+  }
+
+  private var bellRow: some View {
+    row(green: kgFocused) {
+      Text("kg").font(.caption).foregroundStyle(.secondary)
+      Text(kg.map { "\($0)" } ?? "None")
+        .font(.system(size: 24, weight: .bold, design: .rounded)).monospacedDigit()
+        .foregroundStyle(kg == nil ? .secondary : .primary)
+      Spacer(minLength: 0)
+      Image(systemName: kgFocused ? "square.grid.2x2" : "chevron.right").font(.caption.bold())
+        .foregroundStyle(.secondary)
+    }
+    .focusable()
+    .focused($kgFocused)
+    .digitalCrownRotation(
+      $kgStep, from: 0, through: Double(HandSet.weights.count), by: 1, sensitivity: .low, isContinuous: false,
+      isHapticFeedbackEnabled: true
+    )
+    .onTapGesture {
+      kgTaps += 1
+      // Instrumented (ea-bgi): whether watchOS had already focused the row when the tap's closure ran.
+      log("kg_row_tap", ["tap": kgTaps, "focused": kgFocused])
+      if kgFocused { pickingKg = true } else { kgFocused = true }
+    }
+    // Given the Crown, the weight is the lifter's: a change of exercise no longer moves it.
+    .onChange(of: kgFocused) { _, focused in if focused { kgPicked = true } }
+    .accessibilityLabel(kg.map { "\($0) kilograms. Turn the Crown to change" } ?? "No weight")
+    .accessibilityAddTraits(.isButton)
   }
 
   /// A row of the page: full width, at least 44 pt, outlined green while it has the Crown.
@@ -830,7 +906,11 @@ private struct SetByHandPage: View {
             // An exercise with a usual count opens on it (#196); the others keep the count on the page.
             if let usual = HandSet.usualReps(for: kind) { count = Double(usual) }
             // And its last weight, unless one was turned to (#271).
-            if !kgPicked { kgStep = Self.step(for: startKg(kind)) }
+            if !kgPicked {
+              let weight = startWeight(kind)
+              kgStep = Self.step(for: weight?.bellKg)
+              plates = weight?.barbell
+            }
             choosing = false
           } label: {
             ExerciseGlyph(kind: kind, size: 36)
@@ -853,7 +933,21 @@ private struct SetByHandPage: View {
   /// (#343); it still scrolls should they pass a small face's sheet.
   private var kgPicker: some View {
     ScrollView {
-      kgTiles
+      VStack(spacing: 5) {
+        kgTiles
+        // Plates on a bar (086): the plates page opens once these tiles have closed.
+        Button {
+          platesNext = true
+          pickingKg = false
+        } label: {
+          Text("Bar")
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(Color.secondary.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Barbell plates")
+      }
     }
   }
 
@@ -863,6 +957,7 @@ private struct SetByHandPage: View {
         let picked = Int(kgStep.rounded()) == step
         Button {
           kgStep = Double(step)
+          plates = nil  // a bell replaces the plates (086)
           kgPicked = true
           pickingKg = false
         } label: {

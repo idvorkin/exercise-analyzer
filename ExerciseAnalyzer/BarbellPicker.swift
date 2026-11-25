@@ -12,7 +12,8 @@ struct BarbellPicker: View {
   var body: some View {
     VStack(spacing: 14) {
       Picker("Bar", selection: $load.bar) {
-        ForEach(BarKind.allCases, id: \.self) { bar in Text("\(bar.name) \(bar.lb)").tag(bar) }
+        // Three bars since #375: the short names fit a segment each.
+        ForEach(BarKind.allCases, id: \.self) { bar in Text(bar.short).tag(bar).accessibilityLabel(bar.name) }
       }
       .pickerStyle(.segmented)
       VStack(spacing: 2) {
