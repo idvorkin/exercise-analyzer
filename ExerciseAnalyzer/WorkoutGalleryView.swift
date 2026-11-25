@@ -375,7 +375,8 @@ struct DayFilterRow: View {
           filter.onVideo.toggle()
           log(["exercise": filter.exercise?.rawValue ?? "", "on_video": filter.onVideo])
         } label: {
-          Image(systemName: filter.onVideo ? "diamond.fill" : "diamond")
+          // The camcorder (#390; Igor: "Make diamond a camcorder icon"), the video mark everywhere it appears.
+          Image(systemName: filter.onVideo ? "video.fill" : "video")
             .font(.title3).foregroundStyle(.cyan)
             .frame(width: 36, height: 36)
             .background(filter.onVideo ? Color.cyan.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 8))
@@ -402,7 +403,7 @@ struct DayFilterButton: View {
     Button(action: toggle) {
       HStack(spacing: 4) {
         if let kind = filter.exercise { ExerciseGlyph(kind: kind, size: 20) }
-        if filter.onVideo { Image(systemName: "diamond.fill").font(.caption).foregroundStyle(.cyan) }
+        if filter.onVideo { Image(systemName: "video.fill").font(.caption).foregroundStyle(.cyan) }
         if !filter.isActive { Image(systemName: "line.3.horizontal.decrease").font(.subheadline) }
         if !held { Image(systemName: open ? "chevron.up" : "chevron.down").font(.caption2.bold()) }
       }
@@ -726,7 +727,7 @@ struct DayHeader: View {
           Text(title).font(.title3.bold())
           // Every set on video (#242; Igor: "when I wanna demo it, I can show the right one").
           if day.allOnVideo {
-            Image(systemName: "diamond.fill").font(.caption).foregroundStyle(.cyan)
+            Image(systemName: "video.fill").font(.caption).foregroundStyle(.cyan)
               .accessibilityLabel("Every set on video")
           }
         }
