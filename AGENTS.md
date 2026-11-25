@@ -22,6 +22,7 @@ carry only what was decided.
 
 ## Rules
 
+- **Apple docs and Simulator/Previews: follow the `ios-codev` skill** (Igor, 2026-11-24). It covers looking up Apple APIs on Sosumi before coding, and previews first, then the Simulator, from the CLI on the Mac only. Read [`skills/ios-codev/SKILL.md`](https://github.com/idvorkin/chop-conventions/blob/main/skills/ios-codev/SKILL.md) (lands with chop-conventions #275), or `~/.claude/skills/ios-codev/SKILL.md` once the skill is symlinked.
 - **Beads track the work** (Igor, 2026-10-17). Run `bd prime` at the start of a session and after context recovery,
   then `bd ready`. Create a bead before new work, mark it `in_progress`, close it with a one-line reason when the
   work has merged; a decision only Igor can make gets the `needs-igor` label. GitHub issues stay the intake for
