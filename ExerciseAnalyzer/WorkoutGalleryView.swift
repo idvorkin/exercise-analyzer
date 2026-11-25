@@ -344,7 +344,7 @@ struct WorkoutGalleryView: View {
   }
 }
 
-/// The exercise drawings in the history and the video diamond, above the days (#265, story 073): one tap keeps only
+/// The exercise drawings in the history and the video camcorder, above the days (#265, story 073): one tap keeps only
 /// the matching days, the picked one drawn in its colour and the rest dimmed; a second tap shows every day again.
 struct DayFilterRow: View {
   let row: [ExerciseKind]
@@ -391,7 +391,7 @@ struct DayFilterRow: View {
 }
 
 /// The filter, closed, on the From Photos line (#282, story 073; Igor picked A): it reads what is on, the picked
-/// drawing and the diamond, or a plain filter icon when nothing is; a tap opens the drawings row under the line.
+/// drawing and the camcorder, or a plain filter icon when nothing is; a tap opens the drawings row under the line.
 struct DayFilterButton: View {
   let filter: DayFilter
   let open: Bool
@@ -572,7 +572,7 @@ struct WorkoutDay: Identifiable {
   /// A day the wrist ran a workout on (048): its workout lines are how in, the day does not fold (#163).
   var hasWorkout: Bool { !workouts.isEmpty || live != nil }
 
-  /// Every set of the day on video (#242): the diamond on its line, the day to demo.
+  /// Every set of the day on video (#242): the camcorder on its line (a diamond until #390), the day to demo.
   var allOnVideo: Bool { RecentEntry.allOnVideo(exercises.flatMap(\.sets)) }
 
   /// The day's sets that fall in none of its workouts, by exercise (#163): a workout day shows only these under

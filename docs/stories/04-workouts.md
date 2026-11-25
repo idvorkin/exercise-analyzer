@@ -872,7 +872,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 #### Use Case:
 - **As a** lifter looking for the last day I did pistols, or for a day on video to show someone
-- **I want to** tap an exercise's drawing, or the video diamond, above the day list and see only the days that match
+- **I want to** tap an exercise's drawing, or the video camcorder, above the day list and see only the days that match
 - **so that** I find the day in two taps instead of scrolling the whole history reading headers
 
 #### Acceptance Criteria:
@@ -897,7 +897,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Then:** the row of drawings opens under the line, and a pick closes it again, unless no day matches: then it stays
   open with "No day matches", the picked drawing in reach for the second tap, and the button goes quiet (no chevron,
   no tap, VoiceOver reads "No day matches") so it cannot fold the row into an empty list; closed, the days start right under
-  the line, and the button reads the filter that is on (the picked drawing, the diamond, or a plain filter icon when
+  the line, and the button reads the filter that is on (the picked drawing, the camcorder, or a plain filter icon when
   none), so a filter left on is never out of sight
 
 - **Notes:** A, this story: a row of the exercise drawings plus the diamond above the days, one tap each, the gym-first
