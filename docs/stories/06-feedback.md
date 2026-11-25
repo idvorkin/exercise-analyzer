@@ -169,3 +169,34 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Notes:** BugKit's `BugKitAboutView` in a sheet from the ⋯ menu (this app has no Settings screen; the menu is its settings, story 058), with `extraRows` from `ModelSet.names`. The values come from the built app's Info.plist: `BugKitCommit` (`$(BUGKIT_COMMIT)`, set by `just build-*`) and `BugKitRepositoryURL`; BugKit reads no git at runtime.
 
 - **Issues:** bug-kit [#45](https://github.com/idvorkin/bug-kit/issues/45), [#49](https://github.com/idvorkin/bug-kit/issues/49)
+
+---
+
+### User Story 089:
+
+- **Summary:** The newest build is on the Cockpit's /builds page, ready to install over the air
+- **Status:** implemented in this branch (feat/ota-builds); `just ota` verified by publishing ea-a2d2befe.ipa (main a2d2bef) to /builds on 2026-11-25, the pose model and the kettlebell detector inside it, the profile listing the iPhone and the iPad, the Cockpit listing it; the install from the page is Igor's check; the copy after `just run-device` waits on BugKit's ota-upload.sh (bug-kit bug-a5y) and was not run (no install was made)
+- **Why:** Igor, 2026-11-25 (via Larry): "Why new builds not uploaded", /builds had no Exercise Analyzer build ever while newer builds went straight to his devices; he wants /builds never behind the devices.
+
+#### Use Case:
+- **As a** lifter whose phone or iPad is away from the Mac
+- **I want to** open the Cockpit's /builds page and find the build the devices last got, or a newer one
+- **so that** I can install it anywhere, without waiting for the Mac to reach the device
+
+#### Acceptance Criteria:
+- **Scenario:** A build made for the page
+- **Given:** a clean checkout with the pose model fetched (`just model`)
+- **When:** I run `just ota`
+- **Then:** the commit is archived in Release, exported development-signed, checked to hold the pose model and to say it is that commit, and copied to /builds as `ea-<first 8 of the commit>.ipa`; the page offers it with Install; a checkout with uncommitted changes, or one without the model, publishes nothing and says why
+
+- **Scenario:** Already there
+- **Given:** /builds already has this commit's ipa
+- **When:** I run `just ota` again
+- **Then:** nothing is built; the file is touched, so it shows as the newest; `--force` builds and copies it again
+
+- **Scenario:** Every install also lands on the page
+- **Given:** BugKit's `ota-upload.sh` is in the BugKit checkout
+- **When:** `just run-device` installs a build on the phone
+- **Then:** the same bundle is copied to /builds in the background as `ea-<commit>.ipa` (`-dirty` when built from uncommitted changes), the install and launch go on without waiting, and a failed copy never fails the run; its line is in `~/tmp/agent/notes/ota-uploads.log`
+
+- **Notes:** The Cockpit writes the install manifest from the ipa's own Info.plist; only the ipa goes. `just ota`'s build is Release, the copy after `run-device` is the Debug bundle the phone got. Archiving needed the What's new build phase to find BugKit's script from an archive's deeper build folder.

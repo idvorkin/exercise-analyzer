@@ -112,10 +112,21 @@ build-device:
     [ "$rc" -eq 0 ] || { echo "build-device: guarded build exit $rc (78: Xcode account access failed; stop, do not retry)" >&2; exit "$rc"; }
     grep -q "BUILD SUCCEEDED" Build/build-device.log
 
-# Build, install, and launch on the connected iPhone.
+# The installed bundle also goes to the Cockpit's /builds page in the background (story 089, BugKit's ota-upload.sh;
+# skipped when that checkout has none), so the page is never behind the phone; a failed copy never fails the install,
+# its line is in ~/tmp/agent/notes/ota-uploads.log.
+# Build, install, and launch on the connected iPhone, and put the same build on /builds.
 run-device: build-device
     xcrun devicectl device install app --device {{device}} {{device_app}}
+    @up="${BUG_KIT:-$HOME/gits/bug-kit}/scripts/ota-upload.sh"; mkdir -p "$HOME/tmp/agent/notes"; \
+      if [ -x "$up" ]; then "$up" "$PWD/{{device_app}}" --name ea --repo "$PWD" </dev/null >/dev/null 2>>"$HOME/tmp/agent/notes/ota-uploads.log" & \
+      echo "over the air: publishing the build to /builds in the background"; fi
     xcrun devicectl device process launch --device {{device}} {{bundle}}
+
+# Story 089: for the iPhone and the iPad to install over the air (--dry-run, --force; scripts/ota.sh).
+# This checkout's commit, Release and development-signed, on the Cockpit's /builds page as ea-<sha8>.ipa.
+ota *args:
+    bash scripts/ota.sh {{args}}
 
 # Copy the app's session logs (JSON Lines) from the connected iPhone to ~/tmp/agent/swing-logs.
 pull-logs:
