@@ -191,4 +191,19 @@ final class BarbellTests: XCTestCase {
     XCTAssertEqual(merged.repCount, 11)
     XCTAssertEqual(merged.weight, .barbell(ssb45))
   }
+
+  /// #388: reverse lunges, logged as split squats, are loaded on a bar; the weight row offers the bar, not bells.
+  func testOnlySplitSquatsTakeABar() {
+    XCTAssertEqual(ExerciseKind.allCases.filter(\.takesBar), [.splitSquat])
+  }
+
+  /// The drawing of the loaded bar (#388): heaviest nearest the middle, each plate as tall as it is heavy.
+  func testTheDrawnBarStacksHeaviestInsideAndSizesByWeight() {
+    let load = BarbellLoad(bar: .safetySquat, plates: [10, 45, 25, 45])
+    XCTAssertEqual(load.plates, [45, 45, 25, 10], "inside out, as they are loaded")
+    let heights = BarbellLoad.plateSizes.map(BarbellLoad.drawnHeight)
+    XCTAssertEqual(heights, heights.sorted(by: >), "a heavier plate is never drawn shorter")
+    XCTAssertEqual(BarbellLoad.drawnHeight(45), 1)
+    XCTAssertGreaterThan(BarbellLoad.drawnHeight(10), 0.3, "the 10 still reads as a plate")
+  }
 }

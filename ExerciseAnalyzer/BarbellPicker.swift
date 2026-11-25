@@ -17,6 +17,8 @@ struct BarbellPicker: View {
         ForEach(BarKind.allCases, id: \.self) { bar in Text(bar.short).tag(bar).accessibilityLabel(bar.name) }
       }
       .pickerStyle(.segmented)
+      // The bar as it is loaded (#388), changing with every tap.
+      LoadedBarView(load: load).frame(height: 70)
       VStack(spacing: 2) {
         Text("\(load.totalLb) lb").font(.system(size: 44, weight: .bold, design: .rounded)).monospacedDigit()
         Text(load.sideLabel).font(.headline).foregroundStyle(.secondary)
@@ -72,8 +74,13 @@ struct BarbellPicker: View {
       Text(count == 0 ? " " : "×\(count)").font(.subheadline.bold()).monospacedDigit()
     }
     .frame(maxWidth: .infinity, minHeight: 72)
-    .background(Color.secondary.opacity(count > 0 ? 0.45 : 0.18), in: RoundedRectangle(cornerRadius: 12))
-    .overlay(RoundedRectangle(cornerRadius: 12).stroke(count > 0 ? Color.primary : .clear, lineWidth: 2))
+    // In the plate's colour, as on the drawn bar (#388).
+    .background(
+      BarbellLoad.color(plate).opacity(count > 0 ? 0.5 : 0.2), in: RoundedRectangle(cornerRadius: 12)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 12).stroke(count > 0 ? BarbellLoad.outline(plate) : .clear, lineWidth: 3)
+    )
     .contentShape(RoundedRectangle(cornerRadius: 12))
     // A full side takes no more (#387): the plates dim until one comes off.
     .opacity(load.isFull ? 0.5 : 1)

@@ -99,6 +99,23 @@ public struct BarbellLoad: Codable, Hashable, Sendable {
   public var sideLabel: String {
     plates.isEmpty ? "empty bar" : plates.map(String.init).joined(separator: "+") + "/side"
   }
+
+  /// How tall a plate is drawn on the loaded bar (#388), as a share of the 45's: heavier is taller, and the 10
+  /// still reads as a plate. `plates` is already the order they go on, heaviest nearest the middle.
+  public static func drawnHeight(_ plate: Int) -> Double {
+    switch plate {
+    case 45: 1
+    case 35: 0.86
+    case 25: 0.72
+    default: 0.52
+    }
+  }
+}
+
+extension ExerciseKind {
+  /// Loaded on a bar, not held as a bell (#388; Igor: "Don't do reverse lunges with kb weights"): the weight row
+  /// offers the bar first and no bells. The reverse lunges on the safety squat bar are logged as split squats (083).
+  public var takesBar: Bool { self == .splitSquat }
 }
 
 /// A set's weight: the bell's in kg (066) or a barbell's plates (083).

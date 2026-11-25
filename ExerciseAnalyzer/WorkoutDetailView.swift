@@ -482,7 +482,9 @@ private struct WorkoutPageView: View {
     )
     .sheet(item: $weighing) { entry in
       let row = timeline.rows.first { $0.id == entry.id }
-      BellWeightSheet(weight: row?.weight, inherited: row?.kgInherited ?? false) { onSetWeight?(entry, $0) }
+      BellWeightSheet(weight: row?.weight, inherited: row?.kgInherited ?? false, exercise: entry.exerciseKind) {
+        onSetWeight?(entry, $0)
+      }
     }
     .sheet(item: $adding) { draft in
       // The weight opens on the exercise's last one, from any workout (#271), a bell's or plates (083).
