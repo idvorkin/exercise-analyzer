@@ -36,8 +36,11 @@ final class FrameBacklogTests: XCTestCase {
     let backlog = FrameBacklog<Int>(capacity: 1)
     var reports: [FrameBacklog<Int>.SkipReport] = []
     // Main is stuck from 10.0 to 11.5 s: 45 frames, one waits, the rest are skipped; then it drains every frame.
-    for frame in 0..<45 { if let report = backlog.offer(frame, at: 10 + Double(frame) / 30).report { reports.append(report) } }
-    XCTAssertEqual(reports, [FrameBacklog.SkipReport(second: 10, skipped: 29)], "second 10 closes at its first 11 s skip")
+    for frame in 0..<45 {
+      if let report = backlog.offer(frame, at: 10 + Double(frame) / 30).report { reports.append(report) }
+    }
+    XCTAssertEqual(
+      reports, [FrameBacklog.SkipReport(second: 10, skipped: 29)], "second 10 closes at its first 11 s skip")
     _ = backlog.drain()
     for frame in 45..<90 {
       if let report = backlog.offer(frame, at: 10 + Double(frame) / 30).report { reports.append(report) }
