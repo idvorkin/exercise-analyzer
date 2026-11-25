@@ -999,7 +999,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 083:
 
 - **Summary:** A barbell set's weight is entered as plates per side on a chosen bar, and the app adds it up
-- **Status:** implemented on `feat/2026-11-24-barbell-plates-377` (ea-dbl), verified on the host (`BarbellTests`: 148 lb on the safety squat bar, the carry, the load in kg, the progression, the by-hand pickers, sync merges including a row rewritten by an older build) and the simulator (iPhone 17, a seeded workout: the page read "148 lb", a dimmer carried "148 lb", "24 kg" and "1,432 kg moved"; "Add a set at …" showed the Bar chip after the bells); the plate sheet's taps and press and hold, by eye on the phone, pending
+- **Status:** implemented on `feat/2026-11-24-barbell-plates-377` (ea-dbl), verified on the host (`BarbellTests`: 148 lb on the safety squat bar, the carry, the load in kg, the progression, the by-hand pickers, sync merges including a row rewritten by an older build) and the simulator (iPhone 17, a seeded workout: the page read "148 lb", a dimmer carried "148 lb", "24 kg" and "1,432 kg moved"; "Add a set at …" showed the Bar chip after the bells); the plate sheet's taps and press and hold, by eye on the phone, pending; the "−" under each plate, "Empty bar" and the 8-plate side (#387) on `fix/387-plates-off`, verified on the host (`BarbellTests`: the cap on adding, a stored load over it kept) and the simulator (iPhone 17, the plates sheet before and after), the taps on the phone pending
 - **Why:** Igor, 2026-11-24, logging reverse lunges with the safety squat bar: the weight entry should be in plates. "That can be my barbell weight input. Oh, I actually really like that feature."
 
 #### Use Case:
@@ -1012,6 +1012,11 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Given:** the weight sheet of any set (the playback line's weight chip, a row's long-press on the workout page), switched from Bell to Barbell
 - **When:** I pick "SSB 58" (the safety squat bar; "Barbell 45" is the 45 lb bar, the segments' short labels since 086) and tap the 45 lb plate once
 - **Then:** the sheet reads "148 lb" and "45/side"; each plate (10, 25, 35, 45 lb) is a big button with its count per side, one tap adding one to each side and a press and hold taking one off; Save stores the set's weight and closes, and "No weight" clears the set's own weight as it does for a bell
+
+- **Scenario:** Taking plates off, and a bar that is full (#387)
+- **Given:** the plates sheet with 45 lb ×3 a side
+- **When:** I take one off, or keep tapping 45
+- **Then:** under each plate that is on the bar sits a "−" button of its own (at least 44 pt, beside the plate, not inside it) that takes one off each side, and "Empty bar" takes them all off; a press and hold on the plate still works too; a side holds at most 8 plates, so the ninth tap does nothing and the sheet says "The bar is full: 8 plates a side" with the plates dimmed until one comes off; a load stored or synced with more is shown as it is, never cut (Igor, 2026-11-25, at the gym, after tapping his way to 45 ×15, 1,448 lb, and two holds that slid and were cancelled: "How to turn down plates. Obvious can't go up this high")
 
 - **Scenario:** A barbell weight on the workout page
 - **Given:** a workout of lunge sets where the first has 148 lb on the safety squat bar
@@ -1030,7 +1035,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Notes:** the plates are stored as the bar and a count of each plate on one side, in pounds; the total is the bar plus twice the side. The watch's plates and #375's 65 lb bar are story 086; a count-only reverse lunge exercise and a typed weight are not part of this story.
 
-- **Issues:** [#377](https://github.com/idvorkin/exercise-analyzer/issues/377); [#375](https://github.com/idvorkin/exercise-analyzer/issues/375) (the same ask for reverse lunges, earlier)
+- **Issues:** [#377](https://github.com/idvorkin/exercise-analyzer/issues/377); [#375](https://github.com/idvorkin/exercise-analyzer/issues/375) (the same ask for reverse lunges, earlier); [#387](https://github.com/idvorkin/exercise-analyzer/issues/387) no visible way to take a plate off (the holds slid and were cancelled) and no ceiling (45 ×15 a side)
 
 ---
 
