@@ -25,11 +25,19 @@ enum WatchScreenshotState: String, CaseIterable {
   case setByHandExercise
   /// No videos for a while (071, #236): the idle page without Record, Preview or any word about the phone.
   case noVideos
+  /// An elliptical workout's machine rows (085): incline 6 holding the Crown, intensity 8.
+  case workoutMachine
+
+  /// The workout's type and machine the controller presents: an elliptical for workoutMachine, else strength.
+  var machine: (kind: WorkoutKind, machine: WorkoutEvent.Machine)? {
+    self == .workoutMachine ? (.elliptical, WorkoutEvent.Machine(name: "Elliptical", incline: 6, intensity: 8)) : nil
+  }
 
   /// The fixed workout the controller presents: 42:10 in, 128 bpm (141 while a set runs); nil for no workout.
   var workout: (elapsed: TimeInterval, heartRate: Int)? {
     switch self {
     case .workoutStart: return (190, 96)
+    case .workoutMachine: return (1240, 128)
     case .workout, .workoutEnd, .workoutViewfinder, .setByHand, .setByHandExercise: return (2530, 128)
     case .workoutRecording: return (2530, 141)
     default: return nil
@@ -105,7 +113,7 @@ enum WatchScreenshotState: String, CaseIterable {
       // The count page's weight row opens on 24 kg (#271).
       status.bellKg = [ExerciseKind.kettlebellSwing.rawValue: 24]
       return (status, true, nil)
-    case .workoutStart:
+    case .workoutStart, .workoutMachine:
       return (.idle, true, nil)
     case .workoutRecording:
       let status = WatchStatus(

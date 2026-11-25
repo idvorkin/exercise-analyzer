@@ -133,6 +133,86 @@ final class WorkoutEventsTests: XCTestCase {
     XCTAssertEqual((body["machine"] as? [String: Any])?["incline"] as? Double, 8)
   }
 
+  // Story 085 (ea-jap): the machine rides the wrist's messages; the stream says each change once, at its time.
+  private func wire(machine: WorkoutEvent.Machine?, changedAt seconds: TimeInterval? = nil) -> WorkoutWire {
+    var live = wire()
+    live.machine = machine
+    live.machineAt = seconds.map { at($0).timeIntervalSince1970 }
+    return live
+  }
+
+  func testAMachineOnTheFirstMessageRidesStartedWithNoLevel() {
+    let s = stream([(wire(machine: .init(name: "Elliptical")), [], 2)])
+    XCTAssertEqual(s.waiting.map(\.type), [.started])
+    XCTAssertEqual(s.waiting.first?.machine, .init(name: "Elliptical"))
+  }
+
+  func testAChangedMachineIsOneLevelAtTheWristsTimeAndARepeatIsNone() {
+    let set = WorkoutEvent.Machine(name: "Elliptical", incline: 6, intensity: 8)
+    let s = stream([
+      (wire(machine: .init(name: "Elliptical")), [], 2),
+      (wire(machine: set, changedAt: 50), [], 55),
+      (wire(machine: set, changedAt: 50), [], 60),
+      (wire(machine: set, changedAt: 50), [], 95),
+    ])
+    XCTAssertEqual(s.waiting.map(\.type), [.started, .level])
+    XCTAssertEqual(s.waiting.last?.at, at(50), "when it was changed on the wrist, not when the phone heard")
+    XCTAssertEqual(s.waiting.last?.machine, set)
+    XCTAssertEqual(s.tick?.machine, set)
+  }
+
+  func testAMessageWithoutAMachineNeverClearsIt() {
+    let set = WorkoutEvent.Machine(name: "Elliptical", incline: 6, intensity: 8)
+    let s = stream([
+      (wire(machine: set, changedAt: 1), [], 2),
+      (wire(machine: nil), [], 40),
+    ])
+    XCTAssertEqual(s.waiting.map(\.type), [.started])
+    XCTAssertEqual(s.tick?.machine, set)
+  }
+
+  func testAMachineSetAfterStartWithNoneBeforeIsALevel() {
+    let s = stream([
+      (wire(machine: nil), [], 2),
+      (wire(machine: .init(name: "Treadmill", incline: 2), changedAt: 30), [], 31),
+    ])
+    XCTAssertEqual(s.waiting.map(\.type), [.started, .level])
+    XCTAssertNil(s.waiting.first?.machine)
+    XCTAssertEqual(s.waiting.last?.at, at(30))
+  }
+
+  func testTheMachineOnTheWireDecodesFromAnOlderWatchAsNone() throws {
+    let old = #"{"startedAt":1000,"sets":0,"reps":0,"ending":false,"discarded":false}"#
+    let decoded = try JSONDecoder().decode(WorkoutWire.self, from: Data(old.utf8))
+    XCTAssertNil(decoded.machine)
+    var live = WorkoutWire(startedAt: 1000)
+    live.machine = .init(name: "Bike", incline: nil, intensity: 12)
+    live.machineAt = 1010
+    let back = try JSONDecoder().decode(WorkoutWire.self, from: JSONEncoder().encode(live))
+    XCTAssertEqual(back.machine, live.machine)
+    XCTAssertEqual(back.machineAt, 1010)
+  }
+
+  func testEachCardioKindHasItsMachineAndTheStepsStayInRange() {
+    XCTAssertEqual(WorkoutKind.elliptical.machineName, "Elliptical")
+    XCTAssertEqual(WorkoutKind.run.machineName, "Treadmill")
+    XCTAssertEqual(WorkoutKind.walk.machineName, "Treadmill")
+    XCTAssertEqual(WorkoutKind.bike.machineName, "Bike")
+    XCTAssertEqual(WorkoutKind.row.machineName, "Rower")
+    XCTAssertEqual(WorkoutKind.stairs.machineName, "Stairs")
+    XCTAssertNil(WorkoutKind.strength.machineName)
+    XCTAssertNil(WorkoutKind.hiit.machineName)
+    XCTAssertNil(WorkoutKind.yoga.machineName)
+    XCTAssertEqual(WorkoutEvent.Machine.names, ["Elliptical", "Treadmill", "Bike", "Rower", "Stairs"])
+    // The first step from "—" starts at the last value on that machine, else 0 for incline and 1 for intensity.
+    XCTAssertEqual(WorkoutEvent.Machine.step(nil, by: 1, last: nil, setting: .intensity), 1)
+    XCTAssertEqual(WorkoutEvent.Machine.step(nil, by: 1, last: nil, setting: .incline), 0)
+    XCTAssertEqual(WorkoutEvent.Machine.step(nil, by: -1, last: 7, setting: .intensity), 7)
+    XCTAssertEqual(WorkoutEvent.Machine.step(7, by: 1, last: nil, setting: .intensity), 8)
+    XCTAssertEqual(WorkoutEvent.Machine.step(30, by: 1, last: nil, setting: .incline), 30)
+    XCTAssertEqual(WorkoutEvent.Machine.step(0, by: -1, last: nil, setting: .incline), 0)
+  }
+
   func testTakenRefusedAndStaleEventsGo() {
     var s = stream([(wire(), [], 1), (wire(), [], 40)])
     let tickID = s.tick?.id ?? ""

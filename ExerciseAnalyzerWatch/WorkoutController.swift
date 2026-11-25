@@ -29,6 +29,11 @@ final class WorkoutController: NSObject {
   /// What Health records it as (#333): picked at Start, read back from the session after a restart.
   private(set) var kind: WorkoutKind = .strength
   private(set) var heartRate: Int?
+  /// The cardio machine and its setting (story 085): its name from Start for a kind with a machine, the numbers
+  /// as set on the machine rows; nil for strength, HIIT and yoga.
+  private(set) var machine: WorkoutEvent.Machine?
+  /// When `machine` last changed on the wrist; nil while only Start's name is set.
+  @ObservationIgnored private var machineAt: Date?
   private(set) var heartRateAverage: Int?
   private(set) var heartRateMax: Int?
   /// The last recorded set's heart peak: the rest head says how far the heart has come down from it (#195).
@@ -145,7 +150,12 @@ final class WorkoutController: NSObject {
       setPeak.reading(157, at: ended)
       setPeak.setEnded(at: ended)
     }
-    guard screenshot != .workoutStart else { return }  // before the first set: no sets line yet
+    if let fixed = screenshot.machine {
+      kind = fixed.kind
+      machine = fixed.machine
+    }
+    // Before the first set, and a cardio workout: no sets line.
+    guard screenshot != .workoutStart, screenshot.machine == nil else { return }
     sets = 6
     reps = 47
     exerciseSets = [.kettlebellSwing: 6]
@@ -242,6 +252,9 @@ final class WorkoutController: NSObject {
       exerciseSets = [:]
       exerciseOrder = []
       countedSetAt = 0
+      // A cardio machine's name from the start, its numbers "—" until set (085): `started` says the machine.
+      machine = kind.machineName.map { WorkoutEvent.Machine(name: $0) }
+      machineAt = nil
       discarding = false
       activityOpen = false
       quiet = WorkoutQuiet()
@@ -304,6 +317,10 @@ final class WorkoutController: NSObject {
         self.exerciseOrder = tally.exerciseOrder
         self.countedSetAt = tally.countedSetAt
         self.carried = Self.savedCarry(startedAt: start)
+        // The machine as it was set (085), so the phone hears no change and sends no `level` again.
+        let saved = Self.savedMachine(startedAt: start)
+        self.machine = saved?.machine ?? self.kind.machineName.map { WorkoutEvent.Machine(name: $0) }
+        self.machineAt = saved?.at
         self.discarding = false
         self.activityOpen = false
         // The quiet stretch starts over; a workout with sets has been worked (#330).
@@ -346,7 +363,56 @@ final class WorkoutController: NSObject {
     ]
     // The continued workout too (#238), or a restarted app's head drops back to this session's clock.
     if let carried, let data = try? JSONEncoder().encode(carried) { tally["carried"] = data }
+    // And the machine's setting (085), or a restarted app's rows go back to "—".
+    if let machine, let data = try? JSONEncoder().encode(machine) {
+      tally["machine"] = data
+      if let machineAt { tally["machineAt"] = machineAt.timeIntervalSince1970 }
+    }
     UserDefaults.standard.set(tally, forKey: Self.tallyKey)
+  }
+
+  private static func savedMachine(startedAt: Date) -> (machine: WorkoutEvent.Machine, at: Date?)? {
+    guard let saved = UserDefaults.standard.dictionary(forKey: tallyKey),
+      let at = saved["startedAt"] as? Double, abs(at - startedAt.timeIntervalSince1970) < 2,
+      let data = saved["machine"] as? Data,
+      let machine = try? JSONDecoder().decode(WorkoutEvent.Machine.self, from: data)
+    else { return nil }
+    return (machine, (saved["machineAt"] as? Double).map { Date(timeIntervalSince1970: $0) })
+  }
+
+  // MARK: - The machine (story 085)
+
+  private static let machineLastKey = "machineLast"
+
+  /// The machine's setting changed on the wrist: it goes to the phone at once, which sends Larry one `level`
+  /// (084). The rows call this once the Crown has settled, not on every detent.
+  func setMachine(_ new: WorkoutEvent.Machine) {
+    guard running, new != machine else { return }
+    machine = new
+    machineAt = Date()
+    rememberMachine(new)
+    var fields: [String: Any] = ["name": new.name]
+    if let incline = new.incline { fields["incline"] = incline }
+    if let intensity = new.intensity { fields["intensity"] = intensity }
+    log("watch_machine_set", fields)
+    saveTally()
+    sendWire()
+  }
+
+  /// The last incline or intensity set on a machine, in any workout: where the first step from "—" lands.
+  func lastSetting(_ setting: WorkoutEvent.Machine.Setting, on name: String) -> Int? {
+    let last = UserDefaults.standard.dictionary(forKey: Self.machineLastKey)?[name] as? [String: Int]
+    return last?[setting.rawValue]
+  }
+
+  private func rememberMachine(_ machine: WorkoutEvent.Machine) {
+    guard !fixed else { return }
+    var all = UserDefaults.standard.dictionary(forKey: Self.machineLastKey) ?? [:]
+    var last = all[machine.name] as? [String: Int] ?? [:]
+    if let incline = machine.incline { last[WorkoutEvent.Machine.Setting.incline.rawValue] = Int(incline) }
+    if let intensity = machine.intensity { last[WorkoutEvent.Machine.Setting.intensity.rawValue] = Int(intensity) }
+    all[machine.name] = last
+    UserDefaults.standard.set(all, forKey: Self.machineLastKey)
   }
 
   private static func savedCarry(startedAt: Date) -> WorkoutCarry? {
@@ -584,6 +650,8 @@ final class WorkoutController: NSObject {
       heartRateMax: heartRateMax, sets: sets, reps: reps)
     // Strength stays nil on the wire, as before #333.
     if kind != .strength { wire.kind = kind }
+    wire.machine = machine
+    wire.machineAt = machineAt?.timeIntervalSince1970
     return wire
   }
 
@@ -701,6 +769,8 @@ final class WorkoutController: NSObject {
     startedAt = nil
     heartRate = nil
     carried = nil
+    machine = nil
+    machineAt = nil
     activityOpen = false
     doneOffer = nil
     endAt = nil

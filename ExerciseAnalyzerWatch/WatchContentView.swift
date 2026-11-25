@@ -71,6 +71,10 @@ struct WatchContentView: View {
       ScrollView {
         VStack(spacing: 8) {
           if workout.running { workoutHeader }
+          // A cardio machine's name, incline and intensity right under the head (085).
+          if workout.phase == .running, workout.machine != nil {
+            MachineRows(workout: workout, focusOnAppear: phone.screenshotFocusesMachine ? .incline : nil)
+          }
           switch phone.page {
           case .noVideos:
             // Workout only, no videos (071, #236): nothing about the phone, no Record, no Preview; the workout,

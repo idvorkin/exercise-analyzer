@@ -34,6 +34,27 @@ public struct WorkoutEvent: Codable, Equatable, Sendable {
       self.incline = incline
       self.intensity = intensity
     }
+
+    /// The machine tiles on the wrist (story 085), in their order.
+    public static let names = ["Elliptical", "Treadmill", "Bike", "Rower", "Stairs"]
+    /// Incline and intensity are the whole numbers the machine shows, with no unit.
+    public static let range = 0...30
+
+    public enum Setting: String, Sendable {
+      case incline, intensity
+
+      /// Where the first step from "—" lands with no earlier value on the machine.
+      var first: Int { self == .incline ? 0 : 1 }
+    }
+
+    /// One Crown detent or − / + tap: from "—" it lands on the machine's last value (else `Setting.first`),
+    /// after that it moves by one, inside `range`.
+    public static func step(_ value: Int?, by delta: Int, last: Int?, setting: Setting) -> Int {
+      guard let value else { return clamp(last ?? setting.first) }
+      return clamp(value + delta)
+    }
+
+    public static func clamp(_ value: Int) -> Int { min(max(value, range.lowerBound), range.upperBound) }
   }
 
   /// One counted set, on a `set` event.
@@ -138,10 +159,16 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
       running = Running(
         workoutID: newID(), startedAt: live.startDate, source: source, kind: live.kind ?? .strength, lastTickAt: now,
         lastHeardAt: now)
+      running?.machine = live.machine  // a machine set before the first message rides `started`, no `level`
       update(from: live)
       waiting.append(event(.started, at: live.startDate))
     }
     update(from: live)
+    // The wrist's setting (085): a change is one `level`, at the time it was made there; a message without a
+    // machine (an older watch, a restart's first message) leaves it as it was.
+    if let machine = live.machine, machine != running?.machine {
+      level(machine, at: live.machineAt.map { Date(timeIntervalSince1970: $0) } ?? now)
+    }
     running?.lastHeardAt = now
     countSets(entries, heartRate: heartRate, now: now)
     if live.ending {

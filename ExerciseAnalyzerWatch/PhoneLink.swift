@@ -89,6 +89,8 @@ final class PhoneLink: NSObject {
   var screenshotOpensSetByHand: Bool { screenshot == .setByHand || screenshot == .setByHandExercise }
   /// ...and its exercise list open over it (#154).
   var screenshotOpensExerciseList: Bool { screenshot == .setByHandExercise }
+  /// The screenshot rung wants the machine rows' Incline holding the Crown (085).
+  var screenshotFocusesMachine: Bool { screenshot == .workoutMachine }
 
   /// When the watch app last came to the front.
   private var wokeAt = Date.distantPast
