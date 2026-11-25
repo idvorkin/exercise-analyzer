@@ -189,6 +189,15 @@ final class VideoPoseSession: NSObject {
   private var cameraFirstTime: Double?
   private var cameraFramesDelivered = 0
   private var cameraFramesAnalyzed = 0
+  /// A camera frame on its way from the capture queue to the main actor.
+  private struct CameraFrame {
+    let pixelBuffer: CVPixelBuffer
+    let pts: Double
+  }
+  /// The camera frames waiting for the main actor, at most two (#94): a hang there used to queue a task per frame,
+  /// each holding its pixel buffer, until the capture pool ran dry and the recording lost frames too. Over two,
+  /// the oldest waiting frame is skipped for the live analysis only; the recorder has already taken it.
+  private let cameraBacklog = FrameBacklog<CameraFrame>(capacity: 2)
   /// Pause state (#67): the clip, the count and the elapsed time freeze while the camera keeps running.
   private(set) var paused = false
   /// Seconds cut out by pauses so far, and the camera pts when the current pause began (nil between pauses).
@@ -2387,6 +2396,7 @@ final class VideoPoseSession: NSObject {
     cameraFirstTime = nil
     cameraFramesDelivered = 0
     cameraFramesAnalyzed = 0
+    cameraBacklog.reset()
     liveLastWrists = []
     liveBellFrames = 0
     liveBellTotalMs = 0
@@ -2430,11 +2440,25 @@ final class VideoPoseSession: NSObject {
       let orientation = orientation ?? currentVideoOrientation()
       cameraOrientation = orientation
       let camera = try CameraSource(position: position, orientation: orientation)
-      camera.onFrame = { [weak self, recorderSlot] sampleBuffer in
+      camera.onFrame = { [weak self, recorderSlot, cameraBacklog, log] sampleBuffer in
+        // The recorder first, on the capture queue: every frame reaches the file whatever the main thread does.
         recorderSlot.value?.append(sampleBuffer)
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        Task { @MainActor in self?.cameraFrame(pixelBuffer: pixelBuffer, pts: pts) }
+        // The live analysis gets the newest frames, at most two waiting and one main-actor task per batch (#94).
+        let offer = cameraBacklog.offer(CameraFrame(pixelBuffer: pixelBuffer, pts: pts), at: pts)
+        if let report = offer.report {
+          // From the capture queue, so the line lands while the main thread is the one stalled.
+          log.event(
+            "live_frames_skipped",
+            ["skipped": report.skipped, "total": cameraBacklog.skippedTotal, "waiting_max": cameraBacklog.capacity])
+        }
+        guard offer.needsDrain else { return }
+        Task { @MainActor in
+          let frames = cameraBacklog.drain()  // emptied even when the session is gone, so no buffer is kept
+          guard let self else { return }
+          for frame in frames { self.cameraFrame(pixelBuffer: frame.pixelBuffer, pts: frame.pts) }
+        }
       }
       camera.onGap = { [log] gap, dropped in
         // Logged from the capture queue, so the event lands even while the main thread is the one hanging (#94).
@@ -2691,6 +2715,13 @@ final class VideoPoseSession: NSObject {
     let recordedDuration = duration
     let delivered = cameraFramesDelivered
     let analyzed = cameraFramesAnalyzed
+    // The last second with skipped frames has not been closed by a later frame: say it now (#94).
+    if let tail = cameraBacklog.flush() {
+      log.event(
+        "live_frames_skipped",
+        ["skipped": tail.skipped, "total": cameraBacklog.skippedTotal, "waiting_max": cameraBacklog.capacity])
+    }
+    let skipped = cameraBacklog.skippedTotal
     // A pause open at Done ends here: its tail counts as paused time (#67).
     var pausedTime = pausedTotal
     if paused, let at = pausedAt, let last = lastCameraPts { pausedTime += last - at }
@@ -2713,7 +2744,7 @@ final class VideoPoseSession: NSObject {
       "camera_done",
       [
         "duration_s": recordedDuration, "frames_delivered": delivered, "frames_analyzed": analyzed,
-        "live_reps": livePipeline.reps.count, "live_bell_frames": liveBellFrames,
+        "frames_skipped": skipped, "live_reps": livePipeline.reps.count, "live_bell_frames": liveBellFrames,
         "live_bell_avg_infer_ms": liveBellFrames == 0 ? 0 : liveBellTotalMs / Double(liveBellFrames),
         "live_fps": fps, "live_bells_dropped": liveBellsDropped,
         "paused_s": pausedTime, "segments": closing.count + 1,
