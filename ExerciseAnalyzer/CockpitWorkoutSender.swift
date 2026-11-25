@@ -367,7 +367,8 @@ final class CockpitWorkoutSender {
       self.forgetDeleted(settled)
       // Deleted sets (ea-hp8): those the listing is done with are forgotten; the rest go in their workout's summary.
       let setsSettled = Set(
-        WorkoutSync.settledSets(self.deletedSets, have: have, workouts: mirror.index.workouts))
+        WorkoutSync.settledSets(
+          self.deletedSets, have: have, workouts: mirror.index.workouts, entries: entries))
       if !setsSettled.isEmpty { self.deletedSets = self.deletedSets.filter { !setsSettled.contains($0.entry.id) } }
       let plan =
         discards

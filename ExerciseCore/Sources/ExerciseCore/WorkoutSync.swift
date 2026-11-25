@@ -209,6 +209,8 @@ public enum WorkoutSync {
     deletedSets: [DeletedSet] = []
   ) -> [Planned] {
     let setsOf = assignSets(entries, to: workouts)
+    let live = Set(entries.map(\.id))
+    let deletedSets = deletedSets.filter { !live.contains($0.entry.id) }
     var plan: [Planned] = []
     for workout in workouts.sorted(by: { $0.start < $1.start }) where workout.device == nil {
       let sets = setsOf[workout.id] ?? []
@@ -256,13 +258,15 @@ public enum WorkoutSync {
 
   /// The deleted sets the Cockpit's whole listing is done with, by set id, to forget: shown last carried by a
   /// summary that marked them deleted, or held by no row (it never had them), or held only by a discarded workout
-  /// (marked with it) or one this phone does not send (another device's, or none of the phone's).
+  /// (marked with it) or one this phone does not send (another device's, or none of the phone's), or back among
+  /// the live `entries` (its delete lost to a later change on another device).
   public static func settledSets(
-    _ deleted: [DeletedSet], have: [WorkoutHave], workouts: [StoredWorkout]
+    _ deleted: [DeletedSet], have: [WorkoutHave], workouts: [StoredWorkout], entries: [RecentEntry]
   ) -> [String] {
     let sendable = Set(workouts.filter { $0.device == nil }.compactMap { match($0, in: have)?.workoutID })
+    let live = Set(entries.map(\.id))
     return deleted.filter { gone in
-      !have.contains { row in !row.discarded && sendable.contains(row.workoutID) && unmarked(gone, in: row) }
+      live.contains(gone.entry.id) || !have.contains { row in !row.discarded && sendable.contains(row.workoutID) && unmarked(gone, in: row) }
     }.map(\.entry.id)
   }
 

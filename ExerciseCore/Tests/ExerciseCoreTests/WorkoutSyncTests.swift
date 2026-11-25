@@ -561,7 +561,7 @@ final class WorkoutSyncTests: XCTestCase {
   ) async -> (left: [DeletedSet], report: WorkoutSync.Report) {
     let since = WorkoutSync.since(workouts: workouts, deleted: [], deletedSets: pending)
     let rows = await WorkoutSync.fetchHave(cockpit: cockpit, since: since, transport: { fake.handle($0) }) ?? []
-    let settled = Set(WorkoutSync.settledSets(pending, have: rows, workouts: workouts))
+    let settled = Set(WorkoutSync.settledSets(pending, have: rows, workouts: workouts, entries: entries))
     var left = pending.filter { !settled.contains($0.entry.id) }
     let plan = WorkoutSync.plan(workouts: workouts, entries: entries, have: rows, refused: [], deletedSets: left)
     var report = WorkoutSync.Report()
@@ -639,7 +639,8 @@ final class WorkoutSyncTests: XCTestCase {
       have("IPAD", start: 9000, rev: 9700, sets: ["theirs"]),
     ]
     XCTAssertEqual(
-      Set(WorkoutSync.settledSets(pending, have: rows, workouts: [own, ipad])), ["never", "theirs", "in-discarded"],
+      Set(WorkoutSync.settledSets(pending, have: rows, workouts: [own, ipad], entries: [])),
+      ["never", "theirs", "in-discarded"],
       "never held: nothing to mark; another device's workout: its to send; a discarded workout: marked with it")
     XCTAssertEqual(
       WorkoutSync.plan(workouts: [own, ipad], entries: [], have: rows, refused: [], deletedSets: pending), [],
@@ -665,6 +666,24 @@ final class WorkoutSyncTests: XCTestCase {
     let third = await setPass([w1], entries: [set("a", at: 100)], deleted: second.left, fake: fake, now: 8000)
     XCTAssertEqual(third.left, [])
     XCTAssertEqual(Set(fake.summaries.compactMap { $0["id"] as? String }).count, 1)
+  }
+
+  func testADeletedSetBackLiveIsSentLiveAndForgotten() async throws {
+    // Its delete lost to a later change on the iPad: the set is back among the live ones under the same id.
+    let w1 = workout("W1", from: 0, to: 2400)
+    let fake = FakeCockpit([
+      FakeCockpit.Held(id: "W1", start: at(0), sets: ["a": "e", "b": "e"], rev: WorkoutEventWire.iso(at(4000)))
+    ])
+    let back = set("b", at: 200)
+    let tombstone = DeletedSet(entry: back, deletedAt: at(5000))
+    let pass = await setPass([w1], entries: [set("a", at: 100), back], deleted: [tombstone], fake: fake, now: 6000)
+    XCTAssertEqual(pass.left, [], "forgotten: the set is live again")
+    XCTAssertEqual(pass.report.sent, 0, "the Cockpit holds both sets live already")
+    let rows = [have("W1", start: 0, rev: 4000, sets: ["a", "b"])]
+    XCTAssertEqual(
+      WorkoutSync.plan(
+        workouts: [w1], entries: [set("a", at: 100), back], have: rows, refused: [], deletedSets: [tombstone]), [],
+      "a live set is never planned marked deleted")
   }
 
   func testADeletedSetWidensTheListing() {
