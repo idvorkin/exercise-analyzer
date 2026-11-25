@@ -106,7 +106,7 @@ final class VideoPoseSession: NSObject {
   /// Where the lifter's eyes are in a replayed track (normalized y), so the zoom keeps them under the HUD's header
   /// (#98); nil while live, where the crop comes from the person box and the zoom reads the eyes off its padding.
   private(set) var personEyeLine: CGFloat?
-  /// The bell detector's switch as the menu shows it (story 034, #85); ModelSet holds the truth.
+  /// The bell detector's switch as Settings shows it (story 034, #85, 088); ModelSet holds the truth.
   private(set) var bellDetectorOn = ModelSet.bellDetectorEnabled
   /// Which exercise the lifter chose (or Auto), and the exercise currently being analyzed.
   private(set) var exerciseMode: ExerciseMode
@@ -1630,7 +1630,7 @@ final class VideoPoseSession: NSObject {
     }
   }
 
-  /// The bell detector switch from the exercise menu (story 034, #85). The set on screen keeps its analysis; the
+  /// The bell detector switch in Settings (story 034, #85, 088). The set on screen keeps its analysis; the
   /// next open of a set analyzed without the detector runs it through the detector (story 035), and the launch
   /// refresh does the same for the rest.
   func setBellDetector(_ on: Bool) {

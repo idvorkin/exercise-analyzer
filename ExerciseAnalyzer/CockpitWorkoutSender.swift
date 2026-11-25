@@ -2,7 +2,7 @@
 
 //  The running workout to Larry's Cockpit (story 084, #376): follows the wrist's workout and the sets saved in it,
 //  turns them into events (`WorkoutStream`, ExerciseCore) and sends them, one at a time, oldest first, while the
-//  exercise menu's "Send workouts to Larry" is on (off by default). What waits is kept across launches. Each answer
+//  Settings' "Send workouts to Larry" (story 088) is on (off by default). What waits is kept across launches. Each answer
 //  is a `workout_event` line in the session log.
 //  Once nothing live waits and no workout runs, it also syncs the archive (story 087, `WorkoutSync`): asks the
 //  Cockpit what it holds and sends, whole, each of the phone's workouts it lacks or holds older, through the same
@@ -27,7 +27,7 @@ final class CockpitWorkoutSender {
     URL(string: ProcessInfo.processInfo.environment["SWING_COCKPIT_URL"] ?? "https://c-5004.squeaker-teeth.ts.net")
     ?? URL(fileURLWithPath: "/")
 
-  /// The exercise menu's switch; off drops whatever waits.
+  /// The Settings switch (story 088); off drops whatever waits.
   var enabled: Bool {
     get {
       access(keyPath: \.enabled)
