@@ -4,6 +4,7 @@
 # Archives the app in Release (the watch app inside it), exports it signed for development (method `debugging`), checks
 # the pose model is in the bundle, and copies it to the Cockpit as ea-<sha8>.ipa. The Cockpit writes the install
 # manifest itself from the ipa's Info.plist, so only the ipa goes.
+# It takes build.lock and xcode-signing.lock itself; never run it under them (lockf would wait forever on its own lock).
 #
 # Usage: ota.sh [--dry-run] [--force]
 #   --dry-run  the plan: the commit, the archive, the destination; builds, signs and copies nothing
@@ -23,7 +24,7 @@ while [ $# -gt 0 ]; do
     --dry-run) dry_run=1 ;;
     --force) force=1 ;;
     -h | --help)
-      sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
