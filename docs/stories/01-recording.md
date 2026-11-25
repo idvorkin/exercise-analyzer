@@ -132,7 +132,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 003:
 
 - **Summary:** Override the detector when it guesses wrong, without re-running the video
-- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f), [4543828](https://github.com/idvorkin/exercise-analyzer/commit/4543828); verified on the phone and the simulator (the `interrupt` check of `just test-sim`); clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator mode-replay→B check; the exercise shown as its drawing and picked from a menu of drawings (ea-599) in [bba46d2](https://github.com/idvorkin/exercise-analyzer/commit/bba46d2), verified by a simulator screenshot of the top line, the open menu to verify on the phone; the interrupted pass's rule (re-run, not re-read) moved to the host as `OfflinePass` in [d0b4333](https://github.com/idvorkin/exercise-analyzer/commit/d0b4333) (`OfflinePassTests`, Linux; the simulator's `interrupt` check retired), the app build to verify on the Mac
+- **Status:** implemented in [1fb9b0a](https://github.com/idvorkin/exercise-analyzer/commit/1fb9b0a), [1336a6f](https://github.com/idvorkin/exercise-analyzer/commit/1336a6f), [4543828](https://github.com/idvorkin/exercise-analyzer/commit/4543828); verified on the phone and the simulator (the `interrupt` check of `just test-sim`); clip-operation isolation in [920e803](https://github.com/idvorkin/exercise-analyzer/commit/920e803), verified by host identity tests and simulator mode-replay→B check; the exercise shown as its drawing and picked from a menu of drawings (ea-599) in [bba46d2](https://github.com/idvorkin/exercise-analyzer/commit/bba46d2), verified by a simulator screenshot of the top line, the open menu to verify on the phone; the interrupted pass's rule (re-run, not re-read) moved to the host as `OfflinePass` in [d0b4333](https://github.com/idvorkin/exercise-analyzer/commit/d0b4333) (`OfflinePassTests`, Linux; the simulator's `interrupt` check retired), the app build to verify on the Mac; the menu rows taking a tap while the camera runs (#394) on `fix/394-menu-taps`: the menu is its own view, no longer rebuilt with every frame, and each pick logs `exercise_menu`; verified by the simulator build (the menu looks as before; the simulator has no camera and no taps, so nothing there rebuilds it per frame), the tap while recording to verify on the phone (`exercise_menu` in the log)
 
 #### Use Case:
 - **As a** lifter whose set was mislabelled
@@ -165,7 +165,12 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I choose an exercise from the menu (or tap the status to retry)
 - **Then:** the clip is re-scanned from the video (an `offline_pass` precedes any `analyzed`), the full skeleton returns, and once the extraction is complete a later switch re-reads instantly without re-scanning
 
-- **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) an interrupted pass left a partial track and the mode switch re-read it instead of re-running the clip; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set
+- **Scenario:** The menu answers while the camera runs (#394)
+- **Given:** the camera is recording, the count and the clock moving with every frame
+- **When:** I open the exercise menu under the drawing and tap a row (an exercise, Auto, the bell detector or "Send workouts to Larry")
+- **Then:** the row takes the tap the first time, as it does on a stored set: the menu closes and the choice holds; the session log shows the pick (`exercise_menu` with what was picked) instead of a run of `ui_touch_cancel` (Igor, 2026-11-25, at the gym: "I can't actually click anything on that menu right now")
+
+- **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) an interrupted pass left a partial track and the mode switch re-read it instead of re-running the clip; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set; [#394](https://github.com/idvorkin/exercise-analyzer/issues/394) while recording, every touch on the menu's rows was cancelled (23 `ui_touch_cancel`, no pick): the menu was rebuilt with each camera frame
 
 ---
 
