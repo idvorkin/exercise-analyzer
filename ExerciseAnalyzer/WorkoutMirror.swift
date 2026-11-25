@@ -551,12 +551,35 @@ final class WorkoutMirror: NSObject {
 
   /// Workouts other devices put in the iCloud container and the ones deleted there (story 070, steps 2 and 4),
   /// as `WorkoutIndex.merge` takes them. Merged into a copy: the published index moves only when something did.
+  /// A workout of this phone's deleted on another device (ea-j3d) is handed to the Cockpit sender as Delete hands
+  /// it over, its heart rate read before anything goes, then Health's when fuller: this phone recorded it, so this
+  /// phone sends its last copy marked discarded. Another device's row is left to it (`WorkoutSync.deleted`).
   func mergeRemote(_ rows: [StoredWorkout], tombstones: [String: Date], me: String) -> SyncMergeResult {
+    let before = index
     var merged = index
     let result = merged.merge(remote: rows, tombstones: tombstones, me: me)
     guard result.changed else { return result }
+    let removed = WorkoutSync.removed(result.removedIDs, from: before.workouts).filter { $0.device == nil }
+    let kept = keptHeartRate(of: removed, before: before)
+    if !removed.isEmpty { onRemoved?(removed, before.workouts, kept, false) }
     index = merged
     try? index.save(root: root)
+    #if !targetEnvironment(simulator)
+      if !removed.isEmpty, HKHealthStore.isHealthDataAvailable(),
+        store.authorizationStatus(for: .workoutType()) != .notDetermined
+      {
+        Task { [weak self] in
+          guard let self else { return }
+          var fuller: [String: HeartRateSeries] = [:]
+          for part in removed {
+            let read = await self.readHeartRate(
+              from: part.start.addingTimeInterval(-60), to: part.end.addingTimeInterval(180))
+            if let read, read.samples.count > (kept[part.id]?.samples.count ?? 0) { fuller[part.id] = read }
+          }
+          if !fuller.isEmpty { self.onRemoved?(removed.filter { fuller[$0.id] != nil }, before.workouts, fuller, true) }
+        }
+      }
+    #endif
     return result
   }
 

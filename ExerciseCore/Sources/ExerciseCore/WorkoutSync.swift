@@ -237,6 +237,14 @@ public enum WorkoutSync {
     }
   }
 
+  /// The rows a merge of another device's tombstones took out (ea-j3d), as they were in `before`: this phone's own
+  /// among them go marked discarded from here, since this phone sends their whole copies; `deleted` leaves
+  /// another device's to it. A tombstone of the phone's own Delete, read back, finds its row gone already.
+  public static func removed(_ ids: [String], from before: [StoredWorkout]) -> [StoredWorkout] {
+    let gone = Set(ids)
+    return before.filter { gone.contains($0.id) }
+  }
+
   /// What to do with each deleted workout's copy once the Cockpit has said what it holds: send it, marked
   /// discarded and under the Cockpit's id (matched by id, else by a start within `sameStart`), when the Cockpit
   /// holds it live; settle it (the ids in `settled`, to forget) when the Cockpit holds it discarded already or

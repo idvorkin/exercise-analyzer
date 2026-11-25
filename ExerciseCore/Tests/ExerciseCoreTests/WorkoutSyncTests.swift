@@ -507,6 +507,48 @@ final class WorkoutSyncTests: XCTestCase {
     XCTAssertNil(WorkoutSync.since(workouts: [], deleted: []))
   }
 
+  // MARK: - a workout of this phone's deleted on another device (ea-j3d)
+
+  func testAWorkoutOfThisPhonesDeletedOnTheIPadGoesMarkedDiscardedFromThePhone() async throws {
+    // The iPad's Delete reaches the phone as a tombstone (070, step 4); the phone, which recorded the workout and
+    // sends its whole copies, sends the last copy marked discarded. The iPad's own workout is the iPad's to send.
+    let own = workout("W1", from: 0, to: 2400)
+    var ipad = workout("IPAD", from: 9000, to: 9600)
+    ipad.device = "ipad"
+    let before = [own, ipad]
+    var index = WorkoutIndex(workouts: before)
+    let result = index.merge(remote: [], tombstones: ["W1": at(10000), "IPAD": at(10000)], me: "phone")
+    XCTAssertEqual(Set(result.removedIDs), ["W1", "IPAD"])
+    let removed = WorkoutSync.removed(result.removedIDs, from: before)
+    let copies = WorkoutSync.deleted(
+      removed, from: before, entries: [set("a", at: 100)], heartRate: ["W1": series], at: at(10001))
+    XCTAssertEqual(copies.map(\.workout.id), ["W1"], "only this phone's own workout")
+    XCTAssertEqual(copies.first?.setList.first?.hrPeakBpm, 141, "the sets as they were, with their peaks")
+    let fake = FakeCockpit([
+      FakeCockpit.Held(id: "LIVE", start: at(1), sets: ["a": "e"], rev: WorkoutEventWire.iso(at(4000)))
+    ])
+    let pass = await discardPass(copies, fake: fake, now: 11000)
+    XCTAssertEqual(pass.left, [])
+    let body = try XCTUnwrap(fake.summaries.first)
+    XCTAssertEqual(body["workout_id"] as? String, "LIVE", "under the Cockpit's id, matched by start")
+    XCTAssertEqual(body["discarded"] as? Bool, true)
+    XCTAssertEqual((body["set_list"] as? [[String: Any]])?.map { $0["id"] as? String }, ["a"])
+    XCTAssertEqual(fake.held.first?.discarded, true, "the Cockpit keeps it, marked deleted")
+  }
+
+  func testATombstoneForAWorkoutAlreadyGoneHereKeepsNoSecondCopy() {
+    // The phone's own Delete writes a tombstone that comes back on the next read: the row went with the Delete,
+    // which kept its copy then, so the merge removes nothing and nothing is kept twice.
+    let kept = workout("W2", from: 9000, to: 9600)
+    var index = WorkoutIndex(workouts: [kept])
+    let result = index.merge(remote: [], tombstones: ["W1": at(5000)], me: "phone")
+    XCTAssertEqual(WorkoutSync.removed(result.removedIDs, from: [kept]), [])
+    let edited = workout("W2", from: 9000, to: 9600, changed: 6000)
+    var later = WorkoutIndex(workouts: [edited])
+    let outlived = later.merge(remote: [], tombstones: ["W2": at(5000)], me: "phone")
+    XCTAssertEqual(outlived.removedIDs, [], "a workout changed after the delete stays, and nothing goes")
+  }
+
   func testA409NamingAnIDIsAConflict() {
     let outcome = WorkoutEventWire.outcome(status: 409, body: FakeCockpit.json(["ok": false, "workout_id": "X"]))
     XCTAssertEqual(outcome, .conflict(workoutID: "X"))
