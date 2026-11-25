@@ -982,64 +982,14 @@ private struct PlayerRouteView: View {
     }
   }
 
-  /// The exercise's drawing and "▾" (Igor, 2026-10-20: "instead of using words for the exercise, use our picto
-  /// icon"): pick an exercise, each row its drawing and name, or Auto. In Auto the detected exercise and its reason
-  /// show.
+  /// The exercise menu under the drawing (`ExerciseMenu`), and the HUD's count logged beside it.
   private var exerciseMenu: some View {
-    Menu {
-      // Toggles, so the menu ticks the current choice beside its drawing.
-      Toggle(isOn: Binding(get: { session.exerciseMode == .auto }, set: { if $0 { session.setExerciseMode(.auto) } })) {
-        Label("Auto-detect", systemImage: "wand.and.stars")
+    ExerciseMenu(session: session)
+      // The set and count the HUD shows, logged when it appears and whenever either changes: the stale player
+      // of 2026-10-18 never logged the second set's. Read here, not inside the menu, so a rep never rebuilds it.
+      .task(id: "\(session.currentEntry?.id ?? "")/\(session.reps.count)") {
+        session.log.event("hud_reps", ["id": session.currentEntry?.id ?? "", "reps": session.reps.count])
       }
-      Divider()
-      ForEach(ExerciseKind.analyzable) { kind in
-        Toggle(
-          isOn: Binding(
-            get: { session.exerciseMode == .fixed(kind) }, set: { if $0 { session.setExerciseMode(.fixed(kind)) } })
-        ) {
-          Label {
-            Text(kind.definition.name)
-          } icon: {
-            Image(uiImage: kind.menuGlyph)
-          }
-        }
-      }
-      if let detection = session.detection {
-        Divider()
-        Text("Detected: \(detection.exercise.definition.name) (\(detection.confidence)%)")
-        Text(detection.reason)
-      }
-      Divider()
-      // The bell detector's switch (story 034, #85): off by default because it halves the offline pass; the dot
-      // on the bell needs it on. Reopening a set analyzed without it runs the set through the detector.
-      Toggle(isOn: Binding(get: { session.bellDetectorOn }, set: { session.setBellDetector($0) })) {
-        Label("Bell detector (slower pass)", systemImage: "circle.circle")
-      }
-      // Every workout's data to Larry's Cockpit as it happens (story 084, #376): off by default.
-      Toggle(
-        isOn: Binding(
-          get: { CockpitWorkoutSender.shared.enabled }, set: { CockpitWorkoutSender.shared.enabled = $0 })
-      ) {
-        Label("Send workouts to Larry", systemImage: "antenna.radiowaves.left.and.right")
-      }
-    } label: {
-      HStack(spacing: 3) {
-        // The drawing in place of the name: the ♥ chip and the rest of the top line get the room (#299, #301).
-        ExerciseGlyph(kind: session.exercise, size: 28)
-          // The set and count the HUD shows, logged when it appears and whenever either changes: the stale player
-          // of 2026-10-18 never logged the second set's.
-          .task(id: "\(session.currentEntry?.id ?? "")/\(session.reps.count)") {
-            session.log.event("hud_reps", ["id": session.currentEntry?.id ?? "", "reps": session.reps.count])
-          }
-        if session.exerciseMode == .auto {
-          Image(systemName: "wand.and.stars").font(.caption2)
-        }
-        Image(systemName: "chevron.down").font(.caption2)
-      }
-      .font(.subheadline)
-    }
-    .foregroundStyle(.white)
-    .accessibilityLabel("Exercise: \(session.exercise.definition.name)")
   }
 
   /// The big number over the video (#54): while reviewing, the gallery's rep — the one the playhead is
@@ -1363,6 +1313,84 @@ extension ExerciseKind {
     let glyph = (renderer.uiImage ?? UIImage()).withRenderingMode(.alwaysOriginal)
     Self.menuGlyphs[self] = glyph
     return glyph
+  }
+}
+
+/// The exercise's drawing and "▾" (Igor, 2026-10-20: "instead of using words for the exercise, use our picto
+/// icon"): pick an exercise, each row its drawing and name, or Auto. In Auto the detected exercise and its reason
+/// show.
+///
+/// Its own view, reading only what it shows (#394): built inline in the HUD, it was rebuilt with every camera
+/// frame (the count reads the latest frame), and UIKit cancelled every touch on its rows while recording.
+struct ExerciseMenu: View {
+  let session: VideoPoseSession
+
+  var body: some View {
+    Menu {
+      // Toggles, so the menu ticks the current choice beside its drawing.
+      Toggle(
+        isOn: Binding(
+          get: { session.exerciseMode == .auto }, set: { if $0 { pick("auto") { session.setExerciseMode(.auto) } } })
+      ) {
+        Label("Auto-detect", systemImage: "wand.and.stars")
+      }
+      Divider()
+      ForEach(ExerciseKind.analyzable) { kind in
+        Toggle(
+          isOn: Binding(
+            get: { session.exerciseMode == .fixed(kind) },
+            set: { if $0 { pick(kind.rawValue) { session.setExerciseMode(.fixed(kind)) } } })
+        ) {
+          Label {
+            Text(kind.definition.name)
+          } icon: {
+            Image(uiImage: kind.menuGlyph)
+          }
+        }
+      }
+      if let detection = session.detection {
+        Divider()
+        Text("Detected: \(detection.exercise.definition.name) (\(detection.confidence)%)")
+        Text(detection.reason)
+      }
+      Divider()
+      // The bell detector's switch (story 034, #85): off by default because it halves the offline pass; the dot
+      // on the bell needs it on. Reopening a set analyzed without it runs the set through the detector.
+      Toggle(
+        isOn: Binding(
+          get: { session.bellDetectorOn }, set: { on in pick("bell_detector", on: on) { session.setBellDetector(on) } })
+      ) {
+        Label("Bell detector (slower pass)", systemImage: "circle.circle")
+      }
+      // Every workout's data to Larry's Cockpit as it happens (story 084, #376): off by default.
+      Toggle(
+        isOn: Binding(
+          get: { CockpitWorkoutSender.shared.enabled },
+          set: { on in pick("send_to_larry", on: on) { CockpitWorkoutSender.shared.enabled = on } })
+      ) {
+        Label("Send workouts to Larry", systemImage: "antenna.radiowaves.left.and.right")
+      }
+    } label: {
+      HStack(spacing: 3) {
+        // The drawing in place of the name: the ♥ chip and the rest of the top line get the room (#299, #301).
+        ExerciseGlyph(kind: session.exercise, size: 28)
+        if session.exerciseMode == .auto {
+          Image(systemName: "wand.and.stars").font(.caption2)
+        }
+        Image(systemName: "chevron.down").font(.caption2)
+      }
+      .font(.subheadline)
+    }
+    .foregroundStyle(.white)
+    .accessibilityLabel("Exercise: \(session.exercise.definition.name)")
+  }
+
+  /// A row's tap reached its action (#394): the log shows the pick, where a cancelled touch shows nothing.
+  private func pick(_ item: String, on: Bool? = nil, _ action: () -> Void) {
+    var fields: [String: Any] = ["item": item, "source": session.source == .camera ? "camera" : "set"]
+    if let on { fields["on"] = on }
+    session.log.event("exercise_menu", fields)
+    action()
   }
 }
 
