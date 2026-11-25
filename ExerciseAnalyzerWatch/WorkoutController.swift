@@ -386,10 +386,10 @@ final class WorkoutController: NSObject {
 
   /// The machine's setting changed on the wrist: it goes to the phone at once, which sends Larry one `level`
   /// (084). The rows call this once the Crown has settled, not on every detent.
-  func setMachine(_ new: WorkoutEvent.Machine) {
+  func setMachine(_ new: WorkoutEvent.Machine, at: Date = Date()) {
     guard running, new != machine else { return }
     machine = new
-    machineAt = Date()
+    machineAt = at
     rememberMachine(new)
     var fields: [String: Any] = ["name": new.name]
     if let incline = new.incline { fields["incline"] = incline }

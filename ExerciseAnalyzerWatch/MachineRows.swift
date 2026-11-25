@@ -17,6 +17,7 @@ struct MachineRows: View {
   var focusOnAppear: Machine.Setting?
   /// What the rows show, ahead of the commit; the controller's own once a commit is through.
   @State private var draft: Machine?
+  @State private var draftAt: Date?
   @State private var inclineCrown = 0.0
   @State private var intensityCrown = 0.0
   @State private var picking = false
@@ -84,9 +85,15 @@ struct MachineRows: View {
     .onChange(of: crown.wrappedValue) { _, turned in
       guard focused == setting else { return }
       let next = Machine.clamp(Int(turned.rounded()))
-      // Resting the Crown on "—"'s start when the row takes it is no step.
-      if number == nil, next == start(setting) { return }
-      if next != number { set(setting, to: next) }
+      // Resting the Crown on "—"'s start when the row takes it is no step; the first detent lands on start.
+      if number == nil {
+        let first = start(setting)
+        guard next != first else { return }
+        set(setting, to: first)
+        crown.wrappedValue = Double(first)
+      } else if next != number {
+        set(setting, to: next)
+      }
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(number.map { "\(title) \($0)" } ?? "\(title) not set")
@@ -119,17 +126,20 @@ struct MachineRows: View {
     case .intensity: machine.intensity = Double(value)
     }
     draft = machine
+    let at = Date()
+    draftAt = at
     commit?.cancel()
     commit = Task {
       try? await Task.sleep(for: Self.settle)
       guard !Task.isCancelled else { return }
-      take(machine)
+      take(machine, at: at)
     }
   }
 
-  private func take(_ machine: Machine) {
+  private func take(_ machine: Machine, at: Date = Date()) {
+    commit?.cancel()
     commit = nil
-    workout.setMachine(machine)
+    workout.setMachine(machine, at: at)
     draft = nil
     WKInterfaceDevice.current().play(.success)
   }
@@ -169,8 +179,11 @@ struct MachineRows: View {
           let picked = shown?.name == name
           Button {
             picking = false
-            commit?.cancel()
-            if !picked { take(Machine(name: name)) }
+            if !picked {
+              take(Machine(name: name))
+            } else if commit != nil, let draft {
+              take(draft, at: draftAt ?? Date())
+            }
           } label: {
             Text(name).font(.headline)
               .frame(maxWidth: .infinity, minHeight: 44)
