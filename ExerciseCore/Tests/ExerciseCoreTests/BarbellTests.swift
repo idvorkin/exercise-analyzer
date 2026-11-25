@@ -60,6 +60,40 @@ final class BarbellTests: XCTestCase {
       "the same plates in any order are the same load")
   }
 
+  /// #387: Igor tapped his way to 45 ×15 a side (1,448 lb). A side takes at most 8 plates; more taps do nothing.
+  func testASideHoldsAtMostEightPlates() {
+    var load = BarbellLoad(bar: .safetySquat)
+    for _ in 0..<15 { load.add(45) }
+    XCTAssertEqual(load.count(of: 45), BarbellLoad.maxPlatesPerSide)
+    XCTAssertEqual(BarbellLoad.maxPlatesPerSide, 8)
+    XCTAssertTrue(load.isFull)
+    load.add(10)
+    XCTAssertEqual(load.count(of: 10), 0, "a full side takes no smaller plate either")
+    XCTAssertEqual(load.totalLb, 58 + 2 * 8 * 45)
+    load.remove(45)
+    XCTAssertFalse(load.isFull)
+    load.add(10)
+    XCTAssertEqual(load.plates.count, 8)
+  }
+
+  /// "Empty bar" takes every plate off; the bar stays.
+  func testEmptyingTheBarKeepsTheBar() {
+    var load = BarbellLoad(bar: .sixtyFive, plates: [45, 25, 10])
+    load.empty()
+    XCTAssertEqual(load, BarbellLoad(bar: .sixtyFive))
+    XCTAssertEqual(load.totalLb, 65)
+  }
+
+  /// The cap is on adding only: a load stored or synced with more plates (an older build) is shown as it is.
+  func testAStoredLoadOverTheCapIsKept() throws {
+    let fifteen = Array(repeating: 45, count: 15)
+    XCTAssertEqual(BarbellLoad(bar: .safetySquat, plates: fifteen).plates.count, 15)
+    let json = Data(#"{"bar":"safety-squat","plates":\#(fifteen)}"#.utf8)
+    let decoded = try JSONDecoder().decode(BarbellLoad.self, from: json)
+    XCTAssertEqual(decoded.totalLb, 58 + 2 * 15 * 45)
+    XCTAssertTrue(decoded.isFull)
+  }
+
   func testOneWeightPerSetTheLaterReplacingTheOther() {
     var entry = set("a", at: 100, weight: .bell(24))
     entry.setWeight(.barbell(ssb45), by: me, at: Date(timeIntervalSince1970: 300))

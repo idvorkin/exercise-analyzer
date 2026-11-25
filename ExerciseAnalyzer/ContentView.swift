@@ -42,6 +42,8 @@ struct ContentView: View {
   @State private var showSyncStatus = false
   /// Settings, from the gear beside ⋯ (story 088, #392).
   @State private var showSettings = false
+  /// The plates sheet opened by `SWING_PLATES` for a screenshot (#387).
+  @State private var platesHook: BarbellLoad?
   /// What's new (story 072): the feed the build wrote into the bundle, and its list.
   private static let whatsNew = WhatsNewSeen.bundledFeed()
   /// This device's own reports (BugKit 0.3.11): What's new says which of them this build fixed. Read once per
@@ -118,6 +120,9 @@ struct ContentView: View {
         session.bugScreen = Self.bugScreen(path: path, source: session.source)
       }
       .onChange(of: session.source) { _, source in session.bugScreen = Self.bugScreen(path: path, source: source) }
+      .sheet(isPresented: Binding(get: { platesHook != nil }, set: { if !$0 { platesHook = nil } })) {
+        BarbellSheet(load: platesHook ?? .start) { _ in }
+      }
       .sheet(isPresented: $showSyncStatus) {
         if let sync = session.sync { SyncStatusView(sync: sync) } else { Text("No sync store").padding() }
       }
@@ -1418,6 +1423,15 @@ extension ContentView {
     if env["SWING_SHOW_GALLERY"] == "1" { showGallery = true }
     // Test hook (088): the Settings sheet open, as a tap on the gear would, for a screenshot.
     if env["SWING_SETTINGS"] == "1" { showSettings = true }
+    // Test hook (083, #387): "safety-squat:45,45,10" opens the plates sheet on that load, for a screenshot; no set
+    // needed, and Use saves nothing.
+    if let hook = env["SWING_PLATES"] {
+      let parts = hook.split(separator: ":", maxSplits: 1).map(String.init)
+      if let bar = parts.first.flatMap(BarKind.init(rawValue:)) {
+        let plates = parts.count > 1 ? parts[1].split(separator: ",").compactMap { Int($0) } : []
+        platesHook = BarbellLoad(bar: bar, plates: plates)
+      }
+    }
     if env["SWING_SHOW_SEEK_CONTROLS"] == "1" {
       Task { @MainActor in
         try? await Task.sleep(for: .seconds(4))

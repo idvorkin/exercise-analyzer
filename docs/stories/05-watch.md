@@ -1058,7 +1058,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** Plates on the 65 lb bar from the wrist
 - **Given:** Set by hand's count page in a workout, its weight row's tiles open (a second tap on the weight row)
 - **When:** I tap "Bar" under the bells, then the 65 tile among the bars (45, 58 and 65 lb) and the 45 plate once
-- **Then:** the plates page reads "155 lb" and "45/side"; a tap on a plate (45, 35, 25, 10) puts one on each side and a press and hold takes one off, with its count per side on the tile; the checkmark closes it and the weight row reads "lb 155"; Save sends the set with its plates, and the phone's row says "155 lb" as one typed there would (083), reaching Larry's Cockpit with the bar and the plates (084)
+- **Then:** the plates page reads "155 lb" and "45/side"; a tap on a plate (45, 35, 25, 10) puts one on each side and a press and hold takes one off, with its count per side on the tile; a side holds at most 8 plates, as on the phone (083, #387), so a ninth tap does nothing; the checkmark closes it and the weight row reads "lb 155"; Save sends the set with its plates, and the phone's row says "155 lb" as one typed there would (083), reaching Larry's Cockpit with the bar and the plates (084)
 
 - **Scenario:** The wrist opens on the last plates
 - **Given:** the newest weight of split squats, on the phone or typed on the wrist, is 45 a side on the 65 lb bar

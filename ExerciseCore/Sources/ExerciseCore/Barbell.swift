@@ -67,14 +67,28 @@ public struct BarbellLoad: Codable, Hashable, Sendable {
 
   public func count(of plate: Int) -> Int { plates.filter { $0 == plate }.count }
 
-  /// One more of `plate` on each side; a plate the gym doesn't have is ignored.
-  public mutating func add(_ plate: Int) { plates = Self.normalized(plates + [plate]) }
+  /// The most plates a side takes from a tap (#387; Igor tapped his way to 45 ×15, 1,448 lb: "Obvious can't go up
+  /// this high"): 8 a side, 765 lb on the barbell in 45s. Only `add` holds to it: a load stored or synced with
+  /// more is kept as it is.
+  public static let maxPlatesPerSide = 8
+
+  /// The side has as many plates as a tap may put on it.
+  public var isFull: Bool { plates.count >= Self.maxPlatesPerSide }
+
+  /// One more of `plate` on each side; a plate the gym doesn't have, or a full side, is ignored.
+  public mutating func add(_ plate: Int) {
+    guard !isFull else { return }
+    plates = Self.normalized(plates + [plate])
+  }
 
   /// One `plate` off each side; none left is none.
   public mutating func remove(_ plate: Int) {
     guard let at = plates.firstIndex(of: plate) else { return }
     plates.remove(at: at)
   }
+
+  /// Every plate off: the bar alone ("Empty bar", #387).
+  public mutating func empty() { plates = [] }
 
   public var perSideLb: Int { plates.reduce(0, +) }
   public var totalLb: Int { bar.lb + 2 * perSideLb }
