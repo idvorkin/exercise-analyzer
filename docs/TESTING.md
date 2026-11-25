@@ -32,6 +32,7 @@ camera, a display, or a wrist goes higher.
 | Trim (export session, keyframe alignment, player start) | Simulator, then one phone trim on an HDR clip | `check_trim` in `sim-smoke.sh`; phone: tap Done after a recording, read `trim`/`display_frame` events |
 | Player, overlay, HUD, gallery layout | Simulator screenshots, then phone | [`screenshots.sh`](../scripts/screenshots.sh) for the eye; the phone for HDR and real frames |
 | What each camera command (Record, Preview, switch, zoom, Pause, Resume, Done, Cancel) does in each camera stage | Host | [`CameraCommandsTests.swift`](../ExerciseCore/Tests/ExerciseCoreTests/CameraCommandsTests.swift), every cell of `CameraCommands`; the phone only shows the actions happen |
+| How many camera frames wait for the main thread, which are skipped, and the once-a-second skip count (#94) | Host | [`FrameBacklogTests.swift`](../ExerciseCore/Tests/ExerciseCoreTests/FrameBacklogTests.swift); the simulator has no camera, so that a stall no longer reaches the recording is phone-only: `live_frames_skipped` lines and no `capture_gap` with `OutOfBuffers` |
 | Camera, recorder, camera switch, idle timer | Phone only | record a set, `just pull-logs`, check `camera_*`, `recording_partial`, `error` events |
 | HDR washout, EDR, layer transforms | Phone only | `video_track` (`hdr`, `edr_headroom`) and `player_layer` events; the eye |
 | Apple Watch companion | Phone + watch | `watch_session`, `watch_reachable`, `ui` events with `from: watch` |
