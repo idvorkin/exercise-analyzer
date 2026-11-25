@@ -1010,7 +1010,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 #### Acceptance Criteria:
 - **Scenario:** Plates on the safety squat bar
 - **Given:** the weight sheet of any set (the playback line's weight chip, a row's long-press on the workout page), switched from Bell to Barbell
-- **When:** I pick "Safety squat bar" (58 lb; "Barbell" is 45 lb) and tap the 45 lb plate once
+- **When:** I pick "SSB 58" (the safety squat bar; "Barbell 45" is the 45 lb bar, the segments' short labels since 086) and tap the 45 lb plate once
 - **Then:** the sheet reads "148 lb" and "45/side"; each plate (10, 25, 35, 45 lb) is a big button with its count per side, one tap adding one to each side and a press and hold taking one off; Save stores the set's weight and closes, and "No weight" clears the set's own weight as it does for a bell
 
 - **Scenario:** A barbell weight on the workout page
