@@ -26,6 +26,9 @@ enum WatchScreenshotState: String, CaseIterable {
   /// The same count page with its plates page open over it (086), on the last split squat's 45 a side on the
   /// 65 lb bar.
   case setByHandBarbell
+  /// The plates page on 45, 45 and 10 a side on the 65 lb bar, scrolled to its bottom: the 10 with its "−",
+  /// "Empty bar" and "Bells instead" (ea-71t).
+  case setByHandBarbellEnd
   /// No videos for a while (071, #236): the idle page without Record, Preview or any word about the phone.
   case noVideos
   /// An elliptical workout's machine rows (085): incline 6 holding the Crown, intensity 8.
@@ -41,7 +44,8 @@ enum WatchScreenshotState: String, CaseIterable {
     switch self {
     case .workoutStart: return (190, 96)
     case .workoutMachine: return (1240, 128)
-    case .workout, .workoutEnd, .workoutViewfinder, .setByHand, .setByHandExercise, .setByHandBarbell:
+    case .workout, .workoutEnd, .workoutViewfinder, .setByHand, .setByHandExercise, .setByHandBarbell,
+      .setByHandBarbellEnd:
       return (2530, 128)
     case .workoutRecording: return (2530, 141)
     default: return nil
@@ -117,12 +121,14 @@ enum WatchScreenshotState: String, CaseIterable {
       // The count page's weight row opens on 24 kg (#271).
       status.bellKg = [ExerciseKind.kettlebellSwing.rawValue: 24]
       return (status, true, nil)
-    case .setByHandBarbell:
+    case .setByHandBarbell, .setByHandBarbellEnd:
       var status = WatchStatus.idle
       status.lastSet = LastSet(
         reps: 8, exercise: ExerciseKind.splitSquat.definition.name, seconds: 40, at: Date().timeIntervalSince1970 - 95)
-      // The plates page opens on 155 lb: 45 a side on the 65 lb bar (#375).
-      status.barbell = [ExerciseKind.splitSquat.rawValue: BarbellLoad(bar: .sixtyFive, plates: [45])]
+      // The plates page opens on 155 lb: 45 a side on the 65 lb bar (#375); the bottom's on 265 lb, 45, 45 and
+      // 10 a side, so the 10's "−" and "Empty bar" show (ea-71t).
+      let plates = self == .setByHandBarbellEnd ? [45, 45, 10] : [45]
+      status.barbell = [ExerciseKind.splitSquat.rawValue: BarbellLoad(bar: .sixtyFive, plates: plates)]
       return (status, true, nil)
     case .workoutStart, .workoutMachine:
       return (.idle, true, nil)
@@ -140,7 +146,7 @@ enum WatchScreenshotState: String, CaseIterable {
   var restEndedAt: Date? {
     switch self {
     case .done: return Date().addingTimeInterval(-35)
-    case .workout, .workoutEnd, .setByHand, .setByHandExercise, .setByHandBarbell:
+    case .workout, .workoutEnd, .setByHand, .setByHandExercise, .setByHandBarbell, .setByHandBarbellEnd:
       return Date().addingTimeInterval(-95)
     case .viewfinder, .workoutViewfinder: return Date().addingTimeInterval(-102)
     default: return nil

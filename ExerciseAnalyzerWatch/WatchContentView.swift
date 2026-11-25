@@ -197,7 +197,7 @@ struct WatchContentView: View {
         NavigationStack {
           SetByHandPage(
             exercise: start.exercise, start: start.reps, choosing: phone.screenshotOpensExerciseList,
-            openPlates: phone.screenshotOpensPlates,
+            openPlates: phone.screenshotOpensPlates, platesAtEnd: phone.screenshotScrollsPlatesToEnd,
             startWeight: {
               HandSet.startWeight(
                 for: $0, bells: status.bellKg, plates: status.barbell, typed: phone.lastTyped, analyzed: status.lastSet)
@@ -687,6 +687,8 @@ private struct SetByHandPage: View {
   /// until turned.
   let startWeight: (ExerciseKind) -> SetWeight?
   let log: (String, [String: Any]) -> Void
+  /// The screenshot rung's setByHandBarbellEnd: the plates page opens scrolled to its bottom (ea-71t).
+  let platesAtEnd: Bool
   /// The set's plates (086): while set, the weight row reads "lb 155" and opens the plates page; nil is a bell.
   @State private var plates: BarbellLoad?
   @State private var pickingPlates = false
@@ -707,11 +709,12 @@ private struct SetByHandPage: View {
   @Environment(\.dismiss) private var dismiss
 
   init(
-    exercise: ExerciseKind, start: Int, choosing: Bool = false, openPlates: Bool = false,
+    exercise: ExerciseKind, start: Int, choosing: Bool = false, openPlates: Bool = false, platesAtEnd: Bool = false,
     startWeight: @escaping (ExerciseKind) -> SetWeight?, log: @escaping (String, [String: Any]) -> Void,
     onSave: @escaping (ExerciseKind, Int, SetWeight?) -> Void
   ) {
     self.onSave = onSave
+    self.platesAtEnd = platesAtEnd
     self.startWeight = startWeight
     self.log = log
     _exercise = State(initialValue: exercise)
@@ -821,7 +824,7 @@ private struct SetByHandPage: View {
   private var platesPage: some View {
     NavigationStack {
       WatchBarbellPage(
-        load: plates ?? startWeight(exercise)?.barbell ?? BarbellLoad.start,
+        load: plates ?? startWeight(exercise)?.barbell ?? BarbellLoad.start, scrollsToEnd: platesAtEnd,
         onDone: { load in
           plates = load
           kgPicked = true
