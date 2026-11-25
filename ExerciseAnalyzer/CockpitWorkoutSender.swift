@@ -267,10 +267,14 @@ final class CockpitWorkoutSender {
   }
 
   /// The workout's heart rate: its own series, read from Health and kept when fuller than its folder's (a just-ended
-  /// workout, or one whose page was never opened, has none stored yet), else the folder of the line it was merged
-  /// into (#169).
+  /// workout, or one whose page was never opened, has none stored yet), or the watch's live samples when fuller (a
+  /// just-ended workout while Health is still catching up, #308), else the folder of the line it was merged into
+  /// (#169).
   private func heartRate(of workout: StoredWorkout, in mirror: WorkoutMirror) async -> HeartRateSeries? {
-    if let own = await mirror.heartRate(for: workout), !own.samples.isEmpty { return own }
+    let read = await mirror.heartRate(for: workout)
+    let live = mirror.liveHeartRateSeries(for: workout)
+    let own = [read, live].compactMap { $0 }.max { $0.samples.count < $1.samples.count }
+    if let own, !own.samples.isEmpty { return own }
     let line = mirror.index.sessions().first { $0.start <= workout.start && $0.end >= workout.end }
     return line.flatMap { HeartRateSeries.load(from: mirror.folder(for: $0.id)) }
   }
