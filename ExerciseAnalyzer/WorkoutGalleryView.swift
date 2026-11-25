@@ -344,7 +344,7 @@ struct WorkoutGalleryView: View {
   }
 }
 
-/// The exercise drawings in the history and the video diamond, above the days (#265, story 073): one tap keeps only
+/// The exercise drawings in the history and the video camcorder, above the days (#265, story 073): one tap keeps only
 /// the matching days, the picked one drawn in its colour and the rest dimmed; a second tap shows every day again.
 struct DayFilterRow: View {
   let row: [ExerciseKind]
@@ -375,7 +375,8 @@ struct DayFilterRow: View {
           filter.onVideo.toggle()
           log(["exercise": filter.exercise?.rawValue ?? "", "on_video": filter.onVideo])
         } label: {
-          Image(systemName: filter.onVideo ? "diamond.fill" : "diamond")
+          // The camcorder (#390; Igor: "Make diamond a camcorder icon"), the video mark everywhere it appears.
+          Image(systemName: filter.onVideo ? "video.fill" : "video")
             .font(.title3).foregroundStyle(.cyan)
             .frame(width: 36, height: 36)
             .background(filter.onVideo ? Color.cyan.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 8))
@@ -390,7 +391,7 @@ struct DayFilterRow: View {
 }
 
 /// The filter, closed, on the From Photos line (#282, story 073; Igor picked A): it reads what is on, the picked
-/// drawing and the diamond, or a plain filter icon when nothing is; a tap opens the drawings row under the line.
+/// drawing and the camcorder, or a plain filter icon when nothing is; a tap opens the drawings row under the line.
 struct DayFilterButton: View {
   let filter: DayFilter
   let open: Bool
@@ -402,7 +403,7 @@ struct DayFilterButton: View {
     Button(action: toggle) {
       HStack(spacing: 4) {
         if let kind = filter.exercise { ExerciseGlyph(kind: kind, size: 20) }
-        if filter.onVideo { Image(systemName: "diamond.fill").font(.caption).foregroundStyle(.cyan) }
+        if filter.onVideo { Image(systemName: "video.fill").font(.caption).foregroundStyle(.cyan) }
         if !filter.isActive { Image(systemName: "line.3.horizontal.decrease").font(.subheadline) }
         if !held { Image(systemName: open ? "chevron.up" : "chevron.down").font(.caption2.bold()) }
       }
@@ -571,7 +572,7 @@ struct WorkoutDay: Identifiable {
   /// A day the wrist ran a workout on (048): its workout lines are how in, the day does not fold (#163).
   var hasWorkout: Bool { !workouts.isEmpty || live != nil }
 
-  /// Every set of the day on video (#242): the diamond on its line, the day to demo.
+  /// Every set of the day on video (#242): the camcorder on its line (a diamond until #390), the day to demo.
   var allOnVideo: Bool { RecentEntry.allOnVideo(exercises.flatMap(\.sets)) }
 
   /// The day's sets that fall in none of its workouts, by exercise (#163): a workout day shows only these under
@@ -726,7 +727,7 @@ struct DayHeader: View {
           Text(title).font(.title3.bold())
           // Every set on video (#242; Igor: "when I wanna demo it, I can show the right one").
           if day.allOnVideo {
-            Image(systemName: "diamond.fill").font(.caption).foregroundStyle(.cyan)
+            Image(systemName: "video.fill").font(.caption).foregroundStyle(.cyan)
               .accessibilityLabel("Every set on video")
           }
         }
