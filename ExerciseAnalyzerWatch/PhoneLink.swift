@@ -86,7 +86,11 @@ final class PhoneLink: NSObject {
   /// The screenshot rung wants the idle page scrolled to its End and Discard buttons.
   var screenshotScrollsToEnd: Bool { screenshot == .workoutEnd }
   /// The screenshot rung wants the count page of a set typed by hand open over the workout page (059).
-  var screenshotOpensSetByHand: Bool { screenshot == .setByHand || screenshot == .setByHandExercise }
+  var screenshotOpensSetByHand: Bool {
+    screenshot == .setByHand || screenshot == .setByHandExercise || screenshot == .setByHandBarbell
+  }
+  /// ...and its plates page open over it (086).
+  var screenshotOpensPlates: Bool { screenshot == .setByHandBarbell }
   /// ...and its exercise list open over it (#154).
   var screenshotOpensExerciseList: Bool { screenshot == .setByHandExercise }
   /// The screenshot rung wants the machine rows' Incline holding the Crown (085).
@@ -385,9 +389,9 @@ final class PhoneLink: NSObject {
   /// Save on the count page (059): the wrist counts the set at once and starts the rest as Done does; the phone
   /// gets it as queued user info, like `logEvent`, so an unreachable phone gets it when it hears from us again.
   /// No Health activity: an activity needs a start, and this set has only its save.
-  func saveSetByHand(exercise: ExerciseKind, reps: Int, kg: Int? = nil) {
+  func saveSetByHand(exercise: ExerciseKind, reps: Int, weight: SetWeight? = nil) {
     guard screenshot == nil else { return }
-    let set = HandSet(exercise: exercise, reps: HandSet.clamp(reps), at: Date().timeIntervalSince1970, kg: kg)
+    let set = HandSet(exercise: exercise, reps: HandSet.clamp(reps), at: Date().timeIntervalSince1970, weight: weight)
     handSet = set
     lastTyped = set
     workout.setAnalyzed(reps: set.reps, exercise: exercise)
@@ -395,12 +399,17 @@ final class PhoneLink: NSObject {
     // Two sets once left the wrist and never reached the phone (#197): the queue's length at the save and the
     // transfer's end (`set_by_hand_sent`) say whether the set left at all.
     let session = WCSession.default
-    logEvent(
-      "set_by_hand",
-      [
-        "id": set.id, "exercise": exercise.rawValue, "reps": set.reps, "kg": kg ?? 0, "reachable": reachable,
-        "outstanding": session.outstandingUserInfoTransfers.count, "activation": session.activationState.rawValue,
-      ])
+    var fields: [String: Any] = [
+      "id": set.id, "exercise": exercise.rawValue, "reps": set.reps, "kg": set.kg ?? 0, "reachable": reachable,
+      "outstanding": session.outstandingUserInfoTransfers.count, "activation": session.activationState.rawValue,
+    ]
+    // Plates (086): the bar, the total and one side, as the phone's set_by_hand logs them (083).
+    if let load = set.barbell {
+      fields["bar"] = load.bar.rawValue
+      fields["lb"] = load.totalLb
+      fields["plates"] = load.plates
+    }
+    logEvent("set_by_hand", fields)
     WKInterfaceDevice.current().play(.success)
     typedRecent = Array((typedRecent + [set]).suffix(Self.typedRecentCount))
     guard session.activationState == .activated else { return }

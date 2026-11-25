@@ -1010,7 +1010,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 #### Acceptance Criteria:
 - **Scenario:** Plates on the safety squat bar
 - **Given:** the weight sheet of any set (the playback line's weight chip, a row's long-press on the workout page), switched from Bell to Barbell
-- **When:** I pick "Safety squat bar" (58 lb; "Barbell" is 45 lb) and tap the 45 lb plate once
+- **When:** I pick "SSB 58" (the safety squat bar; "Barbell 45" is the 45 lb bar, the segments' short labels since 086) and tap the 45 lb plate once
 - **Then:** the sheet reads "148 lb" and "45/side"; each plate (10, 25, 35, 45 lb) is a big button with its count per side, one tap adding one to each side and a press and hold taking one off; Save stores the set's weight and closes, and "No weight" clears the set's own weight as it does for a bell
 
 - **Scenario:** A barbell weight on the workout page
@@ -1028,7 +1028,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** I give it a barbell weight on one device
 - **Then:** the bell's weight is gone from the set, the later weight edit wins on every device as for a bell (070), and a device on an older build that rewrites the set (a re-analysis) does not erase the plates
 
-- **Notes:** the plates are stored as the bar and a count of each plate on one side, in pounds; the total is the bar plus twice the side. The watch's by-hand picker keeps its bells; a count-only reverse lunge exercise, a typed weight and the 65 lb bar of #375 are not part of this story.
+- **Notes:** the plates are stored as the bar and a count of each plate on one side, in pounds; the total is the bar plus twice the side. The watch's plates and #375's 65 lb bar are story 086; a count-only reverse lunge exercise and a typed weight are not part of this story.
 
 - **Issues:** [#377](https://github.com/idvorkin/exercise-analyzer/issues/377); [#375](https://github.com/idvorkin/exercise-analyzer/issues/375) (the same ask for reverse lunges, earlier)
 

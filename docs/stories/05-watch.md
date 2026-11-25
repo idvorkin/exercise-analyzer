@@ -19,7 +19,8 @@ state and is not in the table.
 | workoutStart | a workout before its first set: WORKOUT in green over the session clock (counting up by itself), "♥ 96 BPM", no sets line yet; no figure art, no Start workout | Record (red), Preview, "+ Set by hand" under Preview, the pickers; End workout and Discard below the pickers | 048, 059 |
 | workout | between sets the head is the rest: "REST · 1:30" in orange over the rest count, large, white until the rest length and orange after; then "♥ 128 BPM · 42:13" with the session clock small and green, the sets by exercise with their drawings ("[swing] 6"), the last-set line and the pickers as idle; no second rest line | Record (red), Preview, "+ Set by hand" under Preview (a Crown turn below the first screen), the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048, 050, 059 |
 | workoutMachine | an elliptical workout: ELLIPTICAL in green over the session clock and "♥ 128 BPM", then the machine rows, full width and at least 44 pt: "Incline 6" outlined green with the Crown and "Intensity 8", − and + either side of each, and under them (a Crown turn down) "Elliptical" with a chevron | Incline and Intensity (a tap gives the row the Crown; − and + step it), the machine row (opens the machine tiles), then the workout page's buttons as workout | 085 |
-| setByHand | the count page over the workout page, three full-width rows of at least 44 pt on a 40 mm face unscrolled: the exercise (its drawing and name), the reps outlined green starting at the last set's count (9) with − and + either side (44 pt), the weight ("kg 24"); the sheet's close button and the green checkmark at top right | the exercise row (opens the drawings), the weight row (a first tap gives it the Crown, a second opens the bell tiles), Save (the checkmark); no Cancel: the close button cancels; the Crown steps the green row, the count by one, 1…200 | 059, 066 |
+| setByHand | the count page over the workout page, three full-width rows of at least 44 pt on a 40 mm face unscrolled: the exercise (its drawing and name), the reps outlined green starting at the last set's count (9) with − and + either side (44 pt), the weight ("kg 24"); the sheet's close button and the green checkmark at top right | the exercise row (opens the drawings), the weight row (a first tap gives it the Crown, a second opens the bell tiles and "Bar" under them; on plates, "lb 155" and a tap opens the plates page), Save (the checkmark); no Cancel: the close button cancels; the Crown steps the green row, the count by one, 1…200 | 059, 066 |
+| setByHandBarbell | the plates page over the count page, opened on the last split squat's 155 lb: "155 lb" large over "45/side", the bars as three tiles (45, 58, 65, the 65 green), the plates as four tiles of at least 44 pt, two across (45 with "×1", 35, 25, 10), the sheet's close button and the green checkmark at top right; a Crown turn down, "Bells instead" | a bar, a plate (a tap puts one on each side, a press and hold takes one off), Save (the checkmark), "Bells instead" (back to the bell tiles) | 086 |
 | setByHandExercise | the count page's drawings over it: every exercise as a 52 pt tile, three across, the current one outlined in white, the sheet's close button | an exercise (sets it and closes the grid) | 059 (#154) |
 | workoutEnd | the bottom of the workout page: the exercise picker's tail, then "End writes one workout to Health" under the buttons | End workout (green), Discard (red, asks first) | 048 |
 | workoutRecording | as recording, with a "♥ 141" chip between the count and the time | as recording | 048 |
@@ -1008,7 +1009,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 ### User Story 085:
 
 - **Summary:** On a cardio machine, the machine, its incline and its intensity are set from the wrist in a few taps, and each change reaches Larry with the time it was made
-- **Status:** implemented on `feat/2026-11-24-machine-level-jap` (ea-jap), verified on the host (`WorkoutEventsTests`: the machine on the first message rides `started` with no `level`, a change is one `level` at the wrist's time and a repeat none, a message without a machine never clears it, an older watch's message decodes, each kind's machine and the steps' range) and the watch simulator (`just watch-screens`, workoutMachine: ELLIPTICAL over the clock and "♥ 128 BPM", then "Incline 6" outlined green and "Intensity 8", − and + either side; the strength shots unchanged); the Crown, the two-second settle, the tap and a real `level` reaching the Cockpit from a wrist session, pending (the simulator has no mirrored workout)
+- **Status:** implemented in [2164c87](https://github.com/idvorkin/exercise-analyzer/commit/2164c87), [7240397](https://github.com/idvorkin/exercise-analyzer/commit/7240397) (ea-jap, #382), verified on the host (`WorkoutEventsTests`: the machine on the first message rides `started` with no `level`, a change is one `level` at the wrist's time and a repeat none, a message without a machine never clears it, an older watch's message decodes, each kind's machine and the steps' range) and the watch simulator (`just watch-screens`, workoutMachine: ELLIPTICAL over the clock and "♥ 128 BPM", then "Incline 6" outlined green and "Intensity 8", − and + either side; the strength shots unchanged); the Crown, the two-second settle, the tap and a real `level` reaching the Cockpit from a wrist session, pending (the simulator has no mirrored workout)
 - **Why:** Larry, 2026-11-24 (igor2-88g.1620), on Igor's ask from the elliptical that morning: a machine object on `started` and every tick, "plus a 'level' event type the moment he changes incline or intensity … so heart rate can be read per level"
 
 #### Use Case:
@@ -1040,6 +1041,39 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Notes:** the watch is the one place the setting is made; the phone, which sends the events (084), takes it from the workout's messages from the wrist and keeps the last one it heard, so a message without a machine (an older watch build, a restart's first message) never clears it. Incline and intensity are the numbers the machine shows, with no unit.
 
 - **Issues:** ea-jap; [#376](https://github.com/idvorkin/exercise-analyzer/issues/376) (the events)
+
+---
+
+### User Story 086:
+
+- **Summary:** A set typed on the wrist takes its weight as plates on a bar, the 65 lb bar among them, as the phone's does
+- **Status:** implemented on `feat/2026-11-24-watch-barbell-375` (ea-3xw), verified on the host (`WatchBarbellTests`: 155 lb on the 65 lb bar and how it is spoken, a wrist-typed set crossing with its plates, a stuck transfer read past the plates' nested object, the wrist opening on the last plates or bell, the phone's status carrying the last plates and an older status decoding) and the watch simulator (`just watch-screens`, setByHandBarbell: "155 lb" over "45/side", the bars 45, 58 and 65 with 65 green, the 45 plate "×1"; setByHand unchanged at "kg 24"); the phone's three-bar sheet by build only (no launch hook opens it); the plate taps and press and hold on the wrist, and a typed set reaching the phone and the Cockpit, pending on the watch and phone
+- **Why:** Igor, 2026-11-15 (#375), from the gym: "Reveras lungea shod be weights on a side 10 25 35 45 and manual. Them show full weight x2 + 65"; the phone got plates on 2026-11-24 (083, #377), the wrist kept its bells
+
+#### Use Case:
+- **As a** lifter doing barbell lunges with the phone out of reach
+- **I want to** tap the plates I loaded on the watch's Set by hand
+- **so that** the set is logged at its real weight without walking to the phone
+
+#### Acceptance Criteria:
+- **Scenario:** Plates on the 65 lb bar from the wrist
+- **Given:** Set by hand's count page in a workout, its weight row's tiles open (a second tap on the weight row)
+- **When:** I tap "Bar" under the bells, then the 65 tile among the bars (45, 58 and 65 lb) and the 45 plate once
+- **Then:** the plates page reads "155 lb" and "45/side"; a tap on a plate (45, 35, 25, 10) puts one on each side and a press and hold takes one off, with its count per side on the tile; the checkmark closes it and the weight row reads "lb 155"; Save sends the set with its plates, and the phone's row says "155 lb" as one typed there would (083), reaching Larry's Cockpit with the bar and the plates (084)
+
+- **Scenario:** The wrist opens on the last plates
+- **Given:** the newest weight of split squats, on the phone or typed on the wrist, is 45 a side on the 65 lb bar
+- **When:** I open Set by hand on a split squat
+- **Then:** the weight row reads "lb 155" and a tap opens the plates page on that load; "Bells instead" at its bottom goes back to the bell tiles, and a bell picked there replaces the plates
+
+- **Scenario:** The 65 lb bar on the phone
+- **Given:** the phone's plate sheet (083)
+- **When:** I look at its bars
+- **Then:** they read "Barbell 45", "SSB 58" and "Bar 65", and VoiceOver says "155 pounds, 65 lb bar, 45 per side" for 45 a side on the 65
+
+- **Notes:** a set typed on the wrist with plates reaches the phone by the queued transfer and the watch's context, as a bell's does (059, #197); the phone tells the wrist each exercise's last plates beside its last bells. A phone or iPad on a build before this one cannot read a set on the 65 lb bar and drops it, so the phone and the iPad get this build before the watch does. #375's reverse lunge as an exercise of its own and a typed (manual) weight are not part of this story (ea-3xw's follow-up).
+
+- **Issues:** [#375](https://github.com/idvorkin/exercise-analyzer/issues/375); ea-3xw
 
 ---
 
