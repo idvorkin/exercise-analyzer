@@ -26,6 +26,11 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
   public var kind: WorkoutKind? = nil
   /// With `ending`: the earlier end the lifter took on "Looks like you're done" (#330); nil ends it now.
   public var endedAt: Double? = nil
+  /// The cardio machine and its setting as last set on the wrist (story 085), on every message once there is one;
+  /// nil from a strength workout and from a watch before 085, which the phone takes as "unchanged".
+  public var machine: WorkoutEvent.Machine? = nil
+  /// When `machine` was last changed on the wrist, seconds since 1970: the `level` event's time.
+  public var machineAt: Double? = nil
 
   public init(
     startedAt: Double, heartRate: Int? = nil, heartRateAverage: Int? = nil, heartRateMax: Int? = nil, sets: Int = 0,
@@ -77,6 +82,19 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .stairs: "Stairs"
     case .hiit: "HIIT"
     case .yoga: "Yoga"
+    }
+  }
+
+  /// The machine it is done on at the gym (story 085), what the wrist's machine row opens on; nil for a workout
+  /// with no machine (strength, HIIT, yoga), which has no machine rows.
+  public var machineName: String? {
+    switch self {
+    case .elliptical: "Elliptical"
+    case .run, .walk: "Treadmill"
+    case .bike: "Bike"
+    case .row: "Rower"
+    case .stairs: "Stairs"
+    case .strength, .hiit, .yoga: nil
     }
   }
 

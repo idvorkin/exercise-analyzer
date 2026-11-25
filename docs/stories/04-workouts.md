@@ -1061,7 +1061,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** the workout goes on
 - **Then:** `started`, the sets, any level change and `ended` wait and go oldest first, each once, when it is back (tried again on their own, 30 s after a miss and doubling to 10 min, and whenever the app comes to the front); only the newest tick waits, not every one missed; anything older than a day is dropped; a refusal is logged and not sent again; a Cockpit without the route yet is "not yet", and the events wait
 
-- **Notes:** `POST /workout` on the Cockpit, idempotent by each event's id, the same contract as Grabber's arrivals (`POST /context`). A machine's name, incline and intensity ride on `started` and every tick, and a `level` event marks each change, once the app can say them (the shape has them; nothing sets them yet). No location and no heart-rate zone: the Cockpit works the zone out.
+- **Notes:** `POST /workout` on the Cockpit, idempotent by each event's id, the same contract as Grabber's arrivals (`POST /context`). A machine's name, incline and intensity ride on `started` and every tick, and a `level` event marks each change, at the time it was made on the wrist (085). No location and no heart-rate zone: the Cockpit works the zone out.
 
 - **Issues:** [#376](https://github.com/idvorkin/exercise-analyzer/issues/376)
 

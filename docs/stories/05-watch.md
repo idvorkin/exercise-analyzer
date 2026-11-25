@@ -18,6 +18,7 @@ state and is not in the table.
 | idle | "Phone ready", exercise picker, rest length picker, the rest count while resting, the last-set line (or "Analyzing…" while the pass runs) | Start workout (green), Record (red), Preview (below it) | 017, 041, 045, 046, 047, 048 |
 | workoutStart | a workout before its first set: WORKOUT in green over the session clock (counting up by itself), "♥ 96 BPM", no sets line yet; no figure art, no Start workout | Record (red), Preview, "+ Set by hand" under Preview, the pickers; End workout and Discard below the pickers | 048, 059 |
 | workout | between sets the head is the rest: "REST · 1:30" in orange over the rest count, large, white until the rest length and orange after; then "♥ 128 BPM · 42:13" with the session clock small and green, the sets by exercise with their drawings ("[swing] 6"), the last-set line and the pickers as idle; no second rest line | Record (red), Preview, "+ Set by hand" under Preview (a Crown turn below the first screen), the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048, 050, 059 |
+| workoutMachine | an elliptical workout: ELLIPTICAL in green over the session clock and "♥ 128 BPM", then the machine rows, full width and at least 44 pt: "Incline 6" outlined green with the Crown and "Intensity 8", − and + either side of each, and under them (a Crown turn down) "Elliptical" with a chevron | Incline and Intensity (a tap gives the row the Crown; − and + step it), the machine row (opens the machine tiles), then the workout page's buttons as workout | 085 |
 | setByHand | the count page over the workout page, three full-width rows of at least 44 pt on a 40 mm face unscrolled: the exercise (its drawing and name), the reps outlined green starting at the last set's count (9) with − and + either side (44 pt), the weight ("kg 24"); the sheet's close button and the green checkmark at top right | the exercise row (opens the drawings), the weight row (a first tap gives it the Crown, a second opens the bell tiles), Save (the checkmark); no Cancel: the close button cancels; the Crown steps the green row, the count by one, 1…200 | 059, 066 |
 | setByHandExercise | the count page's drawings over it: every exercise as a 52 pt tile, three across, the current one outlined in white, the sheet's close button | an exercise (sets it and closes the grid) | 059 (#154) |
 | workoutEnd | the bottom of the workout page: the exercise picker's tail, then "End writes one workout to Health" under the buttons | End workout (green), Discard (red, asks first) | 048 |
@@ -1001,6 +1002,44 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Then:** the workout page heads with RUN; End writes an indoor run (no GPS route) to Health; Workouts' line reads "Run · 7:02 AM · 30 min · ♥ 151" with the runner sign; a later Start workout never asks to continue the run (#238), though a gym hour that ended before the run still is offered; two runs under 30 minutes apart are one Run line, and a run beside a row or a strength workout is a plain line
 
 - **Issues:** [#339](https://github.com/idvorkin/exercise-analyzer/issues/339)
+
+---
+
+### User Story 085:
+
+- **Summary:** On a cardio machine, the machine, its incline and its intensity are set from the wrist in a few taps, and each change reaches Larry with the time it was made
+- **Status:** implemented on `feat/2026-11-24-machine-level-jap` (ea-jap), verified on the host (`WorkoutEventsTests`: the machine on the first message rides `started` with no `level`, a change is one `level` at the wrist's time and a repeat none, a message without a machine never clears it, an older watch's message decodes, each kind's machine and the steps' range) and the watch simulator (`just watch-screens`, workoutMachine: ELLIPTICAL over the clock and "♥ 128 BPM", then "Incline 6" outlined green and "Intensity 8", − and + either side; the strength shots unchanged); the Crown, the two-second settle, the tap and a real `level` reaching the Cockpit from a wrist session, pending (the simulator has no mirrored workout)
+- **Why:** Larry, 2026-11-24 (igor2-88g.1620), on Igor's ask from the elliptical that morning: a machine object on `started` and every tick, "plus a 'level' event type the moment he changes incline or intensity … so heart rate can be read per level"
+
+#### Use Case:
+- **As a** lifter on the elliptical (or a treadmill, a bike, a rower, the stairs) with the watch on my wrist
+- **I want to** tell the watch the machine's incline and intensity as I change them on the machine
+- **so that** Larry can read my heart rate against each level, without me stopping to type anything on the phone
+
+#### Acceptance Criteria:
+- **Scenario:** The machine rows on a cardio workout
+- **Given:** a workout started as Elliptical, Run, Walk, Bike, Row or Stairs under Other… (080, 081)
+- **When:** I look at the workout page
+- **Then:** under the head sit three full-width rows of at least 44 pt: "Incline" and "Intensity", each "—" until I set it, then the machine's name (Elliptical for an elliptical, Treadmill for a run or a walk, Bike, Rower, Stairs); a strength, HIIT or yoga workout has no machine rows
+
+- **Scenario:** Turning the intensity up
+- **Given:** the machine rows of a running elliptical workout
+- **When:** I tap Intensity (it turns green and takes the Crown) and turn the Crown, or tap its − and + (44 pt), from "—" to 8
+- **Then:** the first step starts from the last intensity I set on that machine (else 1 for intensity and 0 for incline), each step is one whole number with a tick, 0 to 30; two seconds after the last step the setting is taken, the wrist taps once, and the phone's next `level` event to the Cockpit carries the machine, incline and intensity at the time of that last step, once, however many steps it took (`watch_machine_set`); every tick from then carries it
+
+- **Scenario:** A different machine
+- **Given:** a running cardio workout
+- **When:** I tap the machine's name and pick Treadmill among the tiles Elliptical, Treadmill, Bike, Rower and Stairs
+- **Then:** the name changes, incline and intensity go back to "—", and a `level` event says the new machine
+
+- **Scenario:** The setting survives a restart
+- **Given:** a set machine in a running workout
+- **When:** the watch app restarts and takes the workout up again (#190)
+- **Then:** the rows show the machine and its setting as before, and no `level` event is sent for it again; a workout started with only the machine's name sends it on `started` and no `level` until I set a number
+
+- **Notes:** the watch is the one place the setting is made; the phone, which sends the events (084), takes it from the workout's messages from the wrist and keeps the last one it heard, so a message without a machine (an older watch build, a restart's first message) never clears it. Incline and intensity are the numbers the machine shows, with no unit.
+
+- **Issues:** ea-jap; [#376](https://github.com/idvorkin/exercise-analyzer/issues/376) (the events)
 
 ---
 
