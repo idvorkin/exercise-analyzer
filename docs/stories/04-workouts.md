@@ -1037,7 +1037,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 084:
 
 - **Summary:** The running workout's data goes to Larry's Cockpit as it happens, stored there for him
-- **Status:** implemented on `feat/2026-11-24-workout-events-376` (ea-6ap), the shape agreed with Larry on 2026-11-24; verified on the host (`WorkoutEventsTests`) and the simulator (iPhone 17, switch on, `SWING_LIVE_WORKOUT=2 SWING_WORKOUT_EVOLVE=1` against a stand-in Cockpit at `SWING_COCKPIT_URL`: `POST /workout` with the Cockpit's Origin took started, two sets and ended, each once, oldest first, `workout_event` logging queued and sent; the first send waited ~15 s behind the launch's model load); the Cockpit's route is Larry's (cockpit-772.2); on the phone with a real workout, ticks with the screen locked and the first real POST, pending
+- **Status:** implemented on `feat/2026-11-24-workout-events-376` (ea-6ap), the shape agreed with Larry on 2026-11-24; verified on the host (`WorkoutEventsTests`) and the simulator (iPhone 17, switch on, `SWING_LIVE_WORKOUT=2 SWING_WORKOUT_EVOLVE=1` against a stand-in Cockpit at `SWING_COCKPIT_URL`: `POST /workout` with the Cockpit's Origin took started, two sets and ended, each once, oldest first, `workout_event` logging queued and sent; the first send waited ~15 s behind the launch's model load); the Cockpit's route is Larry's (cockpit-772.2); on the phone with a real workout, ticks with the screen locked and the first real POST, pending. A simulator sends nowhere without `SWING_COCKPIT_URL` (ea-d8k, dc3403d): verified on the host (`WorkoutSyncTests.testASimulatorSendsOnlyToAStandInCockpit`) and by a simulator build
 - **Why:** Igor, 2026-11-24, on the elliptical: "All the apps should be able to talk to Larry. So if I'm doing a workout, you can be sending workout stats to Larry"; then "I'm less interested in how the coaching sounds, and more interested in getting the data first, 'cause I actually have a lot of data that's not being stored around my workouts."
 
 #### Use Case:
@@ -1061,16 +1061,21 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** the workout goes on
 - **Then:** `started`, the sets, any level change and `ended` wait and go oldest first, each once, when it is back (tried again on their own, 30 s after a miss and doubling to 10 min, and whenever the app comes to the front); only the newest tick waits, not every one missed; anything older than a day is dropped; a refusal is logged and not sent again; a Cockpit without the route yet is "not yet", and the events wait
 
+- **Scenario:** A simulator never reaches Larry's real Cockpit
+- **Given:** the app running in a simulator, with the switch on (left on from a check) and no stand-in Cockpit named
+- **When:** a test workout runs or the archive sync comes due
+- **Then:** nothing is sent anywhere and the session log says once that there is no Cockpit to send to; with a stand-in Cockpit named, the simulator sends to it as the phone sends to the real one; the phone always sends to the real one
+
 - **Notes:** `POST /workout` on the Cockpit, idempotent by each event's id, the same contract as Grabber's arrivals (`POST /context`). A machine's name, incline and intensity ride on `started` and every tick, and a `level` event marks each change, at the time it was made on the wrist (085). No location and no heart-rate zone: the Cockpit works the zone out.
 
-- **Issues:** [#376](https://github.com/idvorkin/exercise-analyzer/issues/376)
+- **Issues:** [#376](https://github.com/idvorkin/exercise-analyzer/issues/376), ea-d8k
 
 ---
 
 ### User Story 087:
 
 - **Summary:** Every workout the phone holds reaches Larry's Cockpit whole, even one the live events missed
-- **Status:** implemented on `feat/2026-11-25-workout-sync` (ea-ya3), to the Cockpit's contract of 2026-11-25 and Larry's answers on the thread; verified on the host (`WorkoutSyncTests` against a fake Cockpit: paging, not-yet, matching by id and start, what is and is not sent, a set in a merged line's gap, the summary body, a pass then a second pass sending nothing, the 409, no answer and refusals); the simulator check is in the PR; on the phone against the real Cockpit, pending. A deleted workout marked discarded (ea-a6d) on `feat/2026-11-25-discarded-workouts`: verified on the host (`WorkoutSyncTests`: the last copy of each own workout of a merged line with its sets, weights and peaks, kept across a relaunch; sent once under the Cockpit's id; never-held and already-discarded settled unsent; no answer kept and retried under the same id; a taken discard whose answer was lost not resent; same-second `rev`; deleting the oldest workout) and on the simulator against a local stand-in Cockpit (deleted with the Cockpit down, sent marked discarded on the next launch, nothing on the third); on the phone, pending
+- **Status:** implemented on `feat/2026-11-25-workout-sync` (ea-ya3), to the Cockpit's contract of 2026-11-25 and Larry's answers on the thread; verified on the host (`WorkoutSyncTests` against a fake Cockpit: paging, not-yet, matching by id and start, what is and is not sent, a set in a merged line's gap, the summary body, a pass then a second pass sending nothing, the 409, no answer and refusals); the simulator check is in the PR; on the phone against the real Cockpit, pending. A deleted workout marked discarded (ea-a6d) on `feat/2026-11-25-discarded-workouts`: verified on the host (`WorkoutSyncTests`: the last copy of each own workout of a merged line with its sets, weights and peaks, kept across a relaunch; sent once under the Cockpit's id; never-held and already-discarded settled unsent; no answer kept and retried under the same id; a taken discard whose answer was lost not resent; same-second `rev`; deleting the oldest workout) and on the simulator against a local stand-in Cockpit (deleted with the Cockpit down, sent marked discarded on the next launch, nothing on the third); on the phone, pending. A summary whose sets differ from the wrist's count logs both (ea-d8k, dc3403d): verified on the host (`WorkoutSyncTests.testASummaryWhoseSetsDoNotMatchTheWristsCountSaysBoth`)
 - **Why:** Igor, 2026-11-25 (via Larry, thread igor2-88g.1620): "Can we have cockpit required missing workouts and last version it has of a workout… Really for igor2 storage."
 
 #### Use Case:
@@ -1099,8 +1104,13 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **When:** it goes from the phone: Delete workout (065, each workout of a merged line), a part Trim end drops (078), or the wrist's Discard landing after the workout was saved
 - **Then:** the phone keeps its last copy of the workout as it was just before (every set inside it with its weight and its heart-rate peak, from the same heart rate a whole workout uses, read before the record goes), across relaunches, and sends it once, whole, marked discarded, under the Cockpit's id (matched by id or else by a start within 2 s), as soon as nothing live waits; the Cockpit keeps the workout and its sets and marks it deleted; no answer keeps the copy and tries again as any whole workout does, under the same id; the copy goes once the Cockpit has taken it (or refused it, logged), or once its list shows the workout discarded already, or once a whole listing holds no such workout (it never had it: nothing to mark); a workout the Cockpit holds discarded is never sent back as live, and a deleted workout's copy is never sent again once the Cockpit shows it discarded; a delete made with the switch off is kept and goes once it is on (switching off does not drop it); at most the 200 newest deletions wait
 
+- **Scenario:** A whole workout whose sets do not add up says so
+- **Given:** a workout the wrist counted some sets in, with a different number of saved sets inside it on the phone
+- **When:** it is sent whole
+- **Then:** it is still sent as it is, and the session log's line for it names both counts, so an archive copy with fewer sets than the wrist counted can be traced to the phone
+
 - **Notes:** `GET /workout/have` (paged by `next`) and a `type: "summary"` body on `POST /workout`, the Cockpit's contract `docs/workout-sync-contract.md` (story 340 there). One summary per workout the wrist recorded, the same unit as the live events' workout; a set in the gap between two workouts shown as one line goes with the earlier one. Only this phone's own workouts are sent, never a row synced in from another device. A workout the Cockpit heard discarded is not sent back. The Cockpit keeps what the phone deleted (Larry, 2026-11-25: "don't tombstone and don't drop it. Send a fresh summary with a newer computed_at and discarded: true"): the deleted workout's summary has its own id, built from when it was deleted, so it is never mistaken for a repeat of the last live copy, and its `computed_at` is when it is sent, newer than any copy before. A set's heart-rate peak in a summary replaces the live one, so it is read from Health before sending (stored for the page as opening it does), taking the live readings for a just-ended workout when they hold more samples, and the merged line's stored heart rate only when neither has any. Not covered yet: a workout of this phone's deleted on another device (its tombstone reaches the phone, which sends nothing; ea-j3d), and a deleted set (ea-hp8).
 
-- **Issues:** ea-ya3, ea-a6d
+- **Issues:** ea-ya3, ea-a6d, ea-d8k
 
 ---

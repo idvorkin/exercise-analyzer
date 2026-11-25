@@ -97,6 +97,9 @@ public enum WorkoutSync {
       public var duplicate: Bool? = nil
       public var status: Int? = nil
       public var reason: String? = nil
+      /// The wrist's set count, named only when the sets sent (`sets`) differ from it (ea-d8k): the summary goes
+      /// as it is, and the log says the archive copy holds fewer (or more) sets than the wrist counted.
+      public var wristSets: Int? = nil
     }
 
     /// Summaries tried (a 409's resend is the same one).
@@ -325,6 +328,7 @@ public enum WorkoutSync {
       var line = Report.Line(
         action: "sent", id: event.id, workoutID: event.workoutID, sets: event.setList?.count ?? 0,
         discarded: planned.discardedAt != nil ? true : nil)
+      if line.sets != event.sets { line.wristSets = event.sets }
       switch outcome {
       case .sent(let duplicate):
         report.sent += 1

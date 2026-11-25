@@ -22,10 +22,16 @@ final class CockpitWorkoutSender {
   static let shared = CockpitWorkoutSender()
   static let enabledKey = "sendWorkoutsToLarry"
   private static let streamKey = "workoutStream"
-  /// Larry's Cockpit, as Grabber reaches it; `SWING_COCKPIT_URL` points elsewhere for a test.
-  nonisolated static let cockpit =
-    URL(string: ProcessInfo.processInfo.environment["SWING_COCKPIT_URL"] ?? "https://c-5004.squeaker-teeth.ts.net")
-    ?? URL(fileURLWithPath: "/")
+  /// Larry's Cockpit, as Grabber reaches it; `SWING_COCKPIT_URL` points elsewhere for a test. Nil in a simulator
+  /// without one (ea-d8k): a switch left on there must not send a fake workout to Larry's archive.
+  nonisolated static let cockpit: URL? = {
+    #if targetEnvironment(simulator)
+      let simulator = true
+    #else
+      let simulator = false
+    #endif
+    return WorkoutEventWire.cockpit(environment: ProcessInfo.processInfo.environment, simulator: simulator)
+  }()
 
   /// The exercise menu's switch; off drops whatever waits.
   var enabled: Bool {
@@ -76,6 +82,8 @@ final class CockpitWorkoutSender {
   @ObservationIgnored private var syncWanted = true
   @ObservationIgnored private var lastSyncAt: Date?
   @ObservationIgnored private var syncBudget = CockpitWorkoutSender.syncBudget
+  /// The launch has logged that there is no Cockpit to send to (a simulator without a stand-in, ea-d8k).
+  @ObservationIgnored private var saidNoCockpit = false
   /// Summary ids the Cockpit refused for good; a changed workout gets a new id and goes again.
   private var refusedSummaries: [String] {
     get { UserDefaults.standard.stringArray(forKey: Self.refusedKey) ?? [] }
@@ -154,13 +162,22 @@ final class CockpitWorkoutSender {
       f["reason"] = "waited over a day"
       onEvent?("workout_event", f)
     }
+    guard let cockpit = Self.cockpit else {
+      if !saidNoCockpit {
+        saidNoCockpit = true
+        onEvent?(
+          "workout_event",
+          ["action": "no_cockpit", "waiting": stream.pending.count, "reason": "a simulator without SWING_COCKPIT_URL"])
+      }
+      return
+    }
     guard let event = stream.pending.first else {
-      sync()
+      sync(cockpit: cockpit)
       return
     }
     sending = true
     Task { [weak self] in
-      let outcome = await Self.send(event)
+      let outcome = await Self.send(event, cockpit: cockpit)
       guard let self else { return }
       self.sending = false
       var f = self.fields(event, action: "sent")
@@ -255,7 +272,7 @@ final class CockpitWorkoutSender {
 
   /// The archive sync (087): asks the Cockpit what it holds, then sends, one at a time and oldest first, what it
   /// lacks or holds older, within the launch's budget. Stops as soon as anything live wants the line.
-  private func sync() {
+  private func sync(cockpit: URL) {
     guard syncWanted, !sending, quiet, syncBudget > 0, let mirror, let recents else { return }
     syncWanted = false
     sending = true
@@ -263,7 +280,7 @@ final class CockpitWorkoutSender {
     let workouts = mirror.index.workouts
     let since = WorkoutSync.since(workouts: workouts, deleted: deletedWorkouts)
     Task { [weak self] in
-      let have = await WorkoutSync.fetchHave(cockpit: Self.cockpit, since: since, transport: Self.transport)
+      let have = await WorkoutSync.fetchHave(cockpit: cockpit, since: since, transport: Self.transport)
       guard let self else { return }
       guard let have else {
         // An older Cockpit, or none in reach: it gets no summary; the next launch or coming to the front asks again.
@@ -298,7 +315,7 @@ final class CockpitWorkoutSender {
         let read = planned.discardedAt == nil ? await self.heartRate(of: planned.workout, in: mirror) : nil
         let series = [planned.workout.id: read].compactMapValues { $0 }
         let report = await WorkoutSync.send(
-          [planned], heartRate: series, cockpit: Self.cockpit, now: { Date() }, transport: Self.transport)
+          [planned], heartRate: series, cockpit: cockpit, now: { Date() }, transport: Self.transport)
         self.refusedSummaries += report.refused
         // Taken (or refused, logged): the copy goes. No answer keeps it, to go again under the same id.
         if planned.discardedAt != nil, report.retry == nil { self.forgetDeleted([planned.workout.id]) }
@@ -310,7 +327,14 @@ final class CockpitWorkoutSender {
           if let duplicate = line.duplicate { f["duplicate"] = duplicate }
           if let status = line.status { f["status"] = status }
           if let reason = line.reason { f["reason"] = reason }
+          if let wristSets = line.wristSets { f["wrist_sets"] = wristSets }
           self.onEvent?("workout_sync", f)
+          if let wristSets = line.wristSets {
+            // ea-d8k: an archive copy with fewer sets than the wrist counted is traced here, not guessed at.
+            self.onEvent?(
+              "workout_sync",
+              ["action": "sets_mismatch", "workout_id": line.workoutID, "set_list": line.sets, "wrist_sets": wristSets])
+          }
         }
         if report.retry != nil {
           stoppedOnRetry = true
@@ -353,7 +377,7 @@ final class CockpitWorkoutSender {
     }
   }
 
-  private nonisolated static func send(_ event: WorkoutEvent) async -> WorkoutEventWire.Outcome {
+  private nonisolated static func send(_ event: WorkoutEvent, cockpit: URL) async -> WorkoutEventWire.Outcome {
     do {
       let request = try WorkoutEventWire.request(event, cockpit: cockpit, sentAt: Date())
       let (data, response) = try await URLSession.shared.data(for: request)

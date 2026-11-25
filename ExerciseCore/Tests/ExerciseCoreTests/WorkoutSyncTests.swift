@@ -334,6 +334,39 @@ final class WorkoutSyncTests: XCTestCase {
     XCTAssertNil(refused.retry, "a refusal does not stop the others")
   }
 
+  // MARK: - where it goes, and a count that does not add up (ea-d8k)
+
+  /// The simulator's fake workout reached the live Cockpit on 2026-11-25 (BF2CB74A, an empty set list): a
+  /// simulator sends only to a stand-in Cockpit it is pointed at.
+  func testASimulatorSendsOnlyToAStandInCockpit() {
+    let standIn = ["SWING_COCKPIT_URL": "http://127.0.0.1:8778"]
+    XCTAssertNil(WorkoutEventWire.cockpit(environment: [:], simulator: true), "no stand-in: nowhere")
+    XCTAssertEqual(
+      WorkoutEventWire.cockpit(environment: standIn, simulator: true), URL(string: "http://127.0.0.1:8778"))
+    XCTAssertEqual(WorkoutEventWire.cockpit(environment: [:], simulator: false), WorkoutEventWire.liveCockpit)
+    XCTAssertEqual(
+      WorkoutEventWire.cockpit(environment: standIn, simulator: false), URL(string: "http://127.0.0.1:8778"))
+    XCTAssertNil(WorkoutEventWire.cockpit(environment: ["SWING_COCKPIT_URL": ""], simulator: true))
+  }
+
+  func testASummaryWhoseSetsDoNotMatchTheWristsCountSaysBoth() async {
+    // The wrist counted 2 sets (`workout`); one saved set lies inside W0 and none inside W1.
+    let plan = WorkoutSync.plan(
+      workouts: [workout("W0", from: 0, to: 600), workout("W1", from: 9000, to: 9600)],
+      entries: [set("a", at: 100), set("b", at: 200), set("c", at: 9100)], have: [], refused: [])
+    let short = WorkoutSync.plan(
+      workouts: [workout("W1", from: 9000, to: 9600)], entries: [], have: [], refused: [])
+    let fake = FakeCockpit()
+    let matched = await WorkoutSync.send(
+      plan, heartRate: [:], cockpit: cockpit, now: { self.at(20000) }, transport: { fake.handle($0) })
+    XCTAssertEqual(matched.lines.map(\.wristSets), [nil, 2], "W0 holds both its sets; W1 holds one of 2")
+    let empty = await WorkoutSync.send(
+      short, heartRate: [:], cockpit: cockpit, now: { self.at(20000) }, transport: { fake.handle($0) })
+    XCTAssertEqual(empty.lines.first?.sets, 0)
+    XCTAssertEqual(empty.lines.first?.wristSets, 2, "sent as it is, both counts named")
+    XCTAssertEqual(empty.sent, 1)
+  }
+
   // MARK: - a workout deleted on the phone (ea-a6d)
 
   private let series = HeartRateSeries(samples: [
