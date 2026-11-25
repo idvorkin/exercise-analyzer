@@ -15,6 +15,10 @@ import UIKit
 @Observable
 final class RecentsStore {
   private(set) var entries: [RecentEntry] = []
+  /// Sets went (Delete set, another device's delete through iCloud, the same clip saved again under a new set): the
+  /// rows as they were, for the Cockpit sender to send marked deleted in their workout's next summary (story 087,
+  /// ea-hp8).
+  @ObservationIgnored var onRemoved: (([RecentEntry]) -> Void)?
   /// What was wrong with index.json at launch, if anything; the session logs it.
   let indexDamage: IndexDamage?
 
@@ -120,6 +124,8 @@ final class RecentsStore {
       }
     }
     let retired = Set(entries.map(\.id)).subtracting(saved.entries.map(\.id))
+    let retiredRows = entries.filter { retired.contains($0.id) }
+    if !retiredRows.isEmpty { onRemoved?(retiredRows) }
     removedIDs.formUnion(retired)
     noteDeleted(Array(retired))
     entries = saved.entries
@@ -241,7 +247,10 @@ final class RecentsStore {
 
   func remove(id: String) {
     removedIDs.insert(id)
-    if entry(id: id) != nil { noteDeleted([id]) }
+    if let gone = entry(id: id) {
+      noteDeleted([id])
+      onRemoved?([gone])
+    }
     entries.removeAll { $0.id == id }
     try? FileManager.default.removeItem(at: folder(for: id))
     try? persistIndex()
@@ -254,6 +263,9 @@ final class RecentsStore {
     var index = RecentsIndex(entries: entries)
     let result = index.merge(remote: rows, tombstones: tombstones, me: me)
     guard result.changed else { return result }
+    let gone = Set(result.removedIDs)
+    let goneRows = entries.filter { gone.contains($0.id) }
+    if !goneRows.isEmpty { onRemoved?(goneRows) }
     for id in result.removedIDs {
       removedIDs.insert(id)
       try? FileManager.default.removeItem(at: folder(for: id))
