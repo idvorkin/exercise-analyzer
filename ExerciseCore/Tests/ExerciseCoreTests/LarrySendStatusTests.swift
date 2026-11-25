@@ -33,11 +33,24 @@ final class LarrySendStatusTests: XCTestCase {
     XCTAssertEqual(status.line(enabled: true, waiting: 0, now: now), "On · last sent 2 days ago")
   }
 
-  /// A whole workout the archive sync sent (087) counts as a send, as a live event does (084).
-  func testAMovedSummaryCountsAsASend() {
+  /// A 409 (`moved`) only renames the summary before it goes again; the Cockpit took nothing until a `sent`.
+  func testAMovedSummaryIsNotASend() {
     var status = LarrySendStatus()
+    status.record(action: "sent", reason: nil, at: now.addingTimeInterval(-600))
     status.record(action: "moved", reason: nil, at: now)
-    XCTAssertEqual(status.lastSentAt, now)
+    status.record(action: "waiting", reason: "timed out", at: now)
+    XCTAssertEqual(status.lastSentAt, now.addingTimeInterval(-600))
+    XCTAssertEqual(status.problem, "No answer from Larry's Cockpit, trying again: timed out")
+  }
+
+  /// The archive sync asking what the Cockpit holds and getting no answer (`not_yet`) is a miss too.
+  func testAnUnansweredArchiveAskIsAMiss() {
+    var status = LarrySendStatus()
+    status.record(action: "not_yet", reason: nil, at: now)
+    XCTAssertEqual(status.problem, "No answer from Larry's Cockpit")
+    XCTAssertNil(status.lastSentAt)
+    status.record(action: "sent", reason: nil, at: now)
+    XCTAssertNil(status.problem)
   }
 
   func testAMissSaysWhyUntilTheNextSend() {

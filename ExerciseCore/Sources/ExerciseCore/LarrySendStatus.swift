@@ -19,11 +19,13 @@ public struct LarrySendStatus: Codable, Equatable, Sendable {
   public mutating func record(action: String, reason: String?, at time: Date) {
     let why = reason.map { ": \($0)" } ?? ""
     switch action {
-    case "sent", "moved":
+    case "sent":
       lastSentAt = time
       problem = nil
     case "waiting":
       problem = "No answer from Larry's Cockpit, trying again\(why)"
+    case "not_yet":
+      problem = "No answer from Larry's Cockpit"
     case "refused":
       problem = "Larry's Cockpit refused one\(why)"
     case "off":
