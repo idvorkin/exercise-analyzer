@@ -8,8 +8,8 @@
 //  Cockpit what it holds and sends, whole, each of the phone's workouts it lacks or holds older, through the same
 //  one-at-a-time sending and the same retries, as `workout_sync` lines. On launch, on coming to the front (at most
 //  every 5 minutes) and once a workout's live events have all gone; at most 50 summaries per launch.
-//  ponytail: an ending that lands after the session ended (ea-iwi's late Discard) is not sent again as a
-//  discard. Upgrade: a correcting `ended` for the same workout id once the Cockpit says how it takes one.
+//  A workout that goes from the phone (Delete, Trim end's dropped parts, ea-iwi's late Discard) keeps its last
+//  copy here, across launches, and goes whole, marked discarded, while the Cockpit holds it live (ea-a6d).
 
 import ExerciseCore
 import Foundation
@@ -54,6 +54,10 @@ final class CockpitWorkoutSender {
   private static let syncEvery: TimeInterval = 5 * 60
   private static let refusedKey = "workoutSyncRefused"
   private static let refusedKept = 200
+  /// Deleted workouts' last copies waiting to go marked discarded (ea-a6d); the newest 200 are kept. Switching off
+  /// does not drop them: the archive is the record.
+  private static let deletedKey = "workoutSyncDeleted"
+  private static let deletedKept = 200
   /// After a "waiting" answer the next try comes on its own, 30 s later, doubling to 10 min.
   private static let firstRetry: TimeInterval = 30
   private static let lastRetry: TimeInterval = 10 * 60
@@ -77,6 +81,17 @@ final class CockpitWorkoutSender {
     get { UserDefaults.standard.stringArray(forKey: Self.refusedKey) ?? [] }
     set { UserDefaults.standard.set(Array(newValue.suffix(Self.refusedKept)), forKey: Self.refusedKey) }
   }
+  private var deletedWorkouts: [DeletedWorkout] {
+    get {
+      UserDefaults.standard.data(forKey: Self.deletedKey).flatMap {
+        try? JSONDecoder().decode([DeletedWorkout].self, from: $0)
+      } ?? []
+    }
+    set {
+      let kept = Array(newValue.sorted { $0.deletedAt < $1.deletedAt }.suffix(Self.deletedKept))
+      if let data = try? JSONEncoder().encode(kept) { UserDefaults.standard.set(data, forKey: Self.deletedKey) }
+    }
+  }
 
   private init() {
     if let data = UserDefaults.standard.data(forKey: Self.streamKey),
@@ -90,6 +105,9 @@ final class CockpitWorkoutSender {
     guard observations.isEmpty else { return }
     self.mirror = mirror
     self.recents = recents
+    mirror.onRemoved = { [weak self] parts, before, heartRate, refined in
+      self?.keepDeleted(parts, before: before, heartRate: heartRate, refined: refined)
+    }
     let follow: () -> Void = { [weak self] in self?.follow(mirror: mirror, recents: recents) }
     observations = [
       MainQueueObservation(read: { mirror.live }, onChange: { _ in follow() }),
@@ -191,6 +209,44 @@ final class CockpitWorkoutSender {
     }
   }
 
+  /// Workouts went from the phone (ea-a6d): their last copies are kept, whatever the switch, and a sync is due.
+  /// `refined`: a fuller heart rate came later (Health's, on Delete); only the copies still waiting take it, with
+  /// their deletion time, so the id they go under stays the same.
+  private func keepDeleted(
+    _ parts: [StoredWorkout], before: [StoredWorkout], heartRate: [String: HeartRateSeries], refined: Bool
+  ) {
+    var copies = WorkoutSync.deleted(
+      parts, from: before, entries: recents?.entries ?? [], heartRate: heartRate, at: Date())
+    var waiting = deletedWorkouts
+    if refined {
+      copies = copies.compactMap { copy in
+        guard let old = waiting.first(where: { $0.workout.id == copy.workout.id }) else { return nil }
+        var better = copy
+        better.deletedAt = old.deletedAt
+        return better
+      }
+    }
+    guard !copies.isEmpty else { return }
+    let ids = Set(copies.map(\.workout.id))
+    waiting = waiting.filter { !ids.contains($0.workout.id) } + copies
+    deletedWorkouts = waiting
+    onEvent?(
+      "workout_sync",
+      [
+        "action": refined ? "deleted_refined" : "deleted_kept", "workouts": copies.count,
+        "sets": copies.map(\.setList.count).reduce(0, +), "waiting": waiting.count,
+      ])
+    if refined { return }
+    syncWanted = true
+    flush()
+  }
+
+  private func forgetDeleted(_ ids: [String]) {
+    guard !ids.isEmpty else { return }
+    let gone = Set(ids)
+    deletedWorkouts = deletedWorkouts.filter { !gone.contains($0.workout.id) }
+  }
+
   /// Is a summary allowed to go now: the switch on, nothing live waiting, no workout running (its live events go
   /// first, and a just-ended one's `started` lands before its summary, which then matches it by start).
   private var quiet: Bool {
@@ -205,7 +261,7 @@ final class CockpitWorkoutSender {
     sending = true
     lastSyncAt = Date()
     let workouts = mirror.index.workouts
-    let since = workouts.filter { $0.device == nil }.map(\.start).min()?.addingTimeInterval(-WorkoutSync.sinceMargin)
+    let since = WorkoutSync.since(workouts: workouts, deleted: deletedWorkouts)
     Task { [weak self] in
       let have = await WorkoutSync.fetchHave(cockpit: Self.cockpit, since: since, transport: Self.transport)
       guard let self else { return }
@@ -217,14 +273,19 @@ final class CockpitWorkoutSender {
         return
       }
       let entries = self.recents?.entries ?? []
-      let plan = WorkoutSync.plan(
-        workouts: mirror.index.workouts, entries: entries, have: have, refused: Set(self.refusedSummaries))
+      // Deleted workouts first (ea-a6d): those the Cockpit holds live go marked discarded; the rest are settled.
+      let (discards, settled) = WorkoutSync.planDiscards(self.deletedWorkouts, have: have)
+      self.forgetDeleted(settled)
+      let plan =
+        discards
+        + WorkoutSync.plan(
+          workouts: mirror.index.workouts, entries: entries, have: have, refused: Set(self.refusedSummaries))
       let budgeted = Array(plan.prefix(self.syncBudget))
       self.onEvent?(
         "workout_sync",
         [
           "action": "plan", "held": have.count, "workouts": workouts.count, "to_send": plan.count,
-          "this_pass": budgeted.count,
+          "this_pass": budgeted.count, "discards": discards.count, "settled": settled.count,
         ])
       var stoppedOnRetry = false
       for planned in budgeted {
@@ -233,15 +294,19 @@ final class CockpitWorkoutSender {
           break
         }
         self.syncBudget -= 1
-        let read = await self.heartRate(of: planned.workout, in: mirror)
+        // A deleted workout's copy carries its sets' peaks already; its heart rate went with it.
+        let read = planned.discardedAt == nil ? await self.heartRate(of: planned.workout, in: mirror) : nil
         let series = [planned.workout.id: read].compactMapValues { $0 }
         let report = await WorkoutSync.send(
           [planned], heartRate: series, cockpit: Self.cockpit, now: { Date() }, transport: Self.transport)
         self.refusedSummaries += report.refused
+        // Taken (or refused, logged): the copy goes. No answer keeps it, to go again under the same id.
+        if planned.discardedAt != nil, report.retry == nil { self.forgetDeleted([planned.workout.id]) }
         for line in report.lines {
           var f: [String: Any] = [
             "action": line.action, "id": line.id, "workout_id": line.workoutID, "sets": line.sets,
           ]
+          if let discarded = line.discarded { f["discarded"] = discarded }
           if let duplicate = line.duplicate { f["duplicate"] = duplicate }
           if let status = line.status { f["status"] = status }
           if let reason = line.reason { f["reason"] = reason }
