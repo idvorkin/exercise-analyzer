@@ -19,12 +19,15 @@ struct BellWeightSheet: View {
   @State private var detent: PresentationDetent = .large
   @Environment(\.dismiss) private var dismiss
 
-  init(weight: SetWeight?, inherited: Bool, onSave: @escaping (SetWeight?) -> Void) {
+  /// `exercise`: the set's; one that takes a bar (#388) opens on Barbell when the set has no weight yet.
+  init(
+    weight: SetWeight?, inherited: Bool, exercise: ExerciseKind? = nil, onSave: @escaping (SetWeight?) -> Void
+  ) {
     self.weight = weight
     self.inherited = inherited
     self.onSave = onSave
     _other = State(initialValue: weight?.bellKg.flatMap { Self.code.map(\.kg).contains($0) ? nil : $0 })
-    _barbell = State(initialValue: weight?.barbell != nil)
+    _barbell = State(initialValue: weight?.barbell != nil || (weight == nil && exercise?.takesBar == true))
     _load = State(initialValue: weight?.barbell ?? .start)
   }
 

@@ -44,6 +44,8 @@ struct ContentView: View {
   @State private var showSettings = false
   /// The plates sheet opened by `SWING_PLATES` for a screenshot (#387).
   @State private var platesHook: BarbellLoad?
+  /// "Add a set" opened by `SWING_HAND_SET` for a screenshot (#388).
+  @State private var handSetHook: RecentEntry?
   /// What's new (story 072): the feed the build wrote into the bundle, and its list.
   private static let whatsNew = WhatsNewSeen.bundledFeed()
   /// This device's own reports (BugKit 0.3.11): What's new says which of them this build fixed. Read once per
@@ -122,6 +124,11 @@ struct ContentView: View {
       .onChange(of: session.source) { _, source in session.bugScreen = Self.bugScreen(path: path, source: source) }
       .sheet(isPresented: Binding(get: { platesHook != nil }, set: { if !$0 { platesHook = nil } })) {
         BarbellSheet(load: platesHook ?? .start) { _ in }
+      }
+      .sheet(item: $handSetHook) { draft in
+        SetByHandSheet(
+          entry: draft, title: "Add a set", lastWeight: RecentEntry.lastWeight(session.recents.entries)
+        ) { _, _, _ in }
       }
       .sheet(isPresented: $showSyncStatus) {
         if let sync = session.sync { SyncStatusView(sync: sync) } else { Text("No sync store").padding() }
@@ -612,7 +619,7 @@ private struct PlayerRouteView: View {
       hud
         .sheet(item: $weighingLoadedSet) { entry in
           let shown = loadedSetWeight(entry)
-          BellWeightSheet(weight: shown.weight, inherited: shown.inherited) {
+          BellWeightSheet(weight: shown.weight, inherited: shown.inherited, exercise: entry.exerciseKind) {
             session.setWeight($0, for: entry, from: "playback")
           }
         }
@@ -1431,6 +1438,11 @@ extension ContentView {
         let plates = parts.count > 1 ? parts[1].split(separator: ",").compactMap { Int($0) } : []
         platesHook = BarbellLoad(bar: bar, plates: plates)
       }
+    }
+    // Test hook (#388): "split-squat" opens "Add a set" on that exercise, its weight row on the exercise's last
+    // weight, for a screenshot; Save adds nothing.
+    if let kind = env["SWING_HAND_SET"].flatMap(ExerciseKind.init(rawValue:)) {
+      handSetHook = HandSet(exercise: kind, reps: 8, at: Date().timeIntervalSince1970).entry
     }
     if env["SWING_SHOW_SEEK_CONTROLS"] == "1" {
       Task { @MainActor in

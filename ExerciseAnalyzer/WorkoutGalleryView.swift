@@ -1033,8 +1033,41 @@ struct SetByHandSheet: View {
   }
 
   /// The weight beside the count (#271): the competition bells in their colours and None, one tap each, and "Bar"
-  /// for plates on a bar (083), which opens the plates sheet and then shows their total.
-  private var weightRow: some View {
+  /// for plates on a bar (083), which opens the plates sheet and then shows their total; for an exercise that takes
+  /// a bar, the bar alone (#388).
+  @ViewBuilder private var weightRow: some View {
+    if exercise.takesBar { barWeightRow } else { bellWeightRow }
+  }
+
+  /// An exercise loaded on a bar (#388; Igor: "Don't do reverse lunges with kb weights"): None and the bar, drawn
+  /// with its plates and total, no bells; a bell already on the set stays as its own chip, so it is never lost.
+  private var barWeightRow: some View {
+    let plates = weight?.barbell
+    return HStack(spacing: 8) {
+      weightChip("None", value: nil, color: .secondary).frame(width: 76)
+      if let kg = weight?.bellKg {
+        weightChip("\(kg) kg", value: .bell(kg), color: .secondary).frame(width: 76)
+      }
+      Button {
+        loadingBar = true
+      } label: {
+        HStack(spacing: 8) {
+          LoadedBarView(load: plates ?? BarbellLoad(bar: barStart.bar)).frame(height: 40)
+          Text(plates.map { "\($0.totalLb) lb" } ?? "Bar").font(.headline).monospacedDigit()
+            .fixedSize()
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 56)
+        .background(Color.primary.opacity(plates != nil ? 0.2 : 0.08), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(plates != nil ? Color.primary : .clear, lineWidth: 3))
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(plates.map { SetWeight.barbell($0).spoken } ?? "Barbell plates")
+      .accessibilityAddTraits(plates != nil ? .isSelected : [])
+    }
+  }
+
+  private var bellWeightRow: some View {
     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
       weightChip("None", value: nil, color: .secondary)
       ForEach(BellWeightSheet.code, id: \.kg) { bell in
