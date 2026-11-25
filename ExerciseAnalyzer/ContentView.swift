@@ -40,6 +40,8 @@ struct ContentView: View {
   @Environment(\.openURL) private var openURL
   @State private var lastClockLog = Date.distantPast
   @State private var showSyncStatus = false
+  /// Settings, from the gear beside ⋯ (story 088, #392).
+  @State private var showSettings = false
   /// What's new (story 072): the feed the build wrote into the bundle, and its list.
   private static let whatsNew = WhatsNewSeen.bundledFeed()
   /// This device's own reports (BugKit 0.3.11): What's new says which of them this build fixed. Read once per
@@ -119,6 +121,7 @@ struct ContentView: View {
       .sheet(isPresented: $showSyncStatus) {
         if let sync = session.sync { SyncStatusView(sync: sync) } else { Text("No sync store").padding() }
       }
+      .sheet(isPresented: $showSettings) { SettingsView(session: session) }
       .sheet(isPresented: $showWhatsNew) {
         NavigationStack {
           WhatsNewView(feed: Self.whatsNew, reports: Self.myReports, logger: session.bugLogger)
@@ -301,6 +304,17 @@ struct ContentView: View {
       onOpenWorkout: { workout in fromLog { path = [.workout(WorkoutIdentity(start: workout.start))] } }
     )
     .toolbar {
+      // The gear (088, #392; Igor: "a high-level settings button from the main menu"): the app's switches.
+      ToolbarItem(placement: .topBarTrailing) {
+        Button {
+          session.log.event("ui", ["action": "open_settings"])
+          showSettings = true
+        } label: {
+          Image(systemName: "gearshape").font(.title3)
+        }
+        .accessibilityLabel("Settings")
+        .disabled(session.source == .camera)
+      }
       ToolbarItem(placement: .topBarTrailing) { moreMenu.disabled(session.source == .camera) }
     }
     // The iPad views, it does not record (068; #269, Igor: "on the iPad get rid of the live button"): no Live under
@@ -394,7 +408,8 @@ struct ContentView: View {
       Button {
         showSyncStatus = true
       } label: {
-        Label("Sync status", systemImage: "gearshape")
+        // A cloud, not the gear: the gear is Settings (088), and Igor looked here for the Larry switch (#392).
+        Label("Sync status", systemImage: "icloud")
       }
       Button {
         showWhatsNew = true
@@ -1353,23 +1368,7 @@ struct ExerciseMenu: View {
         Text("Detected: \(detection.exercise.definition.name) (\(detection.confidence)%)")
         Text(detection.reason)
       }
-      Divider()
-      // The bell detector's switch (story 034, #85): off by default because it halves the offline pass; the dot
-      // on the bell needs it on. Reopening a set analyzed without it runs the set through the detector.
-      Toggle(
-        isOn: Binding(
-          get: { session.bellDetectorOn }, set: { on in pick("bell_detector", on: on) { session.setBellDetector(on) } })
-      ) {
-        Label("Bell detector (slower pass)", systemImage: "circle.circle")
-      }
-      // Every workout's data to Larry's Cockpit as it happens (story 084, #376): off by default.
-      Toggle(
-        isOn: Binding(
-          get: { CockpitWorkoutSender.shared.enabled },
-          set: { on in pick("send_to_larry", on: on) { CockpitWorkoutSender.shared.enabled = on } })
-      ) {
-        Label("Send workouts to Larry", systemImage: "antenna.radiowaves.left.and.right")
-      }
+      // The bell detector and "Send workouts to Larry" moved to Settings, the gear on Workouts (088, #392).
     } label: {
       HStack(spacing: 3) {
         // The drawing in place of the name: the ♥ chip and the rest of the top line get the room (#299, #301).
@@ -1386,10 +1385,8 @@ struct ExerciseMenu: View {
   }
 
   /// A row's tap reached its action (#394): the log shows the pick, where a cancelled touch shows nothing.
-  private func pick(_ item: String, on: Bool? = nil, _ action: () -> Void) {
-    var fields: [String: Any] = ["item": item, "source": session.source == .camera ? "camera" : "set"]
-    if let on { fields["on"] = on }
-    session.log.event("exercise_menu", fields)
+  private func pick(_ item: String, _ action: () -> Void) {
+    session.log.event("exercise_menu", ["item": item, "source": session.source == .camera ? "camera" : "set"])
     action()
   }
 }
@@ -1419,6 +1416,8 @@ extension ContentView {
       }
     }
     if env["SWING_SHOW_GALLERY"] == "1" { showGallery = true }
+    // Test hook (088): the Settings sheet open, as a tap on the gear would, for a screenshot.
+    if env["SWING_SETTINGS"] == "1" { showSettings = true }
     if env["SWING_SHOW_SEEK_CONTROLS"] == "1" {
       Task { @MainActor in
         try? await Task.sleep(for: .seconds(4))

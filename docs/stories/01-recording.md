@@ -167,7 +167,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 
 - **Scenario:** The menu answers while the camera runs (#394)
 - **Given:** the camera is recording, the count and the clock moving with every frame
-- **When:** I open the exercise menu under the drawing and tap a row (an exercise, Auto, the bell detector or "Send workouts to Larry")
+- **When:** I open the exercise menu under the drawing and tap a row (an exercise or Auto; the app's switches moved to Settings, 088)
 - **Then:** the row takes the tap the first time, as it does on a stored set: the menu closes and the choice holds; the session log shows the pick (`exercise_menu` with what was picked) instead of a run of `ui_touch_cancel` (Igor, 2026-11-25, at the gym: "I can't actually click anything on that menu right now")
 
 - **Issues:** [#57](https://github.com/idvorkin/exercise-analyzer/issues/57) an interrupted pass left a partial track and the mode switch re-read it instead of re-running the clip; [#52](https://github.com/idvorkin/exercise-analyzer/issues/52) late foreground clip operations must not publish into another set; [#394](https://github.com/idvorkin/exercise-analyzer/issues/394) while recording, every touch on the menu's rows was cancelled (23 `ui_touch_cancel`, no pick): the menu was rebuilt with each camera frame

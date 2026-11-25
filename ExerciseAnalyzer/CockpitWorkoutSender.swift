@@ -61,9 +61,34 @@ final class CockpitWorkoutSender {
   /// After a "waiting" answer the next try comes on its own, 30 s later, doubling to 10 min.
   private static let firstRetry: TimeInterval = 30
   private static let lastRetry: TimeInterval = 10 * 60
-  @ObservationIgnored var onEvent: ((String, [String: Any]) -> Void)?
+  /// Where the sender's lines go (the session log). Every line passes through `status` first, so Settings reads
+  /// the sender's own answers (story 088).
+  var onEvent: ((String, [String: Any]) -> Void)? {
+    get {
+      { [weak self] type, fields in
+        MainActor.assumeIsolated { self?.note(type, fields) }
+        self?.logEvent?(type, fields)
+      }
+    }
+    set { logEvent = newValue }
+  }
+  @ObservationIgnored private var logEvent: ((String, [String: Any]) -> Void)?
+  private static let statusKey = "larrySendStatus"
+  /// What Settings says under the switch (088): the last send and the last miss, kept across launches.
+  private(set) var status = LarrySendStatus() {
+    didSet {
+      if let data = try? JSONEncoder().encode(status) { UserDefaults.standard.set(data, forKey: Self.statusKey) }
+    }
+  }
+  /// The live events waiting for the Cockpit, for Settings' "2 waiting".
+  private(set) var waiting = 0
 
-  @ObservationIgnored private var stream = WorkoutStream() { didSet { save() } }
+  @ObservationIgnored private var stream = WorkoutStream() {
+    didSet {
+      save()
+      if waiting != stream.pending.count { waiting = stream.pending.count }
+    }
+  }
   @ObservationIgnored private var sending = false
   @ObservationIgnored private var retry: Task<Void, Never>?
   @ObservationIgnored private var retryDelay = CockpitWorkoutSender.firstRetry
@@ -99,6 +124,20 @@ final class CockpitWorkoutSender {
     {
       stream = saved
     }
+    waiting = stream.pending.count
+    if let data = UserDefaults.standard.data(forKey: Self.statusKey),
+      let saved = try? JSONDecoder().decode(LarrySendStatus.self, from: data)
+    {
+      status = saved
+    }
+  }
+
+  /// A line of the sender's own (`workout_event`, `workout_sync`) as Settings' status: sent, missed, refused, off.
+  private func note(_ type: String, _ fields: [String: Any]) {
+    guard type == "workout_event" || type == "workout_sync", let action = fields["action"] as? String else { return }
+    var next = status
+    next.record(action: action, reason: fields["reason"] as? String, at: Date())
+    if next != status { status = next }
   }
 
   func install(mirror: WorkoutMirror, recents: RecentsStore) {
