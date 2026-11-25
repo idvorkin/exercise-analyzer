@@ -266,7 +266,10 @@ public enum WorkoutSync {
     let sendable = Set(workouts.filter { $0.device == nil }.compactMap { match($0, in: have)?.workoutID })
     let live = Set(entries.map(\.id))
     return deleted.filter { gone in
-      live.contains(gone.entry.id) || !have.contains { row in !row.discarded && sendable.contains(row.workoutID) && unmarked(gone, in: row) }
+      live.contains(gone.entry.id)
+        || !have.contains { row in
+          !row.discarded && sendable.contains(row.workoutID) && unmarked(gone, in: row)
+        }
     }.map(\.entry.id)
   }
 
