@@ -1049,7 +1049,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** Off until I turn it on
 - **Given:** a fresh install
 - **When:** I run a workout
-- **Then:** nothing is sent; the exercise menu's "Send workouts to Larry" switch is off, and once on, every workout goes, with no choice per workout
+- **Then:** nothing is sent; the "Send workouts to Larry" switch in Settings (088, the gear on Workouts) is off, and once on, every workout goes, with no choice per workout
 
 - **Scenario:** A workout as it happens
 - **Given:** the switch on and a workout started on the watch
@@ -1112,5 +1112,33 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Notes:** `GET /workout/have` (paged by `next`) and a `type: "summary"` body on `POST /workout`, the Cockpit's contract `docs/workout-sync-contract.md` (story 340 there). One summary per workout the wrist recorded, the same unit as the live events' workout; a set in the gap between two workouts shown as one line goes with the earlier one. Only this phone's own workouts are sent, never a row synced in from another device. A workout the Cockpit heard discarded is not sent back. The Cockpit keeps what the phone deleted (Larry, 2026-11-25: "don't tombstone and don't drop it. Send a fresh summary with a newer computed_at and discarded: true"): the deleted workout's summary has its own id, built from when it was deleted, so it is never mistaken for a repeat of the last live copy, and its `computed_at` is when it is sent, newer than any copy before. A set's heart-rate peak in a summary replaces the live one, so it is read from Health before sending (stored for the page as opening it does), taking the live readings for a just-ended workout when they hold more samples, and the merged line's stored heart rate only when neither has any. Not covered yet: a workout of this phone's deleted on another device (its tombstone reaches the phone, which sends nothing; ea-j3d), and a deleted set (ea-hp8).
 
 - **Issues:** ea-ya3, ea-a6d, ea-d8k
+
+---
+
+### User Story 088:
+
+- **Summary:** The app's switches sit behind a Settings button on Workouts, and the Larry switch says whether it is working
+- **Status:** implemented on `feat/392-settings`, verified on the host (`LarrySendStatusTests`: the status line on, off, never sent, minutes and hours ago, a problem cleared by the next send) and the simulator (iPhone 17, Workouts with the gear, the Settings sheet open, before and after), the phone pending
+- **Why:** Igor, 2026-11-25, at the gym (#392): "Where is my sync setting button I don't see it."; then, by voice: "that sync switch is hidden and doesn't work at all. I can't actually click anything on that menu right now, so let's have a high-level settings button from the main menu." The switch lived at the bottom of the recording screen's exercise menu, and the ⋯ menu's "Sync status" (the iCloud one) wore the gear he looked for.
+
+#### Use Case:
+- **As a** lifter whose workouts go to Larry
+- **I want to** find the app's switches from the Workouts screen in one tap, and see that sending is working
+- **so that** I can turn it on at the gym and trust it without reading logs
+
+#### Acceptance Criteria:
+- **Scenario:** One tap to the switches
+- **Given:** Workouts open, on the phone or the iPad, nothing recording
+- **When:** I tap the gear beside ⋯ at the top
+- **Then:** a Settings sheet opens with "Send workouts to Larry" and "Bell detector (slower pass)", each a switch with a line under it saying what it does; Done closes it; the exercise menu under the drawing keeps only Auto, the exercises and what Auto detected; the ⋯ menu's iCloud "Sync status" wears a cloud, not the gear
+
+- **Scenario:** The Larry switch shows it is working
+- **Given:** "Send workouts to Larry" on
+- **When:** I open Settings
+- **Then:** under the switch it reads "On · last sent 4 min ago" (just now, minutes, hours, days), "On · nothing sent yet" before the first, and " · 2 waiting" when events wait for the Cockpit; after a miss or a refusal a second line says what Larry's Cockpit answered ("No answer from Larry's Cockpit, trying again: …", "Larry's Cockpit refused one: …"), selectable to copy, gone at the next send; off, it reads "Off · nothing goes to Larry"; the last send is remembered across launches
+
+- **Notes:** the same switches as before, moved, not new ones: the Larry switch is 084's and 087's, the bell detector 034's. What a send is: any live event or whole workout the Cockpit took (084, 087).
+
+- **Issues:** [#392](https://github.com/idvorkin/exercise-analyzer/issues/392); [#394](https://github.com/idvorkin/exercise-analyzer/issues/394) the exercise menu's rows could not be tapped while recording
 
 ---

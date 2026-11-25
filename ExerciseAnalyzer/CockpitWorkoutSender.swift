@@ -2,7 +2,7 @@
 
 //  The running workout to Larry's Cockpit (story 084, #376): follows the wrist's workout and the sets saved in it,
 //  turns them into events (`WorkoutStream`, ExerciseCore) and sends them, one at a time, oldest first, while the
-//  exercise menu's "Send workouts to Larry" is on (off by default). What waits is kept across launches. Each answer
+//  Settings' "Send workouts to Larry" (story 088) is on (off by default). What waits is kept across launches. Each answer
 //  is a `workout_event` line in the session log.
 //  Once nothing live waits and no workout runs, it also syncs the archive (story 087, `WorkoutSync`): asks the
 //  Cockpit what it holds and sends, whole, each of the phone's workouts it lacks or holds older, through the same
@@ -33,7 +33,7 @@ final class CockpitWorkoutSender {
     return WorkoutEventWire.cockpit(environment: ProcessInfo.processInfo.environment, simulator: simulator)
   }()
 
-  /// The exercise menu's switch; off drops whatever waits.
+  /// The Settings switch (story 088); off drops whatever waits.
   var enabled: Bool {
     get {
       access(keyPath: \.enabled)
@@ -67,9 +67,34 @@ final class CockpitWorkoutSender {
   /// After a "waiting" answer the next try comes on its own, 30 s later, doubling to 10 min.
   private static let firstRetry: TimeInterval = 30
   private static let lastRetry: TimeInterval = 10 * 60
-  @ObservationIgnored var onEvent: ((String, [String: Any]) -> Void)?
+  /// Where the sender's lines go (the session log). Every line passes through `status` first, so Settings reads
+  /// the sender's own answers (story 088).
+  var onEvent: ((String, [String: Any]) -> Void)? {
+    get {
+      { [weak self] type, fields in
+        MainActor.assumeIsolated { self?.note(type, fields) }
+        self?.logEvent?(type, fields)
+      }
+    }
+    set { logEvent = newValue }
+  }
+  @ObservationIgnored private var logEvent: ((String, [String: Any]) -> Void)?
+  private static let statusKey = "larrySendStatus"
+  /// What Settings says under the switch (088): the last send and the last miss, kept across launches.
+  private(set) var status = LarrySendStatus() {
+    didSet {
+      if let data = try? JSONEncoder().encode(status) { UserDefaults.standard.set(data, forKey: Self.statusKey) }
+    }
+  }
+  /// The live events waiting for the Cockpit, for Settings' "2 waiting".
+  private(set) var waiting = 0
 
-  @ObservationIgnored private var stream = WorkoutStream() { didSet { save() } }
+  @ObservationIgnored private var stream = WorkoutStream() {
+    didSet {
+      save()
+      if waiting != stream.pending.count { waiting = stream.pending.count }
+    }
+  }
   @ObservationIgnored private var sending = false
   @ObservationIgnored private var retry: Task<Void, Never>?
   @ObservationIgnored private var retryDelay = CockpitWorkoutSender.firstRetry
@@ -107,6 +132,20 @@ final class CockpitWorkoutSender {
     {
       stream = saved
     }
+    waiting = stream.pending.count
+    if let data = UserDefaults.standard.data(forKey: Self.statusKey),
+      let saved = try? JSONDecoder().decode(LarrySendStatus.self, from: data)
+    {
+      status = saved
+    }
+  }
+
+  /// A line of the sender's own (`workout_event`, `workout_sync`) as Settings' status: sent, missed, refused, off.
+  private func note(_ type: String, _ fields: [String: Any]) {
+    guard type == "workout_event" || type == "workout_sync", let action = fields["action"] as? String else { return }
+    var next = status
+    next.record(action: action, reason: fields["reason"] as? String, at: Date())
+    if next != status { status = next }
   }
 
   func install(mirror: WorkoutMirror, recents: RecentsStore) {
