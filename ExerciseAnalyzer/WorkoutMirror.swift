@@ -644,15 +644,19 @@ final class WorkoutMirror: NSObject {
   /// watch answered, else why not.
   func startLiveOnWatch(kind: WorkoutKind?, from caller: String) async -> String? {
     guard HKHealthStore.isHealthDataAvailable() else { return "Health is not available on this device" }
-    let launch = LiveLaunch.configuration(kind: kind)
-    let configuration = HKWorkoutConfiguration()
-    configuration.activityType = HKWorkoutActivityType(rawValue: launch.activity) ?? .other
-    configuration.locationType = HKWorkoutSessionLocationType(rawValue: launch.location) ?? .unknown
     var failure: String?
-    do {
-      try await store.startWatchApp(toHandle: configuration)
-    } catch {
-      failure = "The watch app did not open: \(error.localizedDescription)"
+    if live != nil {
+      failure = "A workout is already running on the watch"
+    } else {
+      let launch = LiveLaunch.configuration(kind: kind)
+      let configuration = HKWorkoutConfiguration()
+      configuration.activityType = HKWorkoutActivityType(rawValue: launch.activity) ?? .other
+      configuration.locationType = HKWorkoutSessionLocationType(rawValue: launch.location) ?? .unknown
+      do {
+        try await store.startWatchApp(toHandle: configuration)
+      } catch {
+        failure = "The watch app did not open: \(error.localizedDescription)"
+      }
     }
     onEvent?(
       "live_hr_launch",
@@ -667,7 +671,7 @@ final class WorkoutMirror: NSObject {
   /// only the one this names by its start, so a gym hour is never ended from here. Nil when the watch was told.
   func endLiveOnWatch(from caller: String) async -> String? {
     var failure: String?
-    if let session, let live, live.kind == .call || live.kind == .walk {
+    if let session, let live, live.kind == .call || live.kind == .walk, live.machine == nil {
       do {
         let data = try LiveLaunch.End(startedAt: live.startedAt).encoded()
         let sent = await withCheckedContinuation { (done: CheckedContinuation<String?, Never>) in

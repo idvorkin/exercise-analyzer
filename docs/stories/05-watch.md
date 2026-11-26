@@ -1216,7 +1216,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** A real workout is never ended from outside
 - **Given:** a gym hour or a workout from Other… other than the outdoor walk runs on the wrist
 - **When:** "End live heart rate" comes, or "Start live heart rate"
-- **Then:** nothing changes on the wrist: End ends only a light session, and Start starts nothing while any session runs; with no session running, End says there is nothing to end
+- **Then:** nothing changes on the wrist and the phone refuses, so the link goes back by `x-error` and the action fails: Start while any session runs, End when the running session is not a light one (a treadmill walk carries its machine); with no session running, End says there is nothing to end; success means the watch was told, and the watch still checks for itself
 
 - **Scenario:** The watch app was not running
 - **Given:** the watch app is closed, or a light session is being taken up again after a restart (#190)
