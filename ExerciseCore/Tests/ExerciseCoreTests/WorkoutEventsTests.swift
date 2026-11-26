@@ -107,15 +107,15 @@ final class WorkoutEventsTests: XCTestCase {
     let bare = set("a", at: 100)
     var s = stream([(wire(), [bare], 110)])
     var weighed = bare
-    weighed.setWeight(.bell(24), by: "phone", at: at(200))
+    weighed.setWeight(.bell(28), by: "phone", at: at(200))
     s.follow(wire(), sets: [weighed], now: at(210), newID: { "x" })
     s.follow(wire(), sets: [weighed], now: at(220), newID: { "x" })
     let setEvents = s.waiting.filter { $0.type == .set }
     XCTAssertEqual(setEvents.compactMap(\.set?.id), ["a", "a"], "once bare, once with its weight, then no more")
     XCTAssertEqual(setEvents.map(\.id), ["w1-2", "w1-3"], "a new event id each time")
-    XCTAssertNil(setEvents[0].set?.bellKg)
+    XCTAssertEqual(setEvents[0].set?.bellKg, 24, "bare, it goes at the swing's starting weight (#374)")
     let facts = try XCTUnwrap(WorkoutEventWire.body(setEvents[1], sentAt: at(230))["set"] as? [String: Any])
-    XCTAssertEqual((facts["weight"] as? [String: Any])?["kg"] as? Int, 24)
+    XCTAssertEqual((facts["weight"] as? [String: Any])?["kg"] as? Int, 28)
   }
 
   func testTheEndOfAWorkoutNeverFollowedSaysNothing() {

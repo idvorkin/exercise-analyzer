@@ -227,10 +227,12 @@ final class HandSetTests: XCTestCase {
         set("s4", swing, reps: 8, at: 1500, kg: 28), set("s5", swing, reps: 8, at: 1600),
       ],
       heartRate: nil)
-    XCTAssertEqual(timeline.rows.map(\.kg), [nil, 24, 24, nil, 28, 28])
-    XCTAssertEqual(timeline.rows.map(\.kgInherited), [false, false, true, false, false, true])
-    XCTAssertEqual(timeline.loadKg, 10 * 24 + 12 * 24 + 8 * 28 + 8 * 28)
-    XCTAssertNil(WorkoutTimeline(workout: workout, sets: [set("s1", swing, reps: 10, at: 1100)], heartRate: nil).loadKg)
+    // s1 and g1 have nothing before them of their exercise: they show its starting weight, 24 kg (#374).
+    XCTAssertEqual(timeline.rows.map(\.kg), [24, 24, 24, 24, 28, 28])
+    XCTAssertEqual(timeline.rows.map(\.kgInherited), [true, false, true, true, false, true])
+    XCTAssertEqual(timeline.loadKg, 10 * 24 + 10 * 24 + 12 * 24 + 2 * 24 + 8 * 28 + 8 * 28)
+    let pullUp = set("p1", .pullUp, reps: 5, at: 1100)
+    XCTAssertNil(WorkoutTimeline(workout: workout, sets: [pullUp], heartRate: nil).loadKg, "no starting weight")
     XCTAssertEqual(set("k", swing, reps: 10, at: 1100, kg: 16).keptByHand(exercise: swing, reps: 9).bellKg, 16)
     // An index from before 066 has no weight and still decodes.
     let old =

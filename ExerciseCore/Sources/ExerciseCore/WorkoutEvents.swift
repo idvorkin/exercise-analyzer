@@ -237,13 +237,12 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
   }
 
   /// The facts of a workout's sets, in time order, each with the weight it shows (its own, or carried from the
-  /// exercise's set before inside these, 066 and 083) and its heart-rate peak: what a live `set` carries and
-  /// what a summary's `set_list` carries (087).
+  /// exercise's set before inside these, 066 and 083, else the exercise's starting weight, #374) and its
+  /// heart-rate peak: what a live `set` carries and what a summary's `set_list` carries (087).
   static func setFacts(_ inside: [RecentEntry], heartRate: HeartRateSeries?) -> [WorkoutEvent.SetFacts] {
-    var lastWeight: [ExerciseKind: SetWeight] = [:]
+    var carry = WeightCarry()
     return inside.sorted { $0.span.lowerBound < $1.span.lowerBound }.map { entry in
-      let weight = entry.weight ?? lastWeight[entry.exerciseKind]
-      if let own = entry.weight { lastWeight[entry.exerciseKind] = own }
+      let weight = carry.weight(of: entry)?.weight
       let span = entry.span
       return WorkoutEvent.SetFacts(
         id: entry.id, exercise: entry.exerciseKind, reps: entry.repCount, startedAt: span.lowerBound,
