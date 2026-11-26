@@ -113,8 +113,9 @@ public struct BarbellLoad: Codable, Hashable, Sendable {
 }
 
 extension ExerciseKind {
-  /// Loaded on a bar, not held as a bell (#388; Igor: "Don't do reverse lunges with kb weights"): the weight row
-  /// offers the bar first and no bells. The reverse lunges on the safety squat bar are logged as split squats (083).
+  /// Loaded on a bar, not held as a bell (#388; Igor: "Don't do reverse lunges with kb weights"): with no weight
+  /// to go by, the pickers open on the plates (`picksPlates`, the playback chip's sheet). The reverse lunges on the
+  /// safety squat bar are logged as split squats (083).
   public var takesBar: Bool { self == .splitSquat }
 
   /// The by-hand sheet's inline picker shows plates, not bells (#380; Igor: "choose bells or plates by the

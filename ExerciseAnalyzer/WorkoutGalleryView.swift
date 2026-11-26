@@ -1056,8 +1056,10 @@ struct SetByHandSheet: View {
         showsPlates.toggle()
         // A weight of the other kind is not what the picker shows: cleared until one is picked.
         let otherKind = showsPlates ? weight?.bellKg != nil : weight?.barbell != nil
-        if otherKind { weight = nil }
-        kgPicked = true
+        if otherKind {
+          weight = nil
+          kgPicked = true
+        }
       }
       .font(.footnote).frame(minHeight: 44)
     }
