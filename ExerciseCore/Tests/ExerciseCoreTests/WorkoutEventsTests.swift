@@ -182,6 +182,88 @@ final class WorkoutEventsTests: XCTestCase {
     XCTAssertEqual(s.waiting.last?.at, at(30))
   }
 
+  // ea-o4q: the phone's stand-in from the mirrored session (its start and type, no machine) came a second before
+  // the wrist's first message, so `started` went without Treadmill and a `level` followed (DDE051BE, 2026-11-26).
+  private func standIn() -> WorkoutWire {
+    var live = WorkoutWire(startedAt: t0.timeIntervalSince1970)
+    live.kind = .walk
+    live.standIn = true
+    return live
+  }
+
+  func testTheStandInThenTheMachineIsOneStartedWithItAndNoLevel() {
+    var first = wire(machine: .init(name: "Treadmill"))
+    first.kind = .walk
+    let s = stream([(standIn(), [], 0), (first, [], 1)])
+    XCTAssertEqual(s.waiting.map(\.type), [.started])
+    XCTAssertEqual(s.waiting.first?.id, "w1-1")
+    XCTAssertEqual(s.waiting.first?.at, t0, "at the wrist's start, not when the wrist was heard")
+    XCTAssertEqual(s.waiting.first?.machine, .init(name: "Treadmill"))
+    XCTAssertEqual(s.waiting.first?.hrBpm, 120, "the wrist's first reading rides it")
+  }
+
+  func testTheStandInAloneSendsNothingYet() {
+    let s = stream([(standIn(), [], 0), (standIn(), [], 5)])
+    XCTAssertTrue(s.pending.isEmpty)
+    XCTAssertNotNil(s.running)
+  }
+
+  func testTheStandInAloneStartsAtTheFirstTick() {
+    let s = stream([(standIn(), [], 0), (standIn(), [], 31)])
+    XCTAssertEqual(s.pending.map(\.type), [.started, .tick])
+    XCTAssertEqual(s.pending.map(\.id), ["w1-1", "w1-2"])
+    XCTAssertEqual(s.pending.first?.at, t0)
+  }
+
+  func testTheStandInThenTheEndIsStartedAndEnded() {
+    let s = stream([(standIn(), [], 0), (nil, [], 20)])
+    XCTAssertEqual(s.waiting.map(\.type), [.started, .ended])
+    XCTAssertEqual(s.waiting.map(\.id), ["w1-1", "w1-2"])
+  }
+
+  func testASetHeardBeforeTheWristWaitsBehindStarted() {
+    var live = standIn()
+    live.kind = nil  // the gym hour
+    let s = stream([(live, [], 0), (live, [set("a", at: 3)], 8)])
+    XCTAssertEqual(s.waiting.map(\.type), [.started, .set])
+    XCTAssertEqual(s.waiting.map(\.id), ["w1-1", "w1-2"])
+  }
+
+  func testTheStandInThenAMessageWithoutAMachineThenOneIsALevel() {
+    let s = stream([
+      (standIn(), [], 0),
+      (wire(machine: nil), [], 1),
+      (wire(machine: .init(name: "Treadmill", incline: 2), changedAt: 30), [], 31),
+    ])
+    XCTAssertEqual(s.waiting.map(\.type), [.started, .level])
+    XCTAssertNil(s.waiting.first?.machine)
+  }
+
+  func testAStreamHeldBeforeTheWristSurvivesARelaunch() throws {
+    let s = stream([(standIn(), [], 0)])
+    let back = try JSONDecoder().decode(WorkoutStream.self, from: JSONEncoder().encode(s))
+    XCTAssertEqual(back, s)
+    var after = back
+    after.follow(wire(machine: .init(name: "Treadmill")), sets: [], now: at(2), newID: { "x" })
+    XCTAssertEqual(after.waiting.map(\.type), [.started])
+    XCTAssertEqual(after.waiting.first?.machine?.name, "Treadmill")
+  }
+
+  func testAStreamSavedBeforeTheHoldDecodes() throws {
+    let s = stream([(wire(), [], 2)])
+    var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(s)) as? [String: Any])
+    var running = try XCTUnwrap(json["running"] as? [String: Any])
+    running["startHeld"] = nil
+    json["running"] = running
+    let back = try JSONDecoder().decode(WorkoutStream.self, from: JSONSerialization.data(withJSONObject: json))
+    XCTAssertEqual(back.running?.workoutID, "w1")
+  }
+
+  func testTheStandInIsNeverOnTheWristsWire() throws {
+    let wrist = String(decoding: try JSONEncoder().encode(wire()), as: UTF8.self)
+    XCTAssertFalse(wrist.contains("standIn"))
+  }
+
   func testTheMachineOnTheWireDecodesFromAnOlderWatchAsNone() throws {
     let old = #"{"startedAt":1000,"sets":0,"reps":0,"ending":false,"discarded":false}"#
     let decoded = try JSONDecoder().decode(WorkoutWire.self, from: Data(old.utf8))
