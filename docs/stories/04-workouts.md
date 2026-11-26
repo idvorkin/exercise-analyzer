@@ -919,7 +919,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 075:
 
 - **Summary:** See one exercise across weeks: sets, reps, the bell, the load and the score per week
-- **Status:** built on `feat/2026-10-26-progression` ([#314](https://github.com/idvorkin/exercise-analyzer/issues/314)): the numbers are `ProgressionSeries` (ExerciseCore, `ProgressionSeriesTests`, 7 tests), the card `ProgressionCard` in Workouts; host tests on a Linux toolchain; app build pending
+- **Status:** built on `feat/2026-10-26-progression` ([#314](https://github.com/idvorkin/exercise-analyzer/issues/314)): the numbers are `ProgressionSeries` (ExerciseCore, `ProgressionSeriesTests`, 7 tests), the card `ProgressionCard` in Workouts; host tests on a Linux toolchain; app build pending; a workout's first sets count at the exercise's starting weight (066, #374) on `feat/374-start-weights`, host (`StartingWeightTests`)
 - **Why:** #180 asks what changed in a session where the weight went up; every view so far is per set or per workout (the 2026-10-26 review, P2)
 
 #### Use Case:
@@ -936,10 +936,10 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** The weight carries as on the workout page
 - **Given:** in one workout I set 16 kg on the first swing set only
 - **When:** the card counts that week's load
-- **Then:** every swing set after it in that workout counts at 16 kg, as the page shows it; a set outside every workout counts at the last weight typed that day, which the page and the HUD do not show, and never at one from another day
+- **Then:** every swing set after it in that workout counts at 16 kg, as the page shows it, and a workout's swing sets before any weight of mine count at the starting weight, 24 kg (066, #374); a set outside every workout counts at the last weight typed that day, which the page and the HUD do not show, never at one from another day and never at a starting weight
 
 - **Scenario:** No weight yet
-- **Given:** no swing set has a weight
+- **Given:** no swing set has a weight, and none is inside a workout (where the starting weight counts, 066)
 - **When:** I pick the swing drawing
 - **Then:** the bars are reps per week, and the lines leave out kg and load; a set typed by hand counts its reps, with no score
 
