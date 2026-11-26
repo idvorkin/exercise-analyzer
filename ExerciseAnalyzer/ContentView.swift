@@ -210,8 +210,12 @@ struct ContentView: View {
         )
       }
       .onAppear(perform: loadFromEnvironment)
-      // Story 069: another app (Grabber Native) opened us with exerciseanalyzer://; it only brings the app forward.
-      .onOpenURL { url in session.log.event("open_url", ["url": url.absoluteString]) }
+      // Story 069: another app (Grabber Native) opened us with exerciseanalyzer://; it only brings the app forward,
+      // except Live heart rate's link, which starts or ends it on the watch (092).
+      .onOpenURL { url in
+        session.log.event("open_url", ["url": url.absoluteString])
+        _ = LiveHeartRateLink.open(url)
+      }
       .onChange(of: pickerItem) { _, item in
         guard let item else { return }
         // The player comes up here, as for Files: with a set already loaded the source stays `.file`, so the
@@ -1419,6 +1423,12 @@ extension ContentView {
   private func loadFromEnvironment() {
     let env = ProcessInfo.processInfo.environment
     workouts.seedLiveFromEnvironment()  // SWING_LIVE_WORKOUT=<minutes>: a running workout without a watch (#123)
+    // Test hook (092): SWING_OPEN_URL=<link> takes a link as if another app opened it; `simctl openurl` stops at
+    // iOS's "Open in" alert, which no run can tap.
+    if let link = env["SWING_OPEN_URL"].flatMap(URL.init(string:)) {
+      session.log.event("open_url", ["url": link.absoluteString, "hook": true])
+      _ = LiveHeartRateLink.open(link)
+    }
     // Test hooks (BugKit): SWING_BUG="first|second" saves the reports 2 s after launch from one picture, as "Log it
     // and another" does (#212); SWING_SHAKE_AFTER=<seconds> opens the sheet, for a screenshot of its buttons.
     session.bugReporter.runLaunchHooks()

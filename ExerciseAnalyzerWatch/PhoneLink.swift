@@ -187,7 +187,17 @@ final class PhoneLink: NSObject {
       log: { [weak self] type, fields in self?.logEvent(type, fields) }, screenshot: WatchScreenshotState.launch)
     // Views track the workout's heart rate and sets directly through Observation.
     // The phone's status also comes through the workout session while one runs (#189).
-    workout.onPhoneData = { [weak self] data in self?.apply(["status": data], via: "workout") }
+    // So does End live heart rate (092), a message of its own that no status is mistaken for.
+    workout.onPhoneData = { [weak self] data in
+      guard let self else { return }
+      if let end = LiveLaunch.End(data: data) {
+        self.endLive(end)
+      } else {
+        self.apply(["status": data], via: "workout")
+      }
+    }
+    // The phone opened this app to start Live heart rate (092), before or after this link existed.
+    LiveLaunchInbox.shared.deliver { [weak self] choice in self?.startLive(choice) }
     // A set that finished analyzing while the app was down arrived before the workout was back, and was not
     // counted: tell it again (it counts once, by its time).
     workout.onRecovered = { [weak self] in
@@ -385,6 +395,23 @@ final class PhoneLink: NSObject {
     rest.clear()
     WKInterfaceDevice.current().play(.click)
     workout.startLive()
+  }
+
+  /// Live heart rate started from the phone (092: another app's link or a Shortcuts action). The rest clears and
+  /// the wrist taps only when the session really starts; a running workout is left alone.
+  func startLive(_ choice: LiveLaunch.Choice) {
+    logEvent("command", ["command": "live_start", "from": "phone", "choice": "\(choice)", "live": isLive])
+    guard screenshot == nil else { return }
+    workout.startLive(choice) { [weak self] in
+      self?.rest.clear()
+      WKInterfaceDevice.current().play(.click)
+    }
+  }
+
+  /// End live heart rate from the phone (092): the wrist's own End, for the light session it names only.
+  private func endLive(_ end: LiveLaunch.End) {
+    guard screenshot == nil, workout.endLive(end) else { return }
+    endWorkout(discard: false)
   }
 
   /// End writes the workout to Health; Discard writes nothing. Either way the wrist goes back to idle.
