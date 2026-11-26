@@ -1309,7 +1309,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** End saves the route with the workout
 - **Given:** location is allowed and an outdoor session has run with the watch outdoors
 - **When:** I tap End, or "End live heart rate" (092) ends it
-- **Then:** the location stops at once, Health gets the outdoor workout as before and then its route (fixes within 50 m from the session's start on, at the watch's fitness accuracy), and Fitness shows the map; the watch's log says `route_saved` with the number of fixes
+- **Then:** the location stops at once, Health gets the outdoor workout as before and then its route (fixes within 50 m from the session's start on, at the watch's fitness accuracy), and Fitness shows the map; the watch's log says `watch_route_saved` with the number of fixes
 
 - **Scenario:** Discard keeps no route
 - **Given:** an outdoor session records a route
@@ -1319,12 +1319,12 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** Location is off
 - **Given:** I declined the location ask, or turned it off for Exercise Analyzer
 - **When:** an outdoor session starts (or I decline the ask during one)
-- **Then:** the session runs and End saves the workout as before, without a route; the page says once, under "End saves the walk to Health", "No route: location is off for Exercise Analyzer", in grey, not as an error; the watch never asks again (Core Location's rule), and the log says `route_off`
+- **Then:** the session runs and End saves the workout as before, without a route; the page says once, under "End saves the walk to Health", "No route: location is off for Exercise Analyzer", in grey, not as an error; the watch never asks again (Core Location's rule), and the log says `watch_route_off`
 
 - **Scenario:** Nothing to save
 - **Given:** an outdoor session where no fix within 50 m came (indoors, a short session, Health refused routes)
 - **When:** I tap End
-- **Then:** the workout is saved as before, with no route and no word on the wrist; the log says `route_skipped` or `route_failed` with why
+- **Then:** the workout is saved as before, with no route and no word on the wrist; the log says `watch_route_skipped` or `watch_route_failed` with why
 
 - **Scenario:** The route survives a restart
 - **Given:** an outdoor session records a route
