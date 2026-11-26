@@ -44,12 +44,77 @@ final class LiveSessionTests: XCTestCase {
     XCTAssertEqual(LiveSession.kind(motion: [motion(600, walking: false), motion(300)], now: now), .walk)
   }
 
-  func testOnlyACallAndAnOutdoorWalkAreLight() {
+  func testOnlyACallAndAnOutdoorWalkRunOrHikeAreLight() {
     XCTAssertTrue(LiveSession.isLight(kind: .call, outdoor: false))
     XCTAssertTrue(LiveSession.isLight(kind: .walk, outdoor: true))
+    XCTAssertTrue(LiveSession.isLight(kind: .run, outdoor: true), "Other…'s Outdoor run (093)")
+    XCTAssertTrue(LiveSession.isLight(kind: .hike, outdoor: true), "Other…'s Hike (093)")
     XCTAssertFalse(LiveSession.isLight(kind: .walk, outdoor: false), "the gym's walk under Other… (081)")
+    XCTAssertFalse(LiveSession.isLight(kind: .run, outdoor: false), "the treadmill run under Other… (081)")
     XCTAssertFalse(LiveSession.isLight(kind: .strength, outdoor: true))
-    XCTAssertFalse(LiveSession.isLight(kind: .run, outdoor: true))
+    XCTAssertFalse(LiveSession.isLight(kind: .bike, outdoor: true), "no outdoor ride under Other…")
+  }
+
+  // MARK: - Outdoor run and hike (story 093, ea-qmy)
+
+  func testOtherOffersAnOutdoorRunBesideTheTreadmillRunAndAHike() {
+    let tiles = WorkoutChoice.other
+    let run = tiles[1]
+    let outdoorRun = tiles[2]
+    let hike = tiles[5]
+    XCTAssertEqual(run.kind, .run)
+    XCTAssertFalse(run.outdoor, "Run stays the treadmill run it has been since 081")
+    XCTAssertEqual(run.name, "Run")
+    XCTAssertEqual(run.symbol, "figure.run")
+    XCTAssertEqual(outdoorRun.kind, .run, "both runs reach Health and the Cockpit as `run`")
+    XCTAssertTrue(outdoorRun.outdoor)
+    XCTAssertEqual(outdoorRun.name, "Outdoor run")
+    XCTAssertEqual(outdoorRun.symbol, "figure.run.circle")
+    XCTAssertEqual(hike.kind, .hike)
+    XCTAssertTrue(hike.outdoor, "a hike is only ever outdoors")
+    XCTAssertEqual(hike.name, "Hike")
+    XCTAssertEqual(hike.symbol, "figure.hiking")
+    XCTAssertEqual(tiles.filter { $0.kind == .hike }.count, 1, "no indoor hike")
+    for tile in [outdoorRun, hike] {
+      XCTAssertTrue(LiveSession.isLight(kind: tile.kind, outdoor: tile.outdoor), "the outdoor walk's page (091)")
+    }
+    XCTAssertFalse(LiveSession.isLight(kind: run.kind, outdoor: run.outdoor))
+  }
+
+  func testAHikeIsHealthsHikingWorkoutWithNoMachine() {
+    XCTAssertEqual(WorkoutKind.hike.healthActivity, 24)  // HKWorkoutActivityType.hiking
+    XCTAssertEqual(WorkoutKind(healthActivity: 24), .hike)
+    XCTAssertEqual(WorkoutKind.hike.rawValue, "hike")
+    XCTAssertEqual(WorkoutKind.hike.name, "Hike")
+    XCTAssertEqual(WorkoutKind.hike.label, "Hike")
+    XCTAssertEqual(WorkoutKind.hike.symbol, "figure.hiking")
+    XCTAssertNil(WorkoutKind.hike.machineName)
+    XCTAssertTrue(WorkoutKind.hike.isWorkout)
+    XCTAssertTrue(WorkoutKind.workouts.contains(.hike), "Change type offers Hike (082)")
+  }
+
+  func testAnOutdoorRunAndAHikeReachTheCockpitAsRunAndHikeWithNoMachine() throws {
+    for kind in [WorkoutKind.run, .hike] {
+      let start = now.addingTimeInterval(-60)
+      // The phone's stand-in from the mirrored session first (ea-o4q), then the wrist's messages.
+      var standIn = WorkoutWire(startedAt: start.timeIntervalSince1970)
+      standIn.kind = kind
+      standIn.standIn = true
+      var live = WorkoutWire(startedAt: start.timeIntervalSince1970, heartRate: 152)
+      live.kind = kind
+      var stream = WorkoutStream()
+      stream.follow(standIn, sets: [], now: now, newID: { "w" })
+      stream.follow(live, sets: [], now: now.addingTimeInterval(1), newID: { "w" })
+      stream.follow(live, sets: [], now: now.addingTimeInterval(32), newID: { "w" })
+      XCTAssertEqual(stream.pending.map(\.type), [.started, .tick], "\(kind)")
+      live.ending = true
+      stream.follow(live, sets: [], now: now.addingTimeInterval(40), newID: { "w" })
+      XCTAssertEqual(stream.pending.map(\.type), [.started, .ended], "\(kind): no level, nothing names a machine")
+      XCTAssertTrue(stream.pending.allSatisfy { $0.kind == kind && $0.machine == nil }, "\(kind)")
+      let body = WorkoutEventWire.body(try XCTUnwrap(stream.pending.first), sentAt: now)
+      XCTAssertEqual(body["kind"] as? String, kind.rawValue)
+      XCTAssertNil(body["machine"], "\(kind): no machine on the wire")
+    }
   }
 
   // MARK: - Outdoor walk and treadmill walk (story 091, #409)
@@ -57,9 +122,10 @@ final class LiveSessionTests: XCTestCase {
   func testOtherOffersAnOutdoorWalkAndATreadmillWalkAsTwoTiles() {
     let tiles = WorkoutChoice.other
     XCTAssertEqual(
-      tiles.map(\.name), ["Elliptical", "Run", "Walk", "Treadmill", "Bike", "Row", "Stairs", "HIIT", "Yoga"])
-    let walk = tiles[2]
-    let treadmill = tiles[3]
+      tiles.map(\.name),
+      ["Elliptical", "Run", "Outdoor run", "Walk", "Treadmill", "Hike", "Bike", "Row", "Stairs", "HIIT", "Yoga"])
+    let walk = tiles[3]
+    let treadmill = tiles[4]
     XCTAssertEqual(walk.kind, .walk)
     XCTAssertEqual(treadmill.kind, .walk, "both walks reach Health and the Cockpit as `walk`")
     XCTAssertTrue(walk.outdoor)
@@ -68,8 +134,8 @@ final class LiveSessionTests: XCTestCase {
     XCTAssertEqual(treadmill.symbol, "figure.walk.treadmill")
     XCTAssertTrue(LiveSession.isLight(kind: walk.kind, outdoor: walk.outdoor), "the same walk as Live's (090)")
     XCTAssertFalse(LiveSession.isLight(kind: treadmill.kind, outdoor: treadmill.outdoor))
-    // Every other tile is its kind indoors; no call, no strength.
-    for tile in tiles where tile.kind != .walk {
+    // Every other tile is its kind indoors, but for the outdoor run and the hike (093); no call, no strength.
+    for tile in tiles where tile.kind != .walk && tile.kind != .hike && !(tile.kind == .run && tile.outdoor) {
       XCTAssertFalse(tile.outdoor)
       XCTAssertEqual(tile.name, tile.kind.name)
     }

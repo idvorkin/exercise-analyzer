@@ -41,17 +41,22 @@ public enum LiveSession {
     return recent ? .walk : .call
   }
 
-  /// A session Live heart rate or Other…'s Walk started (091): a call, or a walk recorded outdoors (the
-  /// Treadmill tile's walk is indoors, 081). It is how a restarted watch app knows which page to show (#190).
+  /// The kinds recorded outdoors from Other… (091, 093): a walk, a run and a hike.
+  public static let outdoorKinds: Set<WorkoutKind> = [.walk, .run, .hike]
+
+  /// A session Live heart rate or Other…'s Walk, Outdoor run or Hike started (091, 093): a call, or an outdoor
+  /// walk, run or hike (the Treadmill tile's walk and the Run tile's run are indoors, 081). It is how a restarted
+  /// watch app knows which page to show (#190).
   public static func isLight(kind: WorkoutKind, outdoor: Bool) -> Bool {
-    kind == .call || (kind == .walk && outdoor)
+    kind == .call || (outdoor && outdoorKinds.contains(kind))
   }
 }
 
 /// A tile under Other… (#339; story 091, #409; Igor: "that's an outdoor walk"): a workout kind, and whether it
 /// is recorded outdoors. Walk is the outdoor walk, Live's light WALK (090), and Treadmill the gym's indoor walk
 /// with its machine rows (085); both are `walk` in Health and to the Cockpit, the treadmill's machine telling them
-/// apart. Every other tile is its kind indoors.
+/// apart. Run stays the treadmill run, Outdoor run beside it, both `run`; Hike is only ever outdoors (093). Every
+/// other tile is its kind indoors.
 public struct WorkoutChoice: Hashable, Sendable {
   public let kind: WorkoutKind
   public let outdoor: Bool
@@ -61,14 +66,21 @@ public struct WorkoutChoice: Hashable, Sendable {
     self.outdoor = outdoor
   }
 
-  /// The tiles in the order the watch shows them: each kind under Other…, the walk twice.
-  public static let other: [WorkoutChoice] = WorkoutKind.other.flatMap { kind in
-    kind == .walk
-      ? [WorkoutChoice(kind: .walk, outdoor: true), WorkoutChoice(kind: .walk)] : [WorkoutChoice(kind: kind)]
+  /// The tiles in the order the watch shows them: each kind under Other…, the walk and the run twice.
+  public static let other: [WorkoutChoice] = WorkoutKind.other.flatMap { kind -> [WorkoutChoice] in
+    switch kind {
+    case .walk: [WorkoutChoice(kind: .walk, outdoor: true), WorkoutChoice(kind: .walk)]
+    case .run: [WorkoutChoice(kind: .run), WorkoutChoice(kind: .run, outdoor: true)]
+    case .hike: [WorkoutChoice(kind: .hike, outdoor: true)]
+    default: [WorkoutChoice(kind: kind)]
+    }
   }
 
   private var treadmill: Bool { kind == .walk && !outdoor }
+  private var outdoorRun: Bool { kind == .run && outdoor }
 
-  public var name: String { treadmill ? "Treadmill" : kind.name }
-  public var symbol: String { treadmill ? "figure.walk.treadmill" : kind.symbol }
+  public var name: String { treadmill ? "Treadmill" : outdoorRun ? "Outdoor run" : kind.name }
+  public var symbol: String {
+    treadmill ? "figure.walk.treadmill" : outdoorRun ? "figure.run.circle" : kind.symbol
+  }
 }

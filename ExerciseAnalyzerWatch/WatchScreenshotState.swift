@@ -37,12 +37,24 @@ enum WatchScreenshotState: String, CaseIterable {
   case liveCall
   /// An outdoor walk (090, 091): WALK over the clock and "♥ 104 BPM", "End saves the walk to Health", End, Discard.
   case liveWalk
-  /// Other…'s tiles over the idle page (081, 091): Walk and Treadmill side by side.
+  /// An outdoor run (093): RUN over the clock and "♥ 152 BPM", "End saves the run to Health", End, Discard.
+  case liveRun
+  /// Other…'s tiles over the idle page (081, 091, 093): Elliptical and Run, Outdoor run and Walk, Treadmill and Hike.
   case kindPicker
 
   /// The workout's type and machine the controller presents: an elliptical for workoutMachine, else strength.
   var machine: (kind: WorkoutKind, machine: WorkoutEvent.Machine)? {
     self == .workoutMachine ? (.elliptical, WorkoutEvent.Machine(name: "Elliptical", incline: 6, intensity: 8)) : nil
+  }
+
+  /// The light session the controller presents (090, 091, 093): a call, an outdoor walk or an outdoor run.
+  var lightKind: WorkoutKind? {
+    switch self {
+    case .liveCall: .call
+    case .liveWalk: .walk
+    case .liveRun: .run
+    default: nil
+    }
   }
 
   /// The fixed workout the controller presents: 42:10 in, 128 bpm (141 while a set runs); nil for no workout.
@@ -52,6 +64,7 @@ enum WatchScreenshotState: String, CaseIterable {
     case .workoutMachine: return (1240, 128)
     case .liveCall: return (754, 72)
     case .liveWalk: return (1510, 104)
+    case .liveRun: return (1835, 152)
     case .workout, .workoutEnd, .workoutViewfinder, .setByHand, .setByHandExercise, .setByHandBarbell,
       .setByHandBarbellEnd:
       return (2530, 128)
@@ -138,7 +151,7 @@ enum WatchScreenshotState: String, CaseIterable {
       let plates = self == .setByHandBarbellEnd ? [45, 45, 10] : [45]
       status.barbell = [ExerciseKind.splitSquat.rawValue: BarbellLoad(bar: .sixtyFive, plates: plates)]
       return (status, true, nil)
-    case .workoutStart, .workoutMachine, .liveCall, .liveWalk:
+    case .workoutStart, .workoutMachine, .liveCall, .liveWalk, .liveRun:
       return (.idle, true, nil)
     case .workoutRecording:
       let status = WatchStatus(
