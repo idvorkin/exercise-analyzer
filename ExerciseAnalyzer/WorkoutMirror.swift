@@ -637,6 +637,64 @@ final class WorkoutMirror: NSObject {
     }
   }
 
+  // MARK: - Live heart rate from another app (story 092)
+
+  /// Opens the watch app on Live heart rate's light session: a call, a walk, or nil for the watch's own choice.
+  /// Health opens only this app's own watch app, which is why another app comes through here. Nil when the
+  /// watch answered, else why not.
+  func startLiveOnWatch(kind: WorkoutKind?, from caller: String) async -> String? {
+    guard HKHealthStore.isHealthDataAvailable() else { return "Health is not available on this device" }
+    var failure: String?
+    if live != nil {
+      failure = "A workout is already running on the watch"
+    } else {
+      let launch = LiveLaunch.configuration(kind: kind)
+      let configuration = HKWorkoutConfiguration()
+      configuration.activityType = HKWorkoutActivityType(rawValue: launch.activity) ?? .other
+      configuration.locationType = HKWorkoutSessionLocationType(rawValue: launch.location) ?? .unknown
+      do {
+        try await store.startWatchApp(toHandle: configuration)
+      } catch {
+        failure = "The watch app did not open: \(error.localizedDescription)"
+      }
+    }
+    onEvent?(
+      "live_hr_launch",
+      [
+        "kind": kind?.rawValue ?? "motion", "from": caller, "ok": failure == nil, "message": failure ?? "",
+        "app_state": UIApplication.shared.applicationState.rawValue,
+      ])
+    return failure
+  }
+
+  /// Ends the light session the wrist runs (092), as its own End would. The watch ends only a light session and
+  /// only the one this names by its start, so a gym hour is never ended from here. Nil when the watch was told.
+  func endLiveOnWatch(from caller: String) async -> String? {
+    var failure: String?
+    if let session, let live, live.kind == .call || live.kind == .walk, live.machine == nil {
+      do {
+        let data = try LiveLaunch.End(startedAt: live.startedAt).encoded()
+        let sent = await withCheckedContinuation { (done: CheckedContinuation<String?, Never>) in
+          session.sendToRemoteWorkoutSession(data: data) { ok, error in
+            done.resume(returning: ok ? nil : error.map { "\($0.localizedDescription)" } ?? "no answer")
+          }
+        }
+        failure = sent.map { "The watch was not told: \($0)" }
+      } catch {
+        failure = "The end could not be written: \(error.localizedDescription)"
+      }
+    } else {
+      failure = live == nil ? "No live heart rate is running" : "The running workout is not live heart rate"
+    }
+    onEvent?(
+      "live_hr_end",
+      [
+        "from": caller, "ok": failure == nil, "message": failure ?? "", "kind": live?.kind?.rawValue ?? "",
+        "started_at": live?.startedAt ?? 0,
+      ])
+    return failure
+  }
+
   private func ended(at sessionEnd: Date) {
     guard let live else { return }
     defer {

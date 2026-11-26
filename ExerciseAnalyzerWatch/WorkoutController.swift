@@ -261,6 +261,66 @@ final class WorkoutController: NSObject {
     start(kind: kind, light: true)
   }
 
+  // MARK: - Live heart rate from the phone (story 092)
+
+  /// The start another app asked for through the phone, held until `recover()` has answered: a session still
+  /// running from before this launch is taken up, never doubled.
+  @ObservationIgnored private var heldLaunch: (choice: LiveLaunch.Choice, starting: () -> Void)?
+  /// `recover()` has answered, or had nothing to ask, since this app launched.
+  @ObservationIgnored private var recoverySettled = false
+  /// How long a held start waits for that answer before it goes anyway; the phase still guards a running session.
+  static let launchWait: TimeInterval = 5
+
+  /// The phone opened this app on a light session's configuration (092): the kind it names, or Motion's choice
+  /// as a tap on Live. Nothing starts while any session runs; `starting` runs just before one does.
+  func startLive(_ choice: LiveLaunch.Choice, starting: @escaping () -> Void) {
+    guard recoverySettled else {
+      let first = heldLaunch == nil
+      heldLaunch = (choice, starting)
+      log("live_launch_held", ["choice": "\(choice)"])
+      if first {
+        Task { [weak self] in
+          try? await Task.sleep(for: .seconds(Self.launchWait))
+          self?.settleRecovery(why: "timeout")
+        }
+      }
+      return
+    }
+    guard phase == .none, !fixed, !choosingLive else {
+      log("live_launch_refused", ["phase": "\(phase)", "choosing": choosingLive, "choice": "\(choice)"])
+      return
+    }
+    starting()
+    switch choice {
+    case .motion: startLive()
+    case .kind(let kind):
+      log("live_start", ["kind": kind.rawValue, "readings": -1, "why": "phone"])
+      start(kind: kind, light: true)
+    }
+  }
+
+  private func settleRecovery(why: String) {
+    guard !recoverySettled else { return }
+    recoverySettled = true
+    guard let held = heldLaunch else { return }
+    heldLaunch = nil
+    log("live_launch_released", ["why": why])
+    startLive(held.choice, starting: held.starting)
+  }
+
+  /// The phone's End live heart rate (092): ends the light session it names as the wrist's own End would; a gym
+  /// hour, any other workout or a later session is left running.
+  func endLive(_ end: LiveLaunch.End) -> Bool {
+    let ends = phase == .running && end.ends(light: light, startedAt: startedAt)
+    log(
+      "live_end",
+      [
+        "ends": ends, "phase": "\(phase)", "light": light, "kind": kind.rawValue,
+        "start_gap_s": startedAt.map { $0.timeIntervalSince1970 - end.endLiveStartedAt } ?? 0,
+      ])
+    return ends
+  }
+
   /// What the wrist says when Health refuses the workout: no heart rate until the lifter turns it on.
   static let healthOff =
     "No heart rate: Health access is off. On the iPhone: Health › your picture › Apps › Exercise Analyzer › Turn On All"
@@ -345,10 +405,16 @@ final class WorkoutController: NSObject {
   /// the phone nothing and had no End (#190). Called once at launch, after the link to the phone is up so its
   /// log lines get there; no session to recover is the usual answer.
   func recover() {
-    guard phase == .none, !fixed, HKHealthStore.isHealthDataAvailable() else { return }
+    guard phase == .none, !fixed, HKHealthStore.isHealthDataAvailable() else {
+      settleRecovery(why: "no_ask")
+      return
+    }
     store.recoverActiveWorkoutSession { [weak self] session, error in
       Task { @MainActor in
-        guard let self, self.phase == .none else { return }
+        guard let self else { return }
+        // A start the phone asked for goes once this has answered (092), after a session taken up here.
+        defer { self.settleRecovery(why: "answered") }
+        guard self.phase == .none else { return }
         guard let session, session.state == .running || session.state == .paused else {
           // "No active session" also arrives as an error on some systems: logged, never shown.
           if let error { self.log("workout_recover_none", ["message": "\(error)"]) }

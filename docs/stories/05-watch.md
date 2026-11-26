@@ -1132,7 +1132,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **When:** the watch app restarts and takes the session up again (#190)
 - **Then:** it is still a light CALL or WALK with the same page, and a call still saves nothing at End
 
-- **Notes:** A light walk is recorded outdoors and a gym walk (081, the Treadmill tile since 091) indoors; Other…'s Walk tile starts this same light walk (091), which is how a restarted app tells them apart. `call` is Health's "other" activity type, only ever used for a session that is never saved. A phone on a build before this one cannot read a call's messages: the phone gets this build before the watch. Starting the session from Grabber when a call begins (Larry: a Settings switch "Live heart rate on calls", off by default) is not part of this story: `startWatchApp` opens only the calling app's own watch app, and Grabber has none, so it needs an entry point on EA's phone side and the watch's handling of that launch (context-grabber-at59).
+- **Notes:** A light walk is recorded outdoors and a gym walk (081, the Treadmill tile since 091) indoors; Other…'s Walk tile starts this same light walk (091), which is how a restarted app tells them apart. `call` is Health's "other" activity type, only ever used for a session that is never saved. A phone on a build before this one cannot read a call's messages: the phone gets this build before the watch. Starting the session from Grabber when a call begins (Larry: a Settings switch "Live heart rate on calls", off by default) is not part of this story: Exercise Analyzer's side, the link and the Shortcuts actions Grabber reaches, is story 092 (context-grabber-at59).
 
 - **Issues:** ea-1np; context-grabber-w6po; context-grabber-at59 (starting it from a Grabber call)
 
@@ -1178,6 +1178,54 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Notes:** the wire to the Cockpit does not change shape: both walks are `kind` `walk`, told apart by the treadmill's `machine` (never on an outdoor walk), and no location goes on any event (the Cockpit refuses one). The phone's Workouts line reads Walk for both. A GPS route in Health, outdoor runs and hikes are not part of this story (ea-5qg's follow-ups).
 
 - **Issues:** [#409](https://github.com/idvorkin/exercise-analyzer/issues/409); ea-5qg
+
+---
+
+### User Story 092:
+
+- **Summary:** Another app on the phone (Grabber, as a call starts and ends) starts and ends Live heart rate on the watch without a tap on the wrist
+- **Status:** implemented on `feat/at59-live-hr-intent` (context-grabber-at59), verified on the host (`LiveLaunchTests`: the link's start with its kind or none and its end, any other link not ours, the way back by `x-success` / `x-error` with `errorMessage`, the configuration read back both ways and an unknown one left to Motion, the end a message no status is mistaken for, ending only the light session it names) and the simulator (iPhone 17, `SWING_OPEN_URL`: the start link logs `live_hr_launch` with kind call and `ok: false`, the unsigned build having no HealthKit entitlement, then opens `x-error` with the reason; the end link with no session logs "No live heart rate is running" and opens `x-error`); the watch side by build only; the watch opening and starting CALL, the held start after a cold launch, End from the phone, and the Shortcuts actions with the app in the background, pending on the phone and watch
+- **Why:** Larry, 2026-11-26 (91b07d266c95, context-grabber-at59): Grabber should start the watch's Live heart rate (090) when a call starts, behind a switch, and end it when the call ends; Health lets only Exercise Analyzer's own phone app open its watch app, so Exercise Analyzer needs a door Grabber can reach
+
+#### Use Case:
+- **As** Igor starting a call with Larry in Grabber, the watch on my wrist
+- **I want** the call to start and end the watch's live heart rate by itself
+- **so that** Larry reads my heart rate on every call without me remembering to tap Live on the wrist
+
+#### Acceptance Criteria:
+- **Scenario:** Started by a link
+- **Given:** no workout runs on the watch, and the watch is on my wrist and unlocked
+- **When:** an app opens `exerciseanalyzer://live-heart-rate/start?kind=call` (or `kind=walk`)
+- **Then:** Exercise Analyzer comes to the front, the watch app opens and starts Live heart rate's light session of that kind (090: CALL over the clock and "♥ 72 BPM", "Live to Larry · nothing saved to Health"), with no Motion ask; without `kind`, or with any other, the watch chooses as a tap on Live does (walking in the last two minutes is WALK, else CALL); the phone's log says `live_hr_launch` with the kind and whether the watch answered
+
+- **Scenario:** Back to the app that asked
+- **Given:** the link carries `x-success=<url>` (and `x-error=<url>`)
+- **When:** the watch has been asked
+- **Then:** the phone opens `x-success` once the watch app answered, or `x-error` with `errorMessage` saying why it did not, so the call app is back in front in about a second
+
+- **Scenario:** Started from Shortcuts or Siri
+- **Given:** the actions "Start live heart rate" (Kind: Call, Walk, or empty) and "End live heart rate" in Shortcuts
+- **When:** a shortcut runs "Start live heart rate"
+- **Then:** the watch starts the session as from the link, without Exercise Analyzer coming to the front, and the action fails with the reason when the watch did not answer
+
+- **Scenario:** Ended by the call's end
+- **Given:** a light CALL or WALK session started by Live heart rate, on the wrist or from the phone
+- **When:** an app opens `exerciseanalyzer://live-heart-rate/end`, or a shortcut runs "End live heart rate"
+- **Then:** the watch ends it as its own End would (090: a call saves nothing, a walk is saved), with the wrist's tap; the phone's log says `live_hr_end` with whether the watch was told
+
+- **Scenario:** A real workout is never ended from outside
+- **Given:** a gym hour or a workout from Other… other than the outdoor walk runs on the wrist
+- **When:** "End live heart rate" comes, or "Start live heart rate"
+- **Then:** nothing changes on the wrist and the phone refuses, so the link goes back by `x-error` and the action fails: Start while any session runs, End when the running session is not a light one (a treadmill walk carries its machine); with no session running, End says there is nothing to end; success means the watch was told, and the watch still checks for itself
+
+- **Scenario:** The watch app was not running
+- **Given:** the watch app is closed, or a light session is being taken up again after a restart (#190)
+- **When:** the start comes
+- **Then:** the watch app opens and starts the session once it has looked for one still running, so a session still running is taken up and no second one starts
+
+- **Notes:** Health opens a watch app only for its own phone app, so the link and the Shortcuts actions are Exercise Analyzer's; no app can run another app's action itself, so Grabber reaches the link (and comes back by `x-success`), and Shortcuts or Siri reach the actions. The end goes to the watch through the running session's own channel, once, never through the status the phone keeps resending, so an old status cannot end a later session; it names the session by its start, and a watch build before this story ignores it. Whether the watch opens while the phone app is in the background (a shortcut run with the phone locked) is the phone's to show.
+
+- **Issues:** context-grabber-at59 (Grabber's switch, a later Grabber PR)
 
 ---
 
