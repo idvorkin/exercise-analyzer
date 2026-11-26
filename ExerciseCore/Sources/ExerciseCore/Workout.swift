@@ -55,7 +55,8 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
 /// What a workout is in Health (#333; Igor: "Add another type of workout where it's an elliptical workout"): the
 /// gym hour of sets is functional strength training, anything else is the cardio picked under Other… (#339; Igor:
 /// "Let me select other exrcises like jogging or somethign too"). Chosen at Start, changed later on the phone
-/// (#340). Every one is recorded indoors: a run has no GPS route ("I guess run is indoor for now").
+/// (#340). Every one is recorded indoors ("I guess run is indoor for now") except a walk from Other…'s Walk tile
+/// or Live heart rate, recorded outdoors with no GPS route (`WorkoutChoice`, 091).
 public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
   case strength
   case elliptical
