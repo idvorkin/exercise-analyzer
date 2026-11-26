@@ -175,7 +175,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 ### User Story 089:
 
 - **Summary:** The newest build is on the Cockpit's /builds page, ready to install over the air
-- **Status:** implemented in this branch (feat/ota-builds); `just ota` verified by publishing ea-a2d2befe.ipa (main a2d2bef) to /builds on 2026-11-25, the pose model and the kettlebell detector inside it, the profile listing the iPhone and the iPad, the Cockpit listing it; the install from the page is Igor's check; the copy after `just run-device` waits on BugKit's ota-upload.sh (bug-kit bug-a5y) and was not run (no install was made)
+- **Status:** implemented in this branch (feat/ota-builds); `just ota` verified by publishing ea-a2d2befe.ipa (main a2d2bef) to /builds on 2026-11-25, the pose model and the kettlebell detector inside it, the profile listing the iPhone and the iPad, the Cockpit listing it; the install from the page is Igor's check; the copy after `just run-device` waits on BugKit's ota-upload.sh (bug-kit bug-a5y) and was not run (no install was made); the model check no longer refuses a package that holds the model (ea-cvy: `unzip -l | grep -q` under pipefail died of SIGPIPE on ea-ed5548c3, exit 66) on `fix/ota-model-check`, verified on the host (`scripts/test-ipa-has-model.sh` in `just test`: a 300 KB listing with the model early, which the old check refused), the next `just ota` the live check
 - **Why:** Igor, 2026-11-25 (via Larry): "Why new builds not uploaded", /builds had no Exercise Analyzer build ever while newer builds went straight to his devices; he wants /builds never behind the devices.
 
 #### Use Case:
@@ -187,7 +187,7 @@ Part of the [user stories](README.md); persona, format and the Status vocabulary
 - **Scenario:** A build made for the page
 - **Given:** a clean checkout with the pose model fetched (`just model`)
 - **When:** I run `just ota`
-- **Then:** the commit is archived in Release, exported development-signed, checked to hold the pose model and to say it is that commit, and copied to /builds as `ea-<first 8 of the commit>.ipa`; the page offers it with Install; a checkout with uncommitted changes, or one without the model, publishes nothing and says why
+- **Then:** the commit is archived in Release, exported development-signed, checked to hold the pose model and to say it is that commit, and copied to /builds as `ea-<first 8 of the commit>.ipa`; the page offers it with Install; a checkout with uncommitted changes, or one without the model, publishes nothing and says why; a package that holds the model is never refused, however long its file list (ea-cvy)
 
 - **Scenario:** Already there
 - **Given:** /builds already has this commit's ipa
