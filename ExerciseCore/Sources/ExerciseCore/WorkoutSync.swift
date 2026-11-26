@@ -317,7 +317,9 @@ public enum WorkoutSync {
     let setsOf = assignSets(entries, to: before)
     return parts.filter { $0.device == nil }.sorted { $0.start < $1.start }.map { part in
       DeletedWorkout(
-        workout: part, setList: WorkoutStream.setFacts(setsOf[part.id] ?? [], heartRate: heartRate[part.id]),
+        workout: part,
+        setList: WorkoutStream.setFacts(
+          setsOf[part.id] ?? [], heartRate: heartRate[part.id], workoutStart: part.start),
         deletedAt: at)
     }
   }
@@ -401,16 +403,19 @@ public enum WorkoutSync {
   /// order: its weight as it showed among the sets before it, its peak from the workout's heart rate. The live
   /// sets' carried weights are worked out without it, as the phone now shows them.
   static func setList(_ planned: Planned, heartRate: HeartRateSeries?) -> [WorkoutEvent.SetFacts] {
-    let live = WorkoutStream.setFacts(planned.sets, heartRate: heartRate)
+    let start = planned.workout.start
+    let live = WorkoutStream.setFacts(planned.sets, heartRate: heartRate, workoutStart: start)
     guard !planned.deletedSets.isEmpty else { return live }
     let gone = Set(planned.deletedSets.map(\.id))
-    let deleted = WorkoutStream.setFacts(planned.sets + planned.deletedSets, heartRate: heartRate)
-      .filter { gone.contains($0.id) }
-      .map { facts -> WorkoutEvent.SetFacts in
-        var marked = facts
-        marked.deleted = true
-        return marked
-      }
+    let deleted = WorkoutStream.setFacts(
+      planned.sets + planned.deletedSets, heartRate: heartRate, workoutStart: start
+    )
+    .filter { gone.contains($0.id) }
+    .map { facts -> WorkoutEvent.SetFacts in
+      var marked = facts
+      marked.deleted = true
+      return marked
+    }
     return (live + deleted).sorted { $0.startedAt < $1.startedAt }
   }
 

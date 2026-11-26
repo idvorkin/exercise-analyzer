@@ -109,7 +109,7 @@ public struct WorkoutTimeline: Equatable, Sendable {
   /// The sets whose start falls inside the workout, in start order.
   public init(workout: StoredWorkout, sets: [RecentEntry], heartRate: HeartRateSeries?) {
     let inside = sets.filter { workout.contains($0.span.lowerBound) }.sorted { $0.span.lowerBound < $1.span.lowerBound }
-    var carry = WeightCarry()
+    var carry = WeightCarry(workoutStartedAt: workout.start)
     rows = inside.enumerated().map { index, set in
       let span = set.span
       let next = index + 1 < inside.count ? inside[index + 1].span.lowerBound : nil
