@@ -64,17 +64,14 @@ final class LiveSessionTests: XCTestCase {
     XCTAssertEqual(treadmill.kind, .walk, "both walks reach Health and the Cockpit as `walk`")
     XCTAssertTrue(walk.outdoor)
     XCTAssertFalse(treadmill.outdoor)
-    XCTAssertNil(walk.machineName, "an outdoor walk has no machine rows and sends no machine")
-    XCTAssertEqual(treadmill.machineName, "Treadmill")
     XCTAssertEqual(walk.symbol, "figure.walk")
     XCTAssertEqual(treadmill.symbol, "figure.walk.treadmill")
     XCTAssertTrue(LiveSession.isLight(kind: walk.kind, outdoor: walk.outdoor), "the same walk as Live's (090)")
     XCTAssertFalse(LiveSession.isLight(kind: treadmill.kind, outdoor: treadmill.outdoor))
-    // Every other tile is its kind indoors, with the kind's machine; no call, no strength.
+    // Every other tile is its kind indoors; no call, no strength.
     for tile in tiles where tile.kind != .walk {
       XCTAssertFalse(tile.outdoor)
       XCTAssertEqual(tile.name, tile.kind.name)
-      XCTAssertEqual(tile.machineName, tile.kind.machineName)
     }
     XCTAssertEqual(Set(tiles.map(\.kind)), Set(WorkoutKind.other))
   }

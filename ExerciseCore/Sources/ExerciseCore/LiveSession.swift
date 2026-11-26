@@ -70,6 +70,4 @@ public struct WorkoutChoice: Hashable, Sendable {
 
   public var name: String { treadmill ? "Treadmill" : kind.name }
   public var symbol: String { treadmill ? "figure.walk.treadmill" : kind.symbol }
-  /// The machine its rows open on; outdoors there is none.
-  public var machineName: String? { outdoor ? nil : kind.machineName }
 }
