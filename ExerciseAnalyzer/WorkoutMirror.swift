@@ -531,7 +531,10 @@ final class WorkoutMirror: NSObject {
         let stop = end.map { $0 > session.end ? $0 : min(record.endDate, $0) } ?? record.endDate
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = type ?? record.workoutActivityType
-        configuration.locationType = .indoor
+        // Where the record was: an outdoor walk stays outdoors (091, #409); the gym hour, and a record without
+        // the flag, indoors as before.
+        let indoor = (record.metadata?[HKMetadataKeyIndoorWorkout] as? NSNumber)?.boolValue ?? true
+        configuration.locationType = indoor ? .indoor : .outdoor
         let builder = HKWorkoutBuilder(healthStore: store, configuration: configuration, device: record.device)
         try await builder.beginCollection(at: record.startDate)
         for activity in record.workoutActivities where activity.startDate < stop {

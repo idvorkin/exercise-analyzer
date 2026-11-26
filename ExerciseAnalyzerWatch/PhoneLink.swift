@@ -85,6 +85,8 @@ final class PhoneLink: NSObject {
   private var screenshot: WatchScreenshotState?
   /// The screenshot rung wants the idle page scrolled to its End and Discard buttons.
   var screenshotScrollsToEnd: Bool { screenshot == .workoutEnd }
+  /// The screenshot rung wants Other…'s tiles open over the idle page (081, 091).
+  var screenshotOpensKindPicker: Bool { screenshot == .kindPicker }
   /// The screenshot rung wants the count page of a set typed by hand open over the workout page (059).
   var screenshotOpensSetByHand: Bool {
     screenshot == .setByHand || screenshot == .setByHandExercise || screenshotOpensPlates
@@ -358,20 +360,21 @@ final class PhoneLink: NSObject {
   }
 
   /// Start on the workout page (048): the wrist's own session, no phone needed. `continuing`: Continue on the ask
-  /// that follows an End by under ten minutes (#238). `kind`: a kind under Other… (#333, #339).
-  func startWorkout(continuing: Bool = false, kind: WorkoutKind = .strength) {
+  /// that follows an End by under ten minutes (#238). `kind`: a kind under Other… (#333, #339). `outdoor`: Other…'s
+  /// Walk (091), the light outdoor walk Live starts (090), not the treadmill's.
+  func startWorkout(continuing: Bool = false, kind: WorkoutKind = .strength, outdoor: Bool = false) {
     logEvent(
       "command",
       [
         "command": "workout_start", "reachable": reachable, "live": isLive, "continuing": continuing,
-        "kind": kind.rawValue,
+        "kind": kind.rawValue, "outdoor": outdoor,
       ])
     guard screenshot == nil else { return }
     // A new workout starts with no rest: the count from the last workout's final set carried over and read as
     // a rest of hours (#273; Igor: "the rest needs to reset when I started a workout").
     rest.clear()
     WKInterfaceDevice.current().play(.click)
-    workout.start(continuing: continuing, kind: kind)
+    workout.start(continuing: continuing, kind: kind, light: outdoor)
   }
 
   /// Live heart rate (090): one tap, a light walk or call whose heart rate the phone sends to Larry. No rest
