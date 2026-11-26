@@ -35,6 +35,10 @@ enum WatchScreenshotState: String, CaseIterable {
   case workoutMachine
   /// Live heart rate's call (090): CALL over the clock and "♥ 72 BPM", the line saying nothing is saved, End.
   case liveCall
+  /// An outdoor walk (090, 091): WALK over the clock and "♥ 104 BPM", "End saves the walk to Health", End, Discard.
+  case liveWalk
+  /// Other…'s tiles over the idle page (081, 091): Walk and Treadmill side by side.
+  case kindPicker
 
   /// The workout's type and machine the controller presents: an elliptical for workoutMachine, else strength.
   var machine: (kind: WorkoutKind, machine: WorkoutEvent.Machine)? {
@@ -47,6 +51,7 @@ enum WatchScreenshotState: String, CaseIterable {
     case .workoutStart: return (190, 96)
     case .workoutMachine: return (1240, 128)
     case .liveCall: return (754, 72)
+    case .liveWalk: return (1510, 104)
     case .workout, .workoutEnd, .workoutViewfinder, .setByHand, .setByHandExercise, .setByHandBarbell,
       .setByHandBarbellEnd:
       return (2530, 128)
@@ -86,7 +91,7 @@ enum WatchScreenshotState: String, CaseIterable {
       status.phoneActive = false
       status.lastSet = LastSet(reps: 12, exercise: "Kettlebell Swing", seconds: 62, at: Date().timeIntervalSince1970)
       return (status, true, nil)
-    case .idle, .noVideos:
+    case .idle, .noVideos, .kindPicker:
       return (.idle, true, nil)
     case .live:
       let status = WatchStatus(
@@ -133,7 +138,7 @@ enum WatchScreenshotState: String, CaseIterable {
       let plates = self == .setByHandBarbellEnd ? [45, 45, 10] : [45]
       status.barbell = [ExerciseKind.splitSquat.rawValue: BarbellLoad(bar: .sixtyFive, plates: plates)]
       return (status, true, nil)
-    case .workoutStart, .workoutMachine, .liveCall:
+    case .workoutStart, .workoutMachine, .liveCall, .liveWalk:
       return (.idle, true, nil)
     case .workoutRecording:
       let status = WatchStatus(

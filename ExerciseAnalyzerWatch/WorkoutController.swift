@@ -158,8 +158,8 @@ final class WorkoutController: NSObject {
       kind = fixed.kind
       machine = fixed.machine
     }
-    if screenshot == .liveCall {
-      kind = .call
+    if screenshot == .liveCall || screenshot == .liveWalk {
+      kind = screenshot == .liveCall ? .call : .walk
       light = true
     }
     // Before the first set, a cardio workout and a call: no sets line.

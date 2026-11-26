@@ -52,6 +52,44 @@ final class LiveSessionTests: XCTestCase {
     XCTAssertFalse(LiveSession.isLight(kind: .run, outdoor: true))
   }
 
+  // MARK: - Outdoor walk and treadmill walk (story 091, #409)
+
+  func testOtherOffersAnOutdoorWalkAndATreadmillWalkAsTwoTiles() {
+    let tiles = WorkoutChoice.other
+    XCTAssertEqual(
+      tiles.map(\.name), ["Elliptical", "Run", "Walk", "Treadmill", "Bike", "Row", "Stairs", "HIIT", "Yoga"])
+    let walk = tiles[2]
+    let treadmill = tiles[3]
+    XCTAssertEqual(walk.kind, .walk)
+    XCTAssertEqual(treadmill.kind, .walk, "both walks reach Health and the Cockpit as `walk`")
+    XCTAssertTrue(walk.outdoor)
+    XCTAssertFalse(treadmill.outdoor)
+    XCTAssertEqual(walk.symbol, "figure.walk")
+    XCTAssertEqual(treadmill.symbol, "figure.walk.treadmill")
+    XCTAssertTrue(LiveSession.isLight(kind: walk.kind, outdoor: walk.outdoor), "the same walk as Live's (090)")
+    XCTAssertFalse(LiveSession.isLight(kind: treadmill.kind, outdoor: treadmill.outdoor))
+    // Every other tile is its kind indoors; no call, no strength.
+    for tile in tiles where tile.kind != .walk {
+      XCTAssertFalse(tile.outdoor)
+      XCTAssertEqual(tile.name, tile.kind.name)
+    }
+    XCTAssertEqual(Set(tiles.map(\.kind)), Set(WorkoutKind.other))
+  }
+
+  func testAnOutdoorWalkReachesTheCockpitAsAWalkWithNoMachine() {
+    let start = now.addingTimeInterval(-60)
+    var live = WorkoutWire(startedAt: start.timeIntervalSince1970, heartRate: 104)
+    live.kind = .walk
+    var stream = WorkoutStream()
+    stream.follow(live, sets: [], now: now, newID: { "w" })
+    stream.follow(live, sets: [], now: now.addingTimeInterval(31), newID: { "w" })
+    XCTAssertEqual(stream.pending.map(\.type), [.started, .tick])
+    live.ending = true
+    stream.follow(live, sets: [], now: now.addingTimeInterval(40), newID: { "w" })
+    XCTAssertEqual(stream.pending.map(\.type), [.started, .ended], "no level: nothing names a machine")
+    XCTAssertTrue(stream.pending.allSatisfy { $0.kind == .walk && $0.machine == nil })
+  }
+
   // MARK: - A call is not a workout
 
   func testACallIsNeverAWorkoutNorPickedAsOne() {

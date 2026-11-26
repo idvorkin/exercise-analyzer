@@ -344,6 +344,8 @@ struct WatchContentView: View {
         }
         .tint(.green)
         .sheet(isPresented: $pickingKind) { kindPicker }
+        // The screenshot rung's kindPicker state: the tiles open over the idle page.
+        .onAppear { if phone.screenshotOpensKindPicker { pickingKind = true } }
         // Live heart rate (090; Igor on a call: "continuous data upload… can iOS be pulling it in?"): one tap, a
         // walk if the watch saw walking, else a call that saves nothing. Beside Other…, so Record stays put.
         Button {
@@ -362,18 +364,19 @@ struct WatchContentView: View {
     }
   }
 
-  /// Other…'s kinds as tiles, two across, 52 pt each (#339): one tap starts that workout and closes.
+  /// Other…'s kinds as tiles, two across, 52 pt each (#339): one tap starts that workout and closes. Walk is the
+  /// outdoor walk, Live's light WALK; Treadmill the gym's indoor walk (091, #409).
   private var kindPicker: some View {
     ScrollView {
       LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 2), spacing: 6) {
-        ForEach(WorkoutKind.other, id: \.self) { kind in
+        ForEach(WorkoutChoice.other, id: \.self) { choice in
           Button {
             pickingKind = false
-            phone.startWorkout(kind: kind)
+            phone.startWorkout(kind: choice.kind, outdoor: choice.outdoor)
           } label: {
             VStack(spacing: 2) {
-              Image(systemName: kind.symbol).font(.title3)
-              Text(kind.name).font(.caption2).lineLimit(1).minimumScaleFactor(0.7)
+              Image(systemName: choice.symbol).font(.title3)
+              Text(choice.name).font(.caption2).lineLimit(1).minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity, minHeight: 52)
             .background(Color.green.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
