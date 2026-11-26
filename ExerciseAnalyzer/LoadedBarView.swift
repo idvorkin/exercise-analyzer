@@ -2,8 +2,8 @@
 
 //  The loaded bar, drawn (story 083, #388; Igor, 2026-11-25: "think about nice design graphical for this"): the bar
 //  across, the same plates on both sleeves, heaviest nearest the middle as they are loaded, each as tall as it is
-//  heavy and in its bumper colour. The plates sheet draws it over the total; the by-hand sheet's weight row draws it
-//  on the bar tile of an exercise that takes a bar.
+//  heavy and in its bumper colour. `BarbellPicker` draws it over the total, in the plates sheet and inline in the
+//  by-hand sheet (#380).
 
 import ExerciseCore
 import SwiftUI

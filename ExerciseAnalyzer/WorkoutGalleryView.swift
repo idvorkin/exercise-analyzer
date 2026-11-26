@@ -929,8 +929,11 @@ struct SetByHandSheet: View {
   @State private var weight: SetWeight?
   /// A weight was tapped: a change of exercise no longer moves it.
   @State private var kgPicked = false
-  /// The plates sheet over this one (083), from the weight row's "Bar".
-  @State private var loadingBar = false
+  /// The weight picker shows the plates, not the bells (#380): the kind of the exercise's last weight, until the
+  /// "Bells instead" / "Plates instead" link or a change of exercise.
+  @State private var showsPlates: Bool
+  /// What the inline plates show while the set has no plates picked.
+  @State private var load: BarbellLoad
   @State private var deleting: RecentEntry?
   @Environment(\.dismiss) private var dismiss
 
@@ -946,12 +949,30 @@ struct SetByHandSheet: View {
     self.onDelete = onDelete
     _exercise = State(initialValue: entry.exerciseKind)
     _reps = State(initialValue: HandSet.clamp(entry.repCount == 0 ? HandSet.defaultReps : entry.repCount))
-    _weight = State(initialValue: entry.weight ?? lastWeight?[entry.exerciseKind])
+    let kind = entry.exerciseKind
+    let weight = entry.weight ?? lastWeight?[kind]
+    _weight = State(initialValue: weight)
+    _showsPlates = State(initialValue: kind.picksPlates(own: weight, last: lastWeight?[kind]))
+    _load = State(initialValue: kind.platesStart(own: weight, last: lastWeight?[kind]))
   }
 
-  /// What "Bar" opens on: the plates picked, else the exercise's last plates, else a 45 a side on the barbell.
-  private var barStart: BarbellLoad {
-    weight?.barbell ?? lastWeight?[exercise]?.barbell ?? .start
+  /// A new exercise: its last weight unless one was tapped, and the picker of its kind (#380).
+  private func pick(_ kind: ExerciseKind) {
+    exercise = kind
+    if let lastWeight, !kgPicked { weight = lastWeight[kind] }
+    showsPlates = kind.picksPlates(own: weight, last: lastWeight?[kind])
+    load = kind.platesStart(own: weight, last: lastWeight?[kind])
+  }
+
+  /// The inline plates: the set's plates when it has them, and every change makes them the set's weight.
+  private var plates: Binding<BarbellLoad> {
+    Binding(
+      get: { weight?.barbell ?? load },
+      set: {
+        load = $0
+        weight = .barbell($0)
+        kgPicked = true
+      })
   }
 
   /// What Save does to the video, said before it happens.
@@ -969,8 +990,7 @@ struct SetByHandSheet: View {
           LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             ForEach(ExerciseKind.allCases) { kind in
               Button {
-                exercise = kind
-                if let lastWeight, !kgPicked { weight = lastWeight[kind] }
+                pick(kind)
               } label: {
                 HStack(spacing: 8) {
                   ExerciseGlyph(kind: kind, size: 28)
@@ -1023,47 +1043,34 @@ struct SetByHandSheet: View {
         onDelete?()
         dismiss()
       }
-      .sheet(isPresented: $loadingBar) {
-        BarbellSheet(load: barStart) { load in
-          weight = .barbell(load)
-          kgPicked = true
-        }
-      }
     }
   }
 
-  /// The weight beside the count (#271): the competition bells in their colours and None, one tap each, and "Bar"
-  /// for plates on a bar (083), which opens the plates sheet and then shows their total; for an exercise that takes
-  /// a bar, the bar alone (#388).
-  @ViewBuilder private var weightRow: some View {
-    if exercise.takesBar { barWeightRow } else { bellWeightRow }
+  /// The weight under the count (#271), inline (#380; Igor: "Have a selector but not the kettlebell selector for
+  /// things that take a barbell"): the bells or the plates, by the kind of the exercise's last weight, and a link
+  /// to the other kind. Never a second sheet over this one.
+  private var weightRow: some View {
+    VStack(spacing: 10) {
+      if showsPlates { plateWeightRow } else { bellWeightRow }
+      Button(showsPlates ? "Bells instead" : "Plates instead") {
+        showsPlates.toggle()
+        // A weight of the other kind is not what the picker shows: cleared until one is picked.
+        let otherKind = showsPlates ? weight?.bellKg != nil : weight?.barbell != nil
+        if otherKind {
+          weight = nil
+          kgPicked = true
+        }
+      }
+      .font(.footnote).frame(minHeight: 44)
+    }
   }
 
-  /// An exercise loaded on a bar (#388; Igor: "Don't do reverse lunges with kb weights"): None and the bar, drawn
-  /// with its plates and total, no bells; a bell already on the set stays as its own chip, so it is never lost.
-  private var barWeightRow: some View {
-    let plates = weight?.barbell
-    return HStack(spacing: 8) {
-      weightChip("None", value: nil, color: .secondary).frame(width: 76)
-      if let kg = weight?.bellKg {
-        weightChip("\(kg) kg", value: .bell(kg), color: .secondary).frame(width: 76)
-      }
-      Button {
-        loadingBar = true
-      } label: {
-        HStack(spacing: 8) {
-          LoadedBarView(load: plates ?? BarbellLoad(bar: barStart.bar)).frame(height: 40)
-          Text(plates.map { "\($0.totalLb) lb" } ?? "Bar").font(.headline).monospacedDigit()
-            .fixedSize()
-        }
-        .padding(.horizontal, 10)
-        .frame(maxWidth: .infinity, minHeight: 56)
-        .background(Color.primary.opacity(plates != nil ? 0.2 : 0.08), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(plates != nil ? Color.primary : .clear, lineWidth: 3))
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel(plates.map { SetWeight.barbell($0).spoken } ?? "Barbell plates")
-      .accessibilityAddTraits(plates != nil ? .isSelected : [])
+  /// The plates inline (083's picker): None, then the bar, the drawn load, the total and the plate buttons; dimmer
+  /// while the set has no plates, until a plate or a bar is tapped.
+  private var plateWeightRow: some View {
+    VStack(spacing: 10) {
+      weightChip("None", value: nil, color: .secondary).frame(maxWidth: 120)
+      BarbellPicker(load: plates).opacity(weight?.barbell == nil ? 0.6 : 1)
     }
   }
 
@@ -1073,18 +1080,6 @@ struct SetByHandSheet: View {
       ForEach(BellWeightSheet.code, id: \.kg) { bell in
         weightChip("\(bell.kg)", value: .bell(bell.kg), color: bell.color)
       }
-      let plates = weight?.barbell
-      Button {
-        loadingBar = true
-      } label: {
-        Text(plates.map { "\($0.totalLb) lb" } ?? "Bar").font(.headline).monospacedDigit()
-          .frame(maxWidth: .infinity, minHeight: 48)
-          .background(Color.primary.opacity(plates != nil ? 0.3 : 0.1), in: RoundedRectangle(cornerRadius: 10))
-          .overlay(RoundedRectangle(cornerRadius: 10).stroke(plates != nil ? Color.primary : .clear, lineWidth: 3))
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel(plates.map { SetWeight.barbell($0).spoken } ?? "Barbell plates")
-      .accessibilityAddTraits(plates != nil ? .isSelected : [])
     }
   }
 
