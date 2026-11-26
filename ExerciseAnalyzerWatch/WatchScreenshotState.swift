@@ -33,6 +33,8 @@ enum WatchScreenshotState: String, CaseIterable {
   case noVideos
   /// An elliptical workout's machine rows (085): incline 6 holding the Crown, intensity 8.
   case workoutMachine
+  /// Live heart rate's call (090): CALL over the clock and "♥ 72 BPM", the line saying nothing is saved, End.
+  case liveCall
 
   /// The workout's type and machine the controller presents: an elliptical for workoutMachine, else strength.
   var machine: (kind: WorkoutKind, machine: WorkoutEvent.Machine)? {
@@ -44,6 +46,7 @@ enum WatchScreenshotState: String, CaseIterable {
     switch self {
     case .workoutStart: return (190, 96)
     case .workoutMachine: return (1240, 128)
+    case .liveCall: return (754, 72)
     case .workout, .workoutEnd, .workoutViewfinder, .setByHand, .setByHandExercise, .setByHandBarbell,
       .setByHandBarbellEnd:
       return (2530, 128)
@@ -130,7 +133,7 @@ enum WatchScreenshotState: String, CaseIterable {
       let plates = self == .setByHandBarbellEnd ? [45, 45, 10] : [45]
       status.barbell = [ExerciseKind.splitSquat.rawValue: BarbellLoad(bar: .sixtyFive, plates: plates)]
       return (status, true, nil)
-    case .workoutStart, .workoutMachine:
+    case .workoutStart, .workoutMachine, .liveCall:
       return (.idle, true, nil)
     case .workoutRecording:
       let status = WatchStatus(

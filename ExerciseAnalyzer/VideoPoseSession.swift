@@ -403,9 +403,10 @@ final class VideoPoseSession: NSObject {
     // A set typed on the wrist (059): a Workouts entry with no clip, once per id however often it arrives.
     watch.onHandSet = { [weak self] set, road in self?.addByHand(set, from: road) ?? false }
     watch.recoverInbox()
-    var hadWorkout = WorkoutMirror.shared.live != nil
+    // A call's live heart rate (090) keeps nothing awake: only a workout does.
+    var hadWorkout = WorkoutMirror.shared.liveWorkoutWire != nil
     workoutObservation = MainQueueObservation(
-      read: { WorkoutMirror.shared.live != nil },
+      read: { WorkoutMirror.shared.liveWorkoutWire != nil },
       onChange: { [weak self] active in
         guard active != hadWorkout else { return }
         hadWorkout = active
@@ -2167,7 +2168,7 @@ final class VideoPoseSession: NSObject {
   private func updateKeepAwake() {
     let reason = KeepAwake.decide(
       appActive: UIApplication.shared.applicationState == .active, recording: source == .camera,
-      analyzing: currentJob != nil, watchMode: watchMode, workoutRunning: WorkoutMirror.shared.live != nil,
+      analyzing: currentJob != nil, watchMode: watchMode, workoutRunning: WorkoutMirror.shared.liveWorkoutWire != nil,
       lastWatchContact: watch.lastContact, now: Date())
     dimmer.update(reason)  // every call, not just on a change: the 3 s tick is the dim's clock (#160)
     guard reason != keepAwake else { return }

@@ -47,6 +47,9 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
   }
 
   public var startDate: Date { Date(timeIntervalSince1970: startedAt) }
+
+  /// A workout the phone keeps a row of and the wrist writes to Health; a call's live heart rate (090) is not.
+  public var isWorkout: Bool { kind?.isWorkout ?? true }
 }
 
 /// What a workout is in Health (#333; Igor: "Add another type of workout where it's an elliptical workout"): the
@@ -63,9 +66,17 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
   case stairs
   case hiit
   case yoga
+  /// Live heart rate during a call (090): a light session that is never a workout, so never in Health or the
+  /// phone's list; only Live heart rate on the wrist starts it.
+  case call
 
+  /// The kinds a workout can be: everything but a call, the phone's Change type (082).
+  public static let workouts: [WorkoutKind] = allCases.filter(\.isWorkout)
   /// The kinds under Other…, in the order the watch shows them.
-  public static let other: [WorkoutKind] = allCases.filter { $0 != .strength }
+  public static let other: [WorkoutKind] = workouts.filter { $0 != .strength }
+
+  /// Written to Health at End and kept as a row on the phone; a call is neither (090).
+  public var isWorkout: Bool { self != .call }
 
   /// The phone's word for it on the workout line; strength says nothing, the lifter sign says it.
   public var label: String? { self == .strength ? nil : name }
@@ -82,6 +93,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .stairs: "Stairs"
     case .hiit: "HIIT"
     case .yoga: "Yoga"
+    case .call: "Call"
     }
   }
 
@@ -94,7 +106,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .bike: "Bike"
     case .row: "Rower"
     case .stairs: "Stairs"
-    case .strength, .hiit, .yoga: nil
+    case .strength, .hiit, .yoga, .call: nil
     }
   }
 
@@ -110,6 +122,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .stairs: "figure.stair.stepper"
     case .hiit: "figure.highintensity.intervaltraining"
     case .yoga: "figure.yoga"
+    case .call: "phone.fill"
     }
   }
 
@@ -125,6 +138,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .stairs: 44  // stairClimbing
     case .hiit: 63  // highIntensityIntervalTraining
     case .yoga: 57
+    case .call: 3000  // other: the session is never saved, so it names nothing in Health
     }
   }
 

@@ -299,7 +299,7 @@ private struct WorkoutPageView: View {
               "Type",
               selection: Binding(get: { workout.kind ?? .strength }, set: { onChangeKind?($0) })
             ) {
-              ForEach(WorkoutKind.allCases, id: \.self) { kind in
+              ForEach(WorkoutKind.workouts, id: \.self) { kind in  // never Call (090)
                 Label(kind.name, systemImage: kind.symbol).tag(kind)
               }
             }

@@ -15,9 +15,10 @@ state and is not in the table.
 |---|---|---|---|
 | disconnected | no-phone art, "Not connected…" with the reconnect note, "Last heard Ns ago"; "Last seen recording: N reps" when the last status had the recorder rolling; in a workout, the workout head in place of the art | Start workout (green), Retry; in a workout, "+ Set by hand" under Retry and End workout and Discard at the bottom in place of Start workout | 018, 048, 059 |
 | background | phone-in-background art, the unlock-and-open instruction; in a workout, the workout head in place of the art | Start workout (green), "Send a reminder to the phone" (no Record: it would die silently); in a workout, "+ Set by hand" under the reminder and End workout and Discard at the bottom in place of Start workout | 018, 048, 059 |
-| idle | "Phone ready", exercise picker, rest length picker, the rest count while resting, the last-set line (or "Analyzing…" while the pass runs) | Start workout (green), Record (red), Preview (below it) | 017, 041, 045, 046, 047, 048 |
+| idle | "Phone ready", exercise picker, rest length picker, the rest count while resting, the last-set line (or "Analyzing…" while the pass runs) | Start workout (green), Other… and beside it Live (a pink heart), Record (red), Preview (below it) | 017, 041, 045, 046, 047, 048, 090 |
 | workoutStart | a workout before its first set: WORKOUT in green over the session clock (counting up by itself), "♥ 96 BPM", no sets line yet; no figure art, no Start workout | Record (red), Preview, "+ Set by hand" under Preview, the pickers; End workout and Discard below the pickers | 048, 059 |
 | workout | between sets the head is the rest: "REST · 1:30" in orange over the rest count, large, white until the rest length and orange after; then "♥ 128 BPM · 42:13" with the session clock small and green, the sets by exercise with their drawings ("[swing] 6"), the last-set line and the pickers as idle; no second rest line | Record (red), Preview, "+ Set by hand" under Preview (a Crown turn below the first screen), the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048, 050, 059 |
+| liveCall | a light call session (090): CALL in green over the session clock and "♥ 72 BPM", then "Live to Larry · nothing saved to Health"; no Record, Preview, Set by hand, pickers or machine rows | End (green); no Discard | 090 |
 | workoutMachine | an elliptical workout: ELLIPTICAL in green over the session clock and "♥ 128 BPM", then the machine rows, full width and at least 44 pt: "Incline 6" outlined green with the Crown and "Intensity 8", − and + either side of each, and under them (a Crown turn down) "Elliptical" with a chevron | Incline and Intensity (a tap gives the row the Crown; − and + step it), the machine row (opens the machine tiles), then the workout page's buttons as workout | 085 |
 | setByHand | the count page over the workout page, three full-width rows of at least 44 pt on a 40 mm face unscrolled: the exercise (its drawing and name), the reps outlined green starting at the last set's count (9) with − and + either side (44 pt), the weight ("kg 24"); the sheet's close button and the green checkmark at top right | the exercise row (opens the drawings), the weight row (a first tap gives it the Crown, a second opens the bell tiles and "Bar" under them; on plates, "lb 155" and a tap opens the plates page), Save (the checkmark); no Cancel: the close button cancels; the Crown steps the green row, the count by one, 1…200 | 059, 066 |
 | setByHandBarbell | the plates page over the count page, opened on the last split squat's 155 lb: "155 lb" large over "45/side", the bars as three tiles (45, 58, 65, the 65 green), the plates one per row, each a tile of at least 44 pt with a 44 pt "−" beside it, the first row ("45 ×1" with its "−" solid) on a 40 mm face unscrolled, the rest a Crown turn down with their "−" faded, the sheet's close button and the green checkmark at top right | a bar, a plate (a tap puts one on each side, a press and hold takes one off), "−" (one of that plate off each side), Save (the checkmark) | 086 |
@@ -1079,6 +1080,54 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Notes:** a set typed on the wrist with plates reaches the phone by the queued transfer and the watch's context, as a bell's does (059, #197); the phone tells the wrist each exercise's last plates beside its last bells. A phone or iPad on a build before this one cannot read a set on the 65 lb bar and drops it, so the phone and the iPad get this build before the watch does. #375's reverse lunge as an exercise of its own and a typed (manual) weight are not part of this story (ea-3xw's follow-up).
 
 - **Issues:** [#375](https://github.com/idvorkin/exercise-analyzer/issues/375); ea-3xw; ea-71t (the wrist took a plate off only by press and hold, as #387 was on the phone)
+
+---
+
+### User Story 090:
+
+- **Summary:** One tap on the watch streams my heart rate to Larry live during a call or a walk, without a fake workout in Health
+- **Status:** implemented on `feat/ea-w6po-live-hr` (ea-1np), verified on the host (`LiveSessionTests`: walk or call from Motion's readings, a call is never a workout nor a tile under Other… or in Change type, Health's "other" type read back after a restart, a call's `started` / 10 s `tick` / `ended` not discarded with `kind` `call`, a walk's 30 s ticks, no `set` event during a call) and the watch simulator (`just watch-screens`, Ultra 4 49 mm and SE 3 40 mm: liveCall reads CALL over 12:37 and "♥ 72 BPM", "Live to Larry · nothing saved to Health" and End; idle and noVideos show Other… and Live side by side in the row Other… had alone, the rows below it unmoved; disconnected, background, done, workout, workoutStart and workoutMachine unchanged); the Motion ask, a real mirrored call or walk reaching the Cockpit, and no Health record after a call, pending on the watch and phone
+- **Why:** Igor on a call with Larry, 2026-11-25 (context-grabber-w6po, Larry 6a5172041920): "continuous data upload… if I'm on a call, can iOS be pulling it in?"; Larry, 91b07d266c95: ride the /workout events as kind `walk`, or `call` if he isn't walking, "no fake workouts in his rings", save one only for a real walk; acb69297ff22: a call's heart rate is real data (not discarded), ticks every 10 s on a call
+
+#### Use Case:
+- **As** Igor on a call with Larry (or Tony), or out on a walk, with the watch on my wrist
+- **I want to** start a live heart-rate stream from the watch in one tap
+- **so that** Larry can read my heart rate mid-call, every few seconds, not in Health's late batches, while my rings and my Workouts list hold only real workouts
+
+#### Acceptance Criteria:
+- **Scenario:** Starting it in one tap
+- **Given:** no workout runs on the watch
+- **When:** I tap "Live" (a heart, pink, beside Other… under Start workout, so Record stays where it was; VoiceOver says "Live heart rate")
+- **Then:** the wrist taps once and starts a light session: WALK if the watch saw me walking in the last two minutes, else CALL (no motion reading, a refused Motion permission or no answer within 2 s is CALL; the first tap asks for Motion and waits up to 20 s for that answer); the head reads that word in green over the session clock and "♥ 72 BPM", the heart rate updating every few seconds
+
+- **Scenario:** The light session's page
+- **Given:** a light session runs (CALL or WALK started from Live heart rate)
+- **When:** I look at the workout page
+- **Then:** under the head it says "Live to Larry · nothing saved to Health" for a call or "End saves the walk to Health" for a walk, then End (green), and Discard (red) for a walk only; no Record, Preview, Set by hand, pickers, machine rows or "No videos for a while"; it never asks "Looks like you're done" (077), End when I leave (079) does not watch it, and a later Start workout never offers to continue it (#238)
+
+- **Scenario:** Heart rate reaches Larry
+- **Given:** "Send workouts to Larry" is on (088) and a light session runs
+- **When:** the session starts, runs and ends
+- **Then:** the phone sends the same /workout events as any workout (084): `started`, a `tick` carrying `hr_bpm`, `hr_avg_bpm` and `hr_max_bpm` every 10 s on a call (Larry and Tony read it mid-call) and every 30 s on a walk, and `ended`, with `kind` `call` or `walk` (the Cockpit takes any kind); a call's `ended` is not `discarded`, so the heart rate Larry took stands; a set recorded during a call sends no `set` event
+
+- **Scenario:** A call saves nothing
+- **Given:** a CALL session
+- **When:** I tap End
+- **Then:** no workout is written to Health (no ring, no Fitness entry) and no line is added to the phone's Workouts; while it runs the phone shows no running workout line, no workout Live Activity, and a set recorded meanwhile is not counted as a workout's
+
+- **Scenario:** A walk is a walk
+- **Given:** a WALK session
+- **When:** I tap End
+- **Then:** Health gets an outdoor walking workout and Workouts gets a Walk line, as a walk started under Other… does (081); Discard writes neither
+
+- **Scenario:** The session survives a restart
+- **Given:** a light session runs
+- **When:** the watch app restarts and takes the session up again (#190)
+- **Then:** it is still a light CALL or WALK with the same page, and a call still saves nothing at End
+
+- **Notes:** A light walk is recorded outdoors and a gym walk (081) indoors, which is how a restarted app tells them apart. `call` is Health's "other" activity type, only ever used for a session that is never saved. A phone on a build before this one cannot read a call's messages: the phone gets this build before the watch. Starting the session from Grabber when a call begins (Larry: a Settings switch "Live heart rate on calls", off by default) is not part of this story: `startWatchApp` opens only the calling app's own watch app, and Grabber has none, so it needs an entry point on EA's phone side and the watch's handling of that launch (context-grabber-at59).
+
+- **Issues:** ea-1np; context-grabber-w6po; context-grabber-at59 (starting it from a Grabber call)
 
 ---
 

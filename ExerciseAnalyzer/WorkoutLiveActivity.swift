@@ -59,15 +59,17 @@ final class WorkoutLiveActivity {
     // The mirror starts at nil until Health hands the running workout back, so that first nil must not end an
     // activity a previous run left up mid-workout; one with no workout behind it goes when the next workout
     // starts (replaced), or iOS takes it down after eight hours.
-    if let live = mirror.live { follow(live) }
-    liveObservation = MainQueueObservation(read: { mirror.live }, onChange: { [weak self] in self?.follow($0) })
+    if let live = mirror.liveWorkoutWire { follow(live) }
+    // A call (090) is no workout here: no Live Activity for it.
+    liveObservation = MainQueueObservation(
+      read: { mirror.liveWorkoutWire }, onChange: { [weak self] in self?.follow($0) })
     NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
-      .sink { [weak self] _ in if let live = mirror.live { self?.follow(live) } }.store(in: &cancellables)
+      .sink { [weak self] _ in if let live = mirror.liveWorkoutWire { self?.follow(live) } }.store(in: &cancellables)
     // A set saved, typed or re-counted changes the reps by exercise and the rest clock's start (#181, #182).
     entriesObservation = MainQueueObservation(
       read: { recents.entries },
       onChange: { [weak self] _ in
-        if let live = mirror.live { self?.follow(live) }
+        if let live = mirror.liveWorkoutWire { self?.follow(live) }
       })
   }
 
