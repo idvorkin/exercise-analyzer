@@ -197,6 +197,29 @@ final class BarbellTests: XCTestCase {
     XCTAssertEqual(ExerciseKind.allCases.filter(\.takesBar), [.splitSquat])
   }
 
+  /// #380: the by-hand sheet's inline picker shows the kind of the exercise's last weight, the set's own first,
+  /// then its last in any workout, then its starting weight (066), then plates only for an exercise on a bar.
+  func testTheInlinePickerShowsTheKindOfTheLastWeight() {
+    let swing = ExerciseKind.kettlebellSwing
+    XCTAssertFalse(swing.picksPlates(own: nil, last: nil), "swings start on a bell")
+    XCTAssertTrue(ExerciseKind.splitSquat.picksPlates(own: nil, last: nil), "lunges start on the safety squat bar")
+    XCTAssertFalse(ExerciseKind.pullUp.picksPlates(own: nil, last: nil), "no start, no bar: the bells")
+    XCTAssertTrue(swing.picksPlates(own: nil, last: .barbell(ssb45)), "the last swing set was plates")
+    XCTAssertFalse(ExerciseKind.splitSquat.picksPlates(own: nil, last: .bell(16)), "the last lunge set was a bell")
+    XCTAssertTrue(swing.picksPlates(own: .barbell(ssb45), last: .bell(24)), "the set's own weight first")
+    XCTAssertFalse(ExerciseKind.splitSquat.picksPlates(own: .bell(16), last: .barbell(ssb45)), "a bell is kept")
+  }
+
+  /// #380: what the inline plates open on with no plates on the set: the exercise's last plates, else its starting
+  /// plates, else a 45 a side on the barbell.
+  func testTheInlinePlatesOpenOnTheLastThenTheStartingPlates() {
+    let ssb10 = BarbellLoad(bar: .safetySquat, plates: [10])
+    XCTAssertEqual(ExerciseKind.splitSquat.platesStart(own: nil, last: nil), ssb10)
+    XCTAssertEqual(ExerciseKind.splitSquat.platesStart(own: nil, last: .barbell(ssb45)), ssb45)
+    XCTAssertEqual(ExerciseKind.splitSquat.platesStart(own: .barbell(ssb45), last: nil), ssb45)
+    XCTAssertEqual(ExerciseKind.kettlebellSwing.platesStart(own: .bell(24), last: .bell(24)), .start)
+  }
+
   /// The drawing of the loaded bar (#388): heaviest nearest the middle, each plate as tall as it is heavy.
   func testTheDrawnBarStacksHeaviestInsideAndSizesByWeight() {
     let load = BarbellLoad(bar: .safetySquat, plates: [10, 45, 25, 45])
