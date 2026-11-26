@@ -114,10 +114,18 @@ ipa=$out/ExerciseAnalyzer.ipa
 t2=$(date +%s)
 
 # What the package holds, read back rather than assumed: the model compiled in, and the commit.
-unzip -l "$ipa" | grep -q 'Payload/ExerciseAnalyzer.app/yolo26n-pose.mlmodelc/' || {
-  echo "ota: $ipa has no yolo26n-pose.mlmodelc; nothing copied" >&2
-  exit 66
-}
+"$repo/scripts/ipa-has-model.sh" "$ipa"
+case $? in
+  0) ;;
+  1)
+    echo "ota: $ipa has no yolo26n-pose.mlmodelc; nothing copied" >&2
+    exit 66
+    ;;
+  *)
+    echo "ota: $ipa could not be listed; nothing copied" >&2
+    exit 1
+    ;;
+esac
 plist=$(mktemp) || exit 1
 trap 'rm -f "$plist"' EXIT
 unzip -p "$ipa" Payload/ExerciseAnalyzer.app/Info.plist >"$plist" || exit 1

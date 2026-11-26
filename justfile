@@ -23,6 +23,8 @@ test:
     # The skipped suites only print. ZoomPreviewReport is a by-hand tool: it runs, and checks the picture it draws,
     # only given ZOOM_PREVIEW_IMAGE, ZOOM_PREVIEW_CROP and ZOOM_PREVIEW_OUT (docs/TESTING.md, #98).
     set -uo pipefail
+    # The script checks first (well under a second): ota's model check (ea-cvy).
+    bash scripts/test-ipa-has-model.sh || exit 1
     cd ExerciseCore && swift test --skip TuningReports --skip DetectionReport --skip SwingThresholdSweep --skip ZoomPreviewReport 2>&1 \
       | grep -E "Test Suite|passed|failed|error" | tail -20
 
