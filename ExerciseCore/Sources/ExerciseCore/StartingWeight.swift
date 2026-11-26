@@ -23,7 +23,7 @@ public enum StartingWeight {
   /// The cutoff (Igor, 2026-11-26: "starting weights apply to NEW workouts only"): only a workout that began after
   /// it starts at the table's weights, so a past workout's weights, kg moved and progression stay as recorded. The
   /// app sets it once at launch, before any view reads a weight, to the moment the cutoff first ran on this device
-  /// (`cutoff(stored:now:)`); until then, and off the app, it is the merge.
+  /// (`cutoff(in:now:)`); until then, and off the app, it is the merge.
   nonisolated(unsafe) public static var since: Date = mergedAt
 
   /// The cutoff to keep: the one stored on an earlier run, else `now` (this is the first run), never before the
