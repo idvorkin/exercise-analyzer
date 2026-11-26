@@ -63,7 +63,8 @@ public struct WorkoutChoice: Hashable, Sendable {
 
   /// The tiles in the order the watch shows them: each kind under Other…, the walk twice.
   public static let other: [WorkoutChoice] = WorkoutKind.other.flatMap { kind in
-    kind == .walk ? [WorkoutChoice(kind: .walk, outdoor: true), WorkoutChoice(kind: .walk)] : [WorkoutChoice(kind: kind)]
+    kind == .walk
+      ? [WorkoutChoice(kind: .walk, outdoor: true), WorkoutChoice(kind: .walk)] : [WorkoutChoice(kind: kind)]
   }
 
   private var treadmill: Bool { kind == .walk && !outdoor }
