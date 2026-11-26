@@ -9,7 +9,8 @@ import XCTest
 @testable import ExerciseCore
 
 final class WorkoutEventsTests: XCTestCase {
-  private let t0 = Date(timeIntervalSince1970: 1_795_500_000)
+  /// 2026-12-01: after the starting weights came in, so a bare swing set goes at its starting weight (#374).
+  private let t0 = Date(timeIntervalSince1970: 1_796_100_000)
 
   private func wire(
     hr: Int? = 120, sets: Int = 0, reps: Int = 0, ending: Bool = false, discarded: Bool = false

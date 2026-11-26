@@ -37,14 +37,14 @@ public enum ProgressionSeries {
   ) -> [ProgressionWeek] {
     let mine = sets.filter { $0.exerciseKind == exercise }.sorted { $0.span.lowerBound < $1.span.lowerBound }
     // The weight each set shows, carried inside its workout (or its day) in time order; a barbell's in kg (083).
-    // A workout's first sets start at the exercise's starting weight as the page shows them (#374); a day
-    // outside every workout has none.
+    // A workout's first sets start at the exercise's starting weight as the page shows them, when it began after
+    // the cutoff (#374); a day outside every workout has none.
     var carries: [String: WeightCarry] = [:]
     let weighed: [(set: RecentEntry, kg: Int?)] = mine.map { set in
       let start = set.span.lowerBound
       let workout = workouts.first { $0.contains(start) }
       let session = workout.map { "w:" + $0.id } ?? "d:\(calendar.startOfDay(for: start).timeIntervalSince1970)"
-      var carry = carries[session] ?? WeightCarry(starts: workout == nil ? [:] : StartingWeight.table)
+      var carry = carries[session] ?? WeightCarry(workoutStartedAt: workout?.start)
       let kg = carry.weight(of: set)?.weight.kg
       carries[session] = carry
       return (set, kg)

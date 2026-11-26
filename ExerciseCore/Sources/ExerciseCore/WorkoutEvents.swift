@@ -225,7 +225,7 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
   private mutating func countSets(_ entries: [RecentEntry], heartRate: HeartRateSeries?, now: Date) {
     guard let start = running?.startedAt, running?.kind.isWorkout == true else { return }
     let inside = entries.filter { $0.span.lowerBound >= start && $0.repCount > 0 }
-    for facts in Self.setFacts(inside, heartRate: heartRate) {
+    for facts in Self.setFacts(inside, heartRate: heartRate, workoutStart: start) {
       let sent = SentSet(
         exercise: facts.exercise, reps: facts.reps, score: facts.score, bellKg: facts.bellKg, barbell: facts.barbell)
       guard running?.sentSets[facts.id] != sent else { continue }
@@ -237,10 +237,15 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
   }
 
   /// The facts of a workout's sets, in time order, each with the weight it shows (its own, or carried from the
-  /// exercise's set before inside these, 066 and 083, else the exercise's starting weight, #374) and its
-  /// heart-rate peak: what a live `set` carries and what a summary's `set_list` carries (087).
-  static func setFacts(_ inside: [RecentEntry], heartRate: HeartRateSeries?) -> [WorkoutEvent.SetFacts] {
-    var carry = WeightCarry()
+  /// exercise's set before inside these, 066 and 083, else the exercise's starting weight when the workout began
+  /// after the cutoff, #374) and its heart-rate peak: what a live `set` carries and what a summary's `set_list`
+  /// carries (087).
+  static func setFacts(
+    _ inside: [RecentEntry], heartRate: HeartRateSeries?, workoutStart: Date?
+  )
+    -> [WorkoutEvent.SetFacts]
+  {
+    var carry = WeightCarry(workoutStartedAt: workoutStart)
     return inside.sorted { $0.span.lowerBound < $1.span.lowerBound }.map { entry in
       let weight = carry.weight(of: entry)?.weight
       let span = entry.span
