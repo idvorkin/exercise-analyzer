@@ -78,6 +78,8 @@ final class WorkoutMirror: NSObject {
       // row (090). Strength stays nil on the wire, as before #333.
       let kind = WorkoutKind(healthActivity: session.workoutConfiguration.activityType.rawValue)
       if kind != .strength { placeholder.kind = kind }
+      // Not the wrist's word: the Cockpit's `started` waits for its first message, and the machine on it (ea-o4q).
+      placeholder.standIn = true
       live = placeholder
     }
     onEvent?(

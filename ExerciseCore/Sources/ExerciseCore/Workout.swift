@@ -31,6 +31,10 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
   public var machine: WorkoutEvent.Machine? = nil
   /// When `machine` was last changed on the wrist, seconds since 1970: the `level` event's time.
   public var machineAt: Double? = nil
+  /// The phone's stand-in from the mirrored session (its start and type) until the wrist's first message
+  /// (ea-o4q): not the wrist's word on anything, so the Cockpit's `started` waits for that message. The wrist
+  /// never sets it, and nil is not encoded, so its messages are as before.
+  public var standIn: Bool? = nil
 
   public init(
     startedAt: Double, heartRate: Int? = nil, heartRateAverage: Int? = nil, heartRateMax: Int? = nil, sets: Int = 0,

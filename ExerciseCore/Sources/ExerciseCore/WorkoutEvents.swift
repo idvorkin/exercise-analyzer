@@ -127,6 +127,10 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
     var heartRateMax: Int?
     var sets = 0
     var reps = 0
+    /// Opened by the phone's stand-in (ea-o4q): `started` keeps the first id and waits for the wrist's first
+    /// message, so it carries the wrist's machine; any other event due first sends it. Nil once it went, and in a
+    /// stream saved before ea-o4q.
+    var startHeld: Bool?
   }
 
   /// The facts of a set as its last `set` event carried them.
@@ -171,9 +175,19 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
         lastHeardAt: now)
       running?.machine = live.machine  // a machine set before the first message rides `started`, no `level`
       update(from: live)
-      waiting.append(event(.started, at: live.startDate))
+      if live.standIn == true {
+        running?.seq = 1  // `started` keeps the first id, sent once the wrist is heard
+        running?.startHeld = true
+      } else {
+        waiting.append(event(.started, at: live.startDate))
+      }
     }
     update(from: live)
+    if live.standIn != true, running?.startHeld == true {
+      // The wrist's first message: its machine rides the held `started`, with no `level` (ea-o4q).
+      if let machine = live.machine { running?.machine = machine }
+      sendHeldStart()
+    }
     // The wrist's setting (085): a change is one `level`, at the time it was made there; a message without a
     // machine (an older watch, a restart's first message) leaves it as it was.
     if let machine = live.machine, machine != running?.machine {
@@ -268,12 +282,27 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
     tick = nil
   }
 
+  /// The `started` held for the wrist's first message (ea-o4q), under the first id and at the wrist's start, with
+  /// what the stream knows now.
+  private mutating func sendHeldStart() {
+    guard let run = running, run.startHeld == true else { return }
+    running?.startHeld = nil
+    waiting.append(event(.started, at: run.startedAt, seq: 1))
+  }
+
   private mutating func event(_ type: WorkoutEvent.EventType, at date: Date) -> WorkoutEvent {
+    // Anything due before the wrist is heard (a tick, a set, the end) goes behind the held `started`.
+    sendHeldStart()
     guard var run = running else { preconditionFailure("an event needs a running workout") }
     run.seq += 1
     running = run
+    return event(type, at: date, seq: run.seq)
+  }
+
+  private func event(_ type: WorkoutEvent.EventType, at date: Date, seq: Int) -> WorkoutEvent {
+    guard let run = running else { preconditionFailure("an event needs a running workout") }
     return WorkoutEvent(
-      id: "\(run.workoutID)-\(run.seq)", type: type, workoutID: run.workoutID, kind: run.kind, source: run.source,
+      id: "\(run.workoutID)-\(seq)", type: type, workoutID: run.workoutID, kind: run.kind, source: run.source,
       at: date, startedAt: run.startedAt, hrBpm: run.heartRate, hrAvgBpm: run.heartRateAverage,
       hrMaxBpm: run.heartRateMax, sets: run.sets, reps: run.reps,
       machine: type == .set || type == .ended ? nil : run.machine)

@@ -1012,7 +1012,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 ### User Story 085:
 
 - **Summary:** On a cardio machine, the machine, its incline and its intensity are set from the wrist in a few taps, and each change reaches Larry with the time it was made
-- **Status:** implemented in [2164c87](https://github.com/idvorkin/exercise-analyzer/commit/2164c87), [7240397](https://github.com/idvorkin/exercise-analyzer/commit/7240397) (ea-jap, #382), verified on the host (`WorkoutEventsTests`: the machine on the first message rides `started` with no `level`, a change is one `level` at the wrist's time and a repeat none, a message without a machine never clears it, an older watch's message decodes, each kind's machine and the steps' range) and the watch simulator (`just watch-screens`, workoutMachine: ELLIPTICAL over the clock and "♥ 128 BPM", then "Incline 6" outlined green and "Intensity 8", − and + either side; the strength shots unchanged); the Crown, the two-second settle, the tap and a real `level` reaching the Cockpit from a wrist session, pending (the simulator has no mirrored workout)
+- **Status:** implemented in [2164c87](https://github.com/idvorkin/exercise-analyzer/commit/2164c87), [7240397](https://github.com/idvorkin/exercise-analyzer/commit/7240397) (ea-jap, #382), verified on the host (`WorkoutEventsTests`: the machine on the first message rides `started` with no `level`, a change is one `level` at the wrist's time and a repeat none, a message without a machine never clears it, an older watch's message decodes, each kind's machine and the steps' range) and the watch simulator (`just watch-screens`, workoutMachine: ELLIPTICAL over the clock and "♥ 128 BPM", then "Incline 6" outlined green and "Intensity 8", − and + either side; the strength shots unchanged); the Crown, the two-second settle, the tap and a real `level` reaching the Cockpit from a wrist session, pending (the simulator has no mirrored workout); `started` waiting for the wrist's first message (ea-o4q) on `fix/ea-o4q-started-machine`, verified on the host (`WorkoutEventsTests`: the stand-in then the machine is one `started` with it and no `level`, the stand-in alone sends nothing until a set, a tick or `ended` is due and then `started` first, a stream saved before it decodes) and the simulator (`SWING_LIVE_WORKOUT` against a stand-in Cockpit, `started` still sent); the mirrored session's order on the phone, pending
 - **Why:** Larry, 2026-11-24 (igor2-88g.1620), on Igor's ask from the elliptical that morning: a machine object on `started` and every tick, "plus a 'level' event type the moment he changes incline or intensity … so heart rate can be read per level"
 
 #### Use Case:
@@ -1041,9 +1041,14 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **When:** the watch app restarts and takes the workout up again (#190)
 - **Then:** the rows show the machine and its setting as before, and no `level` event is sent for it again; a workout started with only the machine's name sends it on `started` and no `level` until I set a number
 
-- **Notes:** the watch is the one place the setting is made; the phone, which sends the events (084), takes it from the workout's messages from the wrist and keeps the last one it heard, so a message without a machine (an older watch build, a restart's first message) never clears it. Incline and intensity are the numbers the machine shows, with no unit.
+- **Scenario:** The machine picked at Start, heard after the session (ea-o4q)
+- **Given:** a walk started on the wrist, so its machine is Treadmill from the first moment
+- **When:** the phone is handed the workout's session a second before the wrist's first message reaches it
+- **Then:** the Cockpit's `started` carries Treadmill, at the wrist's start, and no `level` follows it; `started` waits for the wrist's first message, and goes without one only when a set is saved or the workout ends before any message came, so a workout whose messages never arrive still says `started` and `ended`
 
-- **Issues:** ea-jap; [#376](https://github.com/idvorkin/exercise-analyzer/issues/376) (the events)
+- **Notes:** the watch is the one place the setting is made; the phone, which sends the events (084), takes it from the workout's messages from the wrist and keeps the last one it heard, so a message without a machine (an older watch build, a restart's first message) never clears it. The phone holds a stand-in for the workout from the moment Health hands it the session (the session's start and type), and that stand-in is not the wrist's word on the machine: on DDE051BE (2026-11-26) it sent `started` with no machine at 18:15:18 and a `level` with Treadmill at 18:15:19. Incline and intensity are the numbers the machine shows, with no unit.
+
+- **Issues:** ea-jap; [#376](https://github.com/idvorkin/exercise-analyzer/issues/376) (the events); ea-o4q (`started` without the machine, then a `level` a second later)
 
 ---
 
