@@ -5,6 +5,7 @@
 //  through it, and an ended workout becomes a StoredWorkout row for Workouts. The watch owns the session; this
 //  never starts, pauses or ends one.
 
+import CoreLocation
 import ExerciseCore
 import Foundation
 import HealthKit
@@ -116,8 +117,10 @@ final class WorkoutMirror: NSObject {
     // The simulator's sheet would wait for a tap no run can give (as in `delete`).
     #if !targetEnvironment(simulator)
       guard HKHealthStore.isHealthDataAvailable(), UIApplication.shared.applicationState == .active else { return }
-      let share: Set<HKSampleType> = [.workoutType()]
-      let read: Set<HKObjectType> = [.workoutType(), HKQuantityType(.heartRate)]
+      // Routes too, so an edit keeps an outdoor workout's map (094, ea-err); a phone that answered before is asked
+      // once more.
+      let share: Set<HKSampleType> = [.workoutType(), HKSeriesType.workoutRoute()]
+      let read: Set<HKObjectType> = [.workoutType(), HKQuantityType(.heartRate), HKSeriesType.workoutRoute()]
       do {
         guard try await store.statusForAuthorizationRequest(toShare: share, read: read) == .shouldRequest else {
           return
@@ -524,7 +527,12 @@ final class WorkoutMirror: NSObject {
       if let end { return record.endDate > end }
       return type.map { record.workoutActivityType != $0 } ?? false
     }
-    var saved: [HKWorkout] = []
+    // Route access is asked with the edit's when the page opens (078); asked here it would never show (#349).
+    let routes: Set<HKSampleType> = [HKSeriesType.workoutRoute()]
+    let routeAsked = (try? await store.statusForAuthorizationRequest(toShare: routes, read: routes)) == .unnecessary
+    // The new records and their routes.
+    var saved: [HKSample] = []
+    var carriedRoutes: [HKWorkoutRoute] = []
     // The old records go only once their new ones are saved; if Health will not save one or let them go (a
     // record the watch wrote may be the watch's alone to delete), the new ones go again, so Health never holds
     // both.
@@ -554,13 +562,73 @@ final class WorkoutMirror: NSObject {
         try await builder.endCollection(at: stop)
         guard let new = try await builder.finishWorkout() else { throw WorkoutTrimError.notSaved }
         saved.append(new)
+        // The old record's map goes with it (094, ea-err); never fatal, the workout is what was asked for.
+        if let route = await carryRoute(from: record, to: new, until: stop, asked: routeAsked) {
+          saved.append(route.new)
+          carriedRoutes += route.old
+        }
       }
       if !records.isEmpty { try await store.delete(records) }
     } catch {
       if !saved.isEmpty { try? await store.delete(saved) }
       throw error
     }
+    // The old routes go last, once their new ones are saved and the old records are gone. The watch wrote them, so
+    // Health may keep them the watch's to delete (or have taken them with the record): logged, never undone.
+    if !carriedRoutes.isEmpty {
+      do {
+        try await store.delete(carriedRoutes)
+      } catch {
+        onEvent?("workout_route_carried", ["old_deleted": false, "routes": carriedRoutes.count, "message": "\(error)"])
+      }
+    }
     return records.count
+  }
+
+  /// The old record's route, its fixes from `record`'s start to `until`, saved to `new` (094, ea-err). Returns the
+  /// new route and the old ones it replaces, or nil when there is none to carry or Health refused: the workout's
+  /// new record stays either way, the old route stays in Health, and `workout_route_carried` says why.
+  private func carryRoute(
+    from record: HKWorkout, to new: HKWorkout, until end: Date, asked: Bool
+  ) async -> (new: HKWorkoutRoute, old: [HKWorkoutRoute])? {
+    var info: [String: Any] = ["asked": asked]
+    defer { onEvent?("workout_route_carried", info) }
+    var routes: [HKWorkoutRoute] = []
+    var kept: [CLLocation] = []
+    if asked {
+      do {
+        let query = HKSampleQueryDescriptor(
+          predicates: [.workoutRoute(HKQuery.predicateForObjects(from: record))], sortDescriptors: [])
+        routes = try await query.result(for: store)
+        var fixes: [CLLocation] = []
+        for route in routes {
+          for try await fix in HKWorkoutRouteQueryDescriptor(route).results(for: store) { fixes.append(fix) }
+        }
+        kept = WorkoutRoute.carried(fixes, from: record.startDate, to: end) { $0.timestamp }
+        info["read"] = fixes.count
+      } catch {
+        info["why"] = "read_failed"
+        info["message"] = "\(error)"
+        return nil
+      }
+    }
+    info["routes"] = routes.count
+    info["kept"] = kept.count
+    if case .skip(let why) = WorkoutRoute.carry(asked: asked, routes: routes.count, kept: kept.count) {
+      info["why"] = why
+      return nil
+    }
+    do {
+      let builder = HKWorkoutRouteBuilder(healthStore: store, device: record.device)
+      try await builder.insertRouteData(kept)
+      let route = try await builder.finishRoute(with: new, metadata: nil)
+      info["saved"] = true
+      return (route, routes)
+    } catch {
+      info["why"] = "save_failed"
+      info["message"] = "\(error)"
+      return nil
+    }
   }
 
   /// Workouts other devices put in the iCloud container and the ones deleted there (story 070, steps 2 and 4),

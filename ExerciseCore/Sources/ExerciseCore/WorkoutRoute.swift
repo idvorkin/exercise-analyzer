@@ -55,4 +55,20 @@ public enum WorkoutRoute {
     if fixes == 0 { return .skip("no_fixes") }
     return .save
   }
+
+  /// The fixes a record saved again keeps (ea-err): Trim end, Undo trim and Change type replace the wrist's record
+  /// with a new one, which carries those of the old route from its start to its end, both included, in their order.
+  /// Change type keeps them all; Trim end the ones up to the new end; Undo trim what the trim kept.
+  public static func carried<Fix>(_ fixes: [Fix], from start: Date, to end: Date, at time: (Fix) -> Date) -> [Fix] {
+    fixes.filter { (start...end).contains(time($0)) }
+  }
+
+  /// Whether the new record gets a route: route access already answered (asked when the page opens, 078; an ask
+  /// inside the edit never shows, #349), a route on the old record, and a fix inside the kept time.
+  public static func carry(asked: Bool, routes: Int, kept: Int) -> Finish {
+    if !asked { return .skip("not_asked") }
+    if routes == 0 { return .skip("no_route") }
+    if kept == 0 { return .skip("no_fixes_kept") }
+    return .save
+  }
 }

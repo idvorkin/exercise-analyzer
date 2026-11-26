@@ -81,4 +81,45 @@ final class WorkoutRouteTests: XCTestCase {
     XCTAssertEqual(WorkoutRoute.finish(saved: false, fixes: 120, discarded: false), .skip("workout_not_saved"))
     XCTAssertEqual(WorkoutRoute.finish(saved: true, fixes: 0, discarded: false), .skip("no_fixes"))
   }
+
+  // MARK: - Trim end, Undo trim and Change type keep the route (ea-err)
+
+  /// A fix a minute from 08:00 to 08:40, out of order as Health may batch them.
+  private var walk: [Date] { [40, 0, 10, 20, 30, 39, 1].map { start.addingTimeInterval(Double($0) * 60) } }
+
+  func testTrimEndKeepsOnlyTheFixesUpToTheNewEnd() {
+    let end = start.addingTimeInterval(20 * 60)
+    let kept = WorkoutRoute.carried(walk, from: start, to: end) { $0 }
+    XCTAssertEqual(kept, [0, 10, 20, 1].map { start.addingTimeInterval(Double($0) * 60) }, "the new end itself is in")
+  }
+
+  func testChangeTypeKeepsTheWholeRoute() {
+    let end = start.addingTimeInterval(40 * 60)
+    XCTAssertEqual(WorkoutRoute.carried(walk, from: start, to: end) { $0 }, walk)
+  }
+
+  func testUndoTrimKeepsWhatTheTrimKept() {
+    let trimmed = WorkoutRoute.carried(walk, from: start, to: start.addingTimeInterval(20 * 60)) { $0 }
+    let undone = WorkoutRoute.carried(trimmed, from: start, to: start.addingTimeInterval(40 * 60)) { $0 }
+    XCTAssertEqual(undone, trimmed, "the fixes a trim cut do not come back")
+  }
+
+  func testAFixOutsideTheRecordStaysOut() {
+    let fixes = [start.addingTimeInterval(-5), start.addingTimeInterval(60), start.addingTimeInterval(601)]
+    XCTAssertEqual(
+      WorkoutRoute.carried(fixes, from: start, to: start.addingTimeInterval(600)) { $0 }, [start.addingTimeInterval(60)]
+    )
+  }
+
+  func testATrimBeforeTheFirstFixKeepsNoRoute() {
+    let fixes = [start.addingTimeInterval(300)]
+    XCTAssertEqual(WorkoutRoute.carried(fixes, from: start, to: start.addingTimeInterval(120)) { $0 }, [])
+  }
+
+  func testTheNewRecordGetsTheRouteOnlyWithRouteAccessARouteAndFixesKept() {
+    XCTAssertEqual(WorkoutRoute.carry(asked: true, routes: 1, kept: 300), .save)
+    XCTAssertEqual(WorkoutRoute.carry(asked: false, routes: 1, kept: 300), .skip("not_asked"))
+    XCTAssertEqual(WorkoutRoute.carry(asked: true, routes: 0, kept: 0), .skip("no_route"), "an indoor workout")
+    XCTAssertEqual(WorkoutRoute.carry(asked: true, routes: 1, kept: 0), .skip("no_fixes_kept"))
+  }
 }
