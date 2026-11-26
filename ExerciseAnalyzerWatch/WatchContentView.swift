@@ -398,6 +398,10 @@ struct WatchContentView: View {
         workoutHeader
         Text(workout.kind.isWorkout ? "End saves the \(outing) to Health" : "Live to Larry · nothing saved to Health")
           .font(.caption2).multilineTextAlignment(.center).foregroundStyle(.secondary)
+        // Location off for an outdoor session (094): said once, in grey; the workout still saves.
+        if let notice = workout.routeNotice {
+          Text(notice).font(.caption2).multilineTextAlignment(.center).foregroundStyle(.secondary)
+        }
         Button {
           phone.endWorkout(discard: false)
         } label: {

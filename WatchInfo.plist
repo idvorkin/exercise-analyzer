@@ -15,12 +15,12 @@
 		<string>location</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>With End when I leave on, the watch ends your workout once you leave the place you started it.</string>
+	<string>The watch records the route of an outdoor walk, run or hike to Health, and with End when I leave on, ends your workout once you leave the place you started it.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Live heart rate checks whether you are walking, to record a walk rather than a call.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Exercise Analyzer reads your heart rate during a workout started on the watch.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Exercise Analyzer saves each workout you end on the watch to Health, with its sets.</string>
+	<string>Exercise Analyzer saves each workout you end on the watch to Health, with its sets, and an outdoor walk, run or hike with its route.</string>
 </dict>
 </plist>

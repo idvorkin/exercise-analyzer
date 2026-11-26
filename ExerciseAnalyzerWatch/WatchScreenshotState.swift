@@ -39,6 +39,9 @@ enum WatchScreenshotState: String, CaseIterable {
   case liveWalk
   /// An outdoor run (093): RUN over the clock and "♥ 152 BPM", "End saves the run to Health", End, Discard.
   case liveRun
+  /// An outdoor walk with location off (094): liveWalk's page with "No route: location is off for Exercise
+  /// Analyzer" in grey under "End saves the walk to Health".
+  case liveWalkNoRoute
   /// Other…'s tiles over the idle page (081, 091, 093): Elliptical and Run, Outdoor run and Walk, Treadmill and Hike.
   case kindPicker
 
@@ -51,7 +54,7 @@ enum WatchScreenshotState: String, CaseIterable {
   var lightKind: WorkoutKind? {
     switch self {
     case .liveCall: .call
-    case .liveWalk: .walk
+    case .liveWalk, .liveWalkNoRoute: .walk
     case .liveRun: .run
     default: nil
     }
@@ -63,7 +66,7 @@ enum WatchScreenshotState: String, CaseIterable {
     case .workoutStart: return (190, 96)
     case .workoutMachine: return (1240, 128)
     case .liveCall: return (754, 72)
-    case .liveWalk: return (1510, 104)
+    case .liveWalk, .liveWalkNoRoute: return (1510, 104)
     case .liveRun: return (1835, 152)
     case .workout, .workoutEnd, .workoutViewfinder, .setByHand, .setByHandExercise, .setByHandBarbell,
       .setByHandBarbellEnd:
@@ -151,7 +154,7 @@ enum WatchScreenshotState: String, CaseIterable {
       let plates = self == .setByHandBarbellEnd ? [45, 45, 10] : [45]
       status.barbell = [ExerciseKind.splitSquat.rawValue: BarbellLoad(bar: .sixtyFive, plates: plates)]
       return (status, true, nil)
-    case .workoutStart, .workoutMachine, .liveCall, .liveWalk, .liveRun:
+    case .workoutStart, .workoutMachine, .liveCall, .liveWalk, .liveRun, .liveWalkNoRoute:
       return (.idle, true, nil)
     case .workoutRecording:
       let status = WatchStatus(
