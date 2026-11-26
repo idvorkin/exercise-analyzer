@@ -20,7 +20,8 @@ state and is not in the table.
 | workout | between sets the head is the rest: "REST · 1:30" in orange over the rest count, large, white until the rest length and orange after; then "♥ 128 BPM · 42:13" with the session clock small and green, the sets by exercise with their drawings ("[swing] 6"), the last-set line and the pickers as idle; no second rest line | Record (red), Preview, "+ Set by hand" under Preview (a Crown turn below the first screen), the pickers; End workout and Discard below the pickers (the workoutEnd shot) | 048, 050, 059 |
 | liveCall | a light call session (090): CALL in green over the session clock and "♥ 72 BPM", then "Live to Larry · nothing saved to Health"; no Record, Preview, Set by hand, pickers or machine rows | End (green); no Discard | 090 |
 | liveWalk | an outdoor walk (090, 091): WALK in green over the session clock and "♥ 104 BPM", then "End saves the walk to Health"; no Record, Preview, Set by hand, pickers or machine rows | End (green), Discard (red, asks first) | 090, 091 |
-| kindPicker | Other…'s tiles over the idle page, two across, 52 pt each: Elliptical, Run, Walk (the walker), Treadmill (the walker on a treadmill), Bike, Row, Stairs, HIIT, Yoga | a tile (starts that workout and closes) | 081, 091 |
+| liveRun | an outdoor run (093): RUN in green over the session clock and "♥ 152 BPM", then "End saves the run to Health"; no Record, Preview, Set by hand, pickers or machine rows | End (green), Discard (red, asks first) | 093 |
+| kindPicker | Other…'s tiles over the idle page, two across, 52 pt each: Elliptical, Run (the runner, the treadmill run), Outdoor run (the runner in a circle), Walk (the walker), Treadmill (the walker on a treadmill), Hike (the hiker), Bike, Row, Stairs, HIIT, Yoga | a tile (starts that workout and closes) | 081, 091, 093 |
 | workoutMachine | an elliptical workout: ELLIPTICAL in green over the session clock and "♥ 128 BPM", then the machine rows, full width and at least 44 pt: "Incline 6" outlined green with the Crown and "Intensity 8", − and + either side of each, and under them (a Crown turn down) "Elliptical" with a chevron | Incline and Intensity (a tap gives the row the Crown; − and + step it), the machine row (opens the machine tiles), then the workout page's buttons as workout | 085 |
 | setByHand | the count page over the workout page, three full-width rows of at least 44 pt on a 40 mm face unscrolled: the exercise (its drawing and name), the reps outlined green starting at the last set's count (9) with − and + either side (44 pt), the weight ("kg 24"); the sheet's close button and the green checkmark at top right | the exercise row (opens the drawings), the weight row (a first tap gives it the Crown, a second opens the bell tiles and "Bar" under them; on plates, "lb 155" and a tap opens the plates page), Save (the checkmark); no Cancel: the close button cancels; the Crown steps the green row, the count by one, 1…200 | 059, 066 |
 | setByHandBarbell | the plates page over the count page, opened on the last split squat's 155 lb: "155 lb" large over "45/side", the bars as three tiles (45, 58, 65, the 65 green), the plates one per row, each a tile of at least 44 pt with a 44 pt "−" beside it, the first row ("45 ×1" with its "−" solid) on a 40 mm face unscrolled, the rest a Crown turn down with their "−" faded, the sheet's close button and the green checkmark at top right | a bar, a plate (a tap puts one on each side, a press and hold takes one off), "−" (one of that plate off each side), Save (the checkmark) | 086 |
@@ -1002,7 +1003,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** Starting a run
 - **Given:** no workout runs on the watch
 - **and Given:** Start workout still starts the gym hour in one tap, and Other… sits under it
-- **When:** I tap Other… and then Run among the tiles Elliptical, Run, Walk, Treadmill, Bike, Row, Stairs, HIIT and Yoga (Walk is the outdoor walk and Treadmill the gym's indoor one, 091)
+- **When:** I tap Other… and then Run among the tiles Elliptical, Run, Outdoor run, Walk, Treadmill, Hike, Bike, Row, Stairs, HIIT and Yoga (Walk is the outdoor walk and Treadmill the gym's indoor one, 091; Outdoor run and Hike are 093)
 - **Then:** the workout page heads with RUN; End writes an indoor run (no GPS route) to Health; Workouts' line reads "Run · 7:02 AM · 30 min · ♥ 151" with the runner sign; a later Start workout never asks to continue the run (#238), though a gym hour that ended before the run still is offered; two runs under 30 minutes apart are one Run line, and a run beside a row or a strength workout is a plain line
 
 - **Issues:** [#339](https://github.com/idvorkin/exercise-analyzer/issues/339); [#409](https://github.com/idvorkin/exercise-analyzer/issues/409) (Walk was the indoor treadmill walk, so an outdoor walk reached Larry as a treadmill; 091)
@@ -1153,7 +1154,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** Two walks under Other…
 - **Given:** no workout runs on the watch
 - **When:** I tap Other…
-- **Then:** the tiles read Elliptical, Run, Walk, Treadmill, Bike, Row, Stairs, HIIT and Yoga: Walk wears the walker and Treadmill the walker on a treadmill
+- **Then:** the tiles read Elliptical, Run, Walk, Treadmill, Bike, Row, Stairs, HIIT and Yoga: Walk wears the walker and Treadmill the walker on a treadmill (093 adds Outdoor run after Run and Hike after Treadmill)
 
 - **Scenario:** An outdoor walk
 - **Given:** the tiles under Other…
@@ -1175,7 +1176,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **When:** I trim its end or change its type (078, 082)
 - **Then:** the record Health keeps is still outdoors; a gym workout stays indoors
 
-- **Notes:** the wire to the Cockpit does not change shape: both walks are `kind` `walk`, told apart by the treadmill's `machine` (never on an outdoor walk), and no location goes on any event (the Cockpit refuses one). The phone's Workouts line reads Walk for both. A GPS route in Health, outdoor runs and hikes are not part of this story (ea-5qg's follow-ups).
+- **Notes:** the wire to the Cockpit does not change shape: both walks are `kind` `walk`, told apart by the treadmill's `machine` (never on an outdoor walk), and no location goes on any event (the Cockpit refuses one). The phone's Workouts line reads Walk for both. A GPS route in Health is not part of this story (ea-kay); outdoor runs and hikes are 093.
 
 - **Issues:** [#409](https://github.com/idvorkin/exercise-analyzer/issues/409); ea-5qg
 
@@ -1214,7 +1215,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Then:** the watch ends it as its own End would (090: a call saves nothing, a walk is saved), with the wrist's tap; the phone's log says `live_hr_end` with whether the watch was told
 
 - **Scenario:** A real workout is never ended from outside
-- **Given:** a gym hour or a workout from Other… other than the outdoor walk runs on the wrist
+- **Given:** a gym hour or a workout from Other… other than the outdoor walk, run or hike (091, 093) runs on the wrist
 - **When:** "End live heart rate" comes, or "Start live heart rate"
 - **Then:** nothing changes on the wrist and the phone refuses, so the link goes back by `x-error` and the action fails: Start while any session runs, End when the running session is not a light one (a treadmill walk carries its machine); with no session running, End says there is nothing to end; success means the watch was told, and the watch still checks for itself
 
@@ -1226,6 +1227,59 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Notes:** Health opens a watch app only for its own phone app, so the link and the Shortcuts actions are Exercise Analyzer's; no app can run another app's action itself, so Grabber reaches the link (and comes back by `x-success`), and Shortcuts or Siri reach the actions. The end goes to the watch through the running session's own channel, once, never through the status the phone keeps resending, so an old status cannot end a later session; it names the session by its start, and a watch build before this story ignores it. Whether the watch opens while the phone app is in the background (a shortcut run with the phone locked) is the phone's to show.
 
 - **Issues:** context-grabber-at59 (Grabber's switch, a later Grabber PR)
+
+---
+
+### User Story 093:
+
+- **Summary:** An outdoor run and a hike start from Other… as tiles of their own, outdoor workouts in Health that stream to Larry as `run` and `hike`
+- **Status:** implemented on `feat/ea-qmy-run-hike` (ea-qmy), verified on the host (`LiveSessionTests`: the tiles in order with Run indoors, Outdoor run and Hike outdoors and no indoor hike; an outdoor run and a hike are light, a treadmill run and an outdoor ride are not; a hike is Health's hiking type (24) with no machine and is in Change type; an outdoor run's and a hike's `started`, `tick` and `ended`, after the phone's stand-in, carry `kind` `run` or `hike` and no `machine`, with no `level`), an unsigned `just build-sim` (phone and watch) and the watch simulator (`just watch-screens`, Ultra 4 49 mm and SE 3 40 mm: kindPicker shows Elliptical and Run, Outdoor run (the runner in a circle) and Walk, Treadmill and Hike (the hiker) unscrolled on the 49 mm, the third row's signs at the 40 mm's bottom edge; liveRun reads RUN over 30:38 and "♥ 152 BPM", "End saves the run to Health" and End, no machine rows; liveWalk still "End saves the walk to Health"); the tap on the wrist, an outdoor run and a hike in Health, their events reaching the Cockpit, and a restart keeping the outdoor page, pending on the watch and phone
+- **Why:** [#409](https://github.com/idvorkin/exercise-analyzer/issues/409) asked for an outdoor walk "and likely outdoor run/hike"; 091 did the walk, and Other…'s Run is still the gym's indoor treadmill run (081)
+
+#### Use Case:
+- **As** Igor heading out for a run or a hike with the watch on my wrist
+- **I want to** start it from Other… in one tap, as I start an outdoor walk
+- **so that** Health records an outdoor run or a hike, and Larry hears a run or a hike, not a treadmill
+
+#### Acceptance Criteria:
+- **Scenario:** The tiles under Other…
+- **Given:** no workout runs on the watch
+- **When:** I tap Other…
+- **Then:** the tiles read Elliptical, Run, Outdoor run, Walk, Treadmill, Hike, Bike, Row, Stairs, HIIT and Yoga: Run keeps the runner (the treadmill run, unchanged), Outdoor run wears the runner in a circle, Hike the hiker; on a 49 mm face the first six show without scrolling, on a 40 mm the first four, with Treadmill and Hike's signs at the bottom edge
+
+- **Scenario:** An outdoor run
+- **Given:** the tiles under Other…
+- **When:** I tap Outdoor run
+- **Then:** the wrist starts a session like the outdoor walk's (091): RUN in green over the session clock and the heart rate, "End saves the run to Health", End and Discard ("Discard this run?" asks first), with no machine rows, Record, Preview, Set by hand or pickers; End when I leave (079) does not watch it, "Looks like you're done" (077) never asks and a later Start workout never offers to continue it (#238); End writes an outdoor running workout to Health (no GPS route) and Workouts gets a Run line with the runner sign
+
+- **Scenario:** A hike
+- **Given:** the tiles under Other…
+- **When:** I tap Hike
+- **Then:** the same session with HIKE over the clock, "End saves the hike to Health" and "Discard this hike?"; End writes an outdoor hiking workout to Health (no GPS route) and Workouts gets a Hike line with the hiker sign
+
+- **Scenario:** They reach Larry as a run and a hike
+- **Given:** "Send workouts to Larry" is on (088) and an outdoor run or a hike runs
+- **When:** the session starts, runs and ends
+- **Then:** the phone sends `started`, a `tick` every 30 s with the heart rate, and `ended`, each with `kind` `run` or `hike` and no `machine`, and no `level` event
+
+- **Scenario:** The treadmill stays the treadmill
+- **Given:** the tiles under Other…
+- **When:** I tap Run or Treadmill
+- **Then:** the wrist starts the gym's indoor run or walk as before (081, 085, 091): the machine rows with Treadmill, an indoor workout in Health, and events carrying `machine` Treadmill
+
+- **Scenario:** The session survives a restart
+- **Given:** an outdoor run or a hike runs
+- **When:** the watch app restarts and takes the session up again (#190)
+- **Then:** it is still that outdoor session with the same page, never the gym's page with machine rows
+
+- **Scenario:** Change type knows a hike
+- **Given:** an ended workout on the phone
+- **When:** I change its type (082)
+- **Then:** Hike is among the types, and an outdoor run or hike changed or trimmed (078) stays outdoors in Health (091)
+
+- **Notes:** the tile names are the call Igor can flip: Run stays the treadmill run it has been since 081, so the new tile is "Outdoor run" (unlike Walk, which became the outdoor one in 091). Both runs are `kind` `run` on the wire, told apart by the treadmill's `machine`; `hike` is a new kind (the Cockpit stores any kind as sent) and Health's hiking type. No location goes on any event. A phone or iPad on a build before this one cannot read a hike: the watch's messages for it fail to decode and a synced Hike row is dropped from its Workouts (kept aside, as any unreadable row), so the phone and iPad get this build before the watch. Being light sessions like the outdoor walk, an outdoor run and a hike can be ended by "End live heart rate" (092) as the walk can. A GPS route is ea-kay.
+
+- **Issues:** ea-qmy; [#409](https://github.com/idvorkin/exercise-analyzer/issues/409)
 
 ---
 

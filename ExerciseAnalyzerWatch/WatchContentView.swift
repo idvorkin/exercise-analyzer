@@ -387,13 +387,16 @@ struct WatchContentView: View {
     }
   }
 
-  /// Live heart rate's session (090): CALL or WALK over the clock and the heart rate, what End does, End, and
-  /// for a walk Discard. No Record, Preview, Set by hand or pickers: it is a call or a walk, not the gym.
+  /// Live heart rate's session (090), or Other…'s outdoor walk, run or hike (091, 093): CALL, WALK, RUN or HIKE
+  /// over the clock and the heart rate, what End does, End, and for all but a call Discard. No Record, Preview,
+  /// Set by hand or pickers: it is a call or an outing, not the gym.
   private var lightSessionPage: some View {
-    ScrollView {
+    // "walk", "run", "hike": what End saves and Discard drops.
+    let outing = workout.kind.name.lowercased()
+    return ScrollView {
       VStack(spacing: 8) {
         workoutHeader
-        Text(workout.kind.isWorkout ? "End saves the walk to Health" : "Live to Larry · nothing saved to Health")
+        Text(workout.kind.isWorkout ? "End saves the \(outing) to Health" : "Live to Larry · nothing saved to Health")
           .font(.caption2).multilineTextAlignment(.center).foregroundStyle(.secondary)
         Button {
           phone.endWorkout(discard: false)
@@ -407,7 +410,7 @@ struct WatchContentView: View {
           } label: {
             Label("Discard", systemImage: "trash").frame(maxWidth: .infinity)
           }
-          .confirmationDialog("Discard this walk?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+          .confirmationDialog("Discard this \(outing)?", isPresented: $confirmDiscard, titleVisibility: .visible) {
             Button("Discard", role: .destructive) { phone.endWorkout(discard: true) }
           } message: {
             Text("Nothing goes to Health.")

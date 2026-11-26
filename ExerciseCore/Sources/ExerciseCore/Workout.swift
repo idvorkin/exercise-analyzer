@@ -60,12 +60,15 @@ public struct WorkoutWire: Codable, Equatable, Sendable {
 /// gym hour of sets is functional strength training, anything else is the cardio picked under Other… (#339; Igor:
 /// "Let me select other exrcises like jogging or somethign too"). Chosen at Start, changed later on the phone
 /// (#340). Every one is recorded indoors ("I guess run is indoor for now") except a walk from Other…'s Walk tile
-/// or Live heart rate, recorded outdoors with no GPS route (`WorkoutChoice`, 091).
+/// or Live heart rate, and Other…'s Outdoor run and Hike, recorded outdoors with no GPS route (`WorkoutChoice`,
+/// 091, 093).
 public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
   case strength
   case elliptical
   case run
   case walk
+  /// Only ever outdoors, from Other…'s Hike tile (093); no machine.
+  case hike
   case bike
   case row
   case stairs
@@ -93,6 +96,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .elliptical: "Elliptical"
     case .run: "Run"
     case .walk: "Walk"
+    case .hike: "Hike"
     case .bike: "Bike"
     case .row: "Row"
     case .stairs: "Stairs"
@@ -103,7 +107,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
   }
 
   /// The machine it is done on at the gym (story 085), what the wrist's machine row opens on; nil for a workout
-  /// with no machine (strength, HIIT, yoga), which has no machine rows.
+  /// with no machine (strength, a hike, HIIT, yoga), which has no machine rows.
   public var machineName: String? {
     switch self {
     case .elliptical: "Elliptical"
@@ -111,7 +115,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .bike: "Bike"
     case .row: "Rower"
     case .stairs: "Stairs"
-    case .strength, .hiit, .yoga, .call: nil
+    case .strength, .hike, .hiit, .yoga, .call: nil
     }
   }
 
@@ -122,6 +126,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .elliptical: "figure.elliptical"
     case .run: "figure.run"
     case .walk: "figure.walk"
+    case .hike: "figure.hiking"
     case .bike: "figure.indoor.cycle"
     case .row: "figure.rower"
     case .stairs: "figure.stair.stepper"
@@ -138,6 +143,7 @@ public enum WorkoutKind: String, Codable, Sendable, CaseIterable {
     case .elliptical: 16
     case .run: 37  // running
     case .walk: 52  // walking
+    case .hike: 24  // hiking
     case .bike: 13  // cycling
     case .row: 35  // rowing
     case .stairs: 44  // stairClimbing

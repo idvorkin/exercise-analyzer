@@ -158,8 +158,8 @@ final class WorkoutController: NSObject {
       kind = fixed.kind
       machine = fixed.machine
     }
-    if screenshot == .liveCall || screenshot == .liveWalk {
-      kind = screenshot == .liveCall ? .call : .walk
+    if let lightKind = screenshot.lightKind {
+      kind = lightKind
       light = true
     }
     // Before the first set, a cardio workout and a call: no sets line.
@@ -328,8 +328,8 @@ final class WorkoutController: NSObject {
   private func open() {
     let configuration = HKWorkoutConfiguration()
     configuration.activityType = HKWorkoutActivityType(rawValue: kind.healthActivity) ?? .functionalStrengthTraining
-    // A light walk is outdoors, the gym's walk indoors: how a restarted app tells them apart (090).
-    configuration.locationType = light ? (kind == .walk ? .outdoor : .unknown) : .indoor
+    // A light walk, run or hike is outdoors, the gym's indoors: how a restarted app tells them apart (090, 093).
+    configuration.locationType = light ? (kind == .call ? .unknown : .outdoor) : .indoor
     do {
       let session = try HKWorkoutSession(healthStore: store, configuration: configuration)
       let builder = session.associatedWorkoutBuilder()
