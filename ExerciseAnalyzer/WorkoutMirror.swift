@@ -671,7 +671,9 @@ final class WorkoutMirror: NSObject {
   /// only the one this names by its start, so a gym hour is never ended from here. Nil when the watch was told.
   func endLiveOnWatch(from caller: String) async -> String? {
     var failure: String?
-    if let session, let live, live.kind == .call || live.kind == .walk, live.machine == nil {
+    if let session, let live, let kind = live.kind, live.machine == nil,
+      LiveSession.isLight(kind: kind, outdoor: session.workoutConfiguration.locationType == .outdoor)
+    {
       do {
         let data = try LiveLaunch.End(startedAt: live.startedAt).encoded()
         let sent = await withCheckedContinuation { (done: CheckedContinuation<String?, Never>) in
