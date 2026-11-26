@@ -11,9 +11,9 @@
 #   --force    copy even when /builds already has ea-<sha8>.ipa (otherwise it is only touched, so it sorts newest)
 #
 # Environment: OTA_HOST (developer@c-5004) and OTA_DIR (gits/igor2/cockpit-data/builds), where the package goes.
-# Exits: 0 built and copied (or already there); 64 usage; 65 the checkout has uncommitted changes; 66 no pose model
-# (just model); 78 a person must act (the Xcode account); 80 the Mac stayed locked (BugKit's guard); a failed build's
-# own code otherwise.
+# Exits: 0 built and copied (or already there); 1 the package could not be read; 64 usage; 65 the checkout has
+# uncommitted changes; 66 no pose model (just model); 78 a person must act (the Xcode account); 80 the Mac stayed
+# locked (BugKit's guard); a failed build's own code otherwise.
 set -uo pipefail
 repo=$(cd "$(dirname "$0")/.." && pwd) || exit 1
 cd "$repo" || exit 1

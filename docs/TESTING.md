@@ -47,7 +47,8 @@ make the failing count fail in `swift test`, fix, then ship.
 
 ## Rung 1: host tests
 
-Package: [`ExerciseCore`](../ExerciseCore). `cd ExerciseCore && swift test`, or `just test`.
+Package: [`ExerciseCore`](../ExerciseCore). `cd ExerciseCore && swift test`, or `just test`, which first runs
+[`scripts/test-ipa-has-model.sh`](../scripts/test-ipa-has-model.sh) (`just ota`'s model check, under a second).
 
 **Fixtures** are compact pose tracks in
 [`ExerciseCore/Tests/ExerciseCoreTests/Fixtures/`](../ExerciseCore/Tests/ExerciseCoreTests/Fixtures/):
