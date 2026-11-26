@@ -374,6 +374,16 @@ final class PhoneLink: NSObject {
     workout.start(continuing: continuing, kind: kind)
   }
 
+  /// Live heart rate (090): one tap, a light walk or call whose heart rate the phone sends to Larry. No rest
+  /// carries into it, as into any new workout (#273).
+  func startLive() {
+    logEvent("command", ["command": "live_start", "reachable": reachable, "live": isLive])
+    guard screenshot == nil else { return }
+    rest.clear()
+    WKInterfaceDevice.current().play(.click)
+    workout.startLive()
+  }
+
   /// End writes the workout to Health; Discard writes nothing. Either way the wrist goes back to idle.
   /// `at`: the earlier end taken on "Looks like you're done" (#330).
   func endWorkout(discard: Bool, at: Date? = nil) {

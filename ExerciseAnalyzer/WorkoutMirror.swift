@@ -73,7 +73,12 @@ final class WorkoutMirror: NSObject {
     session.delegate = self
     let start = session.startDate ?? Date()
     if live == nil || live?.startedAt != start.timeIntervalSince1970 {
-      live = WorkoutWire(startedAt: start.timeIntervalSince1970)
+      var placeholder = WorkoutWire(startedAt: start.timeIntervalSince1970)
+      // The session's own type until the wrist's first message: a call with no message heard still saves no
+      // row (090). Strength stays nil on the wire, as before #333.
+      let kind = WorkoutKind(healthActivity: session.workoutConfiguration.activityType.rawValue)
+      if kind != .strength { placeholder.kind = kind }
+      live = placeholder
     }
     onEvent?(
       "workout_mirror",
@@ -196,14 +201,18 @@ final class WorkoutMirror: NSObject {
   /// The ended workouts as the phone shows them: those under 30 minutes apart are one session (#169), and while
   /// a workout runs, the session it joins is not among them (#238). Health keeps its records; the list, the page
   /// and "‹ Workout" read these.
-  var sessions: [StoredWorkout] { index.joining(live, now: Date()).sessions }
+  var sessions: [StoredWorkout] { index.joining(liveWorkoutWire, now: Date()).sessions }
 
   // ponytail: the Live Activity still follows `live`, so its clock counts from the wrist's Start. Upgrade: feed
   // it `shownLive`.
   /// The running workout as the phone shows it (#238): a workout started under 30 minutes after the last one
   /// ended is that session going on, from its start with both counts, as it will be once it ends. `live` stays
   /// the wrist's own, which `ended(at:)` saves.
-  var shownLive: WorkoutWire? { index.joining(live, now: Date()).live }
+  var shownLive: WorkoutWire? { index.joining(liveWorkoutWire, now: Date()).live }
+
+  /// `live` when it is a workout: a call's live heart rate (090) is no running workout on the phone's pages, its
+  /// keep-awake or its Live Activity; only the Cockpit sender follows it, from `live`.
+  var liveWorkoutWire: WorkoutWire? { live.flatMap { $0.isWorkout ? $0 : nil } }
 
   /// The wrist's readings for a workout shown from its start to its end (#308): the running one, or the one
   /// that just ended while Health may still be catching up; nil for any other.
@@ -663,6 +672,13 @@ final class WorkoutMirror: NSObject {
     // The readings are this workout's only while no next one has begun (a Start within the 30 s, ea-iwi review).
     let ownReadings = liveHeartRate.startedAt == live.startedAt
     if ownReadings { liveHeartRate.end(at: date) }
+    // A call's live heart rate is no workout (090): no row, nothing to sync; the Cockpit took its events.
+    guard live.isWorkout else {
+      onEvent?(
+        "workout_call_ended",
+        ["seconds": Int(date.timeIntervalSince(live.startDate)), "hr_avg": live.heartRateAverage ?? 0])
+      return nil
+    }
     let late: [String: Any] = id == nil ? [:] : ["late": true]
     // An amend's stamp is never older than the row: the row's end is the watch's clock, the stamp the phone's, and
     // a tombstone or row older than the copy the mirror holds loses to it (SyncStore, SyncMerge).

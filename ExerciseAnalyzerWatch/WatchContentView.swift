@@ -31,6 +31,8 @@ struct WatchContentView: View {
       // is `WatchPage.of` in ExerciseCore, host-tested in WatchPageTests.
       if phone.page == .recording {
         recordingPages
+      } else if workout.running, workout.light {
+        lightSessionPage  // Live heart rate (090): the head and End, nothing of the gym
       } else {
         idlePages
       }
@@ -241,7 +243,8 @@ struct WatchContentView: View {
   /// Between sets the head flips (050): the rest is the number acted on, so it is the large one, white until the
   /// rest length and orange after, and the session clock goes small and green beside the heart rate.
   private var workoutHeader: some View {
-    let resting = workout.phase == .ending ? nil : phone.rest.restEnded
+    // A call or a walk (090) has no rest between sets: its head is always the session clock.
+    let resting = workout.phase == .ending || workout.light ? nil : phone.rest.restEnded
     let drop = resting == nil ? nil : workout.setPeak.drop(now: workout.heartRate)
     // A continued workout (#238) shows from its first part: that clock, those sets with this session's.
     let tally = workout.shownTally
@@ -332,14 +335,28 @@ struct WatchContentView: View {
       }
       // Under Start (#333, #339; Igor: "Let me select other exrcises like jogging"): a cardio session is its own
       // workout in Health, never a continued gym hour. Start workout stays one tap for the gym.
-      Button {
-        pickingKind = true
-      } label: {
-        Label("Other…", systemImage: "figure.mixed.cardio").frame(maxWidth: .infinity)
+      HStack(spacing: 6) {
+        Button {
+          pickingKind = true
+        } label: {
+          Label("Other…", systemImage: "figure.mixed.cardio").frame(maxWidth: .infinity)
+            .lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .tint(.green)
+        .sheet(isPresented: $pickingKind) { kindPicker }
+        // Live heart rate (090; Igor on a call: "continuous data upload… can iOS be pulling it in?"): one tap, a
+        // walk if the watch saw walking, else a call that saves nothing. Beside Other…, so Record stays put.
+        Button {
+          phone.startLive()
+        } label: {
+          Label(workout.choosingLive ? "…" : "Live", systemImage: "heart.fill").frame(maxWidth: .infinity)
+            .lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .tint(.pink)
+        .accessibilityLabel(workout.choosingLive ? "Starting live heart rate" : "Live heart rate")
+        .disabled(workout.choosingLive)
       }
-      .tint(.green)
       .disabled(workout.phase == .starting)
-      .sheet(isPresented: $pickingKind) { kindPicker }
       // The option (#332; Igor: "3 as well as an option"): the gym is wherever Start is tapped.
       Toggle("End when I leave", isOn: Bindable(workout).endWhenLeaving).font(.caption)
     }
@@ -364,6 +381,41 @@ struct WatchContentView: View {
           .buttonStyle(.plain)
         }
       }
+    }
+  }
+
+  /// Live heart rate's session (090): CALL or WALK over the clock and the heart rate, what End does, End, and
+  /// for a walk Discard. No Record, Preview, Set by hand or pickers: it is a call or a walk, not the gym.
+  private var lightSessionPage: some View {
+    ScrollView {
+      VStack(spacing: 8) {
+        workoutHeader
+        Text(workout.kind.isWorkout ? "End saves the walk to Health" : "Live to Larry · nothing saved to Health")
+          .font(.caption2).multilineTextAlignment(.center).foregroundStyle(.secondary)
+        Button {
+          phone.endWorkout(discard: false)
+        } label: {
+          Label("End", systemImage: "checkmark").frame(maxWidth: .infinity)
+        }
+        .tint(.green)
+        if workout.kind.isWorkout {
+          Button(role: .destructive) {
+            confirmDiscard = true
+          } label: {
+            Label("Discard", systemImage: "trash").frame(maxWidth: .infinity)
+          }
+          .confirmationDialog("Discard this walk?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("Discard", role: .destructive) { phone.endWorkout(discard: true) }
+          } message: {
+            Text("Nothing goes to Health.")
+          }
+        }
+        if let error = workout.lastError {
+          Text(error).font(.caption2).foregroundStyle(.red).multilineTextAlignment(.center)
+        }
+      }
+      .disabled(workout.phase == .ending)
+      .padding(.horizontal, 4)
     }
   }
 

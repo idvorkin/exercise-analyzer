@@ -104,6 +104,9 @@ public struct WorkoutEvent: Codable, Equatable, Sendable {
 
 public struct WorkoutStream: Codable, Equatable, Sendable {
   public static let tickSeconds: TimeInterval = 30
+  /// A call's ticks come every 10 s (090; Larry, 2026-11-25: he and Tony read them mid-call); every other kind's,
+  /// a walk's included, every 30 s.
+  public static func tickSeconds(for kind: WorkoutKind) -> TimeInterval { kind == .call ? 10 : tickSeconds }
   /// An event still waiting after a day is dropped: Larry hearing on Thursday about Monday's set is noise.
   public static let maxWait: TimeInterval = 24 * 60 * 60
 
@@ -182,7 +185,7 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
       end(at: live.endedAt.map { Date(timeIntervalSince1970: $0) } ?? now, discarded: live.discarded)
       return
     }
-    if let running, now.timeIntervalSince(running.lastTickAt) >= Self.tickSeconds {
+    if let running, now.timeIntervalSince(running.lastTickAt) >= Self.tickSeconds(for: running.kind) {
       self.running?.lastTickAt = now
       tick = event(.tick, at: now)
     }
@@ -218,9 +221,9 @@ public struct WorkoutStream: Codable, Equatable, Sendable {
   }
 
   /// A `set` for each set inside the workout not sent yet, or changed since it went (a weight picked later, a
-  /// recount), in time order, with the weight it shows.
+  /// recount), in time order, with the weight it shows. A call (090) has no sets: it is not a workout.
   private mutating func countSets(_ entries: [RecentEntry], heartRate: HeartRateSeries?, now: Date) {
-    guard let start = running?.startedAt else { return }
+    guard let start = running?.startedAt, running?.kind.isWorkout == true else { return }
     let inside = entries.filter { $0.span.lowerBound >= start && $0.repCount > 0 }
     for facts in Self.setFacts(inside, heartRate: heartRate) {
       let sent = SentSet(

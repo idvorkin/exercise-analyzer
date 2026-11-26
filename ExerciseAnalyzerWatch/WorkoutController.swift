@@ -5,6 +5,7 @@
 //  mirrored to the phone (the Apple way: HKWorkoutSession + HKLiveWorkoutBuilder + startMirroringToCompanionDevice).
 //  The session is what keeps this app alive wrist-down and what writes the one HKWorkout at End.
 
+import CoreMotion
 import ExerciseCore
 import Foundation
 import HealthKit
@@ -28,6 +29,9 @@ final class WorkoutController: NSObject {
   private(set) var startedAt: Date?
   /// What Health records it as (#333): picked at Start, read back from the session after a restart.
   private(set) var kind: WorkoutKind = .strength
+  /// Started from Live heart rate (090): a call, or a walk recorded outdoors. Its page is the head and End, and
+  /// it never asks "Looks like you're done", watches for leaving or offers to be continued.
+  private(set) var light = false
   private(set) var heartRate: Int?
   /// The cardio machine and its setting (story 085): its name from Start for a kind with a machine, the numbers
   /// as set on the machine rows; nil for strength, HIIT and yoga.
@@ -81,7 +85,7 @@ final class WorkoutController: NSObject {
       UserDefaults.standard.set(endWhenLeaving, forKey: Self.endWhenLeavingKey)
       log("leave_option", ["on": endWhenLeaving])
       if endWhenLeaving { leave?.askPermission() }
-      if running, endWhenLeaving {
+      if running, endWhenLeaving, !light {
         leave?.start()
       } else {
         leave?.stop()
@@ -154,8 +158,12 @@ final class WorkoutController: NSObject {
       kind = fixed.kind
       machine = fixed.machine
     }
-    // Before the first set, and a cardio workout: no sets line.
-    guard screenshot != .workoutStart, screenshot.machine == nil else { return }
+    if screenshot == .liveCall {
+      kind = .call
+      light = true
+    }
+    // Before the first set, a cardio workout and a call: no sets line.
+    guard screenshot != .workoutStart, screenshot.machine == nil, !light else { return }
     sets = 6
     reps = 47
     exerciseSets = [.kettlebellSwing: 6]
@@ -167,10 +175,12 @@ final class WorkoutController: NSObject {
   /// Asks for Health permission the first time, then opens the session and starts mirroring it to the phone.
   /// `continuing`: Continue on Start's ask (#238), the last ended workout carried on the wrist. `kind`: Start
   /// workout, or a kind under Other… (#333, #339).
-  func start(continuing: Bool = false, kind: WorkoutKind = .strength) {
+  /// `light`: Live heart rate's session (090), a call or an outdoor walk.
+  func start(continuing: Bool = false, kind: WorkoutKind = .strength, light: Bool = false) {
     guard phase == .none, !fixed else { return }
-    pendingCarry = continuing ? continuable : nil
+    pendingCarry = continuing && !light ? continuable : nil
     self.kind = kind
+    self.light = LiveSession.isLight(kind: kind, outdoor: light)
     guard HKHealthStore.isHealthDataAvailable() else {
       fail("Health data is not available on this watch", event: "workout_failed")
       return
@@ -205,6 +215,52 @@ final class WorkoutController: NSObject {
     }
   }
 
+  // MARK: - Live heart rate (story 090)
+
+  /// Live heart rate was tapped: Motion is being asked whether this is a walk.
+  private(set) var choosingLive = false
+  @ObservationIgnored private let activity = CMMotionActivityManager()
+  /// The Motion ask in flight: its answer or its timeout, whichever comes first, starts the session.
+  @ObservationIgnored private var liveAsk: UUID?
+
+  /// One tap (090): a walk if Motion saw walking in the last two minutes, else a call; a light session either way.
+  func startLive() {
+    guard phase == .none, !fixed, !choosingLive else { return }
+    choosingLive = true
+    let ask = UUID()
+    liveAsk = ask
+    let now = Date()
+    let status = CMMotionActivityManager.authorizationStatus()
+    guard CMMotionActivityManager.isActivityAvailable(), status != .denied, status != .restricted else {
+      liveChosen(ask, readings: nil, why: "motion_\(status.rawValue)")
+      return
+    }
+    activity.queryActivityStarting(from: now.addingTimeInterval(-LiveSession.motionLookback), to: now, to: .main) {
+      [weak self] activities, error in
+      let readings = activities?.map {
+        LiveSession.Motion(start: $0.startDate, walking: $0.walking || $0.running, confident: $0.confidence != .low)
+      }
+      MainActor.assumeIsolated {
+        self?.liveChosen(ask, readings: error == nil ? readings : nil, why: error.map { "\($0)" } ?? "answered")
+      }
+    }
+    // The first ask shows Motion's permission sheet: time to read it, but never a session long after the tap.
+    let wait = status == .authorized ? LiveSession.motionWait : LiveSession.permissionWait
+    Task { [weak self] in
+      try? await Task.sleep(for: .seconds(wait))
+      self?.liveChosen(ask, readings: nil, why: "timeout")
+    }
+  }
+
+  private func liveChosen(_ ask: UUID, readings: [LiveSession.Motion]?, why: String) {
+    guard liveAsk == ask else { return }
+    liveAsk = nil
+    choosingLive = false
+    let kind = LiveSession.kind(motion: readings, now: Date())
+    log("live_start", ["kind": kind.rawValue, "readings": readings?.count ?? -1, "why": why])
+    start(kind: kind, light: true)
+  }
+
   /// What the wrist says when Health refuses the workout: no heart rate until the lifter turns it on.
   static let healthOff =
     "No heart rate: Health access is off. On the iPhone: Health › your picture › Apps › Exercise Analyzer › Turn On All"
@@ -212,7 +268,8 @@ final class WorkoutController: NSObject {
   private func open() {
     let configuration = HKWorkoutConfiguration()
     configuration.activityType = HKWorkoutActivityType(rawValue: kind.healthActivity) ?? .functionalStrengthTraining
-    configuration.locationType = .indoor
+    // A light walk is outdoors, the gym's walk indoors: how a restarted app tells them apart (090).
+    configuration.locationType = light ? (kind == .walk ? .outdoor : .unknown) : .indoor
     do {
       let session = try HKWorkoutSession(healthStore: store, configuration: configuration)
       let builder = session.associatedWorkoutBuilder()
@@ -253,7 +310,7 @@ final class WorkoutController: NSObject {
       exerciseOrder = []
       countedSetAt = 0
       // A cardio machine's name from the start, its numbers "—" until set (085): `started` says the machine.
-      machine = kind.machineName.map { WorkoutEvent.Machine(name: $0) }
+      machine = light ? nil : kind.machineName.map { WorkoutEvent.Machine(name: $0) }
       machineAt = nil
       discarding = false
       activityOpen = false
@@ -262,10 +319,10 @@ final class WorkoutController: NSObject {
       endAt = nil
       lastWorkedAt = nil
       readResting()
-      if endWhenLeaving { leave?.start() }
+      if endWhenLeaving, !light { leave?.start() }
       phase = .running
       saveTally()
-      var startFields: [String: Any] = ["kind": kind.rawValue]
+      var startFields: [String: Any] = ["kind": kind.rawValue, "light": light]
       if let carried {
         startFields["continues"] = true
         startFields["ended_s_ago"] = Int(start.timeIntervalSince(carried.end))
@@ -309,6 +366,8 @@ final class WorkoutController: NSObject {
         let start = session.startDate ?? builder.startDate ?? Date()
         self.startedAt = start
         self.kind = WorkoutKind(healthActivity: session.workoutConfiguration.activityType.rawValue) ?? .strength
+        self.light = LiveSession.isLight(
+          kind: self.kind, outdoor: session.workoutConfiguration.locationType == .outdoor)
         // The count of sets is ours, not Health's: kept on disk per workout (`saveTally`).
         let tally = Self.savedTally(startedAt: start)
         self.sets = tally.sets
@@ -319,7 +378,8 @@ final class WorkoutController: NSObject {
         self.carried = Self.savedCarry(startedAt: start)
         // The machine as it was set (085), so the phone hears no change and sends no `level` again.
         let saved = Self.savedMachine(startedAt: start)
-        self.machine = saved?.machine ?? self.kind.machineName.map { WorkoutEvent.Machine(name: $0) }
+        self.machine =
+          self.light ? nil : saved?.machine ?? self.kind.machineName.map { WorkoutEvent.Machine(name: $0) }
         self.machineAt = saved?.at
         self.discarding = false
         self.activityOpen = false
@@ -331,7 +391,7 @@ final class WorkoutController: NSObject {
         self.readResting()
         // ponytail: after a restart the first fix becomes the place, wherever the watch is by then; keep the
         // start fix on disk if a restart away from the gym ever matters.
-        if self.endWhenLeaving { self.leave?.start() }
+        if self.endWhenLeaving, !self.light { self.leave?.start() }
         self.phase = .running
         session.startMirroringToCompanionDevice { [weak self] ok, error in
           Task { @MainActor in
@@ -342,7 +402,7 @@ final class WorkoutController: NSObject {
           "workout_recovered",
           [
             "state": session.state.rawValue, "seconds": Int(Date().timeIntervalSince(start)), "sets": tally.sets,
-            "reps": tally.reps,
+            "reps": tally.reps, "kind": self.kind.rawValue, "light": self.light,
           ])
         self.onRecovered?()
         self.sendWire()
@@ -513,7 +573,8 @@ final class WorkoutController: NSObject {
 
   /// The recorder started rolling on the phone: the set is an activity of the workout.
   func setBegan(exercise: String) {
-    guard phase == .running, let session, !fixed else { return }
+    // A set filmed during a Live call or walk (090) is not part of it.
+    guard phase == .running, !light, let session, !fixed else { return }
     setPeak.recordStarted(at: Date())
     worked()
     let configuration = HKWorkoutConfiguration()
@@ -572,7 +633,8 @@ final class WorkoutController: NSObject {
   /// After each heart reading: once the heart has been down a quarter hour with no set, ask, with a tap on the
   /// wrist, whatever page is up.
   private func checkQuiet() {
-    guard phase == .running, doneOffer == nil, let offer = quiet.offer(at: Date()) else { return }
+    // A call's heart is at rest the whole time: a light session never asks (090).
+    guard phase == .running, !light, doneOffer == nil, let offer = quiet.offer(at: Date()) else { return }
     doneOffer = offer
     WKInterfaceDevice.current().play(.notification)
     log("workout_quiet_ask", ["quiet_s": Int(Date().timeIntervalSince(offer)), "resting": quiet.resting])
@@ -630,7 +692,7 @@ final class WorkoutController: NSObject {
 
   /// A set typed by hand on the wrist (059), or the phone's count from above.
   func setAnalyzed(reps count: Int, exercise: ExerciseKind?) {
-    guard phase == .running else { return }
+    guard phase == .running, !light else { return }
     worked()
     sets += 1
     reps += count
@@ -747,6 +809,17 @@ final class WorkoutController: NSObject {
       reset()
       return
     }
+    // A call's live heart rate is never a workout (090, Larry: "no fake workouts in his rings"): nothing goes to
+    // Health, and unlike Discard the last gym hour stays offered to continue.
+    if !kind.isWorkout {
+      builder.discardWorkout()
+      var fields = summaryFields
+      fields["saved"] = false
+      fields["kind"] = kind.rawValue
+      log("workout_ended", fields)
+      reset()
+      return
+    }
     // Before the Health write's reply, which can take a while: a Start meanwhile already asks (#238).
     rememberEnded(at: date)
     builder.finishWorkout { workout, error in
@@ -768,6 +841,7 @@ final class WorkoutController: NSObject {
     phase = .none
     startedAt = nil
     heartRate = nil
+    light = false
     carried = nil
     machine = nil
     machineAt = nil
