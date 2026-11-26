@@ -94,6 +94,12 @@ final class WorkoutController: NSObject {
   }
   private static let endWhenLeavingKey = "endWhenLeaving"
   @ObservationIgnored private var leave: LeaveWatcher?
+  /// An outdoor walk, run or hike's GPS route (story 094): recorded while one runs, saved with it at End.
+  @ObservationIgnored private var route: RouteRecorder?
+  /// The page's one line while an outdoor session runs without its route: location is off (094).
+  private(set) var routeNotice: String?
+  /// Recorded outdoors: Other…'s Walk, Outdoor run and Hike, and Live's WALK (090, 091, 093); never a call.
+  private var outdoor: Bool { light && kind != .call }
 
   var running: Bool { phase == .running || phase == .ending }
 
@@ -141,6 +147,12 @@ final class WorkoutController: NSObject {
         self.end(discard: false, at: left)
       }
       self.leave = leave
+      let route = RouteRecorder(log: log)
+      route.onOff = { [weak self] in
+        guard let self, self.running, self.routeNotice == nil else { return }
+        self.routeNotice = WorkoutRoute.offNotice
+      }
+      self.route = route
     }
     guard let screenshot, let workout = screenshot.workout else { return }
     phase = .running
@@ -162,6 +174,7 @@ final class WorkoutController: NSObject {
       kind = lightKind
       light = true
     }
+    if screenshot == .liveWalkNoRoute { routeNotice = WorkoutRoute.offNotice }
     // Before the first set, a cardio workout and a call: no sets line.
     guard screenshot != .workoutStart, screenshot.machine == nil, !light else { return }
     sets = 6
@@ -191,17 +204,25 @@ final class WorkoutController: NSObject {
     let read: Set<HKObjectType> = [
       Self.heartRateType, HKQuantityType(.activeEnergyBurned), HKQuantityType(.restingHeartRate),
     ]
+    // Routes only for a session that records one (094): a gym hour never brings Health's sheet back for them.
+    let routed = WorkoutRoute.records(kind: kind, outdoor: outdoor)
+    let share: Set<HKSampleType> = routed ? [.workoutType(), HKSeriesType.workoutRoute()] : [.workoutType()]
     // The ask: Health shows its sheet for anything never answered. A permission once turned off is never asked
     // again (HealthKit's rule), so then the wrist says where to turn it back on (ea-690, #351/#352).
-    store.requestAuthorization(toShare: [.workoutType()], read: read) { [weak self] granted, error in
+    store.requestAuthorization(toShare: share, read: read) { [weak self] granted, error in
       Task { @MainActor in
         guard let self else { return }
         // Health hides whether reading heart rate is allowed; sharing workouts is the one it tells, and the
         // live builder collects nothing without it.
         let sharing = self.store.authorizationStatus(for: .workoutType())
-        self.log(
-          "workout_auth",
-          ["granted": granted, "sharing": sharing.rawValue, "message": error.map { "\($0)" } ?? ""])
+        var fields: [String: Any] = [
+          "granted": granted, "sharing": sharing.rawValue, "message": error.map { "\($0)" } ?? "",
+        ]
+        // A refused route share is the route's alone: logged, the workout runs and saves as before.
+        if routed {
+          fields["route_sharing"] = self.store.authorizationStatus(for: HKSeriesType.workoutRoute()).rawValue
+        }
+        self.log("workout_auth", fields)
         guard granted else {
           self.phase = .none
           self.fail(error?.localizedDescription ?? "Health permission was not given", event: "workout_failed")
@@ -380,7 +401,10 @@ final class WorkoutController: NSObject {
       lastWorkedAt = nil
       readResting()
       if endWhenLeaving, !light { leave?.start() }
+      routeNotice = nil
       phase = .running
+      // After `.running`: location already off puts its line on the page at once.
+      if WorkoutRoute.records(kind: kind, outdoor: outdoor) { route?.start(builder: builder, since: start) }
       saveTally()
       var startFields: [String: Any] = ["kind": kind.rawValue, "light": light]
       if let carried {
@@ -458,7 +482,12 @@ final class WorkoutController: NSObject {
         // ponytail: after a restart the first fix becomes the place, wherever the watch is by then; keep the
         // start fix on disk if a restart away from the gym ever matters.
         if self.endWhenLeaving, !self.light { self.leave?.start() }
+        self.routeNotice = nil
         self.phase = .running
+        // The route records on from here (094); what Health kept before the restart stays with it.
+        if WorkoutRoute.records(kind: self.kind, outdoor: self.outdoor) {
+          self.route?.start(builder: builder, since: start)
+        }
         session.startMirroringToCompanionDevice { [weak self] ok, error in
           Task { @MainActor in
             self?.log("workout_mirror", ["ok": ok, "message": error.map { "\($0)" } ?? "", "recovered": true])
@@ -610,6 +639,7 @@ final class WorkoutController: NSObject {
     }
     doneOffer = nil
     leave?.stop()
+    route?.stop()  // no more location from the tap on; the route so far waits for Health's workout (094)
     phase = .ending
     var fields = summaryFields
     if let endAt { fields["end_s_ago"] = Int(Date().timeIntervalSince(endAt)) }
@@ -870,6 +900,7 @@ final class WorkoutController: NSObject {
   private func collectionEnded(_ builder: HKLiveWorkoutBuilder, at date: Date) {
     if discarding {
       builder.discardWorkout()
+      route?.finish(workout: nil, discarded: true)
       forgetEnded()
       log("workout_ended", ["saved": false])
       reset()
@@ -895,6 +926,8 @@ final class WorkoutController: NSObject {
         fields["uuid"] = workout?.uuid.uuidString ?? ""
         fields["message"] = error.map { "\($0)" } ?? ""
         self.log("workout_ended", fields)
+        // The route goes with the saved workout (094); none saved, none goes.
+        self.route?.finish(workout: workout, discarded: false)
         if workout == nil { self.lastError = error?.localizedDescription ?? "The workout was not saved to Health" }
         self.reset()
       }
@@ -917,6 +950,8 @@ final class WorkoutController: NSObject {
     lastWorkedAt = nil
     pendingEnd = nil  // ended by another road during the wait: nothing left to end
     leave?.stop()
+    route?.cancel()  // a route not finished above (a failed session, a call) is dropped, its location stopped
+    routeNotice = nil
   }
 }
 

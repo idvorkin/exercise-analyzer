@@ -21,6 +21,7 @@ state and is not in the table.
 | liveCall | a light call session (090): CALL in green over the session clock and "♥ 72 BPM", then "Live to Larry · nothing saved to Health"; no Record, Preview, Set by hand, pickers or machine rows | End (green); no Discard | 090 |
 | liveWalk | an outdoor walk (090, 091): WALK in green over the session clock and "♥ 104 BPM", then "End saves the walk to Health"; no Record, Preview, Set by hand, pickers or machine rows | End (green), Discard (red, asks first) | 090, 091 |
 | liveRun | an outdoor run (093): RUN in green over the session clock and "♥ 152 BPM", then "End saves the run to Health"; no Record, Preview, Set by hand, pickers or machine rows | End (green), Discard (red, asks first) | 093 |
+| liveWalkNoRoute | an outdoor walk with location off (094): liveWalk's page with "No route: location is off for Exercise Analyzer" in grey under "End saves the walk to Health" | End (green), Discard (red, asks first) | 094 |
 | kindPicker | Other…'s tiles over the idle page, two across, 52 pt each: Elliptical, Run (the runner, the treadmill run), Outdoor run (the runner in a circle), Walk (the walker), Treadmill (the walker on a treadmill), Hike (the hiker), Bike, Row, Stairs, HIIT, Yoga | a tile (starts that workout and closes) | 081, 091, 093 |
 | workoutMachine | an elliptical workout: ELLIPTICAL in green over the session clock and "♥ 128 BPM", then the machine rows, full width and at least 44 pt: "Incline 6" outlined green with the Crown and "Intensity 8", − and + either side of each, and under them (a Crown turn down) "Elliptical" with a chevron | Incline and Intensity (a tap gives the row the Crown; − and + step it), the machine row (opens the machine tiles), then the workout page's buttons as workout | 085 |
 | setByHand | the count page over the workout page, three full-width rows of at least 44 pt on a 40 mm face unscrolled: the exercise (its drawing and name), the reps outlined green starting at the last set's count (9) with − and + either side (44 pt), the weight ("kg 24"); the sheet's close button and the green checkmark at top right | the exercise row (opens the drawings), the weight row (a first tap gives it the Crown, a second opens the bell tiles and "Bar" under them; on plates, "lb 155" and a tap opens the plates page), Save (the checkmark); no Cancel: the close button cancels; the Crown steps the green row, the count by one, 1…200 | 059, 066 |
@@ -956,7 +957,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Given:** End when I leave is on (under Start on the watch; turning it on asks once for the watch's location)
 - **and Given:** I started a workout, and the watch's first fix within 100 m is taken as the gym
 - **When:** two fixes in a row within 100 m are each more than 300 m (plus their own doubt) from it
-- **Then:** the wrist taps and the workout ends as End does, two minutes before the first fix away (never before the last fix still near the gym, the first minute after Start, or the last set) (`watch_leave_left`, then `watch_workout_end` with `end_s_ago`); a single stray fix, a vague fix, the car park, or the watch's remembered place from before Start end nothing; with the option off the watch never reads location, and the phone's Trim end (078) corrects whatever the door time got wrong
+- **Then:** the wrist taps and the workout ends as End does, two minutes before the first fix away (never before the last fix still near the gym, the first minute after Start, or the last set) (`watch_leave_left`, then `watch_workout_end` with `end_s_ago`); a single stray fix, a vague fix, the car park, or the watch's remembered place from before Start end nothing; with the option off the watch never reads location for leaving (an outdoor walk, run or hike's route is 094's, and the two share the one location permission), and the phone's Trim end (078) corrects whatever the door time got wrong
 
 - **Issues:** [#332](https://github.com/idvorkin/exercise-analyzer/issues/332)
 
@@ -1159,7 +1160,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** An outdoor walk
 - **Given:** the tiles under Other…
 - **When:** I tap Walk
-- **Then:** the wrist starts the same walk as Live heart rate's WALK (090): WALK in green over the session clock and the heart rate, "End saves the walk to Health", End and Discard, with no machine rows, Record, Set by hand or pickers; End when I leave (079) does not watch it, and "Looks like you're done" (077) never asks; End writes an outdoor walking workout to Health (no GPS route) and Workouts gets a Walk line with the walker sign
+- **Then:** the wrist starts the same walk as Live heart rate's WALK (090): WALK in green over the session clock and the heart rate, "End saves the walk to Health", End and Discard, with no machine rows, Record, Set by hand or pickers; End when I leave (079) does not watch it, and "Looks like you're done" (077) never asks; End writes an outdoor walking workout to Health with its route (094) and Workouts gets a Walk line with the walker sign
 
 - **Scenario:** The walk reaches Larry as a walk
 - **Given:** "Send workouts to Larry" is on (088) and an outdoor walk runs
@@ -1176,7 +1177,7 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **When:** I trim its end or change its type (078, 082)
 - **Then:** the record Health keeps is still outdoors; a gym workout stays indoors
 
-- **Notes:** the wire to the Cockpit does not change shape: both walks are `kind` `walk`, told apart by the treadmill's `machine` (never on an outdoor walk), and no location goes on any event (the Cockpit refuses one). The phone's Workouts line reads Walk for both. A GPS route in Health is not part of this story (ea-kay); outdoor runs and hikes are 093.
+- **Notes:** the wire to the Cockpit does not change shape: both walks are `kind` `walk`, told apart by the treadmill's `machine` (never on an outdoor walk), and no location goes on any event (the Cockpit refuses one). The phone's Workouts line reads Walk for both. The GPS route in Health is 094 (ea-kay); outdoor runs and hikes are 093.
 
 - **Issues:** [#409](https://github.com/idvorkin/exercise-analyzer/issues/409); ea-5qg
 
@@ -1250,12 +1251,12 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **Scenario:** An outdoor run
 - **Given:** the tiles under Other…
 - **When:** I tap Outdoor run
-- **Then:** the wrist starts a session like the outdoor walk's (091): RUN in green over the session clock and the heart rate, "End saves the run to Health", End and Discard ("Discard this run?" asks first), with no machine rows, Record, Preview, Set by hand or pickers; End when I leave (079) does not watch it, "Looks like you're done" (077) never asks and a later Start workout never offers to continue it (#238); End writes an outdoor running workout to Health (no GPS route) and Workouts gets a Run line with the runner sign
+- **Then:** the wrist starts a session like the outdoor walk's (091): RUN in green over the session clock and the heart rate, "End saves the run to Health", End and Discard ("Discard this run?" asks first), with no machine rows, Record, Preview, Set by hand or pickers; End when I leave (079) does not watch it, "Looks like you're done" (077) never asks and a later Start workout never offers to continue it (#238); End writes an outdoor running workout to Health with its route (094) and Workouts gets a Run line with the runner sign
 
 - **Scenario:** A hike
 - **Given:** the tiles under Other…
 - **When:** I tap Hike
-- **Then:** the same session with HIKE over the clock, "End saves the hike to Health" and "Discard this hike?"; End writes an outdoor hiking workout to Health (no GPS route) and Workouts gets a Hike line with the hiker sign
+- **Then:** the same session with HIKE over the clock, "End saves the hike to Health" and "Discard this hike?"; End writes an outdoor hiking workout to Health with its route (094) and Workouts gets a Hike line with the hiker sign
 
 - **Scenario:** They reach Larry as a run and a hike
 - **Given:** "Send workouts to Larry" is on (088) and an outdoor run or a hike runs
@@ -1277,9 +1278,62 @@ being up, the phone app's state, no videos), held as a table in `WatchPageTests`
 - **When:** I change its type (082)
 - **Then:** Hike is among the types, and an outdoor run or hike changed or trimmed (078) stays outdoors in Health (091)
 
-- **Notes:** the tile names are the call Igor can flip: Run stays the treadmill run it has been since 081, so the new tile is "Outdoor run" (unlike Walk, which became the outdoor one in 091). Both runs are `kind` `run` on the wire, told apart by the treadmill's `machine`; `hike` is a new kind (the Cockpit stores any kind as sent) and Health's hiking type. No location goes on any event. A phone or iPad on a build before this one cannot read a hike: the watch's messages for it fail to decode and a synced Hike row is dropped from its Workouts (kept aside, as any unreadable row), so the phone and iPad get this build before the watch. Being light sessions like the outdoor walk, an outdoor run and a hike can be ended by "End live heart rate" (092) as the walk can. A GPS route is ea-kay.
+- **Notes:** the tile names are the call Igor can flip: Run stays the treadmill run it has been since 081, so the new tile is "Outdoor run" (unlike Walk, which became the outdoor one in 091). Both runs are `kind` `run` on the wire, told apart by the treadmill's `machine`; `hike` is a new kind (the Cockpit stores any kind as sent) and Health's hiking type. No location goes on any event. A phone or iPad on a build before this one cannot read a hike: the watch's messages for it fail to decode and a synced Hike row is dropped from its Workouts (kept aside, as any unreadable row), so the phone and iPad get this build before the watch. Being light sessions like the outdoor walk, an outdoor run and a hike can be ended by "End live heart rate" (092) as the walk can. The GPS route is 094 (ea-kay).
 
 - **Issues:** ea-qmy; [#409](https://github.com/idvorkin/exercise-analyzer/issues/409)
+
+---
+
+### User Story 094:
+
+- **Summary:** An outdoor walk, run or hike saved from the watch carries its GPS route in Health, and nothing indoors ever reads my location for it
+- **Status:** implemented on `feat/ea-kay-gps-route` (ea-kay), verified on the host (`WorkoutRouteTests`: only an outdoor walk, run or hike records, never a call, the gym, the treadmill or an indoor tile, and of Other…'s tiles only Outdoor run, Walk and Hike; never asked is ask, allowed records, denied or restricted is off with the notice; fixes within 50 m from the start on, a vague, invalid or earlier cached fix dropped; End saves the route only for a saved workout with fixes, never on Discard), an unsigned `just build-sim` (phone and watch) and the watch simulator (Ultra 4 49 mm, `WATCH_STATE`: liveWalkNoRoute reads WALK over 25:14, "♥ 104 BPM", "End saves the walk to Health", then "No route: location is off for Exercise Analyzer" in grey, then End; liveWalk unchanged); the asks, a route in Fitness, Discard, location off and a restart, pending on the watch (the unsigned simulator build has no HealthKit, so no session opens there)
+- **Why:** 091 and 093 saved outdoor workouts with no route (ea-kay): a walk, run or hike in Fitness should show where it went, as Apple's own Workout app does
+
+#### Use Case:
+- **As** Igor out on a walk, run or hike with the watch on my wrist
+- **I want** the workout Health keeps to carry the route I took
+- **so that** Fitness shows its map, while my gym hours, treadmill sessions and calls never read where I am
+
+#### Acceptance Criteria:
+- **Scenario:** Which sessions record a route
+- **Given:** the watch starts a session
+- **When:** it is an outdoor walk, Outdoor run or Hike (Other…'s tiles, 091, 093), or Live heart rate's WALK (090, 092)
+- **Then:** the watch records its route; a gym hour, Run (the treadmill run), Treadmill, every other tile under Other… and a CALL never read location for a route
+
+- **Scenario:** The first outdoor session asks
+- **Given:** the watch has never asked for location (neither here nor by End when I leave, 079)
+- **When:** the first outdoor walk, run or hike starts
+- **Then:** Health asks once to save routes along with workouts, and the watch asks for location while the app is in use, saying why ("records the route of an outdoor walk, run or hike to Health"); the session runs meanwhile, its clock and heart rate unchanged; a gym hour never brings either ask
+
+- **Scenario:** End saves the route with the workout
+- **Given:** location is allowed and an outdoor session has run with the watch outdoors
+- **When:** I tap End, or "End live heart rate" (092) ends it
+- **Then:** the location stops at once, Health gets the outdoor workout as before and then its route (fixes within 50 m from the session's start on, at the watch's fitness accuracy), and Fitness shows the map; the watch's log says `route_saved` with the number of fixes
+
+- **Scenario:** Discard keeps no route
+- **Given:** an outdoor session records a route
+- **When:** I tap Discard and confirm
+- **Then:** the location stops at once and nothing goes to Health, route included
+
+- **Scenario:** Location is off
+- **Given:** I declined the location ask, or turned it off for Exercise Analyzer
+- **When:** an outdoor session starts (or I decline the ask during one)
+- **Then:** the session runs and End saves the workout as before, without a route; the page says once, under "End saves the walk to Health", "No route: location is off for Exercise Analyzer", in grey, not as an error; the watch never asks again (Core Location's rule), and the log says `route_off`
+
+- **Scenario:** Nothing to save
+- **Given:** an outdoor session where no fix within 50 m came (indoors, a short session, Health refused routes)
+- **When:** I tap End
+- **Then:** the workout is saved as before, with no route and no word on the wrist; the log says `route_skipped` or `route_failed` with why
+
+- **Scenario:** The route survives a restart
+- **Given:** an outdoor session records a route
+- **When:** the watch app restarts and takes the session up again (#190)
+- **Then:** the route goes on recording from then; End saves what Health kept
+
+- **Notes:** the route stays in Health: no location goes to the phone's events or to the Cockpit (which refuses one), and the record's shape on the wire does not change. Live heart rate's WALK records a route because it is the same outdoor walk in Health as Other…'s Walk (the call Igor can flip: a walk on a call around the house then maps the house). "Says once" is once per session, a line on the page, never a tap or an alert; the call Igor can flip is once ever. Battery: location runs only while an outdoor session runs, at Core Location's fitness setting (standard best accuracy, not navigation), and stops on End, Discard or a failed session. Trim end and Change type (078, 082) save the workout again without its route, which then is gone (ea-err).
+
+- **Issues:** ea-kay; [#409](https://github.com/idvorkin/exercise-analyzer/issues/409)
 
 ---
 
