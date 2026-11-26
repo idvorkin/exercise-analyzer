@@ -656,15 +656,15 @@ private struct PlayerRouteView: View {
   // MARK: - HUD
 
   /// The open set's weight, a bell (066) or plates (083): its own, else the one its workout carries from the
-  /// exercise's set before.
-  private func loadedSetWeight(_ entry: RecentEntry) -> (weight: SetWeight?, inherited: Bool) {
-    if let own = entry.weight { return (own, false) }
+  /// exercise's set before, or the exercise's starting weight with none before it (#374, `start`).
+  private func loadedSetWeight(_ entry: RecentEntry) -> (weight: SetWeight?, inherited: Bool, start: Bool) {
+    if let own = entry.weight { return (own, false, false) }
     guard let workout = workoutOfLoadedSet,
       let row = WorkoutTimeline(workout: workout, sets: session.recents.entries, heartRate: nil).rows.first(where: {
         $0.id == entry.id
       })
-    else { return (nil, false) }
-    return (row.weight, row.kgInherited)
+    else { return (nil, false, false) }
+    return (row.weight, row.kgInherited, row.kgFromStart)
   }
 
   /// The stored workout the set on screen was done in: the page it was opened from, else the workout its first
@@ -798,7 +798,10 @@ private struct PlayerRouteView: View {
           }
           .buttonStyle(.plain)
           .accessibilityLabel(
-            shown.weight.map { "Weight \($0.spoken)" + (shown.inherited ? ", carried from the set before" : "") }
+            shown.weight.map {
+              "Weight \($0.spoken)"
+                + (shown.start ? ", the starting weight" : shown.inherited ? ", carried from the set before" : "")
+            }
               ?? "Set the weight"
           )
           .alignmentGuide(.top, computeValue: Self.capTop(.preferredFont(forTextStyle: .subheadline)))

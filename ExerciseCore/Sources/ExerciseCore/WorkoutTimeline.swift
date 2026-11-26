@@ -89,9 +89,11 @@ public struct WorkoutTimeline: Equatable, Sendable {
     public let byHand: Bool
     /// The set's weight, a bell (066) or a barbell's plates (083): the set's own, else the last set of its
     /// exercise before it in this workout (`kgInherited`), so the weight is set once when it changes, not on
-    /// every set.
+    /// every set; with none before it, the exercise's starting weight (#374, `kgFromStart`). Both show dimmer.
     public var weight: SetWeight? = nil
     public var kgInherited = false
+    /// The weight is the exercise's starting weight, not one carried from a set before (#374).
+    public var kgFromStart = false
     /// The weight in kg, a barbell's converted: what the load counts.
     public var kg: Int? { weight?.kg }
   }
@@ -107,7 +109,7 @@ public struct WorkoutTimeline: Equatable, Sendable {
   /// The sets whose start falls inside the workout, in start order.
   public init(workout: StoredWorkout, sets: [RecentEntry], heartRate: HeartRateSeries?) {
     let inside = sets.filter { workout.contains($0.span.lowerBound) }.sorted { $0.span.lowerBound < $1.span.lowerBound }
-    var lastWeight: [ExerciseKind: SetWeight] = [:]
+    var carry = WeightCarry()
     rows = inside.enumerated().map { index, set in
       let span = set.span
       let next = index + 1 < inside.count ? inside[index + 1].span.lowerBound : nil
@@ -116,14 +118,14 @@ public struct WorkoutTimeline: Equatable, Sendable {
       let peakEnd = min(span.upperBound.addingTimeInterval(Self.peakLag), next ?? .distantFuture)
       let peak = heartRate?.peak(from: span.lowerBound, to: peakEnd)
       let later = dropOver > 0 ? heartRate?.bpm(at: span.upperBound.addingTimeInterval(dropOver)) : nil
-      let weight = set.weight ?? lastWeight[set.exerciseKind]
-      if let own = set.weight { lastWeight[set.exerciseKind] = own }
+      let shown = carry.weight(of: set)
       return SetRow(
         id: set.id, start: span.lowerBound, end: span.upperBound, exercise: set.exerciseKind, reps: set.repCount,
         score: set.bestScore, peak: peak, average: heartRate?.average(from: span.lowerBound, to: peakEnd),
         restAfter: rest,
         drop: peak.flatMap { peak in later.map { peak - $0 } }, dropOver: dropOver, byHand: set.isByHand,
-        weight: weight, kgInherited: set.weight == nil && weight != nil)
+        weight: shown?.weight, kgInherited: shown.map { $0.source != .own } ?? false,
+        kgFromStart: shown?.source == .start)
     }
     workSeconds = rows.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
     restSeconds = rows.compactMap(\.restAfter).reduce(0, +)
